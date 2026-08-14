@@ -1,0 +1,39 @@
+---
+launch:
+  # required args
+  - arg: {name: log_path}
+  - arg: {name: object_variant}
+  # options
+  - arg: {name: robot_id, default: '0', description: unique robot identifier}
+  - arg: {name: scene, default: uhumans2_office, description: uhumans2 scene name}
+  - arg: {name: exit_after_clock, default: 'true', description: shutdown hydra node after a rosbag finishes playing}
+  # nodes
+  - node:
+      pkg: hydra_ros
+      exec: hydra_ros_node
+      name: hydra
+      on_exit: shutdown
+      param:
+        - {name: use_sim_time, value: true}
+      remap:
+        - {from: hydra/input/left_cam/depth_registered/image_rect, to: /tesse/depth_cam/mono/image_raw}
+        - {from: hydra/input/left_cam/rgb/image_raw, to: /tesse/left_cam/rgb/image_raw}
+        - {from: hydra/input/left_cam/rgb/camera_info, to: /tesse/left_cam/camera_info}
+        - {from: hydra/input/left_cam/semantic/image_raw, to: /tesse/seg_cam/rgb/image_raw}
+        - {from: hydra/detect_object, to: detect_object}
+      args: >-
+        --config-utilities-var colormap_path=$(find-pkg-share hydra_ros)/config/color/$(var scene).csv
+        --config-utilities-file $(find-pkg-share hydra)/config/label_spaces/$(var scene)_label_space.yaml@labelspace
+        --config-utilities-file $(find-pkg-share hydra_plusplus)/config/pipelines/uhumans2.yaml
+        --config-utilities-file $(find-pkg-share hydra_plusplus)/config/pipelines/variants/uhumans2_$(var object_variant).yaml
+        --config-utilities-file $(find-pkg-share hydra_plusplus)/config/pipelines/input/uhumans2.yaml
+        --config-utilities-yaml {robot_id: $(var robot_id), odom_frame: odom, robot_frame: base_link_gt, map_frame: map}
+        --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
+        --config-utilities-yaml {glog_verbosity: 0, config_verbosity: -1, show_run_settings: false, preprint_config: false}
+  - include:
+      file: $(find-pkg-share hydra_plusplus)/launch/visualizer.launch.yaml
+      arg:
+        - {name: use_mesh_color_adapter, value: 'false'}
+        - {name: rviz_path, value: $(find-pkg-share hydra_plusplus)/rviz/uhumans2.rviz}
+  - node: {pkg: tf2_ros, exec: static_transform_publisher, args: --frame-id world --child-frame-id map}
+  - node: {pkg: tf2_ros, exec: static_transform_publisher, args: --frame-id map --child-frame-id odom}

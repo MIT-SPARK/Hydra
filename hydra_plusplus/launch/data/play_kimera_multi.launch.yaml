@@ -1,0 +1,49 @@
+---
+launch:
+  # required arguments
+  - arg: {name: robot_name}
+  # playback options
+  - arg: {name: sim_time, default: 'true'}
+  # nodes
+  - push_ros_namespace: {namespace: $(var robot_name)}
+  - node:  # Decompress RGB stream
+      pkg: image_transport
+      exec: republish
+      name: decompress_rgb
+      param:
+        - {name: in_transport, value: compressed}
+        - {name: out_transport, value: raw}
+      remap:
+        - {from: in/compressed, to: forward/color/image_raw/compressed}
+        - {from: out, to: forward/color/image_raw}
+  - node:  # Publish robot TF tree
+      pkg: ianvs
+      exec: transform_file_broadcaster
+      name: transform_file_broadcaster
+      param:
+        - {name: use_sim_time, value: $(var sim_time)}
+        - {name: filepath, value: $(find-pkg-share hydra_plusplus)/config/static_tfs/kimera_multi/$(var robot_name)_static_tfs.yaml}
+  - node:  # Run LiDAR odometry
+      pkg: spark_fast_lio
+      exec: spark_lio_mapping
+      name: laser_mapping
+      remap:
+        - {from: lidar, to: lidar_points}
+        - {from: imu, to: forward/imu}
+      param:
+        - from: $(find-pkg-share spark_fast_lio)/config/kimera_multi/$(var robot_name).yaml
+        - from: $(find-pkg-share hydra_plusplus)/config/data/kimera_multi_fast_lio.yaml
+        - {name: use_sim_time, value: $(var sim_time)}
+        - {name: common.lidar_frame, value: $(var robot_name)/velodyne}
+        - {name: common.base_frame, value: $(var robot_name)/base}
+        - {name: common.map_frame, value: $(var robot_name)/odom}
+  - node:
+      namespace: patchwork
+      pkg: patchwork
+      exec: run_patchwork
+      name: patchwork
+      remap:
+        - {from: /patchwork/input_cloud, to: /$(var robot_name)/cloud_registered_lidar}
+        - {from: cloud_groundseg_lidar, to: /$(var robot_name)/cloud_groundseg}
+      param:
+        - from: $(find-pkg-share patchwork)/config/velodyne16.yaml

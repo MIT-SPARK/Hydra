@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hydra_ros</name>
+  <version>1.0.0</version>
+  <description>hydra ros nodes</description>
+  <author email="na26933@mit.edu">Nathan Hughes</author>
+  <author email="yunchang@mit.edu">Yun Chang</author>
+  <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <depend>cv_bridge</depend>
+  <depend>geometry_msgs</depend>
+  <depend>hydra</depend>
+  <depend>hydra_msgs</depend>
+  <depend>hydra_visualizer</depend>
+  <depend>kimera_pgmo_ros</depend>
+  <depend>kimera_pgmo_msgs</depend>
+  <depend>pose_graph_tools_ros</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2_eigen</depend>
+  <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
+  <depend>semantic_inference_msgs</depend>
+
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>kimera_pgmo_rviz</exec_depend>
+
+  <export>
+      <build_type>ament_cmake</build_type>
+  </export>
+</package>

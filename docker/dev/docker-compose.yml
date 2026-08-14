@@ -1,0 +1,25 @@
+# hydra_ros/docker/dev/docker-compose.yml
+# Docker compose for Hydra with development setup for ROS 2
+services:
+  hydra-dev:
+    image: hydra-dev
+    build:
+      context: ../../../..
+      dockerfile: src/hydra_ros/docker/dev/Dockerfile
+      network: host
+    container_name: hydra-dev
+    runtime: nvidia
+    volumes:
+      - ../../../../:/root/hydra_ws
+      - ${DATASETS_PATH:-/root/empty_data}:/root/data
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev:/dev
+    network_mode: host
+    environment:
+      - DISPLAY=$DISPLAY
+      - QT_X11_NO_MITSHM=1
+    devices:
+      - /dev/dri
+    privileged: true
+    stdin_open: true
+    tty: true

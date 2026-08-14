@@ -1,0 +1,31 @@
+---
+launch:
+  # development args
+  - arg: {name: verbosity, default: '0'}
+  - arg: {name: debug, default: 'false'}
+  # visualizer configuration
+  - arg: {name: visualizer_ns, default: hydra_visualizer}
+  - arg: {name: visualizer_config_path, default: $(find-pkg-share hydra_visualizer)/config/visualizer_config.yaml}
+  - arg: {name: external_plugins_path, default: $(find-pkg-share hydra_visualizer)/config/external_plugins.yaml}
+  # communication
+  - arg: {name: use_zmq, default: 'false', description: use zmq to receive scene graphs}
+  - arg: {name: visualizer_frame, default: map, description: frame ID for zmq to use}
+  - arg: {name: zmq_url, default: tcp://127.0.0.1:8001, description: full zmq url}
+  # visualizer node and control for launching
+  - arg: {name: start_visualizer, default: 'true'}
+  - node:
+      if: $(var start_visualizer)
+      pkg: hydra_visualizer
+      exec: hydra_visualizer_node
+      name: $(var visualizer_ns)
+      launch-prefix: $(if $(var debug) 'gdbserver localhost:0')
+      on_exit: shutdown
+      args: >
+        --config-utilities-file $(var visualizer_config_path)
+        --config-utilities-file $(var external_plugins_path)
+        --config-utilities-yaml {glog_level: 0, glog_verbosity: $(var verbosity)}
+        --config-utilities-yaml {graph: {type: $(if $(var use_zmq) GraphFromZmq GraphFromRos), url: $(var zmq_url), frame_id: $(var visualizer_frame)}}
+  # rviz node and control for launching
+  - arg: {name: start_rviz, default: 'true', description: automatically start rviz}
+  - arg: {name: rviz_path, default: $(find-pkg-share hydra_visualizer)/rviz/streaming_visualizer.rviz, description: rviz file to load}
+  - node: {if: $(var start_rviz), name: rviz, pkg: rviz2, exec: rviz2, args: -d $(var rviz_path)}

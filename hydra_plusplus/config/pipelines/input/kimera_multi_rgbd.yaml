@@ -1,0 +1,13 @@
+---
+input:
+  type: RosInput
+  tf_lookup: {verbosity: 1}
+  clear_queue_on_fail: true
+  inputs:
+    rgbd:
+      receiver: {type: InstanceImageReceiver}
+      sensor:
+        type: camera_info
+        min_range: 0.2
+        max_range: 5.0
+        extrinsics: {type: ros, robot_frame: $<var robot_frame>, sensor_frame: $<var robot_name>/forward_color_optical_frame}

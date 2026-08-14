@@ -1,0 +1,16 @@
+---
+input:
+  type: RosInput
+  inputs:
+    - receiver:
+        type: ClosedSetImageReceiver
+        queue_size: 30
+      sensor:
+        type: camera_info
+        min_range: $(arg sensor_min_range)
+        max_range: $(arg sensor_max_range)
+        camera_info_topic: $(arg rgb_info_topic)
+        extrinsics:
+          type: param
+          body_p_sensor: [0.00012, -0.00084, 0.00026]
+          body_R_sensor: {w: 0.5126615, x: 0.48921694, y: -0.49796629, z: -0.49987453}

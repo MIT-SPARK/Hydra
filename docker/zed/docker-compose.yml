@@ -1,0 +1,28 @@
+# hydra_ros/docker/zed/docker-compose.yml
+# Docker compose for Hydra w/ZED SDK, TensorRT for ROS 2
+services:
+  hydra-zed:
+    image: hydra-zed
+    build:
+      context: ../../../..
+      dockerfile: src/hydra_ros/docker/zed/Dockerfile
+      network: host
+    container_name: hydra-zed
+    runtime: nvidia
+    volumes:
+      - ../../../../:/root/hydra_ws
+      - ${DATASETS_PATH:-/root/empty_data}:/root/data
+      # - ${ZED_CACHE:-/tmp/zed_data}:/root/.local/share/zed
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev:/dev
+    network_mode: host
+    environment:
+      - DISPLAY=$DISPLAY
+      - QT_X11_NO_MITSHM=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    devices:
+      - /dev/dri
+    privileged: true
+    stdin_open: true
+    tty: true

@@ -1,0 +1,47 @@
+name,red,green,blue,alpha,id
+unlabeled,0,0,0,255,0
+ego vehicle,0,0,1,255,1
+rectification border,0,0,2,255,2
+out of roi,0,0,3,255,3
+static,0,0,4,255,4
+dynamic,111,74,0,255,5
+ground,81,0,81,255,6
+road,128,64,128,255,7
+sidewalk,244,35,232,255,8
+parking,250,170,160,255,9
+rail track,230,150,140,255,10
+building,70,70,70,255,11
+wall,102,102,156,255,12
+fence,190,153,153,255,13
+guard rail,180,165,180,255,14
+bridge,150,100,100,255,15
+tunnel,150,120,90,255,16
+pole,153,153,153,255,17
+polegroup,153,153,153,255,18
+traffic light,250,170,30,255,19
+traffic sign,220,220,0,255,20
+vegetation,107,142,35,255,21
+terrain,152,251,152,255,22
+sky,70,130,180,255,23
+person,220,20,60,255,24
+rider,255,0,0,255,25
+car,0,0,142,255,26
+truck,0,0,70,255,27
+bus,0,60,100,255,28
+caravan,0,0,90,255,29
+trailer,0,0,110,255,30
+train,0,80,100,255,31
+motorcycle,0,0,230,255,32
+bicycle,119,11,32,255,33
+garage,64,128,128,255,34
+gate,190,153,153,255,35
+stop,150,120,90,255,36
+smallpole,153,153,153,255,37
+lamp,0,64,64,255,38
+trash bin,0,128,192,255,39
+vending machine,128,64,0,255,40
+box,64,64,128,255,41
+unknown construction,102,0,0,255,42
+unknown vehicle,51,0,51,255,43
+unknown object,32,32,32,255,44
+license plate,255,255,255,255,-1

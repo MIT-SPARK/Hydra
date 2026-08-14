@@ -1,0 +1,51 @@
+---
+launch:
+  - arg: {name: scene, default: office, description: uhumans2 scene name}
+  - arg: {name: use_gt_semantics, default: 'true'}
+  - arg: {name: use_openset_places, default: 'false'}
+  - arg: {name: use_gt_poses, default: 'true'}
+  - arg: {name: labelspace, default: $(if $(var use_gt_semantics) uhumans2_$(var scene) ade20k_full)}
+  - arg: {name: log_prefix, default: uhumans2_$(var scene)}
+  - arg: {name: label_remap_path, default: $(find-pkg-share hydra)/config/label_remaps/uhumans2_$(var scene).yaml}
+  - set_remap: {from: hydra/input/left_cam/depth_registered/image_rect, to: /tesse/depth_cam/mono/image_raw}
+  - set_remap: {from: hydra/input/left_cam/rgb/image_raw, to: /tesse/left_cam/rgb/image_raw}
+  - set_remap: {from: hydra/input/left_cam/rgb/camera_info, to: /tesse/left_cam/camera_info}
+  - set_remap: {from: hydra/input/left_cam/semantic/image_raw, to: $(if $(var use_gt_semantics) /tesse/seg_cam/converted/image_raw /tesse/left_cam/semantic/image_raw)}
+  - set_remap: {from: hydra/input/left_cam/feature, to: /tesse/left_cam/semantic/feature}
+  - let: {name: extra_yaml_gt, value: '{semantic_label_remap_filepath: $(var label_remap_path)}'}
+  - let: {name: extra_yaml_no_gt, value: '{}'}
+  - node:
+      pkg: tf2_ros
+      name: world_to_map
+      exec: static_transform_publisher
+      args: --frame-id world --child-frame-id map
+  - group:
+      - push_ros_namespace: {namespace: tesse/left_cam}
+      - set_remap: {from: color/image_raw, to: rgb/image_raw}
+      - include:
+          if: $(not $(var use_gt_semantics))
+          file: $(find-pkg-share semantic_inference_ros)/launch/closed_set.launch.yaml
+          arg:
+            - {name: labelspace_name, value: $(var labelspace)}
+      - include:
+          if: $(var use_openset_places)
+          file: $(find-pkg-share semantic_inference_ros)/launch/image_embedding_node.launch.yaml
+          arg:
+            - {name: min_period_s, value: '0.2'}
+  - group:
+      - set_remap: {from: odom, to: /tesse/odom}
+      - set_remap: {from: loop_closures, to: /hydra/external_loop_closures}
+      - include:
+          if: $(not $(var use_gt_poses))
+          file: $(find-pkg-share hydra_ros)/launch/noisy_tf_publisher_node.launch.yaml
+  - include:
+      file: $(find-pkg-share hydra_ros)/launch/hydra.launch.yaml
+      arg:
+        - {name: dataset, value: uhumans2}
+        - {name: labelspace, value: $(var labelspace)}
+        - {name: log_prefix, value: $(var log_prefix)}
+        - {name: robot_frame, value: $(if $(var use_gt_poses) base_link_gt base_link)}
+        - {name: odom_frame, value: $(if $(var use_gt_poses) world odom)}
+        - {name: map_frame, value: map}
+        - {name: lcd_config_path, value: $(find-pkg-share hydra)/config/lcd/uhumans2.yaml}
+        - {name: extra_yaml, value: $(if $(var use_gt_semantics) $(var extra_yaml_gt) $(var extra_yaml_no_gt))}

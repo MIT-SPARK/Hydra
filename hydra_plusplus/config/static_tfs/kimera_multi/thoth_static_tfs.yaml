@@ -1,0 +1,353 @@
+---
+frames:
+  - child_frame_id: thoth/imu_link_ned
+    frame_id: thoth/imu_link
+    qw: -3.0e-06
+    qx: 0.707105
+    qy: 0.707108
+    qz: -3.0e-06
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/os_imu
+    frame_id: thoth/ouster_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.006253
+    y: -0.011775
+    z: 0.007645
+  - child_frame_id: thoth/os_lidar
+    frame_id: thoth/ouster_link
+    qw: 0.0
+    qx: 0.0
+    qy: 0.0
+    qz: 1.0
+    x: 0.0
+    y: 0.0
+    z: 0.03618
+  - child_frame_id: thoth/base_link
+    frame_id: thoth/base
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/chassis_link
+    frame_id: thoth/base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/embedded_imu_link
+    frame_id: thoth/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/forward_bottom_screw_frame
+    frame_id: thoth/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/forward_camera_link
+    frame_id: thoth/forward_bottom_screw_frame
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0175
+    z: 0.0125
+  - child_frame_id: thoth/forward_color_frame
+    frame_id: thoth/forward_depth_frame
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.015
+    z: 0.0
+  - child_frame_id: thoth/forward_color_optical_frame
+    frame_id: thoth/forward_color_frame
+    qw: -0.5
+    qx: 0.5
+    qy: -0.5
+    qz: 0.5
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/forward_depth_frame
+    frame_id: thoth/forward_camera_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/forward_depth_optical_frame
+    frame_id: thoth/forward_depth_frame
+    qw: -0.5
+    qx: 0.5
+    qy: -0.5
+    qz: 0.5
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/forward_link
+    frame_id: thoth/sensor_plate_link
+    qw: 0.999878
+    qx: -0.003799
+    qy: 0.010147
+    qz: 0.011271
+    x: 0.308189
+    y: 0.0141
+    z: 0.337889
+  - child_frame_id: thoth/forward_left_ir_frame
+    frame_id: thoth/forward_depth_frame
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/forward_left_ir_optical_frame
+    frame_id: thoth/forward_left_ir_frame
+    qw: -0.5
+    qx: 0.5
+    qy: -0.5
+    qz: 0.5
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/forward_right_ir_frame
+    frame_id: thoth/forward_depth_frame
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.05
+    z: 0.0
+  - child_frame_id: thoth/forward_right_ir_optical_frame
+    frame_id: thoth/forward_right_ir_frame
+    qw: -0.5
+    qx: 0.5
+    qy: -0.5
+    qz: 0.5
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/front_fender_link
+    frame_id: thoth/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/front_mount
+    frame_id: thoth/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.12
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/imu_link
+    frame_id: thoth/sensor_plate_link
+    qw: 0.7135
+    qx: -0.0016
+    qy: 0.002351
+    qz: 0.700649
+    x: 0.0
+    y: 0.0
+    z: 0.3
+  - child_frame_id: thoth/mid_mount
+    frame_id: thoth/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.184
+  - child_frame_id: thoth/navsat_link
+    frame_id: thoth/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.18
+    y: 0.126
+    z: 0.1815
+  - child_frame_id: thoth/ouster_link
+    frame_id: thoth/sensor_plate_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.12
+    y: 0.0
+    z: 0.315
+  - child_frame_id: thoth/rear_fender_link
+    frame_id: thoth/chassis_link
+    qw: 0.0
+    qx: 0.0
+    qy: 0.0
+    qz: 1.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/rear_mount
+    frame_id: thoth/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.12
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/sensor_plate_link
+    frame_id: thoth/base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/ublox_link
+    frame_id: thoth/sensor_plate_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: thoth/forward_depth_frame
+    frame_id: thoth/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: thoth/forward_color_frame
+    frame_id: thoth/forward_link
+    qw: 0.999999
+    qx: 0.000123
+    qy: -9.9e-05
+    qz: 0.001291
+    x: -0.000364
+    y: -0.059292
+    z: 2.8e-05
+  - child_frame_id: thoth/forward_color_optical_frame
+    frame_id: thoth/forward_aligned_depth_to_color_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: thoth/forward_aligned_depth_to_color_frame
+    frame_id: thoth/forward_link
+    qw: 0.999999
+    qx: 0.000123
+    qy: -9.9e-05
+    qz: 0.001291
+    x: -0.000364
+    y: -0.059292
+    z: 2.8e-05
+  - child_frame_id: thoth/forward_infra1_frame
+    frame_id: thoth/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: thoth/forward_infra1_optical_frame
+    frame_id: thoth/forward_infra1_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: thoth/forward_infra2_frame
+    frame_id: thoth/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.095084
+    z: -0.0
+  - child_frame_id: thoth/forward_infra2_optical_frame
+    frame_id: thoth/forward_infra2_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: thoth/forward_gyro_frame
+    frame_id: thoth/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.01602
+    y: -0.03022
+    z: 0.0074
+  - child_frame_id: thoth/camera_imu_optical_frame
+    frame_id: thoth/forward_gyro_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: thoth/forward_accel_frame
+    frame_id: thoth/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.01602
+    y: -0.03022
+    z: 0.0074
+  - child_frame_id: thoth/forward_accel_optical_frame
+    frame_id: thoth/forward_accel_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0

@@ -1,0 +1,11 @@
+---
+model:
+  instance_model:
+    type: yolo-seg
+    model_name: yolo11n-seg.pt
+    confidence_threshold: 0.25
+# invalid IDs are relative to original model category indices
+invalid_ids: [0, 4, 8, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 80]
+# add extra label 1 between unlabeled 0 and coco labelspace
+extra_categories: [ground]
+category_metadata: {surface_places_labels: [1]}

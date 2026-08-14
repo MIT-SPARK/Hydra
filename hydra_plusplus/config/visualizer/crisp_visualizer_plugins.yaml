@@ -1,0 +1,4 @@
+---
+external_library_paths: [khronos_ros]
+plugins:
+  crisp_objects: {type: ImplicitShapePlugin, layer: OBJECTS}

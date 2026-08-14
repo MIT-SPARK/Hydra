@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Script that loads and publishes a dsg from a file."""
+
+import argparse
+import pathlib
+
+import rclpy
+import spark_dsg as dsg
+import std_msgs.msg
+from rclpy.node import Node
+
+import hydra_ros
+
+
+class DsgFilePublisher(Node):
+    """Node that loads and publishes a DSG from file."""
+
+    def __init__(
+        self,
+        filepath,
+        frame: str = "map",
+        publish_rate: float = 0.0,
+        publish_with_mesh: bool = True,
+    ):
+        """Load and send the DSG."""
+        super().__init__("dsg_file_publisher")
+        filepath = pathlib.Path(filepath).expanduser().absolute()
+        if not filepath.exists():
+            self.get_logger().fatal(f"File '{filepath}' does not exist!")
+            raise ValueError(f"invalid file {filepath}")
+
+        self._frame = frame
+        self.get_logger().info(f"Loading '{filepath}'...")
+        self._graph = dsg.DynamicSceneGraph.load(filepath)
+        self.get_logger().info(f"Loaded '{filepath}'!")
+        self._pub = hydra_ros.DsgPublisher(self, "dsg")
+        if publish_rate > 0.0:
+            self._timer = self._create_timer(1.0 / publish_rate, self._send_graph)
+        else:
+            self._send_graph()
+
+    def _send_graph(self):
+        header = std_msgs.msg.Header()
+        header.stamp = self.get_clock().now().to_msg()
+        header.frame_id = self._frame
+        self._pub.publish_with_header(self._graph, header)
+
+
+def main(args=None):
+    """Start and run node."""
+    parser = argparse.ArgumentParser("Node that publishes a 3SDG from a file")
+    parser.add_argument("filepath")
+    parser.add_argument("--publish_rate", default=0.0, help="rate to publish")
+    parser.add_argument("--frame", "-f", default="map", help="frame ID for publishing")
+    args, rest = parser.parse_known_args()
+    rclpy.init(args=rest)
+
+    try:
+        node = DsgFilePublisher(
+            args.filepath, frame=args.frame, publish_rate=args.publish_rate
+        )
+        rclpy.spin(node)
+        node.destroy_node()
+    finally:
+        rclpy.utilities.try_shutdown()
+
+
+if __name__ == "__main__":
+    main()

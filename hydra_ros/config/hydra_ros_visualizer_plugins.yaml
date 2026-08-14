@@ -1,0 +1,3 @@
+---
+external_libraries: {enabled: true}
+external_library_paths: [hydra_ros]

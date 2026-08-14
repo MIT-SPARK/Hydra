@@ -1,0 +1,2 @@
+---
+plugins: {khronos_objects: {type: KhronosObjectPlugin, dynamic_color_mode: CONSTANT}}

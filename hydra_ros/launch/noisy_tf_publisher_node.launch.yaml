@@ -1,0 +1,21 @@
+---
+launch:
+  - arg: {name: parent_frame, default: odom}
+  - arg: {name: child_frame, default: base_link}
+  - arg: {name: yaw_std_dev, default: '0.001'}
+  - arg: {name: xyz_std_dev, default: '0.001'}
+  - arg: {name: start_from_origin, default: 'true'}
+  - arg: {name: wrong_velocity_frame, default: 'false'}
+  - node:
+      pkg: hydra_ros
+      exec: noisy_tf_publisher
+      name: noisy_tf_publisher
+      on_exit: shutdown
+      param:
+        - {name: parent_frame, value: $(var parent_frame)}
+        - {name: child_frame, value: $(var child_frame)}
+        - {name: yaw_std_dev, value: $(var yaw_std_dev)}
+        - {name: xy_std_dev, value: $(var xyz_std_dev)}
+        - {name: z_std_dev, value: $(var xyz_std_dev)}
+        - {name: start_from_origin, value: $(var start_from_origin)}
+        - {name: wrong_velocity_frame, value: $(var wrong_velocity_frame)}

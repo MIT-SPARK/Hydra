@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+
+import os
+import pathlib
+import pprint
+import shutil
+import subprocess
+import sys
+import tempfile
+
+import click
+import jinja2
+import rich
+import rich.console
+import rich.panel
+import rich.syntax
+from rich.columns import Columns
+
+
+def _pkg_path() -> pathlib.Path:
+    return pathlib.Path(__file__).absolute().parent.parent
+
+
+def _get_session_path(session_path=None) -> pathlib.Path | None:
+    pkg_path = _pkg_path()
+    click.secho(f"Using package location '{pkg_path}'", fg="green")
+    tmux_ws_path = pkg_path / "tmux"
+    tmux_files = sorted([x for x in tmux_ws_path.rglob("*.yaml")])
+    tmux_names = [x.relative_to(tmux_ws_path) for x in tmux_files]
+
+    if session_path is None:
+        rich.print(Columns([f"({i + 1}) {x}" for i, x in enumerate(tmux_names)]))
+        session_idx = click.prompt("What session do you want to load?", default=1)
+        if session_idx <= 0 or session_idx > len(tmux_files):
+            click.secho(f"Invalid session choice: '{session_idx}'", fg="red")
+            return None
+
+        session_path = tmux_files[session_idx - 1]
+
+    session_path = pathlib.Path(session_path).expanduser()
+    session_path = tmux_ws_path / session_path
+    if not session_path.exists():
+        click.secho(f"Invalid tmuxp session filepath: '{session_path}'!", fg="red")
+        click.echo(f"Available: {pprint.pformat(tmux_names)}")
+        return None
+
+    return session_path
+
+
+def _render_tmuxp(session_path, context):
+    with session_path.open("r") as fin:
+        env = jinja2.Environment(trim_blocks=True, lstrip_blocks=True)
+        template = env.from_string(fin.read())
+
+    return template.render(context)
+
+
+def _resolve_zenoh_arg(run_zenoh):
+    rmw_impl = os.getenv("RMW_IMPLEMENTATION")
+    no_zenoh = rmw_impl is None or rmw_impl != "rmw_zenoh_cpp"
+    return not no_zenoh and run_zenoh
+
+
+VARIANTS = ["crisp", "hydra", "khronos"]
+MODELS = ["yoloe", "yolov11", "gdsam2"]
+
+
+@click.command()
+@click.argument("bag_path", type=click.Path(exists=True))
+@click.argument("robot_name", nargs=-1)
+@click.option("--session-path", "-p", type=click.Path(), help="session_path to use")
+@click.option("--output-dir", "-o", type=click.Path(), help="output directory")
+@click.option(
+    "--variant",
+    "-v",
+    default="crisp",
+    type=click.Choice(VARIANTS),
+    help="Object variant",
+)
+@click.option("--segmentation-model", type=click.Choice(MODELS))
+@click.option("--bag-delay", "-d", default=10.0, help="amount of time to delay rosbag")
+@click.option("--bag-rate", "-r", default=1.0, help="bag playback rate")
+@click.option("--bag-start", default=0.0, help="bag start offset")
+@click.option("--bag-duration", default=-1.0, help="bag duration")
+@click.option("--yes", "-y", is_flag=True, help="skip env variable check")
+@click.option("--force", "-f", is_flag=True, help="clear output if it exists")
+@click.option("--shell", default="zsh", help="shell to use")
+@click.option("--run-zenoh/--no-run-zenoh", default=True, help="start zenoh router")
+@click.option("--visualize/--no-visualize", default=True, help="visualize scene graph")
+@click.option("--close/--no-close", default=True, help="kill tmux after hydra exits")
+@click.option("--auto-attach/--no-auto-attach", default=True, help="attach to session")
+def main(
+    bag_path,
+    robot_name,
+    session_path,
+    output_dir,
+    variant,
+    segmentation_model,
+    bag_delay,
+    bag_rate,
+    bag_start,
+    bag_duration,
+    yes,
+    force,
+    shell,
+    run_zenoh,
+    visualize,
+    close,
+    auto_attach,
+):
+    run_zenoh = _resolve_zenoh_arg(run_zenoh)
+    robot_name = robot_name[0] if len(robot_name) else None
+    workspace_path = _pkg_path().parent.parent.parent / "install" / f"setup.{shell}"
+    session_path = _get_session_path(session_path=session_path)
+    if session_path is None:
+        sys.exit("Invalid session path!")
+
+    bag_path = pathlib.Path(bag_path).expanduser().absolute()
+    if not output_dir:
+        name = variant if robot_name is None else f"{variant}_{robot_name}"
+        output_dir = _pkg_path() / "output" / bag_path.stem / name
+
+    output_dir = pathlib.Path(output_dir).expanduser().absolute()
+    if output_dir.exists() and not force:
+        click.confirm(f"Output '{output_dir}' exists! Remove?", abort=True)
+
+    if output_dir.exists():
+        click.secho(f"Clearing previous output: '{output_dir}'", fg="green")
+        shutil.rmtree(output_dir)
+
+    click.secho(f"Loading {session_path}...", fg="green")
+
+    context = {
+        "robot_id": 0,
+        "robot_name": robot_name,
+        "bag_path": bag_path,
+        "bag_duration": bag_duration,
+        "bag_start": bag_start,
+        "delay": bag_delay,
+        "output_path": output_dir,
+        "rate": bag_rate,
+        "object_variant": variant,
+        "shell": {"extension": shell, "cmd": shutil.which(shell)},
+        "run_zenoh": run_zenoh,
+        "visualize": visualize,
+        "close_session": close,
+        "workspace_path": workspace_path,
+        "segmentation_model": segmentation_model,
+    }
+    contents = _render_tmuxp(session_path, context)
+
+    console = rich.console.Console()
+    console.print(rich.panel.Panel(rich.syntax.Syntax(contents, "yaml")))
+    if not yes:
+        click.confirm("Are the settings correct?", abort=True)
+
+    tmuxp_cmd = [shutil.which("tmuxp"), "load"]
+    if auto_attach:
+        tmuxp_cmd.append("-y")
+
+    with tempfile.NamedTemporaryFile("w+", suffix=".yaml") as fout:
+        fout.write(contents)
+        fout.flush()
+        tmuxp_cmd.append(fout.name)
+        subprocess.run(tmuxp_cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main(max_content_width=120))

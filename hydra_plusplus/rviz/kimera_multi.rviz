@@ -1,0 +1,353 @@
+Panels:
+  - Class: rviz_common/Displays
+    Help Height: 138
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /TF1/Frames1
+      Splitter Ratio: 0.5
+    Tree Height: 605
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Tool Properties
+    Expanded:
+      - /2D Goal Pose1
+      - /Publish Point1
+    Name: Tool Properties
+    Splitter Ratio: 0.5886790156364441
+  - Class: rviz_common/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz_common/Time
+    Experimental: false
+    Name: Time
+    SyncMode: 0
+    SyncSource: ""
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+        acl_jackal/base:
+          Value: true
+        acl_jackal/base_link:
+          Value: true
+        acl_jackal/chassis_link:
+          Value: true
+        acl_jackal/embedded_imu_link:
+          Value: true
+        acl_jackal/forward_accel_frame:
+          Value: true
+        acl_jackal/forward_accel_optical_frame:
+          Value: true
+        acl_jackal/forward_bottom_screw_frame:
+          Value: true
+        acl_jackal/forward_camera_link:
+          Value: true
+        acl_jackal/forward_color_frame:
+          Value: true
+        acl_jackal/forward_color_optical_frame:
+          Value: true
+        acl_jackal/forward_depth_frame:
+          Value: true
+        acl_jackal/forward_depth_optical_frame:
+          Value: true
+        acl_jackal/forward_gyro_frame:
+          Value: true
+        acl_jackal/forward_imu_optical_frame:
+          Value: true
+        acl_jackal/forward_infra1_frame:
+          Value: true
+        acl_jackal/forward_infra1_optical_frame:
+          Value: true
+        acl_jackal/forward_infra2_frame:
+          Value: true
+        acl_jackal/forward_infra2_optical_frame:
+          Value: true
+        acl_jackal/forward_left_ir_frame:
+          Value: true
+        acl_jackal/forward_left_ir_optical_frame:
+          Value: true
+        acl_jackal/forward_link:
+          Value: true
+        acl_jackal/forward_right_ir_frame:
+          Value: true
+        acl_jackal/forward_right_ir_optical_frame:
+          Value: true
+        acl_jackal/front_fender_link:
+          Value: true
+        acl_jackal/front_mount:
+          Value: true
+        acl_jackal/imu_link:
+          Value: true
+        acl_jackal/imu_link_ned:
+          Value: true
+        acl_jackal/mid_mount:
+          Value: true
+        acl_jackal/navsat_link:
+          Value: true
+        acl_jackal/odom:
+          Value: true
+        acl_jackal/os_sensor:
+          Value: true
+        acl_jackal/ouster_link:
+          Value: true
+        acl_jackal/rear_fender_link:
+          Value: true
+        acl_jackal/rear_mount:
+          Value: true
+        acl_jackal/sensor_plate_link:
+          Value: true
+        acl_jackal/velodyne:
+          Value: true
+        acl_jackal/velodyne_base_link:
+          Value: true
+        acl_jackal/velodyne_link:
+          Value: true
+        crisp_mesh_O1:
+          Value: true
+        crisp_mesh_O10:
+          Value: true
+        crisp_mesh_O14:
+          Value: true
+        map:
+          Value: false
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        map:
+          acl_jackal/odom:
+            acl_jackal/base:
+              acl_jackal/base_link:
+                acl_jackal/chassis_link:
+                  acl_jackal/embedded_imu_link:
+                    {}
+                  acl_jackal/front_fender_link:
+                    {}
+                  acl_jackal/mid_mount:
+                    acl_jackal/front_mount:
+                      {}
+                    acl_jackal/rear_mount:
+                      {}
+                  acl_jackal/navsat_link:
+                    {}
+                  acl_jackal/rear_fender_link:
+                    {}
+                acl_jackal/sensor_plate_link:
+                  acl_jackal/imu_link:
+                    acl_jackal/imu_link_ned:
+                      {}
+                  acl_jackal/velodyne_link:
+                    acl_jackal/forward_link:
+                      acl_jackal/forward_accel_frame:
+                        acl_jackal/forward_accel_optical_frame:
+                          {}
+                      acl_jackal/forward_bottom_screw_frame:
+                        acl_jackal/forward_camera_link:
+                          {}
+                      acl_jackal/forward_color_frame:
+                        acl_jackal/forward_color_optical_frame:
+                          {}
+                      acl_jackal/forward_depth_frame:
+                        acl_jackal/forward_depth_optical_frame:
+                          {}
+                        acl_jackal/forward_left_ir_frame:
+                          acl_jackal/forward_left_ir_optical_frame:
+                            {}
+                        acl_jackal/forward_right_ir_frame:
+                          acl_jackal/forward_right_ir_optical_frame:
+                            {}
+                      acl_jackal/forward_gyro_frame:
+                        acl_jackal/forward_imu_optical_frame:
+                          {}
+                      acl_jackal/forward_infra1_frame:
+                        acl_jackal/forward_infra1_optical_frame:
+                          {}
+                      acl_jackal/forward_infra2_frame:
+                        acl_jackal/forward_infra2_optical_frame:
+                          {}
+                    acl_jackal/velodyne_base_link:
+                      acl_jackal/velodyne:
+                        {}
+            crisp_mesh_O1:
+              {}
+            crisp_mesh_O10:
+              {}
+            crisp_mesh_O14:
+              {}
+      Update Interval: 0
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Semantic Overlay
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: forward/semantic_overlay/image_raw
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Hydra Scene Graph
+      Namespaces:
+        interlayer_edges_3[1]_2: true
+        layer2_bounding_boxes: true
+        layer2_nodes: true
+        layer2_text: true
+        layer2p97_edges: true
+        layer2p97_nodes: true
+        layer2p97_text: true
+        layer3p1_edges: true
+        layer3p1_nodes: true
+        layer3p1_polygon_boundaries: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: hydra_visualizer/graph
+      Value: true
+    - Ambient: 230; 230; 230
+      Class: kimera_pgmo_rviz/MeshDisplay
+      Cull Backfaces: true
+      Diffuse: 13; 13; 13
+      Emissive: 26; 26; 26
+      Enable Lighting: true
+      Enabled: true
+      Name: Object Meshes
+      Specular: 0; 0; 0
+      Toggle Visibility All: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: acl_jackal/hydra_visualizer/crisp_meshes
+      Value: true
+      Visible:
+        Value: true
+        crisp_mesh_O1: true
+        crisp_mesh_O10: true
+    - Ambient: 230; 230; 230
+      Class: kimera_pgmo_rviz/MeshDeltaDisplay
+      Cull Backfaces: true
+      Default Color: 102; 102; 102
+      Diffuse: 13; 13; 13
+      Emissive: 26; 26; 26
+      Enable Lighting: false
+      Enabled: true
+      Label Alpha: 0
+      Name: Background Mesh
+      Specular: 0; 0; 0
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: hydra/frontend/full_mesh_update
+      Value: true
+      Visible: true
+  Enabled: true
+  Global Options:
+    Background Color: 255; 255; 255
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+    - Class: rviz_default_plugins/SetInitialPose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /goal_pose
+    - Class: rviz_default_plugins/PublishPoint
+      Single click: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /clicked_point
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 50.00799560546875
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 24.434659957885742
+        Y: 7.28887414932251
+        Z: 5.657480239868164
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.6553976535797119
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 4.535394668579102
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 1356
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd00000004000000000000024d00000488fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005e00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000004000000329000000ce00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000002000530065006d0061006e0074006900630020004f007600650072006c00610079010000036f000001590000001800fffffffb0000000a0049006d0061006700650000000b95000001070000000000000000fb0000000a0049006d0061006700650100000b3e0000015e0000000000000000000000010000010000000488fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000004000000488000000ac00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000006ac0000005efc0100000002fb0000000800540069006d00650100000000000006ac000002b200fffffffb0000000800540069006d00650100000000000004500000000000000000000003530000048800000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Selection:
+    collapsed: false
+  Semantic Overlay:
+    collapsed: false
+  Time:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 1708
+  X: 812
+  Y: 195

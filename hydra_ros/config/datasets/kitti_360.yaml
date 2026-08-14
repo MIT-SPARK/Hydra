@@ -1,0 +1,22 @@
+---
+input:
+  type: RosInput
+  tf_verbosity: 1
+  clear_queue_on_fail: true
+  inputs:
+    lidar_sensor:
+      receiver:
+        type: PointcloudReceiver
+      sensor:
+        type: lidar
+        min_range: $(arg sensor_min_range)
+        max_range: $(arg sensor_max_range)
+        is_asymmetric: true
+        horizontal_resolution: 0.16  # true resolution 0.08
+        vertical_resolution: 0.41875  # true resolution 0.41875
+        horizontal_fov: 360.0
+        vertical_fov: 26.8
+        vertical_fov_top: 2.0
+        extrinsics:
+          type: ros
+          sensor_frame: $(arg sensor_frame)

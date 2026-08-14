@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hydra_visualizer</name>
+  <version>1.0.0</version>
+  <description>hydra visualization utilities</description>
+  <author email="na26933@mit.edu">Nathan Hughes</author>
+  <author email="yunchang@mit.edu">Yun Chang</author>
+  <author email="lschmid@mit.edu">Lukas Schmid</author>
+  <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>config_utilities</depend>
+  <depend>config_utilities_ros</depend>
+  <depend>hydra_msgs</depend>
+  <depend>ianvs</depend>
+  <depend>kimera_pgmo_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>spark_dsg</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf2_eigen</depend>
+  <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>kimera_pgmo_rviz</exec_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+      <build_type>ament_cmake</build_type>
+  </export>
+</package>

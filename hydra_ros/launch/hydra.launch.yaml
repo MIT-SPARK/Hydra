@@ -1,0 +1,63 @@
+---
+launch:
+  # development arguments
+  - arg: {name: debug, default: 'false', description: Run hydra with gdbserver}
+  - arg: {name: glog_verbosity, default: '0', description: Verbosity for glog-based logging in hydra}
+  - arg: {name: glog_level, default: '0', description: Minimum severity for glog-based logging in hdyra}
+  - arg: {name: print_missing, default: 'false', description: Have config utilities print all missing parameters when parsing configs}
+  # robot configuration
+  - arg: {name: use_sim_time, default: 'false', description: Use ROS sim time}
+  - arg: {name: dataset, description: Dataset hydra is running}
+  - arg: {name: labelspace, description: Closed-set semantics description}
+  - arg: {name: robot_id, default: '0', description: Unique robot identifier}
+  - arg: {name: robot_frame, default: base_link_gt, description: Robot body tf frame}
+  - arg: {name: odom_frame, default: world, description: Odometry (map) frame}
+  - arg: {name: map_frame, default: map, description: Backend scene graph frame}
+  # configuration
+  - arg: {name: hydra_config_path, default: $(find-pkg-share hydra)/config/datasets/$(var dataset).yaml, description: Primary hydra config}
+  - arg: {name: input_config_path, default: $(find-pkg-share hydra_ros)/config/datasets/$(var dataset).yaml, description: Hydra ROS input config}
+  - arg: {name: labelspace_path, default: $(find-pkg-share hydra)/config/label_spaces/$(var labelspace)_label_space.yaml, description: Closed set label space for Hydra}
+  - arg: {name: enable_lcd, default: 'false', description: Turn on scene graph loop closure detection}
+  - arg: {name: lcd_config_path, default: $(find-pkg-share hydra)/config/lcd/default.yaml, description: Loop closure detection config}
+  - arg: {name: extra_yaml, default: '{}'}
+  # output
+  - arg: {name: log_name, default: $(var dataset), description: Subdirectory to output to}
+  - arg: {name: log_path, default: $(env HOME)/.hydra/$(var log_name), description: Directory to output to}
+  - arg: {name: exit_after_clock, default: 'false', description: Shutdown hydra node after a rosbag finishes playing}
+  - arg: {name: enable_zmq, default: 'false', description: Turn on zmq-based publishing for scene graph}
+  - arg: {name: zmq_url, default: tcp://127.0.0.1:8001, description: ZMQ publish url}
+  - arg: {name: zmq_send_mesh, default: 'false', description: Whether or not to serialize mesh when using ZMQ}
+  # hydra node
+  - node:
+      pkg: hydra_ros
+      exec: hydra_ros_node
+      name: hydra
+      on_exit: shutdown
+      launch-prefix: $(if $(var debug) 'gdbserver localhost:0')
+      param:
+        - {name: use_sim_time, value: $(var use_sim_time)}
+      args: >
+        --config-utilities-file $(var input_config_path)
+        --config-utilities-file $(var hydra_config_path)
+        --config-utilities-file $(var labelspace_path)@labelspace
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/mesh_segmenter_sinks.yaml@frontend/objects
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/gvd_places_sinks.yaml@frontend/freespace_places
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/active_window_sinks.yaml@active_window
+        --config-utilities-yaml {enable_lcd: $(var enable_lcd)}
+        --config-utilities-file $(var lcd_config_path)
+        --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
+        --config-utilities-yaml {print_missing: $(var print_missing), glog_level: $(var glog_level), glog_verbosity: $(var glog_verbosity)}
+        --config-utilities-yaml {robot_id: $(var robot_id), odom_frame: $(var odom_frame), robot_frame: $(var robot_frame), map_frame: $(var map_frame)}
+        --config-utilities-yaml {enable_zmq: $(var enable_zmq), backend: {zmq_sink: {url: $(var zmq_url), send_mesh: $(var zmq_send_mesh)}}}
+        --config-utilities-yaml $(var extra_yaml)
+  # hydra visualizer
+  - arg: {name: graph_to_visualize, default: backend}
+  - set_remap: {from: hydra_visualizer/dsg, to: hydra/$(var graph_to_visualize)/dsg}
+  - arg: {name: start_visualizer, default: 'true', description: run hydra visualizer}
+  - arg: {name: debug_visualizer, default: 'false', description: run visualizer with gdb}
+  - include:
+      file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
+      if: $(var start_visualizer)
+      arg:
+        - {name: external_plugins_path, value: $(find-pkg-share hydra_ros)/config/hydra_ros_visualizer_plugins.yaml}
+        - {name: debug, value: $(var debug_visualizer)}

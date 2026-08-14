@@ -1,0 +1,239 @@
+#!/usr/bin/env python3
+
+import numpy as np
+import rclpy
+import tf2_ros
+from geometry_msgs.msg import Pose, Transform, TransformStamped
+from nav_msgs.msg import Odometry
+from pose_graph_tools_msgs.msg import PoseGraph, PoseGraphEdge
+from rclpy.node import Node
+from rclpy.time import Time
+from scipy.spatial.transform import Rotation
+
+
+def _invert_pose(p):
+    p_inv = np.zeros((4, 4))
+    p_inv[:3, :3] = p[:3, :3].T
+    p_inv[:3, 3] = -p[:3, :3].T @ p[:3, 3]
+    p_inv[3, 3] = 1.0
+    return p_inv
+
+
+def _exp(rho, theta):
+    theta_norm = np.linalg.norm(theta)
+    xi_hat = np.zeros((4, 4))
+    theta_hat = np.array(
+        [[0, -theta[2], theta[1]], [theta[2], 0, -theta[0]], [-theta[1], theta[0], 0]]
+    )
+    xi_hat[:3, :3] = theta_hat
+    xi_hat[:3, 3] = rho
+    return (
+        np.eye(4)
+        + xi_hat
+        + (1 - np.cos(theta_norm)) / (theta_norm**2) * xi_hat @ xi_hat
+        + (theta_norm - np.sin(theta_norm)) / (theta_norm**3) * xi_hat @ xi_hat @ xi_hat
+    )
+
+
+def _translation_distance(pose1, pose2):
+    return np.linalg.norm(pose1[:3, 3] - pose2[:3, 3])
+
+
+def _rot_from_pose(pose):
+    q = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
+    return Rotation.from_quat(q).as_matrix()
+
+
+def _mat_from_pose(pose):
+    pose_out = np.zeros((4, 4))
+    pose_out[:3, :3] = _rot_from_pose(pose)
+    pose_out[:3, 3] = [pose.position.x, pose.position.y, pose.position.z]
+    pose_out[3, 3] = 1.0
+    return pose_out
+
+
+def _pose_from_mat(p):
+    q = Rotation.from_matrix(p[:3, :3]).as_quat()
+
+    msg = Pose()
+    msg.position.x = p[0, 3]
+    msg.position.y = p[1, 3]
+    msg.position.z = p[2, 3]
+    msg.orientation.x = q[0]
+    msg.orientation.y = q[1]
+    msg.orientation.z = q[2]
+    msg.orientation.w = q[3]
+    return msg
+
+
+def _transform_from_mat(p):
+    q = Rotation.from_matrix(p[:3, :3]).as_quat()
+
+    msg = Transform()
+    msg.translation.x = p[0, 3]
+    msg.translation.y = p[1, 3]
+    msg.translation.z = p[2, 3]
+    msg.rotation.x = q[0]
+    msg.rotation.y = q[1]
+    msg.rotation.z = q[2]
+    msg.rotation.w = q[3]
+    return msg
+
+
+class NoisyTransformPublisher(Node):
+    """Node that republishes TFs with noise added."""
+
+    def _get_param(self, name, default=None):
+        return self.declare_parameter(name, default).get_parameter_value()
+
+    def __init__(self):
+        super().__init__("noisy_tf_publisher_node")
+        self._last_noisy_pose = None
+        self._last_loop_closure_stamp = None
+        self._poses = []
+        self._stamps = []
+
+        self._parent_frame = self._get_param("parent_frame", "odom").string_value
+        self._child_frame = self._get_param("child_frame", "base_link").string_value
+        self._yaw_std_dev = self._get_param("yaw_std_dev", 0.001).double_value
+        self._xy_std_dev = self._get_param("xy_std_dev", 0.001).double_value
+        self._z_std_dev = self._get_param("z_std_dev", 0.001).double_value
+
+        self._start_from_origin = self._get_param("start_from_origin", True).bool_value
+        self._add_noise = self._get_param("add_noise", True).bool_value
+        self._wrong_velocity_frame = self._get_param(
+            "wrong_velocity_frame", False
+        ).bool_value
+
+        self._enable_pseudo_loop_closures = self._get_param(
+            "enable_pseudo_loop_closures", True
+        ).bool_value
+        self._robot_id = self._get_param("robot_id", 0).integer_value
+        self._loop_closure_threshold_m = self._get_param(
+            "loop_closure_threshold_m", 0.5
+        ).double_value
+        min_lc_sep_s = self._get_param(
+            "minimum_loop_closure_separation_s", 1.0
+        ).double_value
+        self._min_loop_closure_separation_ns = int(1.0e9 * min_lc_sep_s)
+        lc_window_s = self._get_param("loop_closure_window_ns", 30.0).double_value
+        self._loop_closure_window_ns = int(1.0e9 * lc_window_s)
+
+        seed = self._get_param("random_seed", 0).integer_value
+        self._rng = np.random.default_rng(seed=seed if seed > 0 else None)
+
+        self._br = tf2_ros.TransformBroadcaster(self)
+        self._sub = self.create_subscription(Odometry, "odom", self._odom_cb, 10)
+        self._pub = self.create_publisher(Odometry, "noisy_odom", 10)
+        if self._enable_pseudo_loop_closures:
+            self._lc_pub = self.create_publisher(PoseGraph, "loop_closures", 10)
+
+    def _odom_cb(self, msg):
+        map_T_new = _mat_from_pose(msg.pose.pose)
+        self._poses.append(map_T_new)
+        self._stamps.append(Time.from_msg(msg.header.stamp).nanoseconds)
+        if len(self._poses) == 1:
+            self._last_noisy_pose = np.eye(4) if self._start_from_origin else map_T_new
+            return
+
+        map_T_old = self._poses[-2]
+        old_T_new = _invert_pose(map_T_old) @ map_T_new
+        if self._add_noise:
+            old_T_new @= _exp(*self._sample_noise())
+
+        self._last_noisy_pose = self._last_noisy_pose @ old_T_new
+        self._publish_noisy_transform(msg.header.stamp, self._last_noisy_pose)
+        self._publish_noisy_odom(self._last_noisy_pose, msg)
+        if not self._enable_pseudo_loop_closures:
+            return
+
+        candidate = self._find_pseudo_loop_closure()
+        if candidate is None:
+            return
+
+        self._last_loop_closure_stamp = self._stamps[-1]
+        self._publish_loop_closure(candidate)
+
+    def _find_pseudo_loop_closure(self):
+        curr_stamp = self._stamps[-1]
+        if self._last_loop_closure_stamp is not None:
+            last_diff_ns = curr_stamp - self._last_loop_closure_stamp
+            if last_diff_ns < self._min_loop_closure_separation_ns:
+                return None
+
+        curr_pose = self._poses[-1]
+        for idx, prev_pose in enumerate(self._poses[:-1]):
+            prev_stamp = self._stamps[idx]
+            time_diff_ns = curr_stamp - prev_stamp
+            if time_diff_ns < self._loop_closure_window_ns:
+                return None
+
+            diff_m = _translation_distance(curr_pose, prev_pose)
+            if diff_m < self._loop_closure_threshold_m:
+                return idx
+
+    def _publish_loop_closure(self, candidate):
+        map_T_ref = self._poses[candidate]
+        map_T_query = self._poses[-1]
+        ref_T_query = _invert_pose(map_T_ref) @ map_T_query
+
+        edge = PoseGraphEdge()
+        edge.header.stamp = Time(nanoseconds=self._stamps[-1]).to_msg()
+        edge.key_from = self._stamps[candidate]
+        edge.key_to = self._stamps[-1]
+        edge.robot_from = self._robot_id
+        edge.robot_to = self._robot_id
+        edge.type = PoseGraphEdge.LOOPCLOSE
+        edge.pose = _pose_from_mat(ref_T_query)
+
+        msg = PoseGraph()
+        msg.edges.append(edge)
+        self._lc_pub.publish(msg)
+
+    def _sample_noise(self):
+        t_noise = np.zeros(3)
+        t_noise[:2] = self._rng.normal(scale=self._xy_std_dev)
+        if self._z_std_dev > 0.0:
+            t_noise[2] = self._rng.normal(scale=self._z_std_dev)
+
+        R_noise = [0, 0, self._rng.normal(scale=self._yaw_std_dev)]
+        return t_noise, R_noise
+
+    def _publish_noisy_transform(self, time, noisy_pose):
+        msg = TransformStamped()
+        msg.header.stamp = time
+        msg.header.frame_id = self._parent_frame
+        msg.child_frame_id = self._child_frame
+        msg.transform = _transform_from_mat(noisy_pose)
+        self._br.sendTransform(msg)
+
+    def _publish_noisy_odom(self, noisy_pose, cur_gt_odom):
+        curr_twist = cur_gt_odom.twist.twist
+        vel = np.array([curr_twist.linear.x, curr_twist.linear.y, curr_twist.linear.z])
+        if self._wrong_velocity_frame:
+            R_gt = _rot_from_pose(cur_gt_odom.pose.pose)
+            R_noisy = noisy_pose[:3, :3]
+            vel = (R_noisy.T @ R_gt) @ vel
+
+        msg = Odometry()
+        msg.header = cur_gt_odom.header
+        msg.pose.pose = _pose_from_mat(noisy_pose)
+        msg.twist.twist.linear.x = vel[0]
+        msg.twist.twist.linear.y = vel[1]
+        msg.twist.twist.linear.z = vel[2]
+        self._pub.publish(msg)
+
+
+def main(args=None):
+    rclpy.init()
+    try:
+        node = NoisyTransformPublisher()
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        rclpy.try_shutdown()
+
+
+if __name__ == "__main__":
+    main()

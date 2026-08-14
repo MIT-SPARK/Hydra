@@ -1,0 +1,22 @@
+# hydra_ros/docker/minimal/docker-compose.yml
+# Docker compose for Hydra with minimal setup for ROS 2
+services:
+  hydra-minimal:
+    image: hydra-minimal
+    build:
+      context: ../../../..
+      dockerfile: src/hydra_ros/docker/minimal/Dockerfile
+      network: host
+    container_name: hydra-minimal
+    volumes:
+      - ../../../../:/root/hydra_ws
+      - ${DATASETS_PATH:-/root/empty_data}:/root/data
+    network_mode: host
+    environment:
+      - DISPLAY=$DISPLAY
+      - QT_X11_NO_MITSHM=1
+    devices:
+      - /dev/dri
+    privileged: true
+    stdin_open: true
+    tty: true

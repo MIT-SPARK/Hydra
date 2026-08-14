@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+"""Node that runs crisp on received masks and RGBD data."""
+
+import pathlib
+
+import geometry_msgs.msg
+import ianvs
+import numpy as np
+import rclpy
+import torch
+import torchvision.ops as tops
+import torchvision.transforms.v2 as tvt
+from crisp.config.config import BaseExpSettings
+from crisp.models.certifier import FrameCertifier
+from crisp.models.joint import JointShapePoseNetwork
+from crisp.models.pipeline import Pipeline
+from crisp.models.rmcc import ReprojectionMaskConsistencyChecker
+from crisp.utils.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+from crisp.utils.sdf import convert_sdf_samples_to_mesh, create_sdf_samples_generic
+from khronos_msgs.srv import ExtractImplicitObject, ReconstructImplicitObject
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.node import Node
+from scipy.spatial.transform import Rotation as Rot
+
+
+def setup_pipeline(
+    checkpoint, device, width, height, log_path=None, debug_settings=None
+):
+    opt = BaseExpSettings(dataset_dir="./")  # note: dataset_dir not actually used
+    opt.image_size = (height, width)
+    opt.checkpoint_path = pathlib.Path(checkpoint).expanduser().absolute()
+    opt.use_corrector = False
+
+    # joint nocs & recons model
+    model = JointShapePoseNetwork(
+        input_dim=3,
+        recons_num_layers=5,
+        recons_hidden_dim=256,
+        recons_modulate_last_layer=True,
+        recons_modulate_type="film",
+        backbone_model=opt.backbone_model_name,
+        local_backbone_model_path=None,
+        freeze_pretrained_weights=True,
+        backbone_input_res=opt.backbone_input_res,
+        nonlinearity=opt.recons_nonlinearity,
+        normalization_type=opt.recons_normalization_type,
+        nocs_network_type=opt.nocs_network_type,
+        nocs_channels=opt.nocs_channels,
+        lateral_layers_type=opt.nocs_lateral_layers_type,
+        normalize_shape_code=opt.recons_shape_code_normalization,
+        recons_shape_code_norm_scale=opt.recons_shape_code_norm_scale,
+    )
+
+    state = torch.load(opt.checkpoint_path)
+    model.load_state_dict(state["model"])
+    model.eval()
+    model.backbone.eval()
+    model.cuda()
+
+    frame_certifier = FrameCertifier(
+        model=model,
+        depths_clamp_thres=opt.cert_depths_clamp_thres,
+        depths_quantile=opt.cert_depths_quantile,
+        depths_eps=opt.cert_depths_eps,
+        degen_min_eig_thres=opt.cert_degen_min_eig_thres,
+        use_degen_cert=opt.use_degen_cert,
+        shape_code_library=None,
+    )
+
+    rmcc_verifier = ReprojectionMaskConsistencyChecker(
+        model=model,
+        cube_samples=32,
+        cube_scale=3.0,
+        projection_radius=1,
+        thr_num_pixels_in_mask=0,
+        thr_iou=0.0,
+        # NOTE(hlim): Using `thr_precision` showed the best performance
+        thr_precision=0.1,
+        # thr_precision=0.0, # NOTE (multy) set to 0.0 to disable and debug
+        thr_coverage=0.0,
+        vis_output=False,
+        log_path=log_path,
+    )
+
+    pipeline = Pipeline(
+        model=model,
+        corrector=None,
+        frame_certifier=frame_certifier,
+        frame_corrector_mode=opt.frame_corrector_mode,
+        pgo_solver=None,
+        multi_frame_shape_code_corrector=None,
+        multi_frame_geometric_shape_corrector=None,
+        device=device,
+        rmcc_verifier=rmcc_verifier,
+        input_H=opt.image_size[0],
+        input_W=opt.image_size[1],
+        nr_downsample_before_corrector=opt.pipeline_nr_downsample_before_corrector,
+        sdf_input_loss_multiplier=opt.corrector_loss_multiplier,
+        registration_inlier_thres=opt.registration_inlier_thres,
+        output_intermediate_vars=True,
+        output_precrt_results=opt.pipeline_output_precrt_results,
+        ssl_batch_size=opt.ssl_batch_size,
+        ssl_nocs_clamp_quantile=opt.ssl_nocs_clamp_quantile,
+        ssl_augmentation=False,
+        ssl_augmentation_type=opt.ssl_augmentation_type,
+        ssl_augmentation_gaussian_perturb_std=opt.ssl_augmentation_gaussian_perturb_std,
+        no_grad_model_forward=True,
+        normalized_recons=True,
+        output_degen_condition_number=False,
+        normalize_input_image=False,
+        shape_code_library=None,
+        debug_settings=debug_settings,
+    )
+
+    return pipeline
+
+
+def get_image_transform():
+    return tvt.Compose(
+        [
+            tvt.ToImage(),
+            tvt.ToDtype(torch.float32, scale=True),
+            tvt.Normalize(mean=IMAGENET_DEFAULT_MEAN, std=IMAGENET_DEFAULT_STD),
+        ]
+    )
+
+
+def decompose_mesh_request(request, device):
+    vec = torch.tensor(request.shape_code).unsqueeze(0).float().to(device)
+    return vec, request.scale
+
+
+def reconstruct_mesh(model, shape_code, s_nocs, cube_samples, cube_scale):
+    def callback(coords):
+        return model.recons_net.forward(shape_code=shape_code, coords=coords)
+
+    (sdf_grid, voxel_size, voxel_grid_origin) = create_sdf_samples_generic(
+        model_fn=callback,
+        N=cube_samples,
+        max_batch=64**3,
+        cube_center=np.array([0, 0, 0]),
+        cube_scale=cube_scale,
+    )
+
+    mesh = convert_sdf_samples_to_mesh(
+        sdf_grid=sdf_grid,
+        voxel_grid_origin=voxel_grid_origin,
+        voxel_size=voxel_size,
+    )
+
+    mesh.vertices *= s_nocs
+    return mesh
+
+
+def pose_from_payload(payload):
+    pose = geometry_msgs.msg.Pose()
+    t = np.squeeze(payload["cam_t_nocs"][0, ...].cpu().numpy())
+    pose.position.x = float(t[0])
+    pose.position.y = float(t[1])
+    pose.position.z = float(t[2])
+    R = np.squeeze(payload["cam_R_nocs"][0, :3, :3].cpu().numpy())
+    q = Rot.from_matrix(R).as_quat()
+    pose.orientation.x = float(q[0])
+    pose.orientation.y = float(q[1])
+    pose.orientation.z = float(q[2])
+    pose.orientation.w = float(q[3])
+    return pose
+
+
+def _get_param(node, name, default):
+    node.declare_parameter(name, default)
+    value = node.get_parameter(name).get_parameter_value()
+    return value
+
+
+class CrispNode(Node):
+    """Node that exposes services to run CRISP on input images."""
+
+    def __init__(self):
+        """Load the pipeline and initialize services."""
+        super().__init__("crisp")
+
+        self.device = _get_param(self, "device", "cuda").string_value
+        self.checkpoint = _get_param(self, "checkpoint", "").string_value
+        if self.checkpoint == "":
+            self.get_logger().fatal("Model checkpoint required!")
+            raise ValueError("Missing model checkpoint")
+
+        self.checkpoint = pathlib.Path(self.checkpoint).expanduser().absolute()
+        if not self.checkpoint.exists():
+            self.get_logger().fatal(
+                f"Model checkpoint '{self.checkpoint}' does not exist!"
+            )
+            raise ValueError(f"Invalid model checkpoint {self.checkpoint}")
+
+        # TODO(nathan) figure out arbitrary width and height
+        self._img_width = _get_param(self, "width", 720).integer_value
+        self._img_height = _get_param(self, "height", 480).integer_value
+        self._cube_samples = _get_param(self, "cube_samples", 128).integer_value
+        self._cube_scale = _get_param(self, "cube_scale", 3.0).double_value
+
+        self._log_idx = 0
+        self._log_path = _get_param(self, "log_path", "").string_value
+        if self._log_path != "":
+            self.get_logger().info(f"Logging inputs to {self._log_path}")
+
+        self.get_logger().info(f"Loading model checkpoint from {self.checkpoint}...")
+        self._pipeline = setup_pipeline(
+            self.checkpoint,
+            self.device,
+            width=self._img_width,
+            height=self._img_height,
+            log_path=self._log_path,
+        )
+        self.get_logger().info("Finished loading model checkpoint and pipeline")
+
+        self._rgb_transform = get_image_transform()
+        self._inference_srv = self.create_service(
+            ExtractImplicitObject, "detect_object", self.detection_callback
+        )
+
+        group = MutuallyExclusiveCallbackGroup()
+        self._mesh_srv = self.create_service(
+            ReconstructImplicitObject,
+            "reconstruct_object",
+            self.reconstruction_callback,
+            callback_group=group,
+        )
+
+    def detection_callback(self, request, response):
+        """Run inference for a given input image."""
+        try:
+            return self._detect(request, response)
+        except Exception as e:
+            self.get_logger().error(f"Detection failed: {e}")
+            response.valid = False
+            return response
+
+    def _detect(self, request, response):
+        intrinsics = torch.tensor(request.intrinsics.k).reshape((3, 3))
+        rgb = ianvs.get_image(request.rgb)
+        if rgb is None or len(rgb.shape) != 3:
+            self.get_logger().error("Invalid RGB image!")
+            return response
+
+        mask = torch.tensor(ianvs.get_image(request.mask), dtype=torch.float32)
+        if mask is None:
+            self.get_logger().error("Invalid mask image!")
+            return response
+
+        depth = torch.tensor(ianvs.get_image(request.depth))
+        if depth is None:
+            self.get_logger().error("Invalid depth image!")
+            return response
+
+        if self._log_path != "":
+            log_path = pathlib.Path(self._log_path).expanduser().absolute()
+            log_path.mkdir(exist_ok=True, parents=True)
+            data = {
+                "rgb": rgb,
+                "mask": mask,
+                "depth": depth,
+                "intrinsics": intrinsics,
+                "volume": request.volume,
+                "semantic_id": request.semantic_id,
+            }
+            torch.save(data, log_path / f"input_{self._log_idx:05d}.pt")
+            self.get_logger().debug(
+                f"Logged input data to {log_path / f'input_{self._log_idx:05d}.pt'}"
+            )
+            self._log_idx += 1
+
+        rgb = self._rgb_transform(rgb)
+        if depth.dtype == torch.uint16:
+            depth = depth.astype(torch.float32) * 1.0e-3
+
+        bboxes = tops.masks_to_boxes(mask.unsqueeze(0))
+        obj_info = [
+            [{"label": "1", "bbox": bboxes[0, ...].int().tolist(), "id_in_segm": 255}]
+        ]
+
+        payload = self._pipeline(
+            rgbs=rgb[None, ...].to(self.device),
+            masks=mask[None, None, ...].to(self.device),
+            depths=depth[None, None, ...].to(self.device),
+            intrinsics=intrinsics[None, None, ...].to(self.device),
+            objs=obj_info,
+            frames_info=[{"inst_count": 1}],
+        )
+
+        response.valid = payload["is_valid"]
+        if not response.valid:
+            return response  # early return to indicate this is an invalid response
+        response.scale = payload["cam_s_nocs"][0, ...].item()
+        response.pose = pose_from_payload(payload)
+        response.shape_code.frombytes(
+            payload["shape_code"][0].cpu().numpy().astype(np.float32).tobytes()
+        )
+        return response
+
+    def reconstruction_callback(self, request, response):
+        try:
+            vec, scale = decompose_mesh_request(request, self.device)
+            mesh = reconstruct_mesh(
+                self._pipeline.model,
+                vec,
+                scale,
+                self._cube_samples,
+                self._cube_scale,
+            )
+            response.vertices.frombytes(
+                mesh.vertices.astype(np.float32).flatten().tobytes()
+            )
+            response.triangles.frombytes(
+                mesh.faces.astype(np.int32).flatten().tobytes()
+            )
+            self.get_logger().debug(
+                f"sending {len(response.vertices) / 3} vertices and {len(response.triangles) / 3} faces"
+            )
+            return response
+        except Exception as e:
+            self.get_logger().error(f"Mesh reconstruction failed: {e}")
+            return response
+
+
+def main(args=None):
+    """Run CRISP on images."""
+    rclpy.init()
+    try:
+        node = CrispNode()
+        executor = MultiThreadedExecutor()
+        executor.add_node(node)
+        try:
+            executor.spin()
+        finally:
+            executor.shutdown()
+            node.destroy_node()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        rclpy.try_shutdown()
+
+
+if __name__ == "__main__":
+    main()
