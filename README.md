@@ -41,7 +41,7 @@ If you find this code relevant for your work, please consider citing one or both
   - [Python Bindings](#hydra-python-bindings)
   - [Evaluation](#hydra-evaluation)
 - [Filing Issues](#filing-issues)
-- [Configuring Hydra](#additional-resources)
+- [Configuring Hydra](#configuring-hydra)
 - [Acknowledgements](#acknowledgements)
 
 ## News
@@ -203,7 +203,7 @@ Depending on the nature of the issue, it may be helpful to browse [this](doc/deb
 
 Thank you in advance for your understanding!
 
-## Additional Resources
+## Configuring Hydra
 
 We maintain information on the ROS2 interfaces that Hydra uses [here](doc/hydra_ros_interfaces.md) that may be useful if you are trying to understand how to use Hydra with a new dataset.
 We also have a preliminary guide to setting up Hydra with the Zed2i camera [here](doc/setting_up_a_new_sensor.md).
