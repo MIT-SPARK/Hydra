@@ -19,7 +19,7 @@ Most parsing happens from the initialization of `hydra::HydraRosPipeline` withou
 
 With the exception of the input configuration (discussed below), most defaults in Hydra *should* be sane enough for the pipeline to run (though this is untested).
 Labelspace information is required for the objects and the 2D places to be created (which is considered part of the input configuration discussed below).
-You may need to check the backend module configuration to make sure appropriate update functors (pieces of code that process the scene graph to correct it) are configured properly (see [here](https://github.com/MIT-SPARK/Hydra/blob/2d2322d88d11121108add39508c61eb319a0688e/config/datasets/uhumans2.yaml#L72)) for the scene graph to appropriately deform after optimization and contain rooms.
+You may need to check the backend module configuration to make sure appropriate update functors (pieces of code that process the scene graph to correct it) are configured properly (see [here](hydra/config/datasets/uhumans2.yaml#L86)) for the scene graph to appropriately deform after optimization and contain rooms.
 
 It may also be helpful to run Hydra with higher verbosity (i.e., set `glog_verbosity: 1` as a parameter) to see the currently parsed configuration.
 If you are parsing sensor information from `sensor_msgs::msg::CameraInfo` messages or via `tf` (discussed below), you will likely need to start the dataset to let Hydra resolve this information before printing configuration information for the frontend, backend, active window, and loop closure detection.

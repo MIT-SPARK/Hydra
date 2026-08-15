@@ -81,7 +81,7 @@ We will link to the new repository once this is done.
 
 </details>
 
-## Installation and Running
+## Getting Started
 
 Hydra has been tested on Ubuntu 24.04 and ROS2 Jazzy.
 
@@ -132,7 +132,7 @@ colcon build --continue-on-error
 > Depending on the amount of RAM available on your machine, you may run out of memory when compiling with `colcon build` directly (which will result in a `GCC killed` error). If this occurs, you can either specify fewer threads for colcon via `MAKEFLAGS="-j2" colcon build --parallel-workers 2` (which builds 2 packages at a time with 2 threads for 4 threads total) or compile certain larger packages directly first by building them specifically.
 
 > :warning: **Warning**</br>
-> In the `vcs import` step, GitHub may block too many concurrent requests. If you receive `kex_exchange_identification: read: Connection reset by peer` errors, try running `vcs import . < hydra/install/hydra.rosinstall --workers 1`.
+> In the `vcs import` step, GitHub may block too many concurrent requests. If you receive `kex_exchange_identification: read: Connection reset by peer` errors, try running `vcs import . < hydra/install/packages.yaml --workers 1`.
 
 ### Dataset Setup
 
@@ -142,11 +142,6 @@ Then install [rosbags](https://pypi.org/project/rosbags/) via pip (i.e., `pip in
 To convert the bag:
 ```shell
 rosbags-convert --src path/to/office.bag --dst path/to/office
-```
-
-Make sure to create a override for latching static tf topics:
-```shell
-echo "/tf_static: {depth: 1, durability: transient_local}" > ~/.tf_overrides.yaml
 ```
 
 ### Running Hydra
@@ -163,7 +158,8 @@ ros2 launch hydra_ros uhumans2.launch.yaml
 
 Then, start the rosbag in a separate terminal:
 ```shell
-ros2 bag play path/to/rosbag --clock --qos-profile-overrides-path ~/.tf_overrides.yaml
+source ~/hydra_ws/install/setup.zsh
+ros2 run ianvs play_rosbag path/to/rosbag --clock
 ```
 
 #### Running with Semantic Segmentation
@@ -178,7 +174,8 @@ ros2 launch hydra_ros uhumans2.launch.yaml use_gt_semantics:=false
 
 You may need to wait for about a minute for TensorRT to compile the model the first time you run the launch file. Once Hydra initializes, then run
 ```
-ros2 bag play path/to/rosbag --clock --qos-profile-overrides-path ~/.tf_overrides.yaml
+source ~/hydra_ws/install/setup.zsh
+ros2 run ianvs play_rosbag path/to/rosbag --clock
 ```
 
 ### Hydra Python Bindings

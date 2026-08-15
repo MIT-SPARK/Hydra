@@ -56,21 +56,21 @@ Before using Docker, make sure to:
     ```shell
     mkdir -p $WORKSPACE/src
     cd $WORKSPACE
-    echo "build: {cmake-args: [--no-warn-unused-cli, -DCMAKE_BUILD_TYPE=Release, -DCONFIG_UTILS_ENABLE_ROS=OFF]}" > colcon_defaults.yaml
+    echo "build: {cmake-args: [--no-warn-unused-cli, -DCMAKE_BUILD_TYPE=Release]}" > colcon_defaults.yaml
 
     cd src
-    git clone https://github.com/MIT-SPARK/Hydra-ROS.git hydra_ros
-    vcs import . < hydra_ros/install/packages.yaml
+    git clone https://github.com/MIT-SPARK/Hydra.git hydra
+    vcs import . < hydra/install/packages.yaml
     ```
 
 > :warning: **Warning**</br>
-> In the `vcs import` step, GitHub may block too many concurrent requests. If you receive `kex_exchange_identification: read: Connection reset by peer` errors, try running `vcs import . < hydra/install/hydra.rosinstall --workers 1`.
+> In the `vcs import` step, GitHub may block too many concurrent requests. If you receive `kex_exchange_identification: read: Connection reset by peer` errors, try running `vcs import . < hydra/install/packages.yaml --workers 1`.
 
 2. You can skip this step if you do not need to mount a dataset path from the host; otherwise, setup your dataset path (this only needs to be done once):
 
     ```shell
-    cd $WORKSPACE/src/hydra_ros/docker
-    echo "DATASETS_PATH=/home/jared/datasets" > .env
+    cd $WORKSPACE/src/hydra/docker
+    echo "DATASETS_PATH=$HOME/datasets" > .env
     ```
 
 If you want to change the dataset path, you do not need to rebuild the image; you can simply edit the `.env` file in the `docker` directory and restart the container (e.g., `make down` + `make up`). The path will be mounted to `/root/data` inside the container.
@@ -81,7 +81,7 @@ If you want to change the dataset path, you do not need to rebuild the image; yo
 1. Build the image and run the container for the `minimal` profile:
 
 ```shell
-cd $WORKSPACE/src/hydra_ros/docker
+cd $WORKSPACE/src/hydra/docker
 make build PROFILE=minimal
 make up PROFILE=minimal
 make shell PROFILE=minimal
@@ -95,24 +95,22 @@ source install/setup.bash
 ros2 launch hydra_ros uhumans2.launch.yaml
 ```
 
-
 > **:warning: Warning**<br>
 > If you encounter graphical issues (e.g. rviz not displaying), make sure you run `xhost +local:root` on the host machine and that `DISPLAY` is correctly set.
 
 2. In a separate terminal, open another shell in the container:
 
 ```bash
-cd $WORKSPACE/src/hydra_ros/docker
+cd $WORKSPACE/src/hydra/docker
 make shell PROFILE=minimal
 ```
 
 Before playing the bag, make sure to create an override for latching static tf topics, then play the bag:
 
 ```bash
-echo "/tf_static: {depth: 1, durability: transient_local}" > ~/.tf_overrides.yaml
-ros2 bag play /root/data/path/to/rosbag --clock --qos-profile-overrides-path ~/.tf_overrides.yaml
+source install/setup.bash
+ros2 run ianvs play_rosbag /root/data/path/to/rosbag --clock
 ```
-
 
 > **:warning: Warning**<br>
 > You must convert the ROS 1 bag to a ROS 2 bag before playing it. The `rosbags-convert` tool is preinstalled in the container, and you can use it to convert the bag using the following command: `rosbags-convert --src path/to/office.bag --dst path/to/office` (in ROS2, you do not need `.bag` since a ROS 2 bag is a directory). You should run this in the container if you don't have `rosbags-convert` installed on your host machine.
@@ -136,7 +134,7 @@ git clone https://github.com/stereolabs/zed-ros2-wrapper.git
 ```shell
 mkdir -p "$WORKSPACE/.zed_cache"
 
-cd $WORKSPACE/src/hydra_ros/docker
+cd $WORKSPACE/src/hydra/docker
 grep -q '^ZED_CACHE=' .env || echo "ZED_CACHE=$WORKSPACE/.zed_cache" >> .env
 ```
 ### Container (PROFILE=zed)
