@@ -41,12 +41,15 @@ If you find this code relevant for your work, please consider citing one or both
   - [Python Bindings](#hydra-python-bindings)
   - [Evaluation](#hydra-evaluation)
 - [Filing Issues](#filing-issues)
+- [Configuring Hydra](#additional-resources)
 - [Acknowledgements](#acknowledgements)
 
 ## News
 
-**Update (08/14/26):** We have recombined the ROS2 interfaces for Hydra (previously available in [this repo](https://github.com/MIT-SPARK/Hydra-ROS)) with this repository.
-You will likely have to perform a clean build (and remove the old Hydra-ROS repo from your workspace) if you have previously installed and built Hydra.
+**Update (08/14/26):** We have recombined the ROS2 Hydra interfances (from [this repo](https://github.com/MIT-SPARK/Hydra-ROS)) with this repository.
+
+> :warning:**Warning**<br>
+> You will have to perform a clean build (and remove the old Hydra-ROS repo from your workspace) if you have previously installed and built Hydra.
 
 **Update (07/09/25):** We've archived the ROS1 version of Hydra and switched to the ROS2 version by default. See [this branch](https://github.com/MIT-SPARK/Hydra/tree/archive/ros_noetic) for the pinned version of the code if you need the ROS1 version for any reason. We are unlikely to support any issues that come up with the archived ROS1 version.
 
@@ -87,7 +90,7 @@ Hydra has been tested on Ubuntu 24.04 and ROS2 Jazzy.
 
 > :warning: **Warning** <br>
 > Hydra has previously worked with Ubuntu 22.04 and ROS2 Iron and **might** still build on Iron.
-> It **will not** build on ROS2 distributions older than Iron (it depends on the `NodeInterfaces` suite of classes that were introduced in Iron).
+> It **will not** build on ROS2 distributions older than Iron (it depends on API introduced in Iron).
 
 You can follow the instructions [here](https://docs.ros.org/en/jazzy/Installation.html) to install ROS2 if you haven't already.
 The link points to Jazzy currently, pay attention to the distribution!
