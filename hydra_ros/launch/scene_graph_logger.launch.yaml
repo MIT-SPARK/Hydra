@@ -1,0 +1,9 @@
+---
+launch:
+  - arg: {name: output_path, default: ''}
+  - arg: {name: output_every_num, default: '5'}
+  - node:
+    pkg: hydra_ros
+    exec: scene_graph_logger_node
+    name: scene_graph_logger
+    args: '--config-utilities-yaml {output_path: $(var output_path), output_every_num: $(arg output_every_num)}'

@@ -1,0 +1,14 @@
+---
+model:
+  instance_model:
+    type: gdsam2
+    text_prompt: bench., car. trash bin. fire hydrant.
+    sam2_checkpoint: sam2.1_hiera_small.pt
+    sam2_model_config: sam2.1_hiera_s.yaml
+    grounding_dino_config: GroundingDINO_SwinT_OGC.py
+    grounding_dino_checkpoint: groundingdino_swint_ogc.pth
+    box_threshold: 0.45
+    text_threshold: 0.25
+    multimask_output: false
+    erosion: false
+    erosion_kernel_size: 5

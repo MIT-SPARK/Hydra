@@ -1,0 +1,10 @@
+---
+/**:
+  ros__parameters:
+    common.visualization_frame: base
+    common.lidar_frame: $(var lidar_frame)
+    common.base_frame: $(var robot_frame)
+    common.map_frame: $(var odom_frame)
+    gravity_alignment.enable_gravity_alignment: false
+    pcl_verbose: false
+    extrinsics_timeout_s: -1.0

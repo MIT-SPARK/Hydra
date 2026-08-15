@@ -1,0 +1,18 @@
+- git:
+    local-name: hydra
+    uri: https://github.com/MIT-SPARK/Hydra.git
+    version: develop
+- git:
+    local-name: khronos
+    uri: https://github.com/MIT-SPARK/Khronos.git
+    version: dcist
+- git:
+    local-name: patchwork
+    uri: https://github.com/LimHyungTae/patchwork.git
+- git:
+    local-name: spark_fast_lio
+    uri: https://github.com/MIT-SPARK/spark-fast-lio.git
+- git:
+    local-name: spark_dsg
+    uri: https://github.com/MIT-SPARK/Spark-DSG.git
+    version: develop

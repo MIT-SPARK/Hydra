@@ -1,0 +1,31 @@
+---
+session_name: uhumans2
+shell_command_before:
+  - source /opt/ros/jazzy/setup.{{ shell.extension }}
+  - source {{ workspace_path }}
+options:
+  default-command: {{ shell.cmd }}
+windows:
+  - window_name: hydra
+    panes:
+      {% if run_zenoh %}
+      - ros2 run rmw_zenoh_cpp rmw_zenohd
+      {% endif %}
+      {% if object_variant is equalto 'crisp' %}
+      - ros2 launch hydra_plusplus crisp.launch.yaml config:=crisp_uhumans2
+      {% endif %}
+      - ros2 run ianvs play_rosbag {{ bag_path }}
+        --clock
+        -d {{ delay }}
+        -r {{ rate }}
+        --start-offset {{ bag_start }}
+        --playback-duration {{ bag_duration }}
+      - ros2 launch hydra_plusplus uhumans2.launch.yaml
+          robot_id:={{ robot_id }}
+          object_variant:={{ object_variant }}
+          log_path:={{ output_path }}
+          start_visualizer:={{ visualize | lower }}
+          start_rviz:={{ visualize | lower }}
+        {% if close_session %}
+        && tmux kill-session
+        {% endif %}

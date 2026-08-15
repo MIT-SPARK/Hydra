@@ -1,0 +1,4 @@
+---
+sinks:
+  - {type: GvdPlacesVisualizer, gvd: {slice_height: 0.0}, colormap: {palette: {type: ironbow}}}
+  - type: GvdOccupancyPublisher

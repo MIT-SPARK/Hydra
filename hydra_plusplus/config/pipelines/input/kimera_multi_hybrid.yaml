@@ -1,0 +1,30 @@
+---
+input:
+  type: RosInput
+  tf_lookup: {verbosity: 1}
+  clear_queue_on_fail: true
+  inputs:
+    rgbd:
+      receiver: {type: InstanceImageReceiver, input_separation_s: 0.1}
+      sensor:
+        type: camera_info
+        min_range: 0.1
+        max_range: 5.0
+        extrinsics: {type: ros, robot_frame: $<var robot_frame>, sensor_frame: $<var robot_name>/forward_color_optical_frame}
+    velodyne16:
+      receiver: {type: PointcloudReceiver, input_separation_s: 0.5, instance_ids: true, discard_transparent_color: true}
+      sensor:
+        type: lidar
+        min_range: 0.1
+        max_range: 15.0
+        is_asymmetric: false
+        horizontal_resolution: 0.2  # 360 / 1800 = 0.2
+        vertical_resolution: 2.0  # 30 / 16 = 2.0
+        horizontal_fov: 360.0
+        vertical_fov: 30.0
+        vertical_fov_top: 15.0
+        extrinsics: {type: ros, robot_frame: $<var robot_frame>, sensor_frame: $<var robot_name>/velodyne}
+        # extrinsics:
+        #   type: param
+        #   body_R_sensor: {w: 0.998292, x: 0.012944, y: -0.056663, z: 0.005868}
+        #   body_p_sensor: [-0.0309, -0.1495, 0.5077]

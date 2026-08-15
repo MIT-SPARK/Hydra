@@ -1,0 +1,263 @@
+---
+frames:
+  - child_frame_id: hathor/forward_depth_frame
+    frame_id: hathor/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: hathor/forward_depth_optical_frame
+    frame_id: hathor/forward_depth_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: hathor/forward_color_frame
+    frame_id: hathor/forward_link
+    qw: 0.999996
+    qx: -0.000356
+    qy: -0.001859
+    qz: 0.001997
+    x: -0.000456
+    y: -0.059332
+    z: 5.9e-05
+  - child_frame_id: hathor/forward_color_optical_frame
+    frame_id: hathor/forward_color_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: hathor/forward_infra1_frame
+    frame_id: hathor/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: hathor/forward_infra1_optical_frame
+    frame_id: hathor/forward_infra1_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: hathor/forward_infra2_frame
+    frame_id: hathor/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.09496
+    z: -0.0
+  - child_frame_id: hathor/forward_infra2_optical_frame
+    frame_id: hathor/forward_infra2_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: hathor/forward_gyro_frame
+    frame_id: hathor/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.01602
+    y: -0.03022
+    z: 0.0074
+  - child_frame_id: hathor/forward_imu_optical_frame
+    frame_id: hathor/forward_gyro_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: hathor/forward_accel_frame
+    frame_id: hathor/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.01602
+    y: -0.03022
+    z: 0.0074
+  - child_frame_id: hathor/forward_accel_optical_frame
+    frame_id: hathor/forward_accel_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: hathor/forward_link
+    frame_id: hathor/realsense_base
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/base_link
+    frame_id: hathor/base
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/chassis_link
+    frame_id: hathor/base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/front_fender_link
+    frame_id: hathor/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/front_mount
+    frame_id: hathor/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.12
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/imu_link
+    frame_id: hathor/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/mid_mount
+    frame_id: hathor/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.184
+  - child_frame_id: hathor/navsat_link
+    frame_id: hathor/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.18
+    y: 0.126
+    z: 0.1815
+  - child_frame_id: hathor/rear_fender_link
+    frame_id: hathor/chassis_link
+    qw: -0.0
+    qx: 0.0
+    qy: 0.0
+    qz: 1.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/rear_mount
+    frame_id: hathor/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.12
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/velodyne_base_link
+    frame_id: hathor/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.1
+  - child_frame_id: hathor/velodyne
+    frame_id: hathor/velodyne_base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0377
+  - child_frame_id: hathor/vlp16_mount_link
+    frame_id: hathor/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: hathor/realsense_base
+    frame_id: hathor/base
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.2
+  - child_frame_id: hathor/forward_infra1_optical_frame
+    frame_id: hathor/realsense_base
+    qw: 0.999947
+    qx: 0.005958
+    qy: 0.004219
+    qz: 0.007244
+    x: -0.026474
+    y: 0.009149
+    z: 0.025756
+  - child_frame_id: hathor/forward_infra2_optical_frame
+    frame_id: hathor/realsense_base
+    qw: 0.999943
+    qx: 0.00496
+    qy: 0.006164
+    qz: 0.007169
+    x: 0.068455
+    y: 0.010707
+    z: 0.025654
+  - child_frame_id: hathor/map
+    frame_id: world
+    qw: 0.877583
+    qx: 0.479426
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0

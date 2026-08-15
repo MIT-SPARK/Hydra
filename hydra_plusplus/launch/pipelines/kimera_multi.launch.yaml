@@ -1,0 +1,71 @@
+---
+launch:
+  # required
+  - arg: {name: robot_name, description: Robot name to use}
+  - arg: {name: log_path, description: output path for hydra}
+  - arg: {name: object_variant, description: 'object extraction variant (one of [crisp, khronos, hydra])'}
+  # pipeline
+  - arg: {name: robot_id, default: '0', description: Robot ID}
+  - arg: {name: exit_after_clock, default: 'true', description: shutdown hydra node after a rosbag finishes playing}
+  - arg: {name: sensor_type, default: hybrid}
+  - arg: {name: segmentation_model, default: yoloe, description: segmentation model to use}
+  # frames
+  - arg: {name: robot_frame, default: $(var robot_name)/base, description: robot body tf frame}
+  - arg: {name: odom_frame, default: $(var robot_name)/odom, description: odometry frame}
+  - arg: {name: map_frame, default: $(var robot_name)/odom, description: map frame}
+  # nodes
+  - push_ros_namespace: {namespace: $(var robot_name)}
+  - group:
+      - push_ros_namespace: {namespace: forward}
+      - pyenv_node:  # 2D instance segmentation
+          pkg: semantic_inference_ros
+          exec: instance_segmentation_node
+          name: semantic_inference
+          pyenv: $(env HOME)/.semantic_inference/env
+          on_exit: shutdown
+          param:
+            - {name: config_path, value: $(find-pkg-share hydra_plusplus)/config/models/$(var segmentation_model).yaml}
+      - node:  # point cloud backprojection
+          pkg: semantic_inference_ros
+          exec: backprojection_node
+          name: semantic_projector
+          remap:
+            - {from: cloud, to: /$(var robot_name)/cloud_groundseg}
+          args: |
+            --config-utilities-yaml {camera_frame: $(var robot_name)/forward_color_optical_frame}
+            --config-utilities-file $(find-pkg-share hydra_plusplus)/config/data/kimera_multi_backprojection.yaml
+  - node:
+      pkg: hydra_ros
+      exec: hydra_ros_node
+      name: hydra
+      on_exit: shutdown
+      param:
+        - {name: use_sim_time, value: true}
+      remap:
+        - {from: hydra/input/rgbd/depth_registered/image_rect, to: forward/depth/image_rect_raw}
+        - {from: hydra/input/rgbd/rgb/image_raw, to: forward/color/image_raw}
+        - {from: hydra/input/rgbd/rgb/camera_info, to: forward/color/camera_info}
+        - {from: hydra/input/rgbd/semantic/image_raw, to: forward/semantic/image_raw}
+        - {from: hydra/input/velodyne16/pointcloud, to: forward/labeled_cloud}
+        - {from: hydra/labelspace, to: forward/labelspace}
+        - {from: hydra/detect_object, to: detect_object}
+      args: >-
+        --config-utilities-var robot_name=$(var robot_name)
+        --config-utilities-var robot_frame=$(var robot_frame)
+        --config-utilities-file $(find-pkg-share hydra_plusplus)/config/pipelines/kimera_multi.yaml
+        --config-utilities-file $(find-pkg-share hydra_plusplus)/config/pipelines/variants/kimera_multi_$(var object_variant).yaml
+        --config-utilities-file $(find-pkg-share hydra_plusplus)/config/pipelines/input/kimera_multi_$(var sensor_type).yaml
+        --config-utilities-yaml {robot_id: $(var robot_id), odom_frame: $(var odom_frame), robot_frame: $(var robot_frame), map_frame: $(var map_frame)}
+        --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
+        --config-utilities-yaml {glog_verbosity: 0, config_verbosity: 1, show_run_settings: true, preprint_config: false}
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: map_tf_pub
+      args: --frame-id map --child-frame-id $(var robot_name)/odom
+      param:
+        - {name: use_sim_time, value: true}
+  - include:
+      file: $(find-pkg-share hydra_plusplus)/launch/visualizer.launch.yaml
+      arg:
+        - {name: rviz_path, value: $(find-pkg-share hydra_plusplus)/rviz/kimera_multi.rviz}

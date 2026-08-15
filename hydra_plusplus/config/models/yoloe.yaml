@@ -1,0 +1,10 @@
+---
+model:
+  instance_model:
+    text_prompt: [bench, car, trash bin, fire hydrant]
+    type: yoloe
+    model_name: yoloe-26m-seg.pt
+    confidence_threshold: 0.1
+# add extra label 1 between unlabeled 0 and coco labelspace
+extra_categories: [ground]
+category_metadata: {surface_places_labels: [1]}

@@ -1,0 +1,13 @@
+---
+paths: [khronos, khronos_ros]
+active_window:
+  type: ActiveWindow
+  projective_integrator: {semantic_integrator: {type: MLESemanticIntegrator}}
+  object_detector: {type: ConnectedSemantics, min_cluster_size: 50, grid_size: 0.1, max_range: 4.5}
+  tracker: {type: MaxIouTracker, track_by: voxels, min_semantic_iou: 0.25, min_cross_iou: 0.1, voxel_size: 0.2, temporal_window: 10.0, min_num_observations: 15}
+  object_extractor:
+    type: ExternalObjectExtractor
+    min_object_allocation_confidence: 0.5
+    excluded_labels: []
+frontend:
+  enable_mesh_objects: false

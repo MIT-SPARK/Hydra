@@ -1,0 +1,227 @@
+---
+frames:
+  - child_frame_id: sparkal2/forward_depth_frame
+    frame_id: sparkal2/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal2/forward_depth_optical_frame
+    frame_id: sparkal2/forward_depth_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal2/forward_color_frame
+    frame_id: sparkal2/forward_link
+    qw: 0.999996
+    qx: -0.000356
+    qy: -0.001859
+    qz: 0.001997
+    x: -0.000456
+    y: -0.059332
+    z: 5.9e-05
+  - child_frame_id: sparkal2/forward_color_optical_frame
+    frame_id: sparkal2/forward_color_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal2/forward_infra1_frame
+    frame_id: sparkal2/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal2/forward_infra1_optical_frame
+    frame_id: sparkal2/forward_infra1_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal2/forward_infra2_frame
+    frame_id: sparkal2/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.09496
+    z: -0.0
+  - child_frame_id: sparkal2/forward_infra2_optical_frame
+    frame_id: sparkal2/forward_infra2_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal2/forward_gyro_frame
+    frame_id: sparkal2/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.01602
+    y: -0.03022
+    z: 0.0074
+  - child_frame_id: sparkal2/forward_imu_optical_frame
+    frame_id: sparkal2/forward_gyro_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal2/forward_accel_frame
+    frame_id: sparkal2/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.01602
+    y: -0.03022
+    z: 0.0074
+  - child_frame_id: sparkal2/forward_accel_optical_frame
+    frame_id: sparkal2/forward_accel_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal2/forward_link
+    frame_id: sparkal2/realsense_base
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal2/base_link
+    frame_id: sparkal2/base
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal2/chassis_link
+    frame_id: sparkal2/base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal2/front_fender_link
+    frame_id: sparkal2/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal2/front_mount
+    frame_id: sparkal2/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.12
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal2/imu_link
+    frame_id: sparkal2/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal2/mid_mount
+    frame_id: sparkal2/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.184
+  - child_frame_id: sparkal2/navsat_link
+    frame_id: sparkal2/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.18
+    y: 0.126
+    z: 0.1815
+  - child_frame_id: sparkal2/rear_fender_link
+    frame_id: sparkal2/chassis_link
+    qw: -0.0
+    qx: 0.0
+    qy: 0.0
+    qz: 1.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal2/rear_mount
+    frame_id: sparkal2/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.12
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal2/velodyne_base_link
+    frame_id: sparkal2/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.1
+  - child_frame_id: sparkal2/velodyne
+    frame_id: sparkal2/velodyne_base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0377
+  - child_frame_id: sparkal2/vlp16_mount_link
+    frame_id: sparkal2/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0

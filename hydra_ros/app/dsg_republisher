@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Script that receives and republishes a dsg."""
+
+import rclpy
+from rclpy.node import Node
+
+import hydra_ros
+
+
+class DsgRepublishNode(Node):
+    """Node to republish a DSG."""
+
+    def __init__(self, with_mesh=True):
+        """Start a republisher node."""
+        super().__init__("scene_graph_republisher")
+        self._sub = hydra_ros.DsgSubscriber("dsg_in", self._handle_graph)
+        self._pub = hydra_ros.DsgPublisher("dsg_out")
+
+        # self.publisher_ = self.create_publisher(String, "topic", 10)
+
+    def _handle_graph(self, header, G):
+        stamp_ns = header.stamp.to_nsec()
+        self.get_logger().info(
+            f"Got graph with {G.num_nodes()} nodes @ {stamp_ns} [ns]"
+        )
+        self._pub.publish_with_header(G, header)
+
+
+if __name__ == "__main__":
+    rclpy.init()
+    node = DsgRepublishNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()

@@ -1,0 +1,16 @@
+---
+launch:
+  - arg: {name: config}
+  - arg: {name: ns, default: ''}
+  - arg: {name: env_path, default: $(env HYDRAPP_ENV), description: Path to crisp environment}
+  - arg: {name: config_path, default: $(find-pkg-share hydra_plusplus)/config/models/$(var config).yaml}
+  - arg: {name: log_path, default: ''}
+  - pyenv_node:
+      pyenv: $(var env_path)
+      pkg: hydra_plusplus
+      exec: crisp_node
+      name: crisp
+      namespace: $(var ns)
+      param:
+        - {from: $(var config_path), allow_substs: true}
+        - {name: log_path, value: $(var log_path)}

@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>hydra_plusplus</name>
+  <version>2.0.0</version>
+  <description>TODO</description>
+  <maintainer email="yunchang@mit.edu">Yun Chang</maintainer>
+  <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>khronos_msgs</exec_depend>
+  <exec_depend>python3-click</exec_depend>
+  <exec_depend>python3-jinja2</exec_depend>
+  <exec_depend>python3-rich</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+
+  <export>
+      <build_type>ament_cmake</build_type>
+  </export>
+</package>

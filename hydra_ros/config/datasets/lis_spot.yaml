@@ -1,0 +1,26 @@
+---
+input:
+  type: RosInput
+  inputs:
+    - receiver:
+        type: ClosedSetImageReceiver
+        queue_size: 30
+        ns: hydra_ros_node/camera_1
+      sensor:
+        type: camera_info
+        min_range: 0.4
+        max_range: 5.0
+        ns: hydra_ros_node/camera_1
+        extrinsics:
+          type: ros
+    - receiver:
+        type: ClosedSetImageReceiver
+        queue_size: 30
+        ns: hydra_ros_node/camera_2
+      sensor:
+        type: camera_info
+        min_range: 0.4
+        max_range: 5.0
+        ns: hydra_ros_node/camera_2
+        extrinsics:
+          type: ros

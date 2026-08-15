@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Broadcast a tf from odom."""
+
+import geometry_msgs.msg
+import nav_msgs.msg
+import rclpy
+import tf2_ros
+from rclpy.node import Node
+
+
+class OdomToTf(Node):
+    """Class that republishes odom to tf."""
+
+    def _get_param(self, name, default=None):
+        return self.declare_parameter(name, default).get_parameter_value()
+
+    def __init__(self):
+        """Construct the node."""
+        super().__init__("odom_to_tf")
+        self._parent_frame = self._get_param("parent_frame", "odom").string_value
+        self._child_frame = self._get_param("child_frame", "base_link").string_value
+        self._broadcaster = tf2_ros.TransformBroadcaster(self)
+        self._sub = self.create_subscription(
+            nav_msgs.msg.Odometry, "~/odom", self._callback, 10
+        )
+
+    def _callback(self, msg):
+        pose = geometry_msgs.msg.TransformStamped()
+        pose.header.stamp = msg.header.stamp
+        pose.header.frame_id = self._parent_frame
+        pose.child_frame_id = self._child_frame
+        pose.transform.translation.x = msg.pose.pose.position.x
+        pose.transform.translation.y = msg.pose.pose.position.y
+        pose.transform.translation.z = msg.pose.pose.position.z
+        pose.transform.rotation.w = msg.pose.pose.orientation.w
+        pose.transform.rotation.x = msg.pose.pose.orientation.x
+        pose.transform.rotation.y = msg.pose.pose.orientation.y
+        pose.transform.rotation.z = msg.pose.pose.orientation.z
+        self._broadcaster.sendTransform(pose)
+
+
+def main(args=None):
+    """Do stuff."""
+    rclpy.init(args=args)
+    try:
+        node = OdomToTf()
+        rclpy.spin(node)
+        node.destroy_node()
+    finally:
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,7 +1,7 @@
 ---
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
-exclude: \.clang-format|notebooks.*|\.github.*
+exclude: .*\.tsv|\.clang-format|.*docker-compose.yml|hydra_plusplus/tmux|notebooks.*|\.github.*
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

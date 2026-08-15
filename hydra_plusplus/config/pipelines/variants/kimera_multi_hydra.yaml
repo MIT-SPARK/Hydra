@@ -1,0 +1,28 @@
+---
+active_window:
+  type: ReconstructionModule
+  tsdf:
+    sensor_map_mode: Strict
+    sensors:
+      rgbd:
+        semantic_integrator: {type: SingleLabelIntegrator}
+      velodyne16:
+        use_constant_weight: true
+        extra_integration_distance: 3.0
+        extra_integration_distance_labels: [1]
+        semantic_integrator: {type: SingleLabelIntegrator, labels_to_ignore: []}
+  sinks:
+    - type: ReconstructionVisualizer
+      sensor_displays:
+        sensor_map_mode: Strict
+        sensors:
+          rgbd: {}
+          velodyne16: {height_scale: 32.0, overlay_alpha: 1.0}
+frontend:
+  enable_mesh_objects: true
+  objects:
+    bounding_box_type: AABB
+    min_cluster_size: 40
+    cluster_tolerance: 0.25
+    sinks:
+      - {type: ObjectVisualizer}

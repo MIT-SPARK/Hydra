@@ -1,0 +1,7 @@
+---
+plugins:
+  mesh: {type: MeshPlugin, coloring: {type: ''}}
+  agent_poses: {type: PosePlugin, num_to_skip: 0}
+renderer:
+  layers:
+    2: {text: {draw: true}}

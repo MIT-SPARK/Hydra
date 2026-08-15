@@ -1,0 +1,191 @@
+---
+launch:
+  - arg: {name: model_name, default: /root/hydra_ws/.models/ade20k-efficientvit_seg_l2.onnx}
+  - arg: {name: model_config_path, default: /root/hydra_ws/src/semantic_inference/semantic_inference_ros/config/models/ade20k-efficientvit_seg_l2.yaml}
+  - arg: {name: labelspace_name, default: ade20k_mit}
+  - arg: {name: use_sim_time, default: 'false'}
+  - arg: {name: dataset, default: a1}
+  - arg: {name: rgb_compressed_topic, default: /cam_d455/color/image_raw/compressed}
+  - arg: {name: rgb_topic, default: /cam_d455/color/image_raw}
+  - arg: {name: camera_info_topic, default: /cam_d455/color/camera_info}
+  - arg: {name: depth_topic_raw, default: /cam_d455/depth/image_rect_raw}
+  - arg: {name: depth_topic, default: /depth_registered/image_rect}
+  - arg: {name: depth_info_topic, default: /cam_d455/depth/camera_info}
+
+  # TODO(jared): currently, these don't do anything
+  - arg: {name: enable_decompress, default: 'false'}
+  - arg: {name: enable_register_depth, default: 'false'}
+  - arg: {name: enable_pc, default: 'false'}
+
+  # extrinsics
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: map_to_odom
+      args: 0 0 0 0 0 0 1 map cam_t265_odom_frame
+
+  # result from kalibr --- difficult to connect to tf tree, so we use
+  # t265_to_d455_bridge below, which was computed backward through
+  # the static tf tree e.g., T^IMU_CAM = T^IMU_OPT * T^OPT_CAM
+  # - node:
+  #     pkg: tf2_ros
+  #     exec: static_transform_publisher
+  #     name: cam_t265_imu_optical_frame_to_cam_d455_color_optical_frame
+  #     args: "0.02216565 0.01795623 -0.21828447 0.9999320589420063 -0.008628001195529594 0.004334249473494838 0.006530518690349069 cam_t265_imu_optical_frame cam_d455_color_optical_frame_bridge"
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: t265_to_d455_bridge
+      args: -0.03682085814765222 0.018967817042455707 -0.21903849135413533 -0.502094165524598 0.5043749875316702 0.48921230299321244 0.504161326857448 cam_t265_imu_optical_frame cam_d455_link
+
+  # extracted tfs (t265)
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: t265_static_tf_0
+      args: 0.00009436560503672808 0.021378569304943085 -0.00007563530380139127 2.220446049250313e-16 0.0 1.0 0.0 cam_t265_link cam_t265_gyro_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: t265_static_tf_1
+      args: 0 0 0 0.5 -0.4999999999999999 -0.5 0.5000000000000001 cam_t265_gyro_frame cam_t265_imu_optical_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: t265_static_tf_2
+      args: 0.00009436560503672808 0.021378569304943085 -0.00007563530380139127 2.220446049250313e-16 0.0 1.0 0.0 cam_t265_link cam_t265_accel_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: t265_static_tf_3
+      args: 0 0 0 0.5 -0.4999999999999999 -0.5 0.5000000000000001 cam_t265_accel_frame cam_t265_accel_optical_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: t265_static_tf_4
+      args: 0 0 0 0 0 0 1 cam_t265_pose_frame cam_t265_link
+
+  # extracted tfs (d455)
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: d455_static_tf_0
+      args: 0.0 -0.0 -0.0 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_depth_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: d455_static_tf_1
+      args: 0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_depth_frame cam_d455_depth_optical_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: d455_static_tf_2
+      args: -0.0002813368628267199 -0.059279922395944595 -3.9372611354338005e-05 4.3593594455160065e-05 0.00020654933177866042 0.002206892240792513 0.9999975562095642 cam_d455_link cam_d455_color_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: d455_static_tf_3
+      args: 0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_color_frame cam_d455_color_optical_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: d455_static_tf_4
+      args: -0.016019999980926514 -0.030220000073313713 0.007400000002235174 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_gyro_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: d455_static_tf_5
+      args: 0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_gyro_frame cam_d455_imu_optical_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: d455_static_tf_6
+      args: -0.016019999980926514 -0.030220000073313713 0.007400000002235174 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_accel_frame
+  - node:
+      pkg: tf2_ros
+      exec: static_transform_publisher
+      name: d455_static_tf_7
+      args: 0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_accel_frame cam_d455_accel_optical_frame
+
+  # decompress images
+  # todo(jared): add condition
+  - node:
+      pkg: image_transport
+      exec: republish
+      name: decompress_rgb
+      param:
+        - {name: in_transport, value: compressed}
+        - {name: out_transport, value: raw}
+      remap:
+        - {from: in/compressed, to: $(var rgb_compressed_topic)}
+        - {from: out, to: $(var rgb_topic)}
+
+  # register depth
+  # todo(jared): add condition
+  - node:
+      pkg: depth_image_proc
+      exec: register_node
+      name: depth_register
+      remap:
+        - {from: depth/image_rect, to: $(var depth_topic_raw)}
+        - {from: depth/camera_info, to: $(var depth_info_topic)}
+        - {from: rgb/camera_info, to: $(var camera_info_topic)}
+      param:
+        - name: queue_size
+          value: 10
+
+  # publish point cloud from color + depth (only for visualization)
+  # todo(jared): add condition
+  - node:
+      pkg: depth_image_proc
+      exec: point_cloud_xyzrgb_node
+      name: depth_to_pointcloud
+      remap:
+        - {from: depth/image_rect, to: $(var depth_topic)}
+        - {from: depth/camera_info, to: $(var depth_info_topic)}
+        - {from: rgb/image_rect_color, to: $(var rgb_topic)}
+        - {from: rgb/camera_info, to: $(var camera_info_topic)}
+      param:
+        - name: queue_size
+          value: 10
+
+  # semantic inference
+  - node:
+      pkg: semantic_inference_ros
+      exec: closed_set_node
+      namespace: frontleft
+      name: segmentation
+      remap:
+        - {from: color/image_raw, to: $(var rgb_topic)}
+        - {from: color/camera_info, to: $(var camera_info_topic)}
+        - {from: depth/image_rect, to: $(var depth_topic)}
+      args: >
+        --config-utilities-file $(var model_config_path)
+        --config-utilities-file $(find-pkg-share semantic_inference_ros)/config/label_groupings/$(var labelspace_name).yaml@output/recolor
+        --config-utilities-yaml {output: {recolor: {colormap_path: $(find-pkg-share semantic_inference_ros)/config/distinct_150_colors.csv}}}
+        --config-utilities-yaml {segmenter: {model: {model_file: $(var model_name)}}}
+        --config-utilities-yaml {worker: {max_queue_size: 1, image_separation_s: 0.0}}
+
+  # hydra
+  - set_remap: {from: hydra/input/frontleft/rgb/image_raw, to: $(var rgb_topic)}
+  - set_remap: {from: hydra/input/frontleft/depth_registered/image_rect, to: $(var depth_topic)}
+  - set_remap: {from: hydra/input/frontleft/rgb/camera_info, to: $(var camera_info_topic)}
+  - set_remap: {from: hydra/input/frontleft/semantic/image_raw, to: /frontleft/semantic/image_raw}
+  - node:
+      pkg: hydra_ros
+      exec: hydra_ros_node
+      name: hydra
+      param:
+        - {name: use_sim_time, value: $(var use_sim_time)}
+      args: >-
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/$(var dataset).yaml
+        --config-utilities-file $(find-pkg-share hydra)/config/label_spaces/$(var labelspace_name)_label_space.yaml
+        --config-utilities-yaml {print_missing: false, show_config: true, verbosity: 2}
+        --config-utilities-yaml {log_path: $(env HOME)/.hydra/$(var dataset)}
+        --config-utilities-yaml {glog_level: 0, glog_verbosity: 0}
+  - set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
+  - include:
+      file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
+      arg:
+        - {name: visualizer_frame, value: map}
+        - {name: rviz_path, value: $(find-pkg-share hydra_ros)/hydra_visualizer/rviz/a1.rviz}

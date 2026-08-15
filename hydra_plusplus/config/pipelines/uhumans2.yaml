@@ -1,0 +1,36 @@
+---
+map_window: {type: spatial, max_radius_m: 8.0}
+active_window:
+  volumetric_map: {voxels_per_side: 16, voxel_size: 0.1, truncation_distance: 0.3, with_semantics: true}
+  frame_data_buffer: {max_buffer_size: 10000}
+frontend:
+  pgmo: {time_horizon: 15.0, d_graph_resolution: 2.5, mesh_resolution: 0.005}
+  pose_graph_tracker: {type: PoseGraphFromOdom, min_pose_separation: 0.1, rotation_separation_weight: 1.0, min_time_separation_s: 1.0}
+  freespace_places:
+    type: gvd
+    gvd: {max_distance_m: 4.5, min_diff_m: 0.1, voronoi_config: {min_distance_m: 0.30, parent_l1_separation: 20, parent_cos_angle_separation: 0.2}}
+    graph: {compression_distance_m: 1.5, min_node_distance_m: 0.4, min_edge_distance_m: 0.25, node_merge_distance_m: 0.7, merge_policy: distance}
+    tsdf_interpolator: {type: downsample, ratio: 2}
+backend:
+  add_places_to_deformation_graph: false
+  update_functors:
+    agents: {type: UpdateAgentsFunctor}
+    objects: {type: UpdateObjectsFunctor}
+    places: {type: UpdatePlacesFunctor}
+    rooms:
+      type: UpdateRoomsFunctor
+      room_finder: {min_dilation_m: 0.5, max_dilation_m: 1.2, min_component_size: 10, dilation_threshold_mode: PLATEAU, plateau_ratio: 0.15, clustering_mode: NEIGHBORS, dilation_diff_threshold_m: -1.0}
+    buildings: {type: UpdateBuildingsFunctor}
+  pgmo:
+    optimizer: {type: KimeraRpgoOptimizer, gnc: {inlier_probability: 0.9, mu_step: 1.6, max_iterations: 100}}
+    covariance:
+      odom: 1.0e-02
+      loop_close: 5.0e-02
+      sg_loop_close: 1.0e-01
+      prior: 1.0e-02
+      mesh_mesh: 1.0e-02
+      pose_mesh: 1.0e-02
+      place_mesh: 1.0e-02
+      place_edge: 10.0
+      place_merge: 10.0
+      object_merge: 10.0

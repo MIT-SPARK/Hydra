@@ -1,0 +1,22 @@
+---
+input:
+  type: RosInput
+  tf_lookup: {verbosity: 1}
+  clear_queue_on_fail: true
+  inputs:
+    velodyne16:
+      receiver: {type: PointcloudReceiver, instance_ids: true, discard_transparent_color: true}
+      sensor:
+        type: lidar
+        min_range: 0.1
+        max_range: 10.0
+        is_asymmetric: false
+        horizontal_resolution: 0.2  # 360 / 1800 = 0.2
+        vertical_resolution: 2.0  # 30 / 16 = 2.0
+        horizontal_fov: 360.0
+        vertical_fov: 30.0
+        vertical_fov_top: 15.0
+        extrinsics: {type: identity}
+frontend:
+  objects:
+    min_cluster_size: 30

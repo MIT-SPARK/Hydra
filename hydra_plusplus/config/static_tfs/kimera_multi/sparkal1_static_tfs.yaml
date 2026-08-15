@@ -1,0 +1,335 @@
+---
+frames:
+  - child_frame_id: sparkal1/os_sensor
+    frame_id: sparkal1/ouster_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/imu_link_ned
+    frame_id: sparkal1/imu_link
+    qw: -3.0e-06
+    qx: 0.707105
+    qy: 0.707108
+    qz: -3.0e-06
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/base_link
+    frame_id: sparkal1/base
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/chassis_link
+    frame_id: sparkal1/base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/embedded_imu_link
+    frame_id: sparkal1/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/forward_bottom_screw_frame
+    frame_id: sparkal1/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/forward_camera_link
+    frame_id: sparkal1/forward_bottom_screw_frame
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0175
+    z: 0.0125
+  - child_frame_id: sparkal1/forward_color_frame
+    frame_id: sparkal1/forward_depth_frame
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.015
+    z: 0.0
+  - child_frame_id: sparkal1/forward_color_optical_frame
+    frame_id: sparkal1/forward_color_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/forward_depth_frame
+    frame_id: sparkal1/forward_camera_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/forward_depth_optical_frame
+    frame_id: sparkal1/forward_depth_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/forward_link
+    frame_id: sparkal1/sensor_plate_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.16
+  - child_frame_id: sparkal1/forward_left_ir_frame
+    frame_id: sparkal1/forward_depth_frame
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/forward_left_ir_optical_frame
+    frame_id: sparkal1/forward_left_ir_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/forward_right_ir_frame
+    frame_id: sparkal1/forward_depth_frame
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.05
+    z: 0.0
+  - child_frame_id: sparkal1/forward_right_ir_optical_frame
+    frame_id: sparkal1/forward_right_ir_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/front_fender_link
+    frame_id: sparkal1/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/front_mount
+    frame_id: sparkal1/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.12
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/imu_link
+    frame_id: sparkal1/sensor_plate_link
+    qw: 0.712769
+    qx: 0.001232
+    qy: -0.004775
+    qz: 0.701381
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/mid_mount
+    frame_id: sparkal1/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.184
+  - child_frame_id: sparkal1/navsat_link
+    frame_id: sparkal1/chassis_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.18
+    y: 0.126
+    z: 0.1815
+  - child_frame_id: sparkal1/rear_fender_link
+    frame_id: sparkal1/chassis_link
+    qw: -0.0
+    qx: 0.0
+    qy: 0.0
+    qz: 1.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/rear_mount
+    frame_id: sparkal1/mid_mount
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.12
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/sensor_plate_link
+    frame_id: sparkal1/base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.13
+    y: 0.0
+    z: 0.19
+  - child_frame_id: sparkal1/velodyne_base_link
+    frame_id: sparkal1/velodyne_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  - child_frame_id: sparkal1/velodyne
+    frame_id: sparkal1/velodyne_base_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0377
+  - child_frame_id: sparkal1/velodyne_link
+    frame_id: sparkal1/sensor_plate_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.33
+  - child_frame_id: sparkal1/forward_depth_frame
+    frame_id: sparkal1/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal1/forward_color_frame
+    frame_id: sparkal1/forward_link
+    qw: 0.999994
+    qx: 0.000364
+    qy: -0.003236
+    qz: 0.001267
+    x: -0.000351
+    y: -0.059194
+    z: -3.6e-05
+  - child_frame_id: sparkal1/forward_infra1_frame
+    frame_id: sparkal1/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal1/forward_infra1_optical_frame
+    frame_id: sparkal1/forward_infra1_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal1/forward_infra2_frame
+    frame_id: sparkal1/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: 0.0
+    y: -0.095007
+    z: -0.0
+  - child_frame_id: sparkal1/forward_infra2_optical_frame
+    frame_id: sparkal1/forward_infra2_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal1/forward_gyro_frame
+    frame_id: sparkal1/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.01602
+    y: -0.03022
+    z: 0.0074
+  - child_frame_id: sparkal1/forward_imu_optical_frame
+    frame_id: sparkal1/forward_gyro_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0
+  - child_frame_id: sparkal1/forward_accel_frame
+    frame_id: sparkal1/forward_link
+    qw: 1.0
+    qx: 0.0
+    qy: 0.0
+    qz: 0.0
+    x: -0.01602
+    y: -0.03022
+    z: 0.0074
+  - child_frame_id: sparkal1/forward_accel_optical_frame
+    frame_id: sparkal1/forward_accel_frame
+    qw: 0.5
+    qx: -0.5
+    qy: 0.5
+    qz: -0.5
+    x: 0.0
+    y: -0.0
+    z: -0.0

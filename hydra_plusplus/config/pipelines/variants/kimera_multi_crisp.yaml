@@ -1,0 +1,30 @@
+---
+paths: [khronos, khronos_ros]
+map_window: {type: temporal, window_sec: 5.0}
+active_window:
+  type: ActiveWindow
+  verbosity: 0
+  frame_data_buffer: {max_buffer_size: 2000}
+  sensor_map_mode: Strict
+  sensors:
+    rgbd:
+      object_detector: {type: InstanceForwarding, min_cluster_size: 30, min_object_volume: 0.1, max_range: 7.0, min_range: 0.05, verbosity: 0, instance_filter: {type: CategoryFilter}}
+      tracker: {type: MaxIouTracker, track_by: pixels, min_semantic_iou: 0.3, min_cross_iou: 0.3, voxel_size: 0.2, min_num_observations: 5}
+      projective_integrator: {semantic_integrator: {type: SingleLabelIntegrator, labels_to_ignore: []}}
+    velodyne16:
+      object_detector: {type: InstanceForwarding, min_cluster_size: 5, grid_size: 0.2, max_range: 15.0, verbosity: 0, instance_filter: {type: CategoryFilter}}
+      tracker: {type: MaxIouTracker, track_by: voxels, min_semantic_iou: 0.1, min_cross_iou: 0.3, voxel_size: 0.4, min_num_observations: 2}
+      projective_integrator:
+        use_constant_weight: true
+        extra_integration_distance: 3.0
+        extra_integration_distance_labels: [1]
+        semantic_integrator: {type: SingleLabelIntegrator, labels_to_ignore: []}
+  object_extractor: {type: ExternalObjectExtractor, depth_mode: lidar_only, mask_from_cluster: false, filter_projected_depth: true}
+  khronos_sinks:
+    - type: ActiveWindowVisualizer
+      sensor_displays:
+        sensor_map_mode: Strict
+        sensors:
+          rgbd: {}
+          velodyne16: {height_scale: 32.0}
+frontend: {enable_mesh_objects: false}

@@ -1,5 +1,5 @@
-# Created by https://www.toptal.com/developers/gitignore/api/python,c++
-# Edit at https://www.toptal.com/developers/gitignore?templates=python,c++
+# Created by https://www.toptal.com/developers/gitignore/api/c++,python
+# Edit at https://www.toptal.com/developers/gitignore?templates=c++,python
 
 ### C++ ###
 # Prerequisites
@@ -206,17 +206,14 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-# End of https://www.toptal.com/developers/gitignore/api/python,c++
+# End of https://www.toptal.com/developers/gitignore/api/c++,python
 
-*.swp
-*.idea
-*.ccls*
-*.vscode/
+**/compile_commands.json
 
-*.ipynb
-compile_commands.json
-*.clangd
+# VS Code
+.vscode/
 
+.clangd
 
 # ROS2
 log/

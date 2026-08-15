@@ -1,0 +1,39 @@
+---
+map_window: {type: spatial, max_radius_m: 15.0}  # NOTE(hyungtae) Radius should be larger than `max_range` + `voxel_size` * `voxels_per_side`
+labelspace: {type: from_msg}
+active_window:
+  volumetric_map: {voxels_per_side: 16, voxel_size: 0.1, truncation_distance: 0.3, with_semantics: true}
+  full_update_separation_s: 0.5  # hydra setting
+  min_output_separation: 0.5  # khronos setting
+frontend:
+  publish_mesh: false
+  serialize_dsg_mesh: false
+  pgmo: {time_horizon: 100.0, d_graph_resolution: 2.5, mesh_resolution: 0.05}
+  pose_graph_tracker: {type: PoseGraphFromOdom, min_pose_separation: 1.0, rotation_separation_weight: 1.0, min_time_separation_s: 5.0}
+  surface_places: {type: place_2d, prefix: P, pure_final_place_size: 5.0, cluster_tolerance: 0.3, min_cluster_size: 10, min_final_place_points: 10, place_overlap_threshold: 0.0}
+  graph_connector:
+    layers:
+      - {parent_layer: MESH_PLACES, child_layers: [layer: OBJECTS]}
+backend:
+  add_places_to_deformation_graph: false
+  serialize_dsg_mesh: false
+  min_dsg_separation_s: 2
+  min_mesh_separation_s: 2
+  publish_mesh: false
+  update_functors:
+    agents: {type: UpdateAgentsFunctor}
+    objects: {type: UpdateObjectsFunctor}
+    surface_places: {type: Update2dPlacesFunctor, min_size: 5.0}
+  pgmo:
+    optimizer: {type: KimeraRpgoOptimizer, gnc: {inlier_probability: 0.9, mu_step: 1.6, max_iterations: 100}}
+    covariance:
+      odom: 1.0e-02
+      loop_close: 5.0e-02
+      sg_loop_close: 1.0e-01
+      prior: 1.0e-02
+      mesh_mesh: 1.0e-02
+      pose_mesh: 1.0e-02
+      place_mesh: 1.0e-02
+      place_edge: 10.0
+      place_merge: 10.0
+      object_merge: 10.0

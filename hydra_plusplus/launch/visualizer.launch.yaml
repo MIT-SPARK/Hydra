@@ -1,0 +1,26 @@
+---
+launch:
+  # node controls
+  - arg: {name: start_visualizer, default: 'true'}
+  - arg: {name: start_rviz, default: 'true', description: automatically start rviz}
+  - arg: {name: start_config_gui, default: 'false', description: automatically start gui}
+  # visualizer configuration
+  - arg: {name: object_variant, default: crisp, description: object variant}
+  - arg: {name: visualizer_config_path, default: $(find-pkg-share hydra_visualizer)/config/visualizer_config.yaml}
+  - arg: {name: rviz_path, default: $(find-pkg-share hydra_plusplus)/rviz/uhumans2.rviz, description: rviz file to load}
+  # nodes
+  - set_remap: {from: hydra_visualizer/reconstruct_object, to: reconstruct_object}
+  - node:
+      if: $(var start_visualizer)
+      pkg: hydra_visualizer
+      exec: hydra_visualizer_node
+      name: hydra_visualizer
+      args: >
+        --config-utilities-yaml {graph: {type: GraphFromRos}, glog_verbosity: 0, glog_level: 1}
+        --config-utilities-file $(var visualizer_config_path)
+        --config-utilities-file $(find-pkg-share hydra_plusplus)/config/visualizer/visualizer_overrides.yaml
+        --config-utilities-file $(find-pkg-share hydra_plusplus)/config/visualizer/$(var object_variant)_visualizer_plugins.yaml
+      remap:
+        - {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
+  - node: {if: $(var start_rviz), name: rviz, pkg: rviz2, exec: rviz2, args: -d $(var rviz_path)}
+  - node: {if: $(var start_config_gui), name: config_gui, pkg: config_utilities_ros, exec: gui}
