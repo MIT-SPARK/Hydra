@@ -1,11 +1,11 @@
 
-#include "clio/ib_utils.h"
-
 #include <glog/logging.h>
 #include <hydra/utils/printing.h>
 
 #include <numeric>
 #include <vector>
+
+#include "clio/ib_utils.h"
 
 namespace clio {
 

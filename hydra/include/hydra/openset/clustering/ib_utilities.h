@@ -2,12 +2,9 @@
 
 #include <hydra/openset/embedding_distances.h>
 #include <hydra/openset/embedding_group.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph_layer.h>
 
 #include <Eigen/Dense>
-
-#include "clio/clustering_workspace.h"
-#include "clio/scene_graph_types.h"
 
 namespace clio {
 
@@ -28,6 +25,6 @@ Eigen::VectorXd computeIBpx(const ClusteringWorkspace& ws);
 Eigen::VectorXd computeIBpy(const hydra::EmbeddingGroup& tasks);
 
 double computeDeltaWeight(const spark_dsg::SceneGraphLayer& layer,
-                          const std::vector<NodeId>& nodes);
+                          const std::vector<spark_dsg::NodeId>& nodes);
 
 }  // namespace clio
