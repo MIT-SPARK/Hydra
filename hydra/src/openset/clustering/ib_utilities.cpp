@@ -1,13 +1,13 @@
+#include "hydra/openset/clustering/ib_utilities.h"
 
 #include <glog/logging.h>
-#include <hydra/utils/printing.h>
 
 #include <numeric>
 #include <vector>
 
-#include "clio/ib_utils.h"
+#include "hydra/utils/printing.h"
 
-namespace clio {
+namespace hydra {
 
 using namespace spark_dsg;
 using Indices = std::vector<std::pair<size_t, size_t>>;
@@ -35,10 +35,10 @@ Indices findTopKIndicesCols(const Eigen::MatrixXd& m, size_t top_k) {
 }
 
 Eigen::MatrixXd computeIBpyGivenX(const ClusteringWorkspace& ws,
-                                  const hydra::EmbeddingGroup& tasks,
-                                  const hydra::EmbeddingDistance& metric,
+                                  const EmbeddingGroup& tasks,
+                                  const EmbeddingDistance& metric,
                                   const PyGivenXConfig& config) {
-  const auto fmt = hydra::getDefaultFormat();
+  const auto fmt = getDefaultFormat();
 
   size_t N = ws.size();
   size_t M = tasks.embeddings.size() + 1;
@@ -98,20 +98,4 @@ Eigen::MatrixXd computeIBpyGivenX(const ClusteringWorkspace& ws,
   return py_x;
 }
 
-Eigen::VectorXd computeIBpx(const ClusteringWorkspace& ws) {
-  // p(x) is uniform
-  size_t N = ws.size();
-  return Eigen::VectorXd::Constant(N, 1.0 / static_cast<double>(N));
-}
-
-Eigen::VectorXd computeIBpy(const hydra::EmbeddingGroup& tasks) {
-  size_t M = tasks.embeddings.size() + 1;
-  return Eigen::VectorXd::Constant(M, 1.0 / static_cast<double>(M));
-}
-
-double computeDeltaWeight(const SceneGraphLayer& layer,
-                          const std::vector<NodeId>& nodes) {
-  return static_cast<double>(nodes.size()) / static_cast<double>(layer.numNodes());
-}
-
-}  // namespace clio
+}  // namespace hydra

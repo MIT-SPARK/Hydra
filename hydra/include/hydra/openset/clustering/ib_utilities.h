@@ -1,30 +1,16 @@
 #pragma once
 
-#include <hydra/openset/embedding_distances.h>
-#include <hydra/openset/embedding_group.h>
 #include <spark_dsg/scene_graph_layer.h>
 
 #include <Eigen/Dense>
 
-namespace clio {
+#include "hydra/openset/embedding_distances.h"
 
-struct PyGivenXConfig {
-  float score_threshold = 0.23f;
-  size_t top_k = 2;
-  bool cumulative = true;
-  bool null_task_preprune = true;
-};
+namespace hydra {
 
 Eigen::MatrixXd computeIBpyGivenX(const ClusteringWorkspace& ws,
-                                  const hydra::EmbeddingGroup& tasks,
-                                  const hydra::EmbeddingDistance& metric,
+                                  const EmbeddingGroup& tasks,
+                                  const EmbeddingDistance& metric,
                                   const PyGivenXConfig& config);
 
-Eigen::VectorXd computeIBpx(const ClusteringWorkspace& ws);
-
-Eigen::VectorXd computeIBpy(const hydra::EmbeddingGroup& tasks);
-
-double computeDeltaWeight(const spark_dsg::SceneGraphLayer& layer,
-                          const std::vector<spark_dsg::NodeId>& nodes);
-
-}  // namespace clio
+}  // namespace hydra

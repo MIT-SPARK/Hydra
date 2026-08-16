@@ -300,18 +300,4 @@ TEST(IBEdgeSelector, CompareEdgesCorrect) {
   EXPECT_FALSE(selector.compareEdges(e2, e1));
 }
 
-TEST(IBEdgeSelector, ComputeDeltaWeightCorrect) {
-  IsolatedSceneGraphLayer layer(2);
-  std::vector<NodeId> nodes;
-  NodeEmbeddingMap x_segments;
-  for (size_t i = 0; i < 5; ++i) {
-    layer.emplaceNode(2 * i, std::make_unique<NodeAttributes>());
-    x_segments[2 * i] = getOneHot(i, 10);
-    nodes.push_back(2 * i);
-  }
-
-  EXPECT_EQ(computeDeltaWeight(layer, std::vector<NodeId>{}), 0.0);
-  EXPECT_EQ(computeDeltaWeight(layer, nodes), 1.0);
-}
-
 }  // namespace clio
