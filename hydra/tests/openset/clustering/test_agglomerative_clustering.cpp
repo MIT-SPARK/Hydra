@@ -16,36 +16,12 @@ using NodeEmbeddingMap = AgglomerativeClustering::NodeEmbeddingMap;
 
 namespace {
 
-inline Eigen::VectorXd getOneHot(size_t i, size_t dim) {
-  Eigen::VectorXd p = Eigen::VectorXd::Zero(dim);
+static const auto fmt = getDefaultFormat();
+
+Eigen::VectorXf getOneHot(size_t i, size_t dim) {
+  Eigen::VectorXf p = Eigen::VectorXf::Zero(dim);
   p(i) = 1.0;
   return p;
-}
-
-struct FakeEmbeddingGroup : public EmbeddingGroup {
-  struct Config {};
-
-  explicit FakeEmbeddingGroup(const Config&) {
-    Eigen::VectorXd ref(10);
-    ref << 1.0, 2.0, 3.0, 4.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-    embeddings.push_back(ref);
-    names.push_back("name_0");
-  }
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<EmbeddingGroup, FakeEmbeddingGroup, Config>(
-          "fake_embeddings");
-};
-
-[[maybe_unused]] void declare_config(FakeEmbeddingGroup::Config&) {}
-
-inline AgglomerativeClustering::Config getFakeConfig() {
-  using namespace config;
-  AgglomerativeClustering::Config conf;
-  conf.metric = CosineDistance::Config{};
-  conf.tasks = FakeEmbeddingGroup::Config{};
-  return conf;
 }
 
 std::map<NodeId, size_t> getNodeAssignments(const ClusterIds& clusters) {
@@ -104,6 +80,14 @@ std::string workspaceState(const AgglomerativeClustering::Workspace& ws) {
   return ss.str();
 }
 
+void fillEdges(const std::vector<EdgeKey>& keys, EdgeContainer::Edges& edges) {
+  for (const auto& [k1, k2] : keys) {
+    edges.emplace(std::piecewise_construct,
+                  std::forward_as_tuple(k1, k2),
+                  std::forward_as_tuple(k1, k2, nullptr));
+  }
+}
+
 }  // namespace
 
 TEST(AgglomerativeClustering, WorkspaceInitCorrect) {
@@ -127,12 +111,12 @@ TEST(AgglomerativeClustering, WorkspaceInitCorrect) {
   }
 
   EdgeContainer::Edges edges;
-  for (size_t i = 0; i < 9; ++i) {
-    const EdgeKey key{i, i + 1};
-    edges.emplace(key, SceneGraphEdge{key.k1, key.k2, nullptr});
-  }
+  std::vector<EdgeKey> keys{
+      {0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 6}, {6, 7}, {7, 8}, {8, 9}};
+  fillEdges(keys, edges);
 
   {  // no siblings in map: only should get features, no edges
+
     ClusteringWorkspace ws(edges, map);
     EXPECT_EQ(ws.size(), 5);
     EXPECT_EQ(ws.featureDim(), 10);
@@ -146,10 +130,8 @@ TEST(AgglomerativeClustering, WorkspaceInitCorrect) {
     EXPECT_EQ(ws.assignments, expected_assignments);
   }
 
-  for (size_t i = 0; i < 4; ++i) {
-    const EdgeKey key{2 * i, 2 * (i + 1)};
-    edges.emplace(key, SceneGraphEdge{key.k1, key.k2, nullptr});
-  }
+  keys = {{0, 2}, {2, 4}, {4, 6}, {6, 8}};
+  fillEdges(keys, edges);
 
   {  // linear siblings: should get edges
     ClusteringWorkspace ws(edges, map);
@@ -176,10 +158,8 @@ TEST(AgglomerativeClustering, WorkspaceMergeCorrect) {
   }
 
   EdgeContainer::Edges edges;
-  for (size_t i = 0; i < 4; ++i) {
-    const EdgeKey key{2 * i, 2 * (i + 1)};
-    edges.emplace(key, SceneGraphEdge{key.k1, key.k2, nullptr});
-  }
+  std::vector<EdgeKey> keys{{0, 2}, {2, 4}, {4, 6}, {6, 8}};
+  fillEdges(keys, edges);
 
   ClusteringWorkspace ws(edges, map);
 
@@ -241,13 +221,13 @@ TEST(AgglomerativeClustering, SetupSimpleCorrect) {
   CosineDistance dist;
   ClusteringWorkspace ws(EdgeContainer::Edges{}, x_segments);
 
-  IBEdgeSelector::Config config;
-  config.py_x.score_threshold = 1.0;
+  IBProbabilityConfig config;
+  config.score_threshold = 1.0;
   // Test simplest case
-  config.py_x.cumulative = false;
-  config.py_x.null_task_preprune = false;
-  config.py_x.top_k = 100;  // Large so that essentially disabled
-  ws.setup(y_tasks, dist);
+  config.cumulative = false;
+  config.null_task_preprune = false;
+  config.top_k = 100;  // Large so that essentially disabled
+  ws.setup(config, y_tasks, dist);
 
   ASSERT_EQ(ws.px.rows(), 5);
   ASSERT_EQ(ws.pz.rows(), 5);
@@ -261,7 +241,6 @@ TEST(AgglomerativeClustering, SetupSimpleCorrect) {
   EXPECT_TRUE(ws.px.isApprox(ws.pz));
   EXPECT_TRUE(ws.py_x.isApprox(ws.py_z));
 
-  const auto fmt = getDefaultFormat();
   Eigen::VectorXd expected_px(5);
   expected_px << 0.2, 0.2, 0.2, 0.2, 0.2;  // row-wise sum normalized via l1-norm
   EXPECT_TRUE(ws.px.isApprox(expected_px))
@@ -280,7 +259,7 @@ TEST(AgglomerativeClustering, SetupSimpleCorrect) {
       << "expected: " << expected_py.format(fmt) << ", result: " << ws.py.format(fmt);
 }
 
-TEST(IBEdgeSelector, SetupTopKCorrect) {
+TEST(AgglomerativeClustering, SetupTopKCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 5; ++i) {
     x_segments[2 * i] = getOneHot(i, 10);
@@ -295,15 +274,13 @@ TEST(IBEdgeSelector, SetupTopKCorrect) {
   CosineDistance dist;
   ClusteringWorkspace ws(EdgeContainer::Edges{}, x_segments);
 
-  IBEdgeSelector::Config config;
-  config.py_x.score_threshold = 0.9;
+  IBProbabilityConfig config;
+  config.score_threshold = 0.9;
   // Test top k (k = 1)
-  config.py_x.cumulative = false;
-  config.py_x.null_task_preprune = false;
-  config.py_x.top_k = 1;  // Test single top k (one hot)
-  ws.setup(y_tasks, dist);
-
-  const auto fmt = getDefaultFormat();
+  config.cumulative = false;
+  config.null_task_preprune = false;
+  config.top_k = 1;  // Test single top k (one hot)
+  ws.setup(config, y_tasks, dist);
 
   Eigen::MatrixXd expected_py_x(4, 5);
   expected_py_x << 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
@@ -313,7 +290,7 @@ TEST(IBEdgeSelector, SetupTopKCorrect) {
       << ", result: " << ws.py_x.format(fmt);
 }
 
-TEST(IBEdgeSelector, SetupCumulativeCorrect) {
+TEST(AgglomerativeClustering, SetupCumulativeCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 5; ++i) {
     x_segments[2 * i] = getOneHot(i, 10);
@@ -328,15 +305,12 @@ TEST(IBEdgeSelector, SetupCumulativeCorrect) {
   CosineDistance dist;
   ClusteringWorkspace ws(EdgeContainer::Edges{}, x_segments);
 
-  IBEdgeSelector::Config config;
-  config.py_x.score_threshold = 0.9;
-  // Test cumulative
-  config.py_x.cumulative = true;
-  config.py_x.null_task_preprune = false;
-  config.py_x.top_k = 2;
-  ws.setup(y_tasks, dist);
-
-  const auto fmt = getDefaultFormat();
+  IBProbabilityConfig config;
+  config.score_threshold = 0.9;
+  config.cumulative = true;  // Test cumulative
+  config.null_task_preprune = false;
+  config.top_k = 2;
+  ws.setup(config, y_tasks, dist);
 
   Eigen::MatrixXd expected_py_x(4, 5);
   expected_py_x << 0.9 / 2.9, 0.9 / 2.9, 0.9 / 2.9, 1.0, 1.0, 2.0 / 2.9, 0.0, 0.0, 0.0,
@@ -346,7 +320,7 @@ TEST(IBEdgeSelector, SetupCumulativeCorrect) {
       << ", result: " << ws.py_x.format(fmt);
 }
 
-TEST(IBEdgeSelector, SetupNullPruneCorrect) {
+TEST(AgglomerativeClustering, SetupNullPruneCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 3; ++i) {
     x_segments[2 * i] = getOneHot(i, 10);
@@ -364,88 +338,65 @@ TEST(IBEdgeSelector, SetupNullPruneCorrect) {
   CosineDistance dist;
   ClusteringWorkspace ws(EdgeContainer::Edges{}, x_segments);
 
-  IBEdgeSelector::Config config;
-  config.py_x.score_threshold = 0.9;
-  // Test null preprune
-  config.py_x.cumulative = false;
-  config.py_x.null_task_preprune = true;
-  config.py_x.top_k = 100;
-  TestableIBEdgeSelector selector(config);
-  selector.setup(ws, y_tasks, dist);
-
-  const auto fmt = getDefaultFormat();
+  IBProbabilityConfig config;
+  config.score_threshold = 0.9;
+  config.cumulative = false;
+  config.null_task_preprune = true;  // Test null preprune
+  config.top_k = 100;
+  ws.setup(config, y_tasks, dist);
 
   Eigen::MatrixXd expected_py_x(4, 5);
   expected_py_x << 0.9 / 1.9, 0.9 / 1.9, 0.9 / 1.9, 1.0, 1.0, 1.0 / 1.9, 0.0, 0.0, 0.0,
       0.0, 0.0, 1.0 / 1.9, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0 / 1.9, 0.0, 0.0;
-  EXPECT_TRUE(selector.py_x_.isApprox(expected_py_x, 1e-9))
+  EXPECT_TRUE(ws.py_x.isApprox(expected_py_x, 1e-9))
       << "expected: " << expected_py_x.format(fmt)
-      << ", result: " << selector.py_x_.format(fmt);
+      << ", result: " << ws.py_x.format(fmt);
 }
 
-TEST(IBEdgeSelector, UpdateCorrect) {
-  IsolatedSceneGraphLayer layer(2);
-
+TEST(AgglomerativeClustering, UpdateCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 5; ++i) {
-    layer.emplaceNode(2 * i, std::make_unique<NodeAttributes>());
     x_segments[2 * i] = getOneHot(i, 10);
   }
 
   EmbeddingGroup y_tasks;
   for (size_t i = 0; i < 3; ++i) {
     y_tasks.embeddings.push_back(getOneHot(i, 10));
-    y_tasks.tasks.push_back(std::to_string(i));
+    y_tasks.names.push_back(std::to_string(i));
   }
 
-  for (size_t i = 0; i < 5; ++i) {
-    layer.emplaceNode(2 * i + 1, std::make_unique<NodeAttributes>());
-  }
+  EdgeContainer::Edges edges;
+  std::vector<EdgeKey> keys{{0, 2}, {2, 4}, {4, 6}, {6, 8}};
+  fillEdges(keys, edges);
 
-  for (size_t i = 0; i < 4; ++i) {
-    layer.insertEdge(2 * i, 2 * (i + 1));
-  }
-
-  ClusteringWorkspace ws(layer, x_segments);
   CosineDistance dist;
+  ClusteringWorkspace ws(edges, x_segments);
 
-  IBEdgeSelector::Config config;
-  config.py_x.score_threshold = 1.0;
-  // Test simplest case
-  config.py_x.cumulative = false;
-  config.py_x.null_task_preprune = false;
-  config.py_x.top_k = 100;  // Large so that essentially disabled
-  TestableIBEdgeSelector selector(config);
-  selector.setup(ws, y_tasks, dist);
-  selector.updateFromEdge(EdgeKey(0, 1));
+  IBProbabilityConfig config;
+  config.score_threshold = 1.0;
+  config.cumulative = false;  // Test simplest case
+  config.null_task_preprune = false;
+  config.top_k = 100;  // Large so that essentially disabled
+  ws.setup(config, y_tasks, dist);
 
-  const auto fmt = getDefaultFormat();
+  std::list<EdgeKey> updated;
+  ws.merge(EdgeKey(0, 1), -std::numeric_limits<double>::infinity(), updated);
 
   // check that hard-cluster assumptions hold
-  EXPECT_EQ(selector.pz_(1), 0.0);
-  EXPECT_EQ(selector.pz_(0), 0.4);
-  EXPECT_EQ(selector.pz_x_(1, 1), 0.0);
-  EXPECT_EQ(selector.pz_x_(0, 0), 1.0);
-  EXPECT_EQ(selector.pz_x_(1, 0), 1.0) << "p(z|x): " << selector.pz_x_.format(fmt);
+  EXPECT_EQ(ws.pz(1), 0.0);
+  EXPECT_EQ(ws.pz(0), 0.4);
+  EXPECT_EQ(ws.pz_x(1, 1), 0.0);
+  EXPECT_EQ(ws.pz_x(0, 0), 1.0);
+  EXPECT_EQ(ws.pz_x(1, 0), 1.0) << "p(z|x): " << ws.pz_x.format(fmt);
 
   Eigen::VectorXd py_0(4);
   py_0 << 0.5, 0.25, 0.25, 0.0;
-  EXPECT_TRUE(selector.py_z_.col(0).isApprox(py_0, 1e-9))
-      << "p(y|z=0): " << selector.py_z_.col(0).format(fmt);
+  EXPECT_TRUE(ws.py_z.col(0).isApprox(py_0, 1e-9))
+      << "p(y|z=0): " << ws.py_z.col(0).format(fmt);
   Eigen::VectorXd py_1(4);
   py_1 << 0.0, 0.0, 0.0, 0.0;
-  EXPECT_TRUE(selector.py_z_.col(1).isApprox(py_1))
-      << "p(y|z=1): " << selector.py_z_.col(1).format(fmt);
-}
-
-TEST(IBEdgeSelector, CompareEdgesCorrect) {
-  IBEdgeSelector::Config config;
-  TestableIBEdgeSelector selector(config);
-  std::pair<EdgeKey, double> e1{{0, 1}, 0.0};
-  std::pair<EdgeKey, double> e2{{0, 1}, 0.1};
-  EXPECT_TRUE(selector.compareEdges(e1, e2));
-  EXPECT_FALSE(selector.compareEdges(e1, e1));
-  EXPECT_FALSE(selector.compareEdges(e2, e1));
+  EXPECT_TRUE(ws.py_z.col(1).isApprox(py_1))
+      << "p(y|z=1): " << ws.py_z.col(1).format(fmt);
 }
 
 TEST(AgglomerativeClustering, GetClustersCorrect) {
@@ -454,21 +405,13 @@ TEST(AgglomerativeClustering, GetClustersCorrect) {
     map[2 * i] = getOneHot(i, 10);
   }
 
-  for (size_t i = 0; i < 5; ++i) {
-  }
-
   EdgeContainer::Edges edges;
-  for (size_t i = 0; i < 4; ++i) {
-    const EdgeKey key{2 * i, 2 * (i + 1)};
-    edges.emplace(key, SceneGraphEdge{key.k1, key.k2, nullptr});
-  }
+  std::vector<EdgeKey> keys{{0, 2}, {2, 4}, {4, 6}, {6, 8}};
+  fillEdges(keys, edges);
 
-  const auto config = getFakeConfig();
   ClusteringWorkspace ws(edges, map);
-  AgglomerativeClustering clustering(config);
 
   {  // expected_assignments = {0, 1, 2, 3, 4}
-
     auto clusters = ws.getClusters();
     EXPECT_EQ(clusters.size(), 5);
     const auto result = getNodeAssignments(clusters);
