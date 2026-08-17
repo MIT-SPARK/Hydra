@@ -14,10 +14,11 @@
 namespace hydra {
 
 using namespace spark_dsg;
+
 using Clusters = AgglomerativeClustering::Clusters;
+using ClusterIds = std::vector<std::vector<NodeId>>;
 using EmbeddingMap = std::map<NodeId, Eigen::VectorXf>;
 using Indices = std::vector<std::pair<size_t, size_t>>;
-using ClusterIds = std::vector<std::vector<NodeId>>;
 
 namespace {
 
@@ -28,10 +29,9 @@ bool keysIntersect(EdgeKey key1, EdgeKey key2) {
 
 EmbeddingMap getEmbeddingMap(const std::map<NodeId, SceneGraphNode::Ptr>& nodes) {
   EmbeddingMap features;
-  for (const auto& id_node : nodes) {
-    const auto& attrs = id_node.second->attributes<SemanticNodeAttributes>();
-    // TODO(nathan) consider other pooling operations
-    features[id_node.first] = attrs.semantic_feature.rowwise().mean();
+  for (const auto& [node_id, node] : nodes) {
+    const auto& attrs = node->attributes<SemanticNodeAttributes>();
+    features[node_id] = attrs.semantic_feature.rowwise().mean();
   }
 
   return features;
@@ -42,7 +42,6 @@ EmbeddingMap getEmbeddingMap(const SceneGraphLayer& layer,
   EmbeddingMap features;
   for (const auto node : nodes) {
     const auto& attrs = layer.getNode(node).attributes<SemanticNodeAttributes>();
-    // TODO(nathan) consider other pooling operations
     features[node] = attrs.semantic_feature.rowwise().mean();
   }
 
@@ -86,32 +85,30 @@ void clearEdgeWeights(const EdgeKey& key,
 }  // namespace
 
 AgglomerativeClustering::Workspace::Workspace(const SceneGraphLayer& layer)
-    : Workspace(layer, getEmbeddingMap(layer.nodes())) {}
+    : Workspace(layer.edges(), getEmbeddingMap(layer.nodes())) {}
 
 AgglomerativeClustering::Workspace::Workspace(const SceneGraphLayer& layer,
                                               const std::vector<NodeId>& nodes)
-    : Workspace(layer, getEmbeddingMap(layer, nodes)) {}
+    : Workspace(layer.edges(), getEmbeddingMap(layer, nodes)) {}
 
-AgglomerativeClustering::Workspace::Workspace(const SceneGraphLayer& layer,
+AgglomerativeClustering::Workspace::Workspace(const EdgeContainer::Edges& edges_,
                                               const EmbeddingMap& node_embeddings) {
   size_t index = 0;
-  for (auto&& [node_id, feature] : node_embeddings) {
+  for (const auto& [node_id, feature] : node_embeddings) {
     features[index] = feature;
     node_lookup[index] = node_id;
     order[node_id] = index;
     ++index;
   }
 
-  for (auto&& [node_id, index] : order) {
-    const auto& node = layer.getNode(node_id);
-    for (const auto& sibling : node.siblings()) {
-      auto iter = order.find(sibling);
-      if (iter == order.end()) {
-        continue;
-      }
-
-      edges.emplace(EdgeKey(index, iter->second), 0.0);
+  for (const auto& [key, _] : edges_) {
+    const auto source = order.find(key.k1);
+    const auto target = order.find(key.k2);
+    if (source == order.end() || target == order.end()) {
+      continue;
     }
+
+    edges.emplace(EdgeKey(source->second, target->second), 0.0);
   }
 
   assignments.resize(order.size());
@@ -395,7 +392,7 @@ void AgglomerativeClustering::cluster(Workspace& ws,
     VLOG(10) << "-----------------------------------";
   }
 
-  VLOG(verbosity) << "[IB] " << summarize();
+  VLOG(verbosity) << "[IB] " << ws.summary(config.max_delta);
 }
 
 }  // namespace hydra

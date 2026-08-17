@@ -13,7 +13,7 @@ class AgglomerativeClustering {
  public:
   struct Workspace {
     using NodeEmbeddings = std::map<spark_dsg::NodeId, Eigen::VectorXf>;
-    Workspace(const spark_dsg::SceneGraphLayer& layer,
+    Workspace(const spark_dsg::EdgeContainer::Edges& edges,
               const NodeEmbeddings& node_embeddings);
 
     Workspace(const spark_dsg::SceneGraphLayer& layer,
@@ -93,11 +93,6 @@ class AgglomerativeClustering {
                       double I_xy = -1,
                       double delta_weight = 1,
                       int verbosity = 5);
-
- protected:
-  static bool updateFromEdge(spark_dsg::EdgeKey edge);
-
-  static std::string summarize();
 
  protected:
   EmbeddingGroup::Ptr tasks_;
