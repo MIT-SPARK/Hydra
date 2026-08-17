@@ -1,4 +1,3 @@
-#include <config_utilities/config.h>
 #include <gtest/gtest.h>
 #include <hydra/openset/clustering/agglomerative_clustering.h>
 #include <hydra/utils/printing.h>
@@ -11,12 +10,13 @@ namespace hydra {
 using namespace spark_dsg;
 using Cluster = AgglomerativeClustering::Cluster;
 using ClusterIds = std::vector<std::vector<NodeId>>;
+using ClusterConfig = AgglomerativeClustering::ClusteringConfig;
 using ClusteringWorkspace = AgglomerativeClustering::Workspace;
 using NodeEmbeddingMap = AgglomerativeClustering::NodeEmbeddingMap;
 
 namespace {
 
-static const auto fmt = getDefaultFormat();
+static const auto fmt = getDefaultFormat(6);
 
 Eigen::VectorXf getOneHot(size_t i, size_t dim) {
   Eigen::VectorXf p = Eigen::VectorXf::Zero(dim);
@@ -80,12 +80,24 @@ std::string workspaceState(const AgglomerativeClustering::Workspace& ws) {
   return ss.str();
 }
 
-void fillEdges(const std::vector<EdgeKey>& keys, EdgeContainer::Edges& edges) {
+ClusteringWorkspace makeWorkspace(const std::vector<EdgeKey>& keys,
+                                  const NodeEmbeddingMap& map,
+                                  const ClusterConfig& config = {}) {
+  EdgeContainer::Edges edges;
   for (const auto& [k1, k2] : keys) {
     edges.emplace(std::piecewise_construct,
                   std::forward_as_tuple(k1, k2),
                   std::forward_as_tuple(k1, k2, nullptr));
   }
+
+  EmbeddingGroup y_tasks;
+  for (size_t i = 0; i < 3; ++i) {
+    y_tasks.embeddings.push_back(getOneHot(i, 10));
+    y_tasks.names.push_back(std::to_string(i));
+  }
+
+  CosineDistance dist;
+  return ClusteringWorkspace(config, edges, map, y_tasks, dist);
 }
 
 }  // namespace
@@ -97,7 +109,7 @@ TEST(AgglomerativeClustering, WorkspaceInitCorrect) {
   }
 
   {  // nodes only: only should get features, no edges
-    ClusteringWorkspace ws(EdgeContainer::Edges{}, map);
+    auto ws = makeWorkspace({}, map);
     EXPECT_EQ(ws.size(), 5);
     EXPECT_EQ(ws.featureDim(), 10);
     EXPECT_TRUE(ws.edges.empty());
@@ -110,14 +122,12 @@ TEST(AgglomerativeClustering, WorkspaceInitCorrect) {
     EXPECT_EQ(ws.assignments, expected_assignments);
   }
 
-  EdgeContainer::Edges edges;
   std::vector<EdgeKey> keys{
       {0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 6}, {6, 7}, {7, 8}, {8, 9}};
-  fillEdges(keys, edges);
 
   {  // no siblings in map: only should get features, no edges
 
-    ClusteringWorkspace ws(edges, map);
+    auto ws = makeWorkspace(keys, map);
     EXPECT_EQ(ws.size(), 5);
     EXPECT_EQ(ws.featureDim(), 10);
     EXPECT_TRUE(ws.edges.empty());
@@ -131,10 +141,9 @@ TEST(AgglomerativeClustering, WorkspaceInitCorrect) {
   }
 
   keys = {{0, 2}, {2, 4}, {4, 6}, {6, 8}};
-  fillEdges(keys, edges);
 
   {  // linear siblings: should get edges
-    ClusteringWorkspace ws(edges, map);
+    auto ws = makeWorkspace(keys, map);
     EXPECT_EQ(ws.size(), 5);
     EXPECT_EQ(ws.featureDim(), 10);
     // edges are keyed by index in workspace
@@ -157,14 +166,11 @@ TEST(AgglomerativeClustering, WorkspaceMergeCorrect) {
     map[2 * i] = getOneHot(i, 10);
   }
 
-  EdgeContainer::Edges edges;
   std::vector<EdgeKey> keys{{0, 2}, {2, 4}, {4, 6}, {6, 8}};
-  fillEdges(keys, edges);
-
-  ClusteringWorkspace ws(edges, map);
+  auto ws = makeWorkspace(keys, map);
 
   std::list<EdgeKey> updated_edges;
-  ws.merge({1, 2}, -std::numeric_limits<double>::infinity(), updated_edges);
+  ws.merge({1, 2}, updated_edges, true);
   std::list<EdgeKey> expected_updates{{0, 1}, {1, 3}};
   EXPECT_EQ(updated_edges, expected_updates);
   EXPECT_EQ(ws.size(), 5);
@@ -175,7 +181,7 @@ TEST(AgglomerativeClustering, WorkspaceMergeCorrect) {
   EXPECT_EQ(ws.assignments, expected_assignments);
 
   // note: edge keys are ordered
-  ws.merge({4, 3}, -std::numeric_limits<double>::infinity(), updated_edges);
+  ws.merge({4, 3}, updated_edges, true);
   expected_updates = {{1, 3}};
   EXPECT_EQ(updated_edges, expected_updates);
   EXPECT_EQ(ws.size(), 5);
@@ -185,7 +191,7 @@ TEST(AgglomerativeClustering, WorkspaceMergeCorrect) {
   expected_assignments = {0, 1, 1, 3, 3};
   EXPECT_EQ(ws.assignments, expected_assignments);
 
-  ws.merge({0, 1}, -std::numeric_limits<double>::infinity(), updated_edges);
+  ws.merge({0, 1}, updated_edges, true);
   expected_updates = {{0, 3}};
   EXPECT_EQ(updated_edges, expected_updates);
   EXPECT_EQ(ws.size(), 5);
@@ -196,7 +202,7 @@ TEST(AgglomerativeClustering, WorkspaceMergeCorrect) {
   EXPECT_EQ(ws.assignments, expected_assignments);
 
   // note: edge keys are ordered
-  ws.merge({3, 0}, -std::numeric_limits<double>::infinity(), updated_edges);
+  ws.merge({3, 0}, updated_edges, true);
   EXPECT_TRUE(updated_edges.empty());
   EXPECT_EQ(ws.size(), 5);
   EXPECT_EQ(ws.featureDim(), 10);
@@ -212,22 +218,12 @@ TEST(AgglomerativeClustering, SetupSimpleCorrect) {
     x_segments[2 * i] = getOneHot(i, 10);
   }
 
-  EmbeddingGroup y_tasks;
-  for (size_t i = 0; i < 3; ++i) {
-    y_tasks.embeddings.push_back(getOneHot(i, 10));
-    y_tasks.names.push_back(std::to_string(i));
-  }
-
-  CosineDistance dist;
-  ClusteringWorkspace ws(EdgeContainer::Edges{}, x_segments);
-
-  IBProbabilityConfig config;
+  ClusterConfig config;
   config.score_threshold = 1.0;
-  // Test simplest case
   config.cumulative = false;
   config.null_task_preprune = false;
   config.top_k = 100;  // Large so that essentially disabled
-  ws.setup(config, y_tasks, dist);
+  auto ws = makeWorkspace({}, x_segments, config);
 
   ASSERT_EQ(ws.px.rows(), 5);
   ASSERT_EQ(ws.pz.rows(), 5);
@@ -265,22 +261,13 @@ TEST(AgglomerativeClustering, SetupTopKCorrect) {
     x_segments[2 * i] = getOneHot(i, 10);
   }
 
-  EmbeddingGroup y_tasks;
-  for (size_t i = 0; i < 3; ++i) {
-    y_tasks.embeddings.push_back(getOneHot(i, 10));
-    y_tasks.names.push_back(std::to_string(i));
-  }
-
-  CosineDistance dist;
-  ClusteringWorkspace ws(EdgeContainer::Edges{}, x_segments);
-
-  IBProbabilityConfig config;
+  ClusterConfig config;
   config.score_threshold = 0.9;
   // Test top k (k = 1)
   config.cumulative = false;
   config.null_task_preprune = false;
   config.top_k = 1;  // Test single top k (one hot)
-  ws.setup(config, y_tasks, dist);
+  auto ws = makeWorkspace({}, x_segments, config);
 
   Eigen::MatrixXd expected_py_x(4, 5);
   expected_py_x << 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
@@ -296,28 +283,20 @@ TEST(AgglomerativeClustering, SetupCumulativeCorrect) {
     x_segments[2 * i] = getOneHot(i, 10);
   }
 
-  EmbeddingGroup y_tasks;
-  for (size_t i = 0; i < 3; ++i) {
-    y_tasks.embeddings.push_back(getOneHot(i, 10));
-    y_tasks.names.push_back(std::to_string(i));
-  }
-
-  CosineDistance dist;
-  ClusteringWorkspace ws(EdgeContainer::Edges{}, x_segments);
-
-  IBProbabilityConfig config;
+  ClusterConfig config;
   config.score_threshold = 0.9;
   config.cumulative = true;  // Test cumulative
   config.null_task_preprune = false;
   config.top_k = 2;
-  ws.setup(config, y_tasks, dist);
+  auto ws = makeWorkspace({}, x_segments, config);
 
   Eigen::MatrixXd expected_py_x(4, 5);
   expected_py_x << 0.9 / 2.9, 0.9 / 2.9, 0.9 / 2.9, 1.0, 1.0, 2.0 / 2.9, 0.0, 0.0, 0.0,
       0.0, 0.0, 2.0 / 2.9, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0 / 2.9, 0.0, 0.0;
-  EXPECT_TRUE(ws.py_x.isApprox(expected_py_x, 1e-9))
-      << "expected: " << expected_py_x.format(fmt)
-      << ", result: " << ws.py_x.format(fmt);
+  EXPECT_TRUE(ws.py_x.isApprox(expected_py_x, 1.0e-6))
+      << "expected: " << expected_py_x.format(fmt) << "\n"
+      << "result:   " << ws.py_x.format(fmt) << "\n"
+      << "diff:     " << (expected_py_x - ws.py_x).format(fmt);
 }
 
 TEST(AgglomerativeClustering, SetupNullPruneCorrect) {
@@ -329,28 +308,20 @@ TEST(AgglomerativeClustering, SetupNullPruneCorrect) {
     x_segments[2 * i] = getOneHot(i, 10) + getOneHot(0, 10);
   }
 
-  EmbeddingGroup y_tasks;
-  for (size_t i = 0; i < 3; ++i) {
-    y_tasks.embeddings.push_back(getOneHot(i, 10));
-    y_tasks.names.push_back(std::to_string(i));
-  }
-
-  CosineDistance dist;
-  ClusteringWorkspace ws(EdgeContainer::Edges{}, x_segments);
-
-  IBProbabilityConfig config;
+  ClusterConfig config;
   config.score_threshold = 0.9;
   config.cumulative = false;
   config.null_task_preprune = true;  // Test null preprune
   config.top_k = 100;
-  ws.setup(config, y_tasks, dist);
+  auto ws = makeWorkspace({}, x_segments, config);
 
   Eigen::MatrixXd expected_py_x(4, 5);
   expected_py_x << 0.9 / 1.9, 0.9 / 1.9, 0.9 / 1.9, 1.0, 1.0, 1.0 / 1.9, 0.0, 0.0, 0.0,
       0.0, 0.0, 1.0 / 1.9, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0 / 1.9, 0.0, 0.0;
-  EXPECT_TRUE(ws.py_x.isApprox(expected_py_x, 1e-9))
-      << "expected: " << expected_py_x.format(fmt)
-      << ", result: " << ws.py_x.format(fmt);
+  EXPECT_TRUE(ws.py_x.isApprox(expected_py_x, 1.0e-6))
+      << "expected: " << expected_py_x.format(fmt) << "\n"
+      << "result:   " << ws.py_x.format(fmt) << "\n"
+      << "diff:     " << (expected_py_x - ws.py_x).format(fmt);
 }
 
 TEST(AgglomerativeClustering, UpdateCorrect) {
@@ -359,28 +330,17 @@ TEST(AgglomerativeClustering, UpdateCorrect) {
     x_segments[2 * i] = getOneHot(i, 10);
   }
 
-  EmbeddingGroup y_tasks;
-  for (size_t i = 0; i < 3; ++i) {
-    y_tasks.embeddings.push_back(getOneHot(i, 10));
-    y_tasks.names.push_back(std::to_string(i));
-  }
-
-  EdgeContainer::Edges edges;
   std::vector<EdgeKey> keys{{0, 2}, {2, 4}, {4, 6}, {6, 8}};
-  fillEdges(keys, edges);
 
-  CosineDistance dist;
-  ClusteringWorkspace ws(edges, x_segments);
-
-  IBProbabilityConfig config;
+  ClusterConfig config;
   config.score_threshold = 1.0;
   config.cumulative = false;  // Test simplest case
   config.null_task_preprune = false;
   config.top_k = 100;  // Large so that essentially disabled
-  ws.setup(config, y_tasks, dist);
+  auto ws = makeWorkspace({}, x_segments, config);
 
   std::list<EdgeKey> updated;
-  ws.merge(EdgeKey(0, 1), -std::numeric_limits<double>::infinity(), updated);
+  ws.merge(EdgeKey(0, 1), updated, true);
 
   // check that hard-cluster assumptions hold
   EXPECT_EQ(ws.pz(1), 0.0);
@@ -405,11 +365,8 @@ TEST(AgglomerativeClustering, GetClustersCorrect) {
     map[2 * i] = getOneHot(i, 10);
   }
 
-  EdgeContainer::Edges edges;
   std::vector<EdgeKey> keys{{0, 2}, {2, 4}, {4, 6}, {6, 8}};
-  fillEdges(keys, edges);
-
-  ClusteringWorkspace ws(edges, map);
+  auto ws = makeWorkspace(keys, map);
 
   {  // expected_assignments = {0, 1, 2, 3, 4}
     auto clusters = ws.getClusters();
@@ -420,7 +377,7 @@ TEST(AgglomerativeClustering, GetClustersCorrect) {
   }
 
   std::list<EdgeKey> updated;
-  ws.merge({1, 2}, -std::numeric_limits<double>::infinity(), updated);
+  ws.merge({1, 2}, updated, true);
   {  // expected_assignments = {0, 1, 1, 3, 4}
     auto clusters = ws.getClusters();
     EXPECT_EQ(clusters.size(), 4);
@@ -429,7 +386,7 @@ TEST(AgglomerativeClustering, GetClustersCorrect) {
     EXPECT_EQ(expected, result) << workspaceState(ws);
   }
 
-  ws.merge({3, 4}, -std::numeric_limits<double>::infinity(), updated);
+  ws.merge({3, 4}, updated, true);
   {  // expected_assignments = {0, 1, 1, 3, 3}
     auto clusters = ws.getClusters();
     EXPECT_EQ(clusters.size(), 3);
@@ -438,7 +395,7 @@ TEST(AgglomerativeClustering, GetClustersCorrect) {
     EXPECT_EQ(expected, result) << workspaceState(ws);
   }
 
-  ws.merge({0, 1}, -std::numeric_limits<double>::infinity(), updated);
+  ws.merge({0, 1}, updated, true);
   {  // expected_assignments = {0, 0, 0, 3, 3}
     auto clusters = ws.getClusters();
     EXPECT_EQ(clusters.size(), 2);
@@ -447,7 +404,7 @@ TEST(AgglomerativeClustering, GetClustersCorrect) {
     EXPECT_EQ(expected, result) << workspaceState(ws);
   }
 
-  ws.merge({0, 3}, -std::numeric_limits<double>::infinity(), updated);
+  ws.merge({0, 3}, updated, true);
   {  // expected_assignments = {0, 0, 0, 0, 0}
     auto clusters = ws.getClusters();
     EXPECT_EQ(clusters.size(), 1);

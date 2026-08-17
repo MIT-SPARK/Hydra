@@ -10,61 +10,56 @@
 
 namespace hydra {
 
-struct IBProbabilityConfig {
-  float score_threshold = 0.23f;
-  size_t top_k = 2;
-  bool cumulative = true;
-  bool null_task_preprune = true;
-};
-
-void declare_config(IBProbabilityConfig& config);
-
 class AgglomerativeClustering {
  public:
+  struct ClusteringConfig {
+    float score_threshold = 0.23f;
+    size_t top_k = 2;
+    bool cumulative = true;
+    bool null_task_preprune = true;
+    double max_delta = 1.0e-3;
+  };
+
   struct Config : VerbosityConfig {
-    IBProbabilityConfig probabilities;
+    ClusteringConfig clustering;
     config::VirtualConfig<EmbeddingGroup> tasks;
     config::VirtualConfig<EmbeddingDistance> metric{CosineDistance::Config()};
-    double max_delta = 1.0e-3;
-    double tolerance = -1.0e-18;
     bool filter_clusters = false;
   } const config;
 
   struct Workspace {
     using FeatureMap = std::map<size_t, Eigen::VectorXf>;
+    using ClusterIndices = std::vector<std::vector<spark_dsg::NodeId>>;
     using NodeEmbeddings = std::map<spark_dsg::NodeId, Eigen::VectorXf>;
 
-    Workspace(const spark_dsg::EdgeContainer::Edges& edges,
-              const NodeEmbeddings& node_embeddings);
-
-    Workspace(const spark_dsg::SceneGraphLayer& layer,
-              const std::vector<spark_dsg::NodeId>& nodes);
-
-    Workspace(const spark_dsg::SceneGraphLayer& layer);
-
-    size_t size() const;
-    size_t featureDim() const;
-
-    void setup(const IBProbabilityConfig& config,
-               const EmbeddingGroup& tasks,
-               const EmbeddingDistance& metric);
+    Workspace(const ClusteringConfig& config,
+              const spark_dsg::EdgeContainer::Edges& edges,
+              const NodeEmbeddings& node_embeddings,
+              const EmbeddingGroup& tasks,
+              const EmbeddingDistance& metric);
 
     void reweight(double I_xy, double delta_weight);
 
     double score(const spark_dsg::EdgeKey& edge) const;
 
     bool merge(spark_dsg::EdgeKey to_merge,
-               double max_delta,
-               std::list<spark_dsg::EdgeKey>& updated);
+               std::list<spark_dsg::EdgeKey>& updated,
+               bool force = false);
 
-    std::string summary(double max_delta) const;
+    size_t size() const;
 
-    std::vector<std::vector<spark_dsg::NodeId>> getClusters() const;
+    size_t featureDim() const;
 
-    static Eigen::MatrixXd compute_py_x(const IBProbabilityConfig& config,
+    std::string summary() const;
+
+    ClusterIndices getClusters() const;
+
+    static Eigen::MatrixXd compute_py_x(const ClusteringConfig& config,
                                         const FeatureMap& features,
                                         const EmbeddingGroup& tasks,
                                         const EmbeddingDistance& metric);
+
+    const ClusteringConfig config;
 
     FeatureMap features;
     std::map<size_t, spark_dsg::NodeId> node_lookup;
@@ -76,10 +71,12 @@ class AgglomerativeClustering {
     Eigen::VectorXd px;
     Eigen::VectorXd pz;
     Eigen::VectorXd py;
+
     // p(z|x), p(y|x), p(y|z)
     Eigen::MatrixXd pz_x;  // NxN
     Eigen::MatrixXd py_x;  // 2xN
     Eigen::MatrixXd py_z;  // 2xN
+
     // mutual information caches
     double I_xy;
     double I_zy_prev;
@@ -103,13 +100,14 @@ class AgglomerativeClustering {
   Clusters cluster(const spark_dsg::SceneGraphLayer& layer,
                    const NodeEmbeddingMap& embeddings) const;
 
-  static void cluster(Workspace& workspace, double max_delta);
+  static void cluster(Workspace& workspace);
 
  protected:
   EmbeddingGroup::Ptr tasks_;
   std::unique_ptr<EmbeddingDistance> metric_;
 };
 
+void declare_config(AgglomerativeClustering::ClusteringConfig& config);
 void declare_config(AgglomerativeClustering::Config& config);
 
 }  // namespace hydra
