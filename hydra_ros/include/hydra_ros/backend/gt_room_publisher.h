@@ -1,6 +1,6 @@
 #pragma once
 
-#include <hydra/backend/update_rooms_functor.h>
+#include <hydra/backend/updates/update_rooms_functor.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
 #include <ianvs/node_handle.h>
 
