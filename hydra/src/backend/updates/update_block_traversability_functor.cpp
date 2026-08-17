@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_block_traversability_functor.h"
+#include "hydra/backend/updates/update_block_traversability_functor.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
@@ -41,7 +41,6 @@
 
 #include <queue>
 
-#include "hydra/common/global_info.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 

@@ -32,46 +32,44 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/zmq_interfaces.h"
+#pragma once
+#include <map>
+#include <memory>
+#include <mutex>
+#include <thread>
 
-#include <config_utilities/config.h>
-#include <config_utilities/factory.h>
-#include <config_utilities/printing.h>
-#include <config_utilities/validation.h>
-#include <glog/logging.h>
-#include <spark_dsg/zmq_interface.h>
+#include "hydra/backend/update_functions.h"
+
+namespace spark_dsg {
+class ZmqReceiver;
+}  // namespace spark_dsg
 
 namespace hydra {
-namespace {
 
-static const auto sink_registration =
-    config::RegistrationWithConfig<BackendModule::Sink, ZmqSink, ZmqSink::Config>(
-        "ZmqSink");
+class ZmqRoomLabelUpdater : public UpdateFunctor {
+ public:
+  struct Config {
+    std::string url = "tcp://127.0.0.1:8002";
+    size_t num_threads = 2;
+    size_t poll_time_ms = 10;
+  } const config;
 
-}  // namespace
+  ZmqRoomLabelUpdater(const Config& config);
+  virtual ~ZmqRoomLabelUpdater();
+  void call(const DynamicSceneGraph&,
+            SharedDsgInfo& graph,
+            const UpdateInfo::ConstPtr&) const override;
 
-void declare_config(ZmqSink::Config& config) {
-  using namespace config;
-  name("ZmqSink::Config");
-  field(config.url, "url");
-  field(config.num_threads, "num_threads");
-  field(config.send_mesh, "send_mesh");
-}
+ private:
+  void checkForUpdates();
 
-ZmqSink::ZmqSink(const Config& config) : config(config::checkValid(config)) {
-  sender_ = std::make_unique<spark_dsg::ZmqSender>(config.url, config.num_threads);
-}
+  mutable std::mutex mutex_;
+  std::unique_ptr<std::thread> thread_;
+  std::atomic<bool> should_shutdown_{false};
+  std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
+  std::map<NodeId, std::string> room_name_map_;
+};
 
-ZmqSink::~ZmqSink() = default;
-
-void ZmqSink::call(uint64_t timestamp_ns,
-                   const DynamicSceneGraph& graph,
-                   const kimera_pgmo::DeformationGraph&) const {
-  VLOG(5) << "Sending graph via zmq to '" << config.url << "' @ " << timestamp_ns
-          << " [ns]";
-  CHECK_NOTNULL(sender_)->send(graph, config.send_mesh);
-}
-
-std::string ZmqSink::printInfo() const { return config::toString(config); }
+void declare_config(ZmqRoomLabelUpdater::Config& conf);
 
 }  // namespace hydra

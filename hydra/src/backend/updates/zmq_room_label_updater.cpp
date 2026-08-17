@@ -32,91 +32,86 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_rooms_functor.h"
+#include "hydra/backend/updates/zmq_room_label_updater.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+#include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-
-#include "hydra/utils/timing_utilities.h"
+#include <spark_dsg/zmq_interface.h>
 
 namespace hydra {
 namespace {
 
-static const auto reg =
+static const auto update_registration =
     config::RegistrationWithConfig<UpdateFunctor,
-                                   UpdateRoomsFunctor,
-                                   UpdateRoomsFunctor::Config>("UpdateRoomsFunctor");
+                                   ZmqRoomLabelUpdater,
+                                   ZmqRoomLabelUpdater::Config>("ZmqRoomLabelUpdater");
 
+}  // namespace
+
+ZmqRoomLabelUpdater::ZmqRoomLabelUpdater(const Config& config)
+    : config(config::checkValid(config)) {
+  receiver_ = std::make_unique<spark_dsg::ZmqReceiver>(config.url, config.num_threads);
+  thread_ = std::make_unique<std::thread>(&ZmqRoomLabelUpdater::checkForUpdates, this);
 }
 
-using timing::ScopedTimer;
-using SemanticLabel = SemanticNodeAttributes::Label;
-
-void declare_config(UpdateRoomsFunctor::Config& config) {
-  using namespace config;
-  name("UpdateRoomsFunctor::Config");
-  field(config.room_finder, "room_finder");
-  field(config.places_layer, "places_layer");
-  field(config.sinks, "sinks");
-}
-
-UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
-    : config(config::checkValid(config)),
-      room_finder(new RoomFinder(config.room_finder)),
-      sinks_(Sink::instantiate(config.sinks)) {}
-
-void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
-                                      DynamicSceneGraph& graph) const {
-  std::vector<NodeId> to_remove;
-  const auto& prev_rooms = graph.getLayer(DsgLayers::ROOMS);
-  for (const auto& id_node_pair : prev_rooms.nodes()) {
-    to_remove.push_back(id_node_pair.first);
-  }
-
-  for (const auto node_id : to_remove) {
-    graph.removeNode(node_id);
-  }
-
-  if (!new_rooms) {
-    return;
-  }
-
-  for (auto&& [id, node] : new_rooms->nodes()) {
-    graph.emplaceNode(DsgLayers::ROOMS, id, node->attributes().clone());
-  }
-
-  for (const auto& id_edge_pair : new_rooms->edges()) {
-    const auto& edge = id_edge_pair.second;
-    graph.insertEdge(edge.source, edge.target, edge.info->clone());
+ZmqRoomLabelUpdater::~ZmqRoomLabelUpdater() {
+  should_shutdown_ = true;
+  if (thread_) {
+    VLOG(2) << "[Hydra Backend] joining zmq thread and stopping";
+    thread_->join();
+    thread_.reset();
+    VLOG(2) << "[Hydra Backend] stopped!";
   }
 }
 
-void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
-                              SharedDsgInfo& dsg,
-                              const UpdateInfo::ConstPtr& info) const {
-  if (!room_finder) {
-    return;
+void ZmqRoomLabelUpdater::checkForUpdates() {
+  while (!should_shutdown_) {
+    if (!receiver_->recv(config.poll_time_ms)) {
+      continue;
+    }
+
+    auto update_graph = receiver_->graph();
+    if (!update_graph) {
+      LOG(ERROR) << "zmq receiver graph is invalid";
+      continue;
+    }
+
+    // start critical section for updating room label map
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto& rooms = update_graph->getLayer(DsgLayers::ROOMS);
+    for (const auto& [node_id, node] : rooms.nodes()) {
+      room_name_map_[node_id] = node->attributes<SemanticNodeAttributes>().name;
+    }
+  }
+}
+
+void ZmqRoomLabelUpdater::call(const DynamicSceneGraph&,
+                               SharedDsgInfo& dsg,
+                               const UpdateInfo::ConstPtr&) const {
+  // start critical section for reading from room label map
+  std::lock_guard<std::mutex> lock(mutex_);
+  const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
+  for (const auto& [node_id, node] : rooms.nodes()) {
+    const auto iter = room_name_map_.find(node_id);
+    if (iter == room_name_map_.end()) {
+      continue;
+    }
+
+    node->attributes<SemanticNodeAttributes>().name = iter->second;
   }
 
-  const auto places_layer = dsg.graph->findLayer(config.places_layer);
-  if (!places_layer) {
-    return;
-  }
-
-  ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
-  auto places_clone = places_layer->clone([](const auto& node) {
-    const auto cat = NodeSymbol(node.id).category();
-    return cat == 'p' || cat == 'h' || cat == 't';
-  });
-
-  // TODO(nathan) layer view
-  // TODO(nathan) pass in timestamp?
-  auto rooms = room_finder->findRooms(*places_clone);
-  rewriteRooms(rooms.get(), *dsg.graph);
-  room_finder->addRoomPlaceEdges(*dsg.graph, config.places_layer);
-  Sink::callAll(sinks_, info->timestamp_ns, *room_finder);
   return;
+}
+
+void declare_config(ZmqRoomLabelUpdater::Config& config) {
+  using namespace config;
+  name("ZmqRoomLabelUpdater::Config");
+  field(config.url, "url");
+  field(config.num_threads, "num_threads");
+  field(config.poll_time_ms, "poll_time_ms");
 }
 
 }  // namespace hydra

@@ -37,9 +37,9 @@
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 
-#include "hydra/backend/update_buildings_functor.h"
 #include "hydra/backend/update_functions.h"
-#include "hydra/backend/update_rooms_functor.h"
+#include "hydra/backend/updates/update_buildings_functor.h"
+#include "hydra/backend/updates/update_rooms_functor.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 
