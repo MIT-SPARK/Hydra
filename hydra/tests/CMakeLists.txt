@@ -12,12 +12,12 @@ add_executable(
   src/resources.cpp
   backend/test_deformation_interpolator.cpp
   backend/test_external_loop_closure.cpp
-  backend/test_generic_update_functor.cpp
   backend/test_merge_tracker.cpp
-  backend/test_update_agents_functor.cpp
-  backend/test_update_buildings_functor.cpp
-  backend/test_update_objects_functor.cpp
-  backend/test_update_places_functor.cpp
+  backend/updates/test_generic_update_functor.cpp
+  backend/updates/test_update_agents_functor.cpp
+  backend/updates/test_update_buildings_functor.cpp
+  backend/updates/test_update_objects_functor.cpp
+  backend/updates/test_update_places_functor.cpp
   common/test_config_utilities.cpp
   common/test_partial_graph.cpp
   common/test_shared_dsg_info.cpp

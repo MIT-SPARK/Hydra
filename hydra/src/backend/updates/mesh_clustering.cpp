@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 
-#include "hydra/backend/mesh_clustering.h"
+#include "hydra/backend/updates/mesh_clustering.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>

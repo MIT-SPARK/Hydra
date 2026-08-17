@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_frontiers_functor.h"
+#include "hydra/backend/updates/update_frontiers_functor.h"
 
 #include <config_utilities/config.h>
 #include <glog/logging.h>

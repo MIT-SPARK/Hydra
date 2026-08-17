@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <gtsam/geometry/Pose3.h>
-#include <hydra/backend/update_places_functor.h>
+#include <hydra/backend/updates/update_places_functor.h>
 
 #include "hydra_test/shared_dsg_fixture.h"
 

@@ -33,15 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <map>
 #include <memory>
-#include <mutex>
-#include <thread>
 
 #include "hydra/backend/backend_module.h"
 
 namespace spark_dsg {
-class ZmqReceiver;
 class ZmqSender;
 }  // namespace spark_dsg
 
@@ -67,31 +63,5 @@ class ZmqSink : public BackendModule::Sink {
 };
 
 void declare_config(ZmqSink::Config& config);
-
-class ZmqRoomLabelUpdater : public UpdateFunctor {
- public:
-  struct Config {
-    std::string url = "tcp://127.0.0.1:8002";
-    size_t num_threads = 2;
-    size_t poll_time_ms = 10;
-  } const config;
-
-  ZmqRoomLabelUpdater(const Config& config);
-  virtual ~ZmqRoomLabelUpdater();
-  void call(const DynamicSceneGraph&,
-            SharedDsgInfo& graph,
-            const UpdateInfo::ConstPtr&) const override;
-
- private:
-  void checkForUpdates();
-
-  mutable std::mutex mutex_;
-  std::unique_ptr<std::thread> thread_;
-  std::atomic<bool> should_shutdown_{false};
-  std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
-  std::map<NodeId, std::string> room_name_map_;
-};
-
-void declare_config(ZmqRoomLabelUpdater::Config& conf);
 
 }  // namespace hydra
