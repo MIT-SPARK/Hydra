@@ -52,7 +52,6 @@
 
 #include "hydra_ros/backend/ros_backend_publisher.h"
 #include "hydra_ros/frontend/ros_frontend_publisher.h"
-#include "hydra_ros/utils/bow_subscriber.h"
 #include "hydra_ros/utils/external_loop_closure_subscriber.h"
 #include "hydra_ros/utils/status_monitor.h"
 
@@ -103,7 +102,6 @@ void HydraRosPipeline::init() {
 
   if (pipeline_config.enable_lcd) {
     initLCD();
-    bow_sub_.reset(new BowSubscriber(nh));
   }
 
   status_monitor_ = std::make_unique<StatusMonitor>(config.status_monitor, nh);

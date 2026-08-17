@@ -79,7 +79,6 @@ class GraphBuilder : public Module {
   using Sink = OutputSink<uint64_t, const DynamicSceneGraph&, const BackendInput&>;
 
   struct Config : public VerbosityConfig {
-    bool lcd_use_bow_vectors = true;
     struct DeformationConfig {
       double mesh_resolution = 0.1;
       double d_graph_resolution = 1.5;
@@ -155,8 +154,6 @@ class GraphBuilder : public Module {
   void updatePoseGraph(const ActiveWindowOutput& msg);
 
  protected:
-  void assignBowVectors();
-
   void archivePlaces2d(const NodeIdSet active_places);
 
   void processNextInput(const ActiveWindowOutput& msg);

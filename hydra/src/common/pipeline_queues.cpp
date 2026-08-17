@@ -50,12 +50,6 @@ PipelineQueues::~PipelineQueues() {
   } else {
     VLOG(2) << "lcd_queue: n/a";
   }
-
-  if (bow_queue) {
-    VLOG(2) << "bow_queue: " << bow_queue->size();
-  } else {
-    VLOG(2) << "bow_queue: n/a";
-  }
 }
 
 PipelineQueues& PipelineQueues::instance() {
@@ -72,10 +66,6 @@ void PipelineQueues::clear() {
   input_features_queue.clear();
   if (lcd_queue) {
     lcd_queue->clear();
-  }
-
-  if (bow_queue) {
-    bow_queue->clear();
   }
 }
 
