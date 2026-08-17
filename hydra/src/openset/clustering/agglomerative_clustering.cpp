@@ -17,6 +17,7 @@ using namespace spark_dsg;
 
 using Clusters = AgglomerativeClustering::Clusters;
 using ClusterIds = std::vector<std::vector<NodeId>>;
+using ClusterWorkspace = AgglomerativeClustering::Workspace;
 using EmbeddingMap = std::map<NodeId, Eigen::VectorXf>;
 using Indices = std::vector<std::pair<size_t, size_t>>;
 
@@ -82,17 +83,39 @@ void clearEdgeWeights(const EdgeKey& key,
   }
 }
 
+Indices findTopKIndicesCols(const Eigen::MatrixXd& m, size_t top_k) {
+  // Find top k indices for each column
+  size_t k = std::min(top_k, static_cast<size_t>(m.rows()));
+  Indices top_indices;
+  for (Eigen::Index c = 0; c < m.cols(); c++) {
+    const auto& col = m.col(c);
+
+    std::vector<size_t> idx(m.rows(), 0);
+    std::iota(idx.begin(), idx.end(), 0);
+    // Sort the indices according to their respective value
+    std::sort(idx.begin(), idx.end(), [&col](auto& lhv, auto& rhv) {
+      return col(lhv) > col(rhv);
+    });
+
+    for (size_t i = 0; i < k; i++) {
+      top_indices.push_back({idx[i], c});
+    }
+  }
+
+  return top_indices;
+}
+
 }  // namespace
 
-AgglomerativeClustering::Workspace::Workspace(const SceneGraphLayer& layer)
+ClusterWorkspace::Workspace(const SceneGraphLayer& layer)
     : Workspace(layer.edges(), getEmbeddingMap(layer.nodes())) {}
 
-AgglomerativeClustering::Workspace::Workspace(const SceneGraphLayer& layer,
-                                              const std::vector<NodeId>& nodes)
+ClusterWorkspace::Workspace(const SceneGraphLayer& layer,
+                            const std::vector<NodeId>& nodes)
     : Workspace(layer.edges(), getEmbeddingMap(layer, nodes)) {}
 
-AgglomerativeClustering::Workspace::Workspace(const EdgeContainer::Edges& edges_,
-                                              const EmbeddingMap& node_embeddings) {
+ClusterWorkspace::Workspace(const EdgeContainer::Edges& edges_,
+                            const EmbeddingMap& node_embeddings) {
   size_t index = 0;
   for (const auto& [node_id, feature] : node_embeddings) {
     features[index] = feature;
@@ -115,9 +138,9 @@ AgglomerativeClustering::Workspace::Workspace(const EdgeContainer::Edges& edges_
   std::iota(assignments.begin(), assignments.end(), 0);
 }
 
-size_t AgglomerativeClustering::Workspace::size() const { return order.size(); }
+size_t ClusterWorkspace::size() const { return order.size(); }
 
-size_t AgglomerativeClustering::Workspace::featureDim() const {
+size_t ClusterWorkspace::featureDim() const {
   if (features.empty()) {
     return 0;
   }
@@ -125,11 +148,14 @@ size_t AgglomerativeClustering::Workspace::featureDim() const {
   return features.begin()->second.rows();
 }
 
-void AgglomerativeClustering::Workspace::setup(const EmbeddingGroup& tasks,
-                                               const EmbeddingDistance& metric,
-                                               bool reweight,
-                                               double I_xy_,
-                                               double delta_weight_) {
+void ClusterWorkspace::reweight(double I_xy_, double delta_weight_) {
+  I_xy = I_xy_;
+  delta_weight = delta_weight_;
+}
+
+void ClusterWorkspace::setup(const IBProbabilityConfig& config,
+                             const EmbeddingGroup& tasks,
+                             const EmbeddingDistance& metric) {
   const auto N = order.size();
   const auto M = tasks.embeddings.size() + 1;
 
@@ -139,7 +165,7 @@ void AgglomerativeClustering::Workspace::setup(const EmbeddingGroup& tasks,
   pz_x = Eigen::MatrixXd::Identity(N, N);  // p(z|x) is identity
   pz = px;                                 // p(z) = p(x) initially
 
-  py_x = computeIBpyGivenX(ws, tasks, metric, config.py_x);
+  py_x = compute_py_x(config, features, tasks, metric);
   py_z = py_x;  // p(y|z) = p(y|x) (as p(z) = p(x) and p(z|x) = I_n
 
   const auto fmt = getDefaultFormat();
@@ -154,14 +180,9 @@ void AgglomerativeClustering::Workspace::setup(const EmbeddingGroup& tasks,
   I_xy = mutualInformation(py, px, py_x);
   I_zy_prev = I_xy;
   deltas.clear();
-
-  if (reweight) {
-    I_xy = I_xy_;
-    delta_weight = delta_weight_;
-  }
 }
 
-double AgglomerativeClustering::Workspace::score(const EdgeKey& edge) const {
+double ClusterWorkspace::score(const EdgeKey& edge) const {
   const auto p_s = pz(edge.k1);
   const auto p_t = pz(edge.k2);
   const auto total = p_s + p_t;
@@ -224,7 +245,7 @@ bool AgglomerativeClustering::Workspace::merge(EdgeKey key,
   return true;
 }
 
-std::string AgglomerativeClustering::Workspace::summary(double max_delta) const {
+std::string ClusterWorkspace::summary(double max_delta) const {
   if (deltas.empty()) {
     return "0 merge(s), δ_0=N/A, δ_n=N/A";
   }
@@ -238,7 +259,7 @@ std::string AgglomerativeClustering::Workspace::summary(double max_delta) const 
   return ss.str();
 }
 
-ClusterIds AgglomerativeClustering::Workspace::getClusters() const {
+ClusterIds ClusterWorkspace::getClusters() const {
   const std::set<size_t> cluster_ids(assignments.begin(), assignments.end());
 
   size_t index = 0;
@@ -257,23 +278,100 @@ ClusterIds AgglomerativeClustering::Workspace::getClusters() const {
   return to_return;
 }
 
+Eigen::MatrixXd ClusterWorkspace::compute_py_x(const IBProbabilityConfig& config,
+                                               const FeatureMap& features,
+                                               const EmbeddingGroup& tasks,
+                                               const EmbeddingDistance& metric) {
+  const auto fmt = getDefaultFormat();
+
+  size_t N = features.size();
+  size_t M = tasks.embeddings.size() + 1;
+
+  Eigen::MatrixXd py_x = Eigen::MatrixXd::Ones(M, N) * 1e-12;
+  Eigen::MatrixXd py_x_temp = Eigen::MatrixXd::Zero(M, N);
+  py_x_temp.row(0).setConstant(config.score_threshold);
+
+  VLOG(15) << "----------------------------------------";
+  VLOG(15) << "Computing workspace feature scores";
+  VLOG(15) << "----------------------------------------";
+
+  for (auto&& [idx, feature] : features) {
+    const auto scores = tasks.getScores(metric, feature);
+    VLOG(15) << "scores @ " << idx << ": " << scores.format(fmt);
+    py_x_temp.block(1, idx, M - 1, 1) = scores.cast<double>();
+  }
+
+  VLOG(15) << "----------------------------------------";
+
+  size_t k = std::min(M, config.top_k);
+  size_t l = k;
+  if (config.cumulative) {
+    l = 1;
+  }
+
+  while (l <= k) {
+    const auto top_k_inds = findTopKIndicesCols(py_x_temp, l);
+    for (const auto& idx : top_k_inds) {
+      py_x(idx.first, idx.second) =
+          py_x(idx.first, idx.second) + py_x_temp(idx.first, idx.second);
+    }
+
+    l++;
+  }
+
+  if (config.null_task_preprune) {
+    // Null task processing
+    const auto top_inds = findTopKIndicesCols(py_x_temp, 1);
+    for (const auto& idx : top_inds) {
+      // Null task corresponds to first row
+      if (idx.first == 0) {
+        py_x.block(1, idx.second, M - 1, 1).setConstant(1e-12);
+        // Essentially 0 (but not 0 to avoid NaN error)
+      }
+    }
+  }
+
+  VLOG(10) << "raw: p(y|x): " << py_x.format(fmt);
+
+  const auto scored = py_x.bottomRows(M - 1);
+  const auto min = scored.rowwise().minCoeff();
+  const auto max = scored.rowwise().maxCoeff();
+  const auto avg = scored.rowwise().mean();
+
+  VLOG(10) << "score average: " << avg.format(fmt) << ", range: " << min.format(fmt)
+           << " -> " << max.format(fmt);
+
+  const auto norm_factor = py_x.colwise().sum();
+  py_x.array().rowwise() /= norm_factor.array();
+
+  VLOG(10) << "p(y|x): " << py_x.format(fmt);
+
+  return py_x;
+}
+
+void declare_config(IBProbabilityConfig& config) {
+  using namespace config;
+  name("IBProbabilityConfig");
+  field(config.score_threshold, "score_threshold");
+  field(config.top_k, "top_k");
+  field(config.cumulative, "cumulative");
+  field(config.null_task_preprune, "null_task_preprune");
+  check(config.top_k, GT, 0, "top_k");
+}
+
 void declare_config(AgglomerativeClustering::Config& config) {
   using namespace config;
   name("AgglomerativeClustering::Config");
+  base<VerbosityConfig>(config);
+  field(config.probabilities, "probabilities");
   field(config.tasks, "tasks");
   config.metric.setOptional();
   field(config.metric, "metric");
   field(config.filter_clusters, "filter_clusters");
   field(config.max_delta, "max_delta");
   field(config.tolerance, "tolerance");
-  field(config.score_threshold, "score_threshold");
-  field(config.top_k, "top_k");
-  field(config.cumulative, "cumulative");
-  field(config.null_task_preprune, "null_task_preprune");
-
   check(config.max_delta, GE, 0.0, "max_delta");
   check(config.tolerance, LE, 0.0, "tolerance");
-  check(config.top_k, GT, 0, "top_k");
 }
 
 AgglomerativeClustering::AgglomerativeClustering(const Config& config)
@@ -288,8 +386,13 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
     return {};
   }
 
-  Workspace ws(layer, features);
-  cluster(ws, *tasks_, *metric_);
+  Workspace ws(layer.edges(), features);
+
+  MLOG(1) << "starting clustering with " << ws.edges.size() << " edges";
+  ws.setup(config.probabilities, *tasks_, *metric_);
+  cluster(ws, config.max_delta);
+  MLOG(1) << ws.summary(config.max_delta);
+
   const auto cluster_nodes = ws.getClusters();
 
   Clusters to_return;
@@ -308,12 +411,12 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
     cluster->feature /= cluster->nodes.size();
 
     const auto info = tasks_->getBestScore(*metric_, cluster->feature);
-    if (config.filter_clusters && info.score < config.score_threshold) {
+    if (config.filter_clusters && info.score < config.probabilities.score_threshold) {
       continue;
     }
 
     cluster->score = info.score;
-    if (info.score >= config.score_threshold) {
+    if (info.score >= config.probabilities.score_threshold) {
       cluster->best_task_index = info.index;
       cluster->best_task_name = tasks_->names.at(info.index);
     } else {
@@ -323,21 +426,11 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
     to_return.push_back(cluster);
   }
 
-  VLOG(1) << "[IB] finished clustering with " << to_return.size() << " cluster(s)";
+  MLOG(1) << "finished clustering with " << to_return.size() << " cluster(s)";
   return to_return;
 }
 
-void AgglomerativeClustering::cluster(Workspace& ws,
-                                      const EmbeddingGroup& tasks,
-                                      const EmbeddingDistance& metric,
-                                      bool reweight,
-                                      double I_xy,
-                                      double delta_weight,
-                                      int verbosity) {
-  VLOG(verbosity) << "[IB] starting clustering with " << ws.edges.size() << " edges";
-
-  ws.setup(tasks, metric, reweight, I_xy, delta_weight);
-
+void AgglomerativeClustering::cluster(Workspace& ws, double max_delta) {
   VLOG(10) << "-----------------------------------";
   VLOG(10) << "Scoring edges";
   VLOG(10) << "-----------------------------------";
@@ -374,7 +467,7 @@ void AgglomerativeClustering::cluster(Workspace& ws,
 
     const auto best_edge = best_edge_ptr->first;
     std::list<EdgeKey> changed_edges;
-    if (!ws.merge(best_edge, config.max_delta, changed_edges)) {
+    if (!ws.merge(best_edge, max_delta, changed_edges)) {
       // we've hit a stop criteria
       break;
     }
@@ -391,8 +484,6 @@ void AgglomerativeClustering::cluster(Workspace& ws,
 
     VLOG(10) << "-----------------------------------";
   }
-
-  VLOG(verbosity) << "[IB] " << ws.summary(config.max_delta);
 }
 
 }  // namespace hydra
