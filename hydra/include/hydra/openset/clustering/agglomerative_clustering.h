@@ -28,9 +28,8 @@ class AgglomerativeClustering {
   } const config;
 
   struct Workspace {
-    using FeatureMap = std::map<size_t, Eigen::VectorXf>;
+    using NodeEmbeddings = FeatureMap<spark_dsg::NodeId>;
     using ClusterIndices = std::vector<std::vector<spark_dsg::NodeId>>;
-    using NodeEmbeddings = std::map<spark_dsg::NodeId, Eigen::VectorXf>;
 
     Workspace(const ClusteringConfig& config,
               const spark_dsg::EdgeContainer::Edges& edges,
@@ -55,13 +54,13 @@ class AgglomerativeClustering {
     ClusterIndices getClusters() const;
 
     static Eigen::MatrixXd compute_py_x(const ClusteringConfig& config,
-                                        const FeatureMap& features,
+                                        const std::vector<FeatureVector>& features,
                                         const EmbeddingGroup& tasks,
                                         const EmbeddingDistance& metric);
 
     const ClusteringConfig config;
 
-    FeatureMap features;
+    std::vector<FeatureVector> features;
     std::map<size_t, spark_dsg::NodeId> node_lookup;
     std::map<spark_dsg::NodeId, size_t> order;
     std::map<spark_dsg::EdgeKey, double> edges;

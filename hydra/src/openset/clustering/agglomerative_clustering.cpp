@@ -93,6 +93,7 @@ ClusterWorkspace::Workspace(const ClusteringConfig& config,
                             const EmbeddingDistance& metric)
     : config(config::checkValid(config)) {
   size_t index = 0;
+  features.resize(node_embeddings.size());
   for (const auto& [node_id, feature] : node_embeddings) {
     features[index] = feature;
     node_lookup[index] = node_id;
@@ -146,7 +147,7 @@ size_t ClusterWorkspace::featureDim() const {
     return 0;
   }
 
-  return features.begin()->second.rows();
+  return features.begin()->rows();
 }
 
 void ClusterWorkspace::reweight(double I_xy_, double delta_weight_) {
@@ -251,10 +252,11 @@ ClusterIds ClusterWorkspace::getClusters() const {
   return to_return;
 }
 
-Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
-                                               const FeatureMap& features,
-                                               const EmbeddingGroup& tasks,
-                                               const EmbeddingDistance& metric) {
+Eigen::MatrixXd ClusterWorkspace::compute_py_x(
+    const ClusteringConfig& config,
+    const std::vector<FeatureVector>& features,
+    const EmbeddingGroup& tasks,
+    const EmbeddingDistance& metric) {
   const auto fmt = getDefaultFormat();
 
   size_t N = features.size();
@@ -268,8 +270,8 @@ Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
   VLOG(15) << "Computing workspace feature scores";
   VLOG(15) << "----------------------------------------";
 
-  for (auto&& [idx, feature] : features) {
-    const auto scores = tasks.getScores(metric, feature);
+  for (size_t idx = 0; idx < features.size(); ++idx) {
+    const auto scores = tasks.getScores(metric, features[idx]);
     VLOG(15) << "scores @ " << idx << ": " << scores.format(fmt);
     py_x_temp.block(1, idx, M - 1, 1) = scores.cast<double>();
   }

@@ -12,6 +12,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functions.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/zmq_interfaces.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/generic_update_functor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/updates/ib_objects_update_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/ib_regions_update_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/mesh_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/update_agents_functor.cpp

@@ -19,8 +19,8 @@ double shannonEntropy(const Eigen::Ref<const Eigen::VectorXd>& p,
  * @param tolerance Threshold for near-zero probability
  * @returns JS divergence of the distributions
  */
-double jensenShannonDivergence(const Eigen::Ref<Eigen::MatrixXd>& p,
-                               const Eigen::Ref<Eigen::VectorXd>& priors,
+double jensenShannonDivergence(const Eigen::Ref<const Eigen::MatrixXd>& p,
+                               const Eigen::Ref<const Eigen::VectorXd>& priors,
                                double tolerance = 1.0e-9);
 
 /**
@@ -31,9 +31,9 @@ double jensenShannonDivergence(const Eigen::Ref<Eigen::MatrixXd>& p,
  * @param tolerance Threshold for near-zero probability
  * @returns mutual information between the two distributions
  */
-double mutualInformation(const Eigen::Ref<Eigen::VectorXd>& pa,
-                         const Eigen::Ref<Eigen::VectorXd>& pb,
-                         const Eigen::Ref<Eigen::MatrixXd>& pa_b,
+double mutualInformation(const Eigen::Ref<const Eigen::VectorXd>& pa,
+                         const Eigen::Ref<const Eigen::VectorXd>& pb,
+                         const Eigen::Ref<const Eigen::MatrixXd>& pa_b,
                          double tolerance = 1.0e-9);
 
 }  // namespace hydra

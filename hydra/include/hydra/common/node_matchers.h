@@ -68,6 +68,15 @@ struct IoUNodeMatcher : public NodeMatcher {
 
 void declare_config(IoUNodeMatcher::Config& config);
 
+struct BBoxIntersectionMatcher : public NodeMatcher {
+  struct Config {};
+
+  explicit BBoxIntersectionMatcher(const Config& config);
+  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
+};
+
+void declare_config(BBoxIntersectionMatcher::Config& config);
+
 struct DistanceNodeMatcher : public NodeMatcher {
   struct Config {
     //! Max distance between node centroids for a merge to be considered

@@ -110,6 +110,25 @@ void declare_config(IoUNodeMatcher::Config& config) {
   check(config.min_same_iou, GT, 0.0, "min_same_iou");
 }
 
+BBoxIntersectionMatcher::BBoxIntersectionMatcher(const Config&) {}
+
+bool BBoxIntersectionMatcher::match(const Attrs& lhs_attrs,
+                                    const Attrs& rhs_attrs) const {
+  const auto lhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&lhs_attrs);
+  const auto rhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&rhs_attrs);
+  if (!lhs_derived || !rhs_derived) {
+    LOG(WARNING) << "Unable to cast both attributes to SemanticNodeAttributes";
+    return false;
+  }
+
+  return rhs_derived->bounding_box.intersects(lhs_derived->bounding_box);
+}
+
+void declare_config(BBoxIntersectionMatcher::Config&) {
+  using namespace config;
+  name("BBoxIntersectionMatcher::Config");
+}
+
 DistanceNodeMatcher::DistanceNodeMatcher(const Config& config)
     : config(config::checkValid(config)) {}
 

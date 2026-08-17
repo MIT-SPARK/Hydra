@@ -18,8 +18,8 @@ double shannonEntropy(const Eigen::Ref<const Eigen::VectorXd>& p, double toleran
 }
 
 // compute the Jensen-Shannon divergence of p(a|b) (uses prior p(b))
-double jensenShannonDivergence(const Eigen::Ref<Eigen::MatrixXd>& pa_b,
-                               const Eigen::Ref<Eigen::VectorXd>& p_b,
+double jensenShannonDivergence(const Eigen::Ref<const Eigen::MatrixXd>& pa_b,
+                               const Eigen::Ref<const Eigen::VectorXd>& p_b,
                                double tolerance) {
   // M = sum_i=0^|{1, 2, ... m}| p_i(x) p(y|x=i)
   // p(a|b) * p(b) = \sum_i=0^|a| p(a|b=i)p(b=i)
@@ -33,9 +33,9 @@ double jensenShannonDivergence(const Eigen::Ref<Eigen::MatrixXd>& pa_b,
 }
 
 // compute the mutual information between two distributions
-double mutualInformation(const Eigen::Ref<Eigen::VectorXd>& pa,
-                         const Eigen::Ref<Eigen::VectorXd>& pb,
-                         const Eigen::Ref<Eigen::MatrixXd>& pa_b,
+double mutualInformation(const Eigen::Ref<const Eigen::VectorXd>& pa,
+                         const Eigen::Ref<const Eigen::VectorXd>& pb,
+                         const Eigen::Ref<const Eigen::MatrixXd>& pa_b,
                          double tolerance) {
   if (pa_b.cols() != pb.rows() || pa_b.rows() != pa.rows()) {
     throw std::domain_error("Invalid argument: conditional probability p(a|b) of [" +
