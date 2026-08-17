@@ -4,9 +4,8 @@
 #include <pcl/point_types.h>
 #include <spatial_hash/types.h>
 
-#include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
-#include "hydra/common/dsg_types.h"
+#include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
@@ -40,7 +39,7 @@ struct Frontier {
   bool has_shape_information = false;
 };
 
-class FrontierExtractor {
+class FrontierExtractor : public GraphBuilderFunctor {
  public:
   struct Config {
     char prefix = 'f';
@@ -59,6 +58,8 @@ class FrontierExtractor {
   } const config;
 
   explicit FrontierExtractor(const Config& config);
+
+  void call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) override;
 
   void updateRecentBlocks(const Eigen::Vector3d& current_position, double block_size);
 

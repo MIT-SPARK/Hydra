@@ -76,9 +76,11 @@ class GvdPlaceExtractor : public GraphBuilderFunctor {
 
   virtual ~GvdPlaceExtractor();
 
-  void detect(const ActiveWindowOutput& msg) override;
+  void call(const ActiveWindowOutput& msg, SharedDsgInfo& graph) override;
 
-  void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph) override;
+  void detect(const ActiveWindowOutput& msg);
+
+  void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
 
  protected:
   places::GvdLayer::Ptr gvd_;

@@ -48,7 +48,6 @@
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
@@ -83,13 +82,15 @@ void declare_config(GraphBuilder::Config& config) {
 
   field(config.graph_connector, "graph_connector");
   field(config.graph_updater, "graph_updater");
-  field(config.enable_mesh_objects, "enable_mesh_objects");
-  field(config.object_config, "objects");
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
+
+  field(config.enable_mesh_objects, "enable_mesh_objects");
+  field(config.object_config, "objects");
   // surface (i.e., 2D) places
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
+
   // traversability places
   config.traversability_places.setOptional();
   field(config.traversability_places, "traversability_places");
@@ -99,6 +100,7 @@ void declare_config(GraphBuilder::Config& config) {
   // frontier (i.e. 3D, boundary to unknown space) places
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
+
   field(config.view_database, "view_database");
   field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
@@ -501,25 +503,7 @@ void GraphBuilder::updateFrontiers(const ActiveWindowOutput& input) {
     return;
   }
 
-  const auto timestamp = input.timestamp_ns;
-  frontier_places_->updateRecentBlocks(input.world_t_body, input.map().blockSize());
-
-  {  // start graph critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-
-    ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
-    // TODO(nathan) this should get wiped out when we updated the frontiers
-    NodeIdSet active_nodes;
-    for (const auto& [node_id, node] :
-         dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
-      if (node->attributes().is_active) {
-        active_nodes.insert(node_id);
-      }
-    }
-
-    frontier_places_->detectFrontiers(input, *dsg_->graph, active_nodes);
-    frontier_places_->addFrontiers(timestamp, *dsg_->graph);
-  }  // end graph update critical section
+  frontier_places_->call(input, *dsg_);
 }
 
 void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
@@ -527,10 +511,7 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
     return;
   }
 
-  freespace_places_->detect(input);
-
-  std::lock_guard<std::mutex> graph_lock(dsg_->mutex);
-  freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
+  freespace_places_->call(input, *dsg_);
 }
 
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {

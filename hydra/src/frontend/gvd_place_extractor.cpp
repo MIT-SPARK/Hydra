@@ -112,6 +112,13 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
 
 GvdPlaceExtractor::~GvdPlaceExtractor() {}
 
+void GvdPlaceExtractor::call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) {
+  detect(msg);
+
+  std::lock_guard<std::mutex> graph_lock(dsg.mutex);
+  updateGraph(msg.timestamp_ns, *dsg.graph);
+}
+
 void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   ScopedTimer timer("frontend/detect_gvd", msg.timestamp_ns, true, 2, false);
 

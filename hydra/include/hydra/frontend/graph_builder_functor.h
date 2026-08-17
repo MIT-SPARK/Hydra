@@ -34,17 +34,15 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <spark_dsg/spark_dsg_fwd.h>
-
 #include "hydra/active_window/active_window_output.h"
+#include "hydra/common/shared_dsg_info.h"
 
 namespace hydra {
 
 class GraphBuilderFunctor {
  public:
   virtual ~GraphBuilderFunctor() = default;
-  virtual void detect(const ActiveWindowOutput& msg) = 0;
-  virtual void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph) = 0;
+  virtual void call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) = 0;
 };
 
 }  // namespace hydra

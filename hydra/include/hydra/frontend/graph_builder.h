@@ -37,7 +37,6 @@
 #include <kimera_pgmo/hashing.h>
 #include <kimera_pgmo/mesh_offset_info.h>
 #include <kimera_pgmo/utils/graph.h>
-#include <pose_graph_tools/bow_query.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
@@ -68,7 +67,6 @@ class MeshDelta;
 
 namespace hydra {
 
-class FrontierExtractor;
 struct VolumetricWindow;
 
 class GraphBuilder : public Module {
@@ -94,7 +92,7 @@ class GraphBuilder : public Module {
     config::VirtualConfig<SurfacePlaceExtractor> surface_places;
     config::VirtualConfig<GraphBuilderFunctor> freespace_places;
     config::VirtualConfig<places::TraversabilityPlaceExtractor> traversability_places;
-    config::VirtualConfig<FrontierExtractor> frontier_places;
+    config::VirtualConfig<GraphBuilderFunctor> frontier_places;
     ViewDatabase::Config view_database;
     std::vector<Sink::Factory> sinks;
     //! @brief Disable merging update packets from the active window if true
@@ -186,12 +184,11 @@ class GraphBuilder : public Module {
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
   std::unique_ptr<places::TraversabilityPlaceExtractor> traversability_places_;
   std::unique_ptr<GraphBuilderFunctor> freespace_places_;
-  std::unique_ptr<FrontierExtractor> frontier_places_;
+  std::unique_ptr<GraphBuilderFunctor> frontier_places_;
   ViewDatabase view_database_;
 
   SceneGraphLogger frontend_graph_logger_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   Sink::List sinks_;
 

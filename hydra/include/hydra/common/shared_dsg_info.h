@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <atomic>
 #include <map>
@@ -63,7 +63,7 @@ struct SharedDsgInfo {
   mutable std::mutex mutex;
   std::atomic<bool> updated;
   uint64_t sequence_number = 0;
-  spark_dsg::DynamicSceneGraph::Ptr graph;
+  std::shared_ptr<spark_dsg::SceneGraph> graph;
   std::map<spark_dsg::NodeId, spark_dsg::NodeId> merges;
 };
 

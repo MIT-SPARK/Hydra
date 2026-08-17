@@ -26,6 +26,7 @@
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
+#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
@@ -121,6 +122,24 @@ FrontierExtractor::FrontierExtractor(const Config& config)
     : config(config),
       next_node_id_(config.prefix, 0),
       map_window_(GlobalInfo::instance().createVolumetricWindow()) {}
+
+void FrontierExtractor::call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) {
+  const auto timestamp = msg.timestamp_ns;
+  updateRecentBlocks(msg.world_t_body, msg.map().blockSize());
+
+  std::lock_guard<std::mutex> graph_lock(dsg.mutex);
+  timing::ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
+
+  NodeIdSet active_nodes;
+  for (const auto& [node_id, node] : dsg.graph->getLayer(DsgLayers::PLACES).nodes()) {
+    if (node->attributes().is_active) {
+      active_nodes.insert(node_id);
+    }
+  }
+
+  detectFrontiers(msg, *dsg.graph, active_nodes);
+  addFrontiers(timestamp, *dsg.graph);
+}
 
 void clusterFrontiers(const SpatialCloud::Ptr cloud,
                       const double cluster_tolerance,
