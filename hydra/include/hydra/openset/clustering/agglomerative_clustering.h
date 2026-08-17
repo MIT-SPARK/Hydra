@@ -28,6 +28,7 @@ class AgglomerativeClustering {
   } const config;
 
   struct Workspace {
+    using Features = std::vector<FeatureVector>;
     using NodeEmbeddings = FeatureMap<spark_dsg::NodeId>;
     using ClusterIndices = std::vector<std::vector<spark_dsg::NodeId>>;
 
@@ -54,7 +55,7 @@ class AgglomerativeClustering {
     ClusterIndices getClusters() const;
 
     static Eigen::MatrixXd compute_py_x(const ClusteringConfig& config,
-                                        const std::vector<FeatureVector>& features,
+                                        const Features& features,
                                         const EmbeddingGroup& tasks,
                                         const EmbeddingDistance& metric);
 

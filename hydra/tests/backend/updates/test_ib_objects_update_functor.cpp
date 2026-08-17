@@ -28,8 +28,9 @@ void addSegment(SceneGraph& graph,
 }
 
 void callWithUnmerged(const UpdateFunctor& functor, SharedDsgInfo& dsg) {
+  auto info = std::make_shared<UpdateInfo>();
   const auto unmerged = dsg.graph->clone();
-  functor.call(*unmerged, dsg, nullptr);
+  functor.call(*unmerged, dsg, info);
 }
 
 }  // namespace

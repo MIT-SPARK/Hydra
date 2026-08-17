@@ -42,7 +42,7 @@ double mutualInformation(const Eigen::Ref<const Eigen::VectorXd>& pa,
                             std::to_string(pa_b.rows()) + ", " +
                             std::to_string(pa_b.cols()) + "] doesn't match p(a) (" +
                             std::to_string(pa.rows()) + " elements) or p(b) (" +
-                            std::to_string(pb.rows()) + " elements");
+                            std::to_string(pb.rows()) + " elements)");
   }
 
   double total = 0.0;

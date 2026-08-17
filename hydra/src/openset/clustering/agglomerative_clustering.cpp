@@ -252,11 +252,10 @@ ClusterIds ClusterWorkspace::getClusters() const {
   return to_return;
 }
 
-Eigen::MatrixXd ClusterWorkspace::compute_py_x(
-    const ClusteringConfig& config,
-    const std::vector<FeatureVector>& features,
-    const EmbeddingGroup& tasks,
-    const EmbeddingDistance& metric) {
+Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
+                                               const Features& features,
+                                               const EmbeddingGroup& tasks,
+                                               const EmbeddingDistance& metric) {
   const auto fmt = getDefaultFormat();
 
   size_t N = features.size();

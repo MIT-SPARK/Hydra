@@ -51,6 +51,12 @@ static const auto iou_registration =
     config::RegistrationWithConfig<NodeMatcher, IoUNodeMatcher, IoUNodeMatcher::Config>(
         "IoUNodeMatcher");
 
+static const auto intersect_registration =
+    config::RegistrationWithConfig<NodeMatcher,
+                                   BBoxIntersectionMatcher,
+                                   BBoxIntersectionMatcher::Config>(
+        "BBoxIntersectionMatcher");
+
 static const auto distance_registration =
     config::RegistrationWithConfig<NodeMatcher,
                                    DistanceNodeMatcher,

@@ -286,7 +286,7 @@ std::set<size_t> IBObjectsUpdateFunctor::addSegmentEdges(SceneGraph& graph) cons
 void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
   const auto& segments = graph.getLayer(config.source_layer);
 
-  const auto M = tasks_->size();
+  const auto M = tasks_->size() + 1;
   const auto all_features = getAllFeatures(segments);
   const auto N = all_features.size();
 
