@@ -36,7 +36,7 @@
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <gtest/gtest.h>
-#include <hydra/backend/generic_update_functor.h>
+#include <hydra/backend/updates/generic_update_functor.h>
 #include <kimera_pgmo/deformation_graph.h>
 
 #include "hydra_test/resources.h"

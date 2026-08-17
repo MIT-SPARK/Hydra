@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/backend/update_buildings_functor.h>
+#include <hydra/backend/updates/update_buildings_functor.h>
 
 #include "hydra_test/shared_dsg_fixture.h"
 
