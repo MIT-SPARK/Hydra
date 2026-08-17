@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/virtual_config.h>
-#include <kimera_pgmo/hashing.h>
 #include <kimera_pgmo/mesh_offset_info.h>
 #include <kimera_pgmo/utils/graph.h>
 #include <spark_dsg/scene_graph_logger.h>
@@ -53,7 +52,6 @@
 #include "hydra/frontend/graph_connector.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_place_extractor.h"
-#include "hydra/frontend/traversability_place_extractor.h"
 #include "hydra/frontend/view_database.h"
 #include "hydra/loop_closure/lcd_input.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
@@ -91,7 +89,7 @@ class GraphBuilder : public Module {
         PoseGraphFromOdom::Config()};
     config::VirtualConfig<SurfacePlaceExtractor> surface_places;
     config::VirtualConfig<GraphBuilderFunctor> freespace_places;
-    config::VirtualConfig<places::TraversabilityPlaceExtractor> traversability_places;
+    config::VirtualConfig<GraphBuilderFunctor> traversability_places;
     config::VirtualConfig<GraphBuilderFunctor> frontier_places;
     ViewDatabase::Config view_database;
     std::vector<Sink::Factory> sinks;
@@ -137,15 +135,15 @@ class GraphBuilder : public Module {
  protected:
   void updateMesh(const ActiveWindowOutput& msg);
 
-  void updateObjects(const ActiveWindowOutput& msg);
-
   void updateFrontiers(const ActiveWindowOutput& msg);
 
   void updatePlaces(const ActiveWindowOutput& msg);
 
-  void updatePlaces2d(const ActiveWindowOutput& msg);
-
   void updateTraversabilityPlaces(const ActiveWindowOutput& msg);
+
+  void updateObjects(const ActiveWindowOutput& msg);
+
+  void updatePlaces2d(const ActiveWindowOutput& msg);
 
   void updateDeformationGraph(const ActiveWindowOutput& msg);
 
@@ -182,7 +180,7 @@ class GraphBuilder : public Module {
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
-  std::unique_ptr<places::TraversabilityPlaceExtractor> traversability_places_;
+  std::unique_ptr<GraphBuilderFunctor> traversability_places_;
   std::unique_ptr<GraphBuilderFunctor> freespace_places_;
   std::unique_ptr<GraphBuilderFunctor> frontier_places_;
   ViewDatabase view_database_;

@@ -514,6 +514,14 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
   freespace_places_->call(input, *dsg_);
 }
 
+void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
+  if (!traversability_places_) {
+    return;
+  }
+
+  traversability_places_->call(input, *dsg_);
+}
+
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   if (!surface_places_) {
     return;
@@ -530,17 +538,6 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
   surface_places_->updateGraph(input, mesh_offsets_, *dsg_->graph);
-}
-
-void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
-  if (!traversability_places_) {
-    return;
-  }
-
-  traversability_places_->detect(input);
-
-  std::lock_guard<std::mutex> graph_lock(dsg_->mutex);
-  traversability_places_->updateGraph(input, *dsg_->graph);
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {

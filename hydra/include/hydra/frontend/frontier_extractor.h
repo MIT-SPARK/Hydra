@@ -1,5 +1,4 @@
 #pragma once
-#include <config_utilities/virtual_config.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <spatial_hash/types.h>
@@ -12,23 +11,15 @@ namespace hydra {
 
 struct Frontier {
  public:
-  Frontier() {};
+  Frontier();
+
   Frontier(Eigen::Vector3d c,
            Eigen::Vector3d s,
            Eigen::Quaterniond o,
            size_t n,
-           spatial_hash::BlockIndex b)
-      : center(c),
-        scale(s),
-        orientation(o),
-        num_frontier_voxels(n),
-        block_index(b),
-        has_shape_information(true) {};
-  Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
-      : center(c),
-        num_frontier_voxels(n),
-        block_index(b),
-        has_shape_information(false) {};
+           spatial_hash::BlockIndex b);
+
+  Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b);
 
  public:
   Eigen::Vector3d center;
@@ -92,10 +83,6 @@ class FrontierExtractor : public GraphBuilderFunctor {
   void computeSparseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                               const TsdfLayer& layer,
                               std::vector<Frontier>& frontiers) const;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<FrontierExtractor, FrontierExtractor, Config>(
-          "voxel_clustering");
 };
 
 Eigen::Vector3d frontiersToCenters(const std::vector<Eigen::Vector3f>& positions);

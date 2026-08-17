@@ -1,6 +1,9 @@
-#include <config_utilities/config_utilities.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+#include <config_utilities/types/conversions.h>
+#include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <spatial_hash/neighbor_utils.h>
 
@@ -29,6 +32,14 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<GraphBuilderFunctor,
+                                   FrontierExtractor,
+                                   FrontierExtractor::Config>("FrontierExtractor");
+
+}
 
 using spatial_hash::IndexSet;
 using SpatialCloud = pcl::PointCloud<pcl::PointXYZ>;
@@ -117,6 +128,23 @@ void splitAllFrontiers(std::vector<std::vector<Eigen::Vector3f>>& frontiers,
     }
   }
 }
+
+Frontier::Frontier() {}
+
+Frontier::Frontier(Eigen::Vector3d c,
+                   Eigen::Vector3d s,
+                   Eigen::Quaterniond o,
+                   size_t n,
+                   spatial_hash::BlockIndex b)
+    : center(c),
+      scale(s),
+      orientation(o),
+      num_frontier_voxels(n),
+      block_index(b),
+      has_shape_information(true) {}
+
+Frontier::Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
+    : center(c), num_frontier_voxels(n), block_index(b), has_shape_information(false) {}
 
 FrontierExtractor::FrontierExtractor(const Config& config)
     : config(config),
