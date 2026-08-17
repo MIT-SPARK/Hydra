@@ -413,9 +413,6 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
         return !map_window_->inBounds(
             msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
       });
-
-  // TODO(nathan) follow up on whether or not we need to do stuff with the 3D places and
-  // mesh
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
