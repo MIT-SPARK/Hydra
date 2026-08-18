@@ -32,7 +32,6 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
 #include "hydra_visualizer/filters/node_filters.h"
 
 #include <config_utilities/config.h>
