@@ -61,21 +61,6 @@ MarkerArrayMsg makeLayerBoundingBoxes(const std_msgs::msg::Header& header,
                                       const SceneGraphLayer& layer,
                                       const std::string& ns);
 
-MarkerMsg makeLayerEllipseBoundaries(const std_msgs::msg::Header& header,
-                                     const LayerInfo& info,
-                                     const SceneGraphLayer& layer,
-                                     const std::string& ns);
-
-MarkerMsg makeLayerPolygonEdges(const std_msgs::msg::Header& header,
-                                const LayerInfo& info,
-                                const SceneGraphLayer& layer,
-                                const std::string& ns);
-
-MarkerMsg makeLayerPolygonBoundaries(const std_msgs::msg::Header& header,
-                                     const LayerInfo& info,
-                                     const SceneGraphLayer& layer,
-                                     const std::string& ns);
-
 MarkerArrayMsg makeEllipsoidMarkers(const std_msgs::msg::Header& header,
                                     const LayerInfo& info,
                                     const SceneGraphLayer& layer,
@@ -95,8 +80,6 @@ MarkerMsg makeLayerEdgeMarkers(const std_msgs::msg::Header& header,
                                const LayerInfo& config,
                                const SceneGraphLayer& layer,
                                const std::string& ns);
-
-// TODO(nathan) add ability to draw mesh points for given 2D place or object
 
 MarkerMsg makeLayerTextMarker(const std_msgs::msg::Header& header,
                               const LayerInfo& info,

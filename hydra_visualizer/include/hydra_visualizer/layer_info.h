@@ -115,31 +115,12 @@ struct LayerConfig {
     //! @brief point at which to break the edge into many edges
     double edge_break_ratio = 0.5;
   } bounding_boxes;
-
-  //! @brief configuration for polygon boundaries
-  struct Boundaries {
-    //! @brief display polygon boundaries
-    bool draw = false;
-    //! @brief draw polygons at mesh level
-    bool collapse = false;
-    //! @brief scale of boundary wireframe
-    double wireframe_scale = 0.1;
-    //! @brief draw polygons using node semantic color
-    bool use_node_color = true;
-    //! @brief alpha of boundary
-    double alpha = 0.5;
-    //! @brief display minimum bounding ellipse
-    bool draw_ellipse = false;
-    //! @brief alpha of bounding ellipse
-    double ellipse_alpha = 0.5;
-  } boundaries;
 };
 
 void declare_config(LayerConfig::Nodes& config);
 void declare_config(LayerConfig::Edges& config);
 void declare_config(LayerConfig::Text& config);
 void declare_config(LayerConfig::BoundingBoxes& config);
-void declare_config(LayerConfig::Boundaries& config);
 void declare_config(LayerConfig& config);
 
 class LayerInfo {

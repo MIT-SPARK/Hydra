@@ -45,6 +45,7 @@ add_library(
   src/plugins/basis_point_plugin.cpp
   src/plugins/footprint_plugin.cpp
   src/plugins/khronos_object_plugin.cpp
+  src/plugins/mesh_places_plugin.cpp
   src/plugins/mesh_plugin.cpp
   src/plugins/mesh_point_plugin.cpp
   src/plugins/places_freespace_plugin.cpp

@@ -83,22 +83,6 @@ struct MarkerNamespaces {
   static std::string layerBboxNamespace(LayerKey key) {
     return keyToLayerName(key) + "_bounding_boxes";
   }
-
-  static std::string layerBoundaryNamespace(LayerKey key) {
-    return keyToLayerName(key) + "_polygon_boundaries";
-  }
-
-  static std::string layerBoundaryEllipseNamespace(LayerKey key) {
-    return keyToLayerName(key) + "_ellipsoid_boundaries";
-  }
-
-  static std::string layerBoundaryEdgeNamespace(LayerKey key) {
-    return keyToLayerName(key) + "_polygon_boundaries_edges";
-  }
-
-  static std::string meshEdgeNamespace(LayerKey key) {
-    return keyToLayerName(key) + "_mesh_edges";
-  }
 };
 
 struct InterlayerInfo {
@@ -410,21 +394,7 @@ void SceneGraphRenderer::drawLayer(const std_msgs::msg::Header& header,
     tracker_.add(makeLayerBoundingBoxes(header, info, layer, ns), msg);
   }
 
-  if (info.config.boundaries.draw) {
-    const auto ns = MarkerNamespaces::layerBoundaryNamespace(layer.id);
-    const auto edge_ns = MarkerNamespaces::layerBoundaryEdgeNamespace(layer.id);
-    tracker_.add(makeLayerPolygonBoundaries(header, info, layer, ns), msg);
-    if (info.config.boundaries.collapse) {
-      tracker_.add(makeLayerPolygonEdges(header, info, layer, edge_ns), msg);
-    }
-  }
-
-  if (info.config.boundaries.draw_ellipse) {
-    const auto ns = MarkerNamespaces::layerBoundaryEllipseNamespace(layer.id);
-    tracker_.add(makeLayerEllipseBoundaries(header, info, layer, ns), msg);
-  }
-
-  if (info.config.draw_frontier_ellipse) {
+  if (layer_config.draw_frontier_ellipse) {
     tracker_.add(makeEllipsoidMarkers(header, info, layer, "frontier_ns"), msg);
     info.filter = {};  // we reset the manual filter to draw edges to frontiers
   }

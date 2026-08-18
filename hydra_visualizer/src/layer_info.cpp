@@ -113,22 +113,6 @@ void declare_config(LayerConfig::BoundingBoxes& config) {
   checkInRange(config.edge_break_ratio, 0.0, 1.0, "edge_break_ratio");
 }
 
-void declare_config(LayerConfig::Boundaries& config) {
-  using namespace config;
-  name("LayerConfig::Boundaries");
-  field(config.draw, "draw");
-  field(config.collapse, "collapse");
-  field(config.wireframe_scale, "wireframe_scale");
-  field(config.use_node_color, "use_node_color");
-  field(config.alpha, "alpha");
-  field(config.draw_ellipse, "draw_ellipse");
-  field(config.ellipse_alpha, "ellipse_alpha");
-
-  check(config.wireframe_scale, GT, 0.0, "wireframe_scale");
-  checkInRange(config.alpha, 0.0, 1.0, "alpha");
-  checkInRange(config.ellipse_alpha, 0.0, 1.0, "ellipse_alpha");
-}
-
 void declare_config(LayerConfig& config) {
   using namespace config;
   name("LayerConfig");
