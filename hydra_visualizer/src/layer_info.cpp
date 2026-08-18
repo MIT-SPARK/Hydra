@@ -135,27 +135,32 @@ bool DrawingContext::valid(const Node& node) const {
   return filter(node);
 }
 
-LayerInfo::LayerInfo(const std::string& ns, const LayerConfig& config) {
-  const ConfigWrapper::Callback callback = [this]() { has_change_ = true; };
-  config_ = std::make_unique<ConfigWrapper>(ns, config, callback);
-}
+LayerInfo::LayerInfo(const std::string& ns, const LayerConfig& config)
+    : config_(ns, config, [this]() { has_change_ = true; }),
+      node_color_config_(
+          ns + "/nodes/color", config.nodes.color, [this]() { updateNodeColor(); }),
+      node_color_adapter_(config.nodes.color.create()) {}
 
 bool LayerInfo::hasChange() const { return has_change_; }
 
 void LayerInfo::clearChangeFlag() { has_change_ = false; }
 
-YAML::Node LayerInfo::dumpConfig() const { return config::toYaml(config_->get()); }
+YAML::Node LayerInfo::dumpConfig() const { return config::toYaml(config_.get()); }
+
+void LayerInfo::updateNodeColor() {
+  has_change_ = true;
+  node_color_adapter_ = node_color_config_.get().create();
+}
 
 DrawingContext::Ptr LayerInfo::context(const SceneGraph& graph,
                                        LayerKey layer,
                                        double offset_size,
                                        bool collapse) const {
-  const auto config = config_->get();
+  const auto config = config_.get();
   if (!config.visualize) {
     return nullptr;
   }
 
-  node_color_adapter_ = config.nodes.color.create();
   edge_color_adapter_ = config.edges.color.create();
   text_adapter_ = config.text.adapter.create();
 

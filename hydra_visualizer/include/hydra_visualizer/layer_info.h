@@ -172,11 +172,15 @@ class LayerInfo {
                               bool collapse = true) const;
 
  private:
+  void updateNodeColor();
+
   bool has_change_ = false;
-  std::unique_ptr<ConfigWrapper> config_;
+  config::DynamicConfig<LayerConfig> config_;
+  config::DynamicConfig<config::VirtualConfig<NodeColorAdapter>> node_color_config_;
+
   mutable std::unique_ptr<NodeFilter> node_filter_;
   mutable std::unique_ptr<NodeTextAdapter> text_adapter_;
-  mutable std::unique_ptr<NodeColorAdapter> node_color_adapter_;
+  std::unique_ptr<NodeColorAdapter> node_color_adapter_;
   mutable std::unique_ptr<EdgeColorAdapter> edge_color_adapter_;
 };
 
