@@ -36,6 +36,7 @@ launch:
         --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
         --config-utilities-yaml {robot_id: 0, odom_frame: world, robot_frame: base_link_gt, map_frame: map}
   - set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
+  - set_remap: {from: hydra_visualizer/feature, to: /tesse/left_cam/semantic/embed/feature}
   - arg: {name: start_visualizer, default: 'true', description: run hydra visualizer}
   - include:
       file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
