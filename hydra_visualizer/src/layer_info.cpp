@@ -119,6 +119,8 @@ void declare_config(LayerConfig& config) {
   name("LayerConfig");
   field(config.visualize, "visualize");
   field(config.z_offset_scale, "z_offset_scale");
+  config.node_filter.setOptional();
+  field(config.node_filter, "node_filter");
 
   // subconfigs
   field(config.nodes, "nodes");
@@ -136,10 +138,9 @@ bool DrawingContext::valid(const Node& node) const {
 }
 
 LayerInfo::LayerInfo(const std::string& ns, const LayerConfig& config)
-    : config_(ns, config, [this]() { has_change_ = true; }),
-      node_color_config_(
-          ns + "/nodes/color", config.nodes.color, [this]() { updateNodeColor(); }),
-      node_color_adapter_(config.nodes.color.create()) {}
+    : config_(ns, config, [this]() { onConfigChange(); }) {
+  onConfigChange();
+}
 
 bool LayerInfo::hasChange() const { return has_change_; }
 
@@ -147,9 +148,16 @@ void LayerInfo::clearChangeFlag() { has_change_ = false; }
 
 YAML::Node LayerInfo::dumpConfig() const { return config::toYaml(config_.get()); }
 
-void LayerInfo::updateNodeColor() {
+void LayerInfo::onConfigChange() {
+  const auto config = config_.get();
+
+  // TODO(nathan) make it so config changes don't override adapters
+
   has_change_ = true;
-  node_color_adapter_ = node_color_config_.get().create();
+  node_filter_ = config.node_filter.create();
+  text_adapter_ = config.text.adapter.create();
+  node_color_adapter_ = config.nodes.color.create();
+  edge_color_adapter_ = config.edges.color.create();
 }
 
 DrawingContext::Ptr LayerInfo::context(const SceneGraph& graph,
@@ -160,9 +168,6 @@ DrawingContext::Ptr LayerInfo::context(const SceneGraph& graph,
   if (!config.visualize) {
     return nullptr;
   }
-
-  edge_color_adapter_ = config.edges.color.create();
-  text_adapter_ = config.text.adapter.create();
 
   if (node_color_adapter_) {
     node_color_adapter_->setGraph(graph, layer);
@@ -179,6 +184,13 @@ DrawingContext::Ptr LayerInfo::context(const SceneGraph& graph,
   context->text_color = colorFromName(config.text.color);
   context->text = config.text;
   context->bounding_boxes = config.bounding_boxes;
+
+  if (node_filter_) {
+    context->filter = [this, &graph](const SceneGraphNode& node) {
+      return node_filter_->valid(graph, node);
+    };
+  }
+
   context->node_text = [this, &graph](const SceneGraphNode& node) {
     return text_adapter_ ? text_adapter_->getText(graph, node) : "";
   };

@@ -50,6 +50,8 @@ struct LayerConfig {
   bool visualize = false;
   //! @brief number of steps of offset to apply
   double z_offset_scale = 0.0;
+  //! @brief optional filter to apply to nodes
+  config::VirtualConfig<NodeFilter> node_filter;
 
   //! @brief Node settings
   struct Nodes {
@@ -153,11 +155,6 @@ struct DrawingContext {
 
 class LayerInfo {
  public:
-  using Color = spark_dsg::Color;
-  using Node = spark_dsg::SceneGraphNode;
-  using Edge = spark_dsg::SceneGraphEdge;
-  using ConfigWrapper = config::DynamicConfig<visualizer::LayerConfig>;
-
   LayerInfo(const std::string& ns, const LayerConfig& config);
 
   bool hasChange() const;
@@ -172,16 +169,14 @@ class LayerInfo {
                               bool collapse = true) const;
 
  private:
-  void updateNodeColor();
+  void onConfigChange();
 
   bool has_change_ = false;
   config::DynamicConfig<LayerConfig> config_;
-  config::DynamicConfig<config::VirtualConfig<NodeColorAdapter>> node_color_config_;
-
-  mutable std::unique_ptr<NodeFilter> node_filter_;
-  mutable std::unique_ptr<NodeTextAdapter> text_adapter_;
+  std::unique_ptr<NodeFilter> node_filter_;
+  std::unique_ptr<NodeTextAdapter> text_adapter_;
   std::unique_ptr<NodeColorAdapter> node_color_adapter_;
-  mutable std::unique_ptr<EdgeColorAdapter> edge_color_adapter_;
+  std::unique_ptr<EdgeColorAdapter> edge_color_adapter_;
 };
 
 }  // namespace hydra::visualizer
