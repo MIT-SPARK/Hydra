@@ -35,6 +35,7 @@ add_library(
   src/adapters/text.cpp
   src/color/colormap_utilities.cpp
   src/drawing.cpp
+  src/filters/node_filters.cpp
   src/groundtruth/bounding_box_publisher.cpp
   src/groundtruth/region_publisher.cpp
   src/io/graph_file_wrapper.cpp
