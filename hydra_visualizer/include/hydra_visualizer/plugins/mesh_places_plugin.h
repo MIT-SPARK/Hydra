@@ -45,7 +45,7 @@ class MeshPlacesPlugin : public LayerPlugin {
   //! @brief configuration for polygon boundaries
   struct Config {
     //! @brief display polygon boundaries
-    bool draw = false;
+    bool draw = true;
     //! @brief draw polygons at mesh level
     bool collapse = false;
     //! @brief scale of boundary wireframe

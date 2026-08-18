@@ -44,17 +44,18 @@ renderer:
       z_offset_scale: 3.0
       visualize: true
       nodes: {scale: 0.2, color: {type: LabelColorAdapter}, alpha: 0.9, use_sphere: true}
-      boundaries: {draw: true, collapse: false, wireframe_scale: 0.1, use_node_color: true, alpha: 1.0}
       edges: {scale: 0.01, alpha: 0.5}
     3p2:
       z_offset_scale: 3.0
       visualize: true
       nodes: {scale: 0.2, color: {type: LabelColorAdapter}, alpha: 0.9, use_sphere: true}
-      boundaries: {draw: true, collapse: false, wireframe_scale: 0.1, use_node_color: true, alpha: 1.0}
       text: {draw: false, collapse: true, adapter: {type: IdTextAdapter}, height: 0.5, scale: 0.45}
       edges: {scale: 0.1, alpha: 0.8, color: {type: TraversabilityEdgeColorAdapter}}
   interlayer_edges:
     - {from: 3*, to: 2p*, draw: false}
     - {from: 3*, to: 2, use_child_color: true, scale: 0.08, alpha: 0.5}
     - {from: 4, to: 3*, scale: 0.08, alpha: 0.4}
-  layer_plugins: []
+  layer_plugins:
+    - layer: 3p1
+      plugins:
+        - {type: MeshPlacesPlugin, wireframe_scale: 0.1, alpha: 1.0}
