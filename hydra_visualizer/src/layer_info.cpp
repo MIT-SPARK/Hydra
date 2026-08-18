@@ -118,14 +118,12 @@ void declare_config(LayerConfig& config) {
   name("LayerConfig");
   field(config.visualize, "visualize");
   field(config.z_offset_scale, "z_offset_scale");
-  field(config.draw_frontier_ellipse, "draw_frontier_ellipse");
 
   // subconfigs
   field(config.nodes, "nodes");
   field(config.edges, "edges");
   field(config.text, "text");
   field(config.bounding_boxes, "bounding_boxes");
-  field(config.boundaries, "boundaries");
 }
 
 LayerInfo::LayerInfo(const LayerConfig& config)

@@ -365,13 +365,6 @@ void SceneGraphRenderer::drawLayer(const std_msgs::msg::Header& header,
     return;
   }
 
-  if (info.config.draw_frontier_ellipse) {
-    info.filter = [](const SceneGraphNode& node) {
-      auto attrs = node.tryAttributes<PlaceNodeAttributes>();
-      return attrs ? attrs->real_place : true;
-    };
-  }
-
   const auto node_ns = MarkerNamespaces::layerNodeNamespace(layer.id);
   if (info.config.nodes.draw) {
     tracker_.add(makeLayerNodeMarkers(header, info, layer, node_ns), msg);
@@ -392,11 +385,6 @@ void SceneGraphRenderer::drawLayer(const std_msgs::msg::Header& header,
   if (info.config.bounding_boxes.draw) {
     const auto ns = MarkerNamespaces::layerBboxNamespace(layer.id);
     tracker_.add(makeLayerBoundingBoxes(header, info, layer, ns), msg);
-  }
-
-  if (layer_config.draw_frontier_ellipse) {
-    tracker_.add(makeEllipsoidMarkers(header, info, layer, "frontier_ns"), msg);
-    info.filter = {};  // we reset the manual filter to draw edges to frontiers
   }
 
   const auto edge_ns = MarkerNamespaces::layerEdgeNamespace(layer.id);

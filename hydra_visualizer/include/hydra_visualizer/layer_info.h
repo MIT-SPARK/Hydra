@@ -48,8 +48,6 @@ struct LayerConfig {
   bool visualize = false;
   //! @brief number of steps of offset to apply
   double z_offset_scale = 0.0;
-  //! @brief Draw current frontiers as ellipses
-  bool draw_frontier_ellipse = false;
 
   //! @brief Node settings
   struct Nodes {

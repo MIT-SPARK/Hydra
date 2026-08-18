@@ -44,6 +44,7 @@ add_library(
   src/layer_info.cpp
   src/plugins/basis_point_plugin.cpp
   src/plugins/footprint_plugin.cpp
+  src/plugins/frontier_plugin.cpp
   src/plugins/khronos_object_plugin.cpp
   src/plugins/mesh_places_plugin.cpp
   src/plugins/mesh_plugin.cpp

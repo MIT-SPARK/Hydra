@@ -33,38 +33,38 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/scene_graph.h>
+
+#include <config_utilities/dynamic_config.h>
+
+#include "hydra_visualizer/plugins/layer_plugin.h"
 
 namespace hydra {
 
-struct NodeFilter {
-  virtual ~NodeFilter() = default;
-
-  /**
-   * @brief Get whether a node should be drawn or not
-   * @param graph Current scene graph node is from
-   * @param node Node to determine validity for
-   * @returns True if the node is valid to draw
-   */
-  virtual bool valid(const spark_dsg::SceneGraph& graph,
-                     const spark_dsg::SceneGraphNode& node) const = 0;
-};
-
-//! Filter that discards or keeps places with the real_place flag
-struct RealPlaceFilter : public NodeFilter {
-  using Ptr = std::shared_ptr<NodeFilter>;
+class FrontierPlugin : public LayerPlugin {
+ public:
   struct Config {
-    bool real_is_valid = true;
-    bool place_attributes_required = true;
-  } const config;
+    //! @brief alpha of boundary
+    double alpha = 0.5;
+  };
 
-  explicit RealPlaceFilter(const Config& config);
-  virtual ~RealPlaceFilter() = default;
+  FrontierPlugin(const Config& config, const std::string& ns);
 
-  virtual bool valid(const spark_dsg::SceneGraph& graph,
-                     const spark_dsg::SceneGraphNode& node) const override;
+  virtual ~FrontierPlugin() = default;
+
+  virtual void draw(const std_msgs::msg::Header& header,
+                    const visualizer::LayerInfo& info,
+                    const spark_dsg::SceneGraphLayer& layer,
+                    const spark_dsg::Mesh* mesh,
+                    visualization_msgs::msg::MarkerArray& msg,
+                    MarkerTracker& tracker) override;
+
+  YAML::Node dumpConfig() const override;
+
+ protected:
+  const std::string ns_;
+  config::DynamicConfig<Config> config_;
 };
 
-void declare_config(RealPlaceFilter::Config& config);
+void declare_config(FrontierPlugin::Config& config);
 
 }  // namespace hydra

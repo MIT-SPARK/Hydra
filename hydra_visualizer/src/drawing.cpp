@@ -35,7 +35,6 @@
 #include "hydra_visualizer/drawing.h"
 
 #include <glog/logging.h>
-#include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/printing.h>
@@ -45,11 +44,11 @@
 
 #include "hydra_visualizer/color/colormap_utilities.h"
 
-namespace hydra::visualizer {
 using namespace spark_dsg;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
 
+namespace hydra::visualizer {
 namespace {
 
 // TODO(nathan) not needed anymore
@@ -220,40 +219,6 @@ MarkerArray makeLayerBoundingBoxes(const std_msgs::msg::Header& header,
   }
 
   return markers;
-}
-
-MarkerArray makeEllipsoidMarkers(const std_msgs::msg::Header& header,
-                                 const LayerInfo& info,
-                                 const SceneGraphLayer& layer,
-                                 const std::string& ns) {
-  size_t id = 0;
-  MarkerArray msg;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto& attrs = node->attributes<PlaceNodeAttributes>();
-    if (attrs.real_place) {
-      continue;
-    }
-
-    Marker marker;
-    marker.header = header;
-    marker.type = Marker::SPHERE;
-    marker.action = Marker::ADD;
-    marker.id = id++;
-    marker.ns = ns;
-
-    marker.scale.x = attrs.frontier_scale.x();
-    marker.scale.y = attrs.frontier_scale.y();
-    marker.scale.z = attrs.frontier_scale.z();
-
-    tf2::convert(attrs.position, marker.pose.position);
-    tf2::convert(attrs.orientation, marker.pose.orientation);
-
-    marker.pose.position.z += info.z_offset;
-    marker.color = makeColorMsg(info.node_color(*node), info.config.nodes.alpha);
-    msg.markers.push_back(marker);
-  }
-
-  return msg;
 }
 
 MarkerArray makeLayerNodeTextMarkers(const std_msgs::msg::Header& header,
