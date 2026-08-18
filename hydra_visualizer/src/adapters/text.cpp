@@ -84,7 +84,7 @@ inline std::string getNodeName(const SceneGraphNode& node) {
   return attrs ? attrs->name : "";
 }
 
-inline std::string getNodeLabel(const DynamicSceneGraph& graph,
+inline std::string getNodeLabel(const SceneGraph& graph,
                                 const SceneGraphNode& node,
                                 std::map<std::string, Labelspace>& labelspaces) {
   const auto attrs = node.tryAttributes<SemanticNodeAttributes>();
@@ -112,21 +112,21 @@ inline std::string getNodeLabel(const DynamicSceneGraph& graph,
 
 void declare_config(IdTextAdapter::Config&) {}
 
-std::string IdTextAdapter::getText(const DynamicSceneGraph&,
+std::string IdTextAdapter::getText(const SceneGraph&,
                                    const SceneGraphNode& node) const {
   return NodeSymbol(node.id).str();
 }
 
 void declare_config(LabelTextAdapter::Config&) {}
 
-std::string LabelTextAdapter::getText(const DynamicSceneGraph& graph,
+std::string LabelTextAdapter::getText(const SceneGraph& graph,
                                       const SceneGraphNode& node) const {
   return getNodeLabel(graph, node, labelspaces_);
 }
 
 void declare_config(LabelIdTextAdapter::Config&) {}
 
-std::string LabelIdTextAdapter::getText(const DynamicSceneGraph& graph,
+std::string LabelIdTextAdapter::getText(const SceneGraph& graph,
                                         const SceneGraphNode& node) const {
   const auto id = NodeSymbol(node.id).str();
   const auto label = getNodeLabel(graph, node, labelspaces_);
@@ -135,14 +135,14 @@ std::string LabelIdTextAdapter::getText(const DynamicSceneGraph& graph,
 
 void declare_config(NameTextAdapter::Config&) {}
 
-std::string NameTextAdapter::getText(const DynamicSceneGraph&,
+std::string NameTextAdapter::getText(const SceneGraph&,
                                      const SceneGraphNode& node) const {
   return getNodeName(node);
 }
 
 void declare_config(NameIdTextAdapter::Config&) {}
 
-std::string NameIdTextAdapter::getText(const DynamicSceneGraph&,
+std::string NameIdTextAdapter::getText(const SceneGraph&,
                                        const SceneGraphNode& node) const {
   const auto id = NodeSymbol(node.id).str();
   const auto name = getNodeName(node);
@@ -151,7 +151,7 @@ std::string NameIdTextAdapter::getText(const DynamicSceneGraph&,
 
 void declare_config(AttributesTextAdaptor::Config&) {}
 
-std::string AttributesTextAdaptor::getText(const DynamicSceneGraph&,
+std::string AttributesTextAdaptor::getText(const SceneGraph&,
                                            const SceneGraphNode& node) const {
   std::stringstream ss;
   ss << node.attributes();

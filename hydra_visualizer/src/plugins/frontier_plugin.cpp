@@ -71,7 +71,7 @@ FrontierPlugin::FrontierPlugin(const Config& config, const std::string& ns)
       config_(ns + "_frontier_plugin", config, [this]() { has_change_ = true; }) {}
 
 void FrontierPlugin::draw(const std_msgs::msg::Header& header,
-                          const visualizer::LayerInfo& info,
+                          const visualizer::DrawingContext& info,
                           const SceneGraphLayer& layer,
                           const Mesh*,
                           MarkerArray& msg,

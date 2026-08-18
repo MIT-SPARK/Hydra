@@ -61,7 +61,7 @@ class MeshPointPlugin : public LayerPlugin {
   MeshPointPlugin(const Config& config, const std::string& ns);
 
   void draw(const std_msgs::msg::Header& header,
-            const visualizer::LayerInfo& info,
+            const visualizer::DrawingContext& context,
             const spark_dsg::SceneGraphLayer& layer,
             const spark_dsg::Mesh* mesh,
             visualization_msgs::msg::MarkerArray& msg,

@@ -53,27 +53,27 @@ void drawBoundingBox(const spark_dsg::BoundingBox& bbox,
                      MarkerMsg& marker);
 
 MarkerArrayMsg makeLayerBoundingBoxes(const std_msgs::msg::Header& header,
-                                      const LayerInfo& info,
+                                      const DrawingContext& context,
                                       const spark_dsg::SceneGraphLayer& layer,
                                       const std::string& ns);
 
 MarkerArrayMsg makeLayerNodeTextMarkers(const std_msgs::msg::Header& header,
-                                        const LayerInfo& info,
+                                        const DrawingContext& context,
                                         const spark_dsg::SceneGraphLayer& layer,
                                         const std::string& ns);
 
 MarkerMsg makeLayerNodeMarkers(const std_msgs::msg::Header& header,
-                               const LayerInfo& info,
+                               const DrawingContext& context,
                                const spark_dsg::SceneGraphLayer& layer,
                                const std::string& ns);
 
 MarkerMsg makeLayerEdgeMarkers(const std_msgs::msg::Header& header,
-                               const LayerInfo& config,
+                               const DrawingContext& context,
                                const spark_dsg::SceneGraphLayer& layer,
                                const std::string& ns);
 
 MarkerMsg makeLayerTextMarker(const std_msgs::msg::Header& header,
-                              const LayerInfo& info,
+                              const DrawingContext& context,
                               const spark_dsg::SceneGraphLayer& layer,
                               const std::string& ns);
 

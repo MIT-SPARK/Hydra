@@ -121,7 +121,7 @@ FeatureScoreColor::FeatureScoreColor(const Config& config)
 
 FeatureScoreColor::~FeatureScoreColor() = default;
 
-void FeatureScoreColor::setGraph(const DynamicSceneGraph& graph, LayerKey layer_key) {
+void FeatureScoreColor::setGraph(const SceneGraph& graph, LayerKey layer_key) {
   values_.clear();
   if (!has_feature_ || !metric_) {
     return;
@@ -147,8 +147,7 @@ void FeatureScoreColor::setGraph(const DynamicSceneGraph& graph, LayerKey layer_
   VLOG(2) << "score range: [" << range_.min << ", " << range_.max << "]";
 }
 
-Color FeatureScoreColor::getColor(const DynamicSceneGraph&,
-                                  const SceneGraphNode& node) const {
+Color FeatureScoreColor::getColor(const SceneGraph&, const SceneGraphNode& node) const {
   auto iter = values_.find(node.id);
   if (iter == values_.end()) {
     return Color();
@@ -186,7 +185,7 @@ NearestFeatureColor::NearestFeatureColor(const Config& config)
       features_(config.features.create()),
       colormap_(config.colormap) {}
 
-Color NearestFeatureColor::getColor(const DynamicSceneGraph&,
+Color NearestFeatureColor::getColor(const SceneGraph&,
                                     const SceneGraphNode& node) const {
   if (!features_ || !metric_) {
     return Color();
@@ -212,7 +211,7 @@ NearestFeatureLabel::NearestFeatureLabel(const Config& config)
       metric_(config.metric.create()),
       features_(config.features.create()) {}
 
-std::string NearestFeatureLabel::getText(const DynamicSceneGraph&,
+std::string NearestFeatureLabel::getText(const SceneGraph&,
                                          const SceneGraphNode& node) const {
   if (!features_ || !metric_) {
     return "";

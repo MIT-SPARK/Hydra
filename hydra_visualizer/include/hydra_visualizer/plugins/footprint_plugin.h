@@ -62,7 +62,7 @@ class FootprintPlugin : public VisualizerPlugin {
   virtual ~FootprintPlugin() = default;
 
   void draw(const std_msgs::msg::Header& header,
-            const spark_dsg::DynamicSceneGraph& graph) override;
+            const spark_dsg::SceneGraph& graph) override;
 
   void reset(const std_msgs::msg::Header& header) override;
 

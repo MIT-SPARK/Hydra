@@ -72,7 +72,7 @@ class GraphZmqWrapper : public GraphWrapper {
   mutable std::mutex graph_mutex_;
   std::unique_ptr<std::thread> recv_thread_;
   std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
-  spark_dsg::DynamicSceneGraph::Ptr graph_;
+  spark_dsg::SceneGraph::Ptr graph_;
 };
 
 void declare_config(GraphZmqWrapper::Config& config);

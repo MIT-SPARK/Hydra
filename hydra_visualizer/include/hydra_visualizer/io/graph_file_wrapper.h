@@ -71,7 +71,7 @@ class GraphFileWrapper : public GraphWrapper {
   bool has_change_;
   ianvs::NodeHandle nh_;
   std::filesystem::path filepath_;
-  spark_dsg::DynamicSceneGraph::Ptr graph_;
+  spark_dsg::SceneGraph::Ptr graph_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_;
 };

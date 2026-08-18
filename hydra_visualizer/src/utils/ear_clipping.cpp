@@ -41,8 +41,8 @@
 
 namespace hydra {
 
-using spark_dsg::DynamicSceneGraph;
 using spark_dsg::NodeId;
+using spark_dsg::SceneGraph;
 
 std::ostream& operator<<(std::ostream& out, const TriangleView& v) {
   out << "(";
@@ -224,7 +224,7 @@ void Polygon::filter() {
   }
 }
 
-Polygon Polygon::fromSceneGraph(const DynamicSceneGraph& graph,
+Polygon Polygon::fromSceneGraph(const SceneGraph& graph,
                                 const std::vector<NodeId>& vertex_nodes) {
   size_t id = 0;
   std::vector<Vertex> vertices;

@@ -33,13 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/dynamic_config.h>
 #include <config_utilities/virtual_config.h>
 #include <spark_dsg/color.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra_visualizer/adapters/edge_color.h"
 #include "hydra_visualizer/adapters/node_color.h"
 #include "hydra_visualizer/adapters/text.h"
+#include "hydra_visualizer/filters/node_filters.h"
 
 namespace hydra::visualizer {
 
@@ -121,36 +123,61 @@ void declare_config(LayerConfig::Text& config);
 void declare_config(LayerConfig::BoundingBoxes& config);
 void declare_config(LayerConfig& config);
 
+struct DrawingContext {
+  using Ptr = std::shared_ptr<DrawingContext>;
+  using Color = spark_dsg::Color;
+  using Node = spark_dsg::SceneGraphNode;
+  using Edge = spark_dsg::SceneGraphEdge;
+  using FilterFunction = std::function<bool(const Node&)>;
+  using TextFunction = std::function<std::string(const Node&)>;
+  using ColorFunction = std::function<Color(const Node&)>;
+  using EdgeColorFunction = std::function<std::pair<Color, Color>(const Edge&)>;
+
+  double z_offset;
+
+  LayerConfig::Nodes nodes;
+  LayerConfig::Edges edges;
+
+  Color text_color;
+  LayerConfig::Text text;
+
+  LayerConfig::BoundingBoxes bounding_boxes;
+
+  FilterFunction filter;
+  TextFunction node_text;
+  ColorFunction node_color;
+  EdgeColorFunction edge_color;
+
+  bool valid(const Node& node) const;
+};
+
 class LayerInfo {
  public:
   using Color = spark_dsg::Color;
   using Node = spark_dsg::SceneGraphNode;
   using Edge = spark_dsg::SceneGraphEdge;
-  using FilterFunction = std::function<bool(const Node&)>;
-  using ColorFunction = std::function<Color(const Node&)>;
-  using EdgeColorFunction = std::function<std::pair<Color, Color>(const Edge&)>;
-  using TextFunction = std::function<std::string(const Node&)>;
+  using ConfigWrapper = config::DynamicConfig<visualizer::LayerConfig>;
 
-  LayerInfo(const LayerConfig& config);
-  LayerInfo& offset(double offset_size = 1.0, bool collapse = true);
-  LayerInfo& graph(const spark_dsg::DynamicSceneGraph& graph,
-                   spark_dsg::LayerKey layer);
+  LayerInfo(const std::string& ns, const LayerConfig& config);
 
-  bool shouldVisualize(const Node& node) const;
-  Color text_color() const;
+  bool hasChange() const;
 
-  const LayerConfig config;
+  void clearChangeFlag();
 
-  double z_offset;
-  ColorFunction node_color;
-  EdgeColorFunction edge_color;
-  TextFunction node_text;
-  mutable FilterFunction filter;
+  YAML::Node dumpConfig() const;
+
+  DrawingContext::Ptr context(const spark_dsg::SceneGraph& graph,
+                              spark_dsg::LayerKey layer,
+                              double offset_size = 1.0,
+                              bool collapse = true) const;
 
  private:
-  std::unique_ptr<NodeColorAdapter> node_color_adapter_;
-  std::unique_ptr<EdgeColorAdapter> edge_color_adapter_;
-  std::unique_ptr<NodeTextAdapter> text_adapter_;
+  bool has_change_ = false;
+  std::unique_ptr<ConfigWrapper> config_;
+  mutable std::unique_ptr<NodeFilter> node_filter_;
+  mutable std::unique_ptr<NodeTextAdapter> text_adapter_;
+  mutable std::unique_ptr<NodeColorAdapter> node_color_adapter_;
+  mutable std::unique_ptr<EdgeColorAdapter> edge_color_adapter_;
 };
 
 }  // namespace hydra::visualizer

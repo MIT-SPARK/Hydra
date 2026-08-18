@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <list>
 
@@ -103,7 +103,7 @@ class Polygon {
  public:
   explicit Polygon(const std::vector<Vertex>& vertices, bool is_ccw = true);
 
-  static Polygon fromSceneGraph(const spark_dsg::DynamicSceneGraph& graph,
+  static Polygon fromSceneGraph(const spark_dsg::SceneGraph& graph,
                                 const std::vector<spark_dsg::NodeId>& vertex_nodes);
 
   static Polygon fromPoints(const Eigen::MatrixXd& points);

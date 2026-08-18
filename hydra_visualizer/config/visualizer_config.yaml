@@ -4,8 +4,6 @@ plugins:
     type: MeshPlugin
     coloring:
       type: SemanticMeshColoring
-  places_basis_points:
-    type: BasisPointPlugin
   khronos_objects:
     type: KhronosObjectPlugin
     dynamic_color_mode: CONSTANT  # ID, SEMANTIC, CONSTANT

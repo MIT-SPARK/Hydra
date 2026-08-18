@@ -35,7 +35,7 @@
 #pragma once
 #include <config_utilities/factory.h>
 #include <spark_dsg/color.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <memory>
 
@@ -55,7 +55,7 @@ struct EdgeColorAdapter {
    * @param edge Edge to get color for
    * @returns Visualizer color for source and target ends of the edge.
    */
-  virtual EdgeColor getColor(const spark_dsg::DynamicSceneGraph& graph,
+  virtual EdgeColor getColor(const spark_dsg::SceneGraph& graph,
                              const spark_dsg::SceneGraphEdge& edge) const = 0;
 
   /**
@@ -65,7 +65,7 @@ struct EdgeColorAdapter {
    * Allows color adapters to gather statistics about the scene graph before generating
    * any edge colors when drawing the scene graph
    */
-  virtual void setGraph(const spark_dsg::DynamicSceneGraph& /* graph */,
+  virtual void setGraph(const spark_dsg::SceneGraph& /* graph */,
                         spark_dsg::LayerKey /* layer */) {}
 };
 
@@ -77,7 +77,7 @@ struct UniformEdgeColorAdapter : EdgeColorAdapter {
   } const config;
 
   explicit UniformEdgeColorAdapter(const Config& config);
-  EdgeColor getColor(const spark_dsg::DynamicSceneGraph& graph,
+  EdgeColor getColor(const spark_dsg::SceneGraph& graph,
                      const spark_dsg::SceneGraphEdge& edge) const override;
 };
 
@@ -85,12 +85,12 @@ void declare_config(UniformEdgeColorAdapter::Config& config);
 
 struct EdgeValueFunctor {
   virtual ~EdgeValueFunctor() = default;
-  virtual double eval(const spark_dsg::DynamicSceneGraph& graph,
+  virtual double eval(const spark_dsg::SceneGraph& graph,
                       const spark_dsg::SceneGraphEdge& edge) const = 0;
 };
 
 struct EdgeWeightFunctor : EdgeValueFunctor {
-  double eval(const spark_dsg::DynamicSceneGraph& graph,
+  double eval(const spark_dsg::SceneGraph& graph,
               const spark_dsg::SceneGraphEdge& edge) const override;
 
   inline static const auto registration =
@@ -104,9 +104,8 @@ struct ValueEdgeColorAdapter : EdgeColorAdapter {
   } const config;
 
   explicit ValueEdgeColorAdapter(const Config& config);
-  void setGraph(const spark_dsg::DynamicSceneGraph& graph,
-                spark_dsg::LayerKey layer) override;
-  EdgeColor getColor(const spark_dsg::DynamicSceneGraph& graph,
+  void setGraph(const spark_dsg::SceneGraph& graph, spark_dsg::LayerKey layer) override;
+  EdgeColor getColor(const spark_dsg::SceneGraph& graph,
                      const spark_dsg::SceneGraphEdge& edge) const override;
 
  private:
@@ -128,9 +127,8 @@ struct TraversabilityEdgeColorAdapter : EdgeColorAdapter {
   } const config;
 
   explicit TraversabilityEdgeColorAdapter(const Config& config);
-  void setGraph(const spark_dsg::DynamicSceneGraph& graph,
-                spark_dsg::LayerKey layer) override;
-  EdgeColor getColor(const spark_dsg::DynamicSceneGraph& graph,
+  void setGraph(const spark_dsg::SceneGraph& graph, spark_dsg::LayerKey layer) override;
+  EdgeColor getColor(const spark_dsg::SceneGraph& graph,
                      const spark_dsg::SceneGraphEdge& edge) const override;
 
  private:

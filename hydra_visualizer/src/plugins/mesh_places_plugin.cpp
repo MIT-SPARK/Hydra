@@ -43,7 +43,7 @@
 
 #include "hydra_visualizer/color/color_parsing.h"
 
-using hydra::visualizer::LayerInfo;
+using hydra::visualizer::DrawingContext;
 using hydra::visualizer::makeColorMsg;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
@@ -60,7 +60,7 @@ static const auto registration_ =
 
 Marker makeLayerEllipseBoundaries(const MeshPlacesPlugin::Config& config,
                                   const std_msgs::msg::Header& header,
-                                  const LayerInfo& info,
+                                  const DrawingContext& info,
                                   const SceneGraphLayer& layer,
                                   const std::string& ns) {
   Marker marker;
@@ -109,7 +109,7 @@ Marker makeLayerEllipseBoundaries(const MeshPlacesPlugin::Config& config,
 
 Marker makeLayerPolygonEdges(const MeshPlacesPlugin::Config& config,
                              const std_msgs::msg::Header& header,
-                             const LayerInfo& info,
+                             const DrawingContext& info,
                              const SceneGraphLayer& layer,
                              const std::string& ns) {
   Marker marker;
@@ -150,7 +150,7 @@ Marker makeLayerPolygonEdges(const MeshPlacesPlugin::Config& config,
 
 Marker makeLayerPolygonBoundaries(const MeshPlacesPlugin::Config& config,
                                   const std_msgs::msg::Header& header,
-                                  const LayerInfo& info,
+                                  const DrawingContext& info,
                                   const SceneGraphLayer& layer,
                                   const std::string& ns) {
   Marker marker;
@@ -213,7 +213,7 @@ MeshPlacesPlugin::MeshPlacesPlugin(const Config& config, const std::string& ns)
       config_(ns + "_mesh_places_plugin", config, [this]() { has_change_ = true; }) {}
 
 void MeshPlacesPlugin::draw(const std_msgs::msg::Header& header,
-                            const visualizer::LayerInfo& info,
+                            const visualizer::DrawingContext& context,
                             const spark_dsg::SceneGraphLayer& layer,
                             const spark_dsg::Mesh*,
                             visualization_msgs::msg::MarkerArray& msg,
@@ -222,16 +222,16 @@ void MeshPlacesPlugin::draw(const std_msgs::msg::Header& header,
 
   if (config.draw) {
     const auto ns = ns_ + "_polygon_boundaries";
-    tracker.add(makeLayerPolygonBoundaries(config, header, info, layer, ns), msg);
+    tracker.add(makeLayerPolygonBoundaries(config, header, context, layer, ns), msg);
     if (config.collapse) {
       const auto edge_ns = ns_ + "_polygon_boundaries_edges";
-      tracker.add(makeLayerPolygonEdges(config, header, info, layer, edge_ns), msg);
+      tracker.add(makeLayerPolygonEdges(config, header, context, layer, edge_ns), msg);
     }
   }
 
   if (config.draw_ellipse) {
     const auto ns = ns_ + "_ellipsoid_boundaries";
-    tracker.add(makeLayerEllipseBoundaries(config, header, info, layer, ns), msg);
+    tracker.add(makeLayerEllipseBoundaries(config, header, context, layer, ns), msg);
   }
 }
 

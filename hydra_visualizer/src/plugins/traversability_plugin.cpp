@@ -45,6 +45,7 @@
 #include <tf2_eigen/tf2_eigen.hpp>
 
 #include "hydra_visualizer/color/color_parsing.h"
+#include "hydra_visualizer/color/colormap_utilities.h"
 
 namespace hydra {
 namespace {
@@ -58,11 +59,7 @@ static const auto registration_ =
 
 }
 
-using spark_dsg::DynamicSceneGraph;
-using spark_dsg::SceneGraphLayer;
-using spark_dsg::TraversabilityNodeAttributes;
-using spark_dsg::TraversabilityState;
-using spark_dsg::TravNodeAttributes;
+using namespace spark_dsg;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
 
@@ -86,7 +83,7 @@ TraversabilityPlugin::TraversabilityPlugin(const Config& config,
       pub_(nh.create_publisher<MarkerArray>(name, rclcpp::QoS(1).transient_local())) {}
 
 void TraversabilityPlugin::draw(const std_msgs::msg::Header& header,
-                                const DynamicSceneGraph& graph) {
+                                const SceneGraph& graph) {
   if (pub_->get_subscription_count() == 0) {
     return;
   }
@@ -108,7 +105,7 @@ void TraversabilityPlugin::reset(const std_msgs::msg::Header& header) {
 }
 
 void TraversabilityPlugin::fillMarkers(const std_msgs::msg::Header& header,
-                                       const DynamicSceneGraph& graph,
+                                       const SceneGraph& graph,
                                        MarkerArray& msg) const {
   const auto config = config_.get();
   auto layer = graph.findLayer(config.layer);

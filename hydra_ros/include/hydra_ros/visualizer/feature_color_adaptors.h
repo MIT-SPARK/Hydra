@@ -22,9 +22,8 @@ class FeatureScoreColor : public NodeColorAdapter {
 
   explicit FeatureScoreColor(const Config& config);
   ~FeatureScoreColor();
-  void setGraph(const spark_dsg::DynamicSceneGraph& graph,
-                spark_dsg::LayerKey layer) override;
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  void setGraph(const spark_dsg::SceneGraph& graph, spark_dsg::LayerKey layer) override;
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
   void setFeature(const Eigen::VectorXf& feature);
@@ -59,7 +58,7 @@ class NearestFeatureColor : public NodeColorAdapter {
   } const config;
 
   explicit NearestFeatureColor(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
  private:
@@ -80,7 +79,7 @@ class NearestFeatureLabel : public visualizer::NodeTextAdapter {
   } const config;
 
   explicit NearestFeatureLabel(const Config& config);
-  std::string getText(const spark_dsg::DynamicSceneGraph& graph,
+  std::string getText(const spark_dsg::SceneGraph& graph,
                       const spark_dsg::SceneGraphNode& node) const override;
 
  private:

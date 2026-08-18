@@ -35,6 +35,7 @@
 #include "hydra_visualizer/layer_info.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/enum.h>
 #include <spark_dsg/node_attributes.h>
 
@@ -126,64 +127,75 @@ void declare_config(LayerConfig& config) {
   field(config.bounding_boxes, "bounding_boxes");
 }
 
-LayerInfo::LayerInfo(const LayerConfig& config)
-    : config(config),
-      z_offset(0.0),
-      node_color(&getNodeColor),
-      node_text([](const SceneGraphNode&) { return ""; }) {}
+bool DrawingContext::valid(const Node& node) const {
+  if (!filter) {
+    return true;
+  }
 
-LayerInfo& LayerInfo::offset(double offset_size, bool collapse) {
-  z_offset = collapse ? 0.0 : offset_size * config.z_offset_scale;
-  return *this;
+  return filter(node);
 }
 
-LayerInfo& LayerInfo::graph(const DynamicSceneGraph& graph, LayerKey layer) {
+LayerInfo::LayerInfo(const std::string& ns, const LayerConfig& config) {
+  const ConfigWrapper::Callback callback = [this]() { has_change_ = true; };
+  config_ = std::make_unique<ConfigWrapper>(ns, config, callback);
+}
+
+bool LayerInfo::hasChange() const { return has_change_; }
+
+void LayerInfo::clearChangeFlag() { has_change_ = false; }
+
+YAML::Node LayerInfo::dumpConfig() const { return config::toYaml(config_->get()); }
+
+DrawingContext::Ptr LayerInfo::context(const SceneGraph& graph,
+                                       LayerKey layer,
+                                       double offset_size,
+                                       bool collapse) const {
+  const auto config = config_->get();
+  if (!config.visualize) {
+    return nullptr;
+  }
+
   node_color_adapter_ = config.nodes.color.create();
+  edge_color_adapter_ = config.edges.color.create();
+  text_adapter_ = config.text.adapter.create();
+
   if (node_color_adapter_) {
     node_color_adapter_->setGraph(graph, layer);
-    node_color = [this, &graph](const SceneGraphNode& node) {
-      return node_color_adapter_->getColor(graph, node);
-    };
   }
 
-  edge_color_adapter_ = config.edges.color.create();
   if (edge_color_adapter_) {
     edge_color_adapter_->setGraph(graph, layer);
-    edge_color = [this, &graph](const SceneGraphEdge& edge) {
-      return edge_color_adapter_->getColor(graph, edge);
-    };
-  } else {
-    // If not specified, use node colors.
-    // TODO(lschmid): This is not the prettiest, but e.g. handing the layerinfo to the
-    // adapters or so also didn't seem right.
-    edge_color = [this, &graph](const SceneGraphEdge& edge) {
-      return std::make_pair(node_color(graph.getNode(edge.source)),
-                            node_color(graph.getNode(edge.target)));
-    };
   }
 
-  text_adapter_ = config.text.adapter.create();
-  if (text_adapter_) {
-    node_text = [this, &graph](const SceneGraphNode& node) {
-      return text_adapter_->getText(graph, node);
-    };
-  }
+  auto context = std::make_shared<DrawingContext>();
+  context->z_offset = collapse ? 0.0 : offset_size * config.z_offset_scale;
+  context->nodes = config.nodes;
+  context->edges = config.edges;
+  context->text_color = colorFromName(config.text.color);
+  context->text = config.text;
+  context->bounding_boxes = config.bounding_boxes;
+  context->node_text = [this, &graph](const SceneGraphNode& node) {
+    return text_adapter_ ? text_adapter_->getText(graph, node) : "";
+  };
 
-  return *this;
-}
+  context->node_color = [this, &graph](const SceneGraphNode& node) {
+    if (!node_color_adapter_) {
+      return getNodeColor(node);
+    }
 
-Color LayerInfo::text_color() const { return colorFromName(config.text.color); }
+    return node_color_adapter_->getColor(graph, node);
+  };
 
-bool LayerInfo::shouldVisualize(const spark_dsg::SceneGraphNode& node) const {
-  if (!config.visualize) {
-    return false;
-  }
+  context->edge_color = [this, context, &graph](const SceneGraphEdge& edge) {
+    if (!edge_color_adapter_) {
+      return std::make_pair(context->node_color(graph.getNode(edge.source)),
+                            context->node_color(graph.getNode(edge.target)));
+    }
 
-  if (filter && !filter(node)) {
-    return false;
-  }
+    return edge_color_adapter_->getColor(graph, edge);
+  };
 
-  return true;
+  return context;
 }
 
 }  // namespace hydra::visualizer

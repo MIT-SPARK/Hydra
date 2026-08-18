@@ -38,6 +38,8 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
+using namespace spark_dsg;
+
 namespace hydra {
 namespace {
 static const auto registration =
@@ -46,8 +48,6 @@ static const auto registration =
                                    GraphZmqWrapper::Config,
                                    ianvs::NodeHandle>("GraphFromZmq");
 }
-
-using spark_dsg::DynamicSceneGraph;
 
 void declare_config(GraphZmqWrapper::Config& config) {
   using namespace config;

@@ -83,7 +83,7 @@ RegionGrowingBoundaryPlugin::RegionGrowingBoundaryPlugin(const Config& config,
 }
 
 void RegionGrowingBoundaryPlugin::draw(const std_msgs::msg::Header& header,
-                                       const visualizer::LayerInfo& info,
+                                       const visualizer::DrawingContext& info,
                                        const spark_dsg::SceneGraphLayer& layer,
                                        const spark_dsg::Mesh*,
                                        visualization_msgs::msg::MarkerArray& msg,
@@ -114,7 +114,7 @@ void RegionGrowingBoundaryPlugin::draw(const std_msgs::msg::Header& header,
   fill_marker.scale.z = 1.0;
 
   for (const auto& [node_id, node] : layer.nodes()) {
-    if (info.filter && !info.filter(*node)) {
+    if (!info.valid(*node)) {
       continue;
     }
 
@@ -125,7 +125,7 @@ void RegionGrowingBoundaryPlugin::draw(const std_msgs::msg::Header& header,
 
     Eigen::MatrixXd points(3, attrs->radii.size());
     const auto color =
-        visualizer::makeColorMsg(info.node_color(*node), info.config.nodes.alpha);
+        visualizer::makeColorMsg(info.node_color(*node), info.nodes.alpha);
     for (size_t i = 1; i <= attrs->radii.size(); ++i) {
       const auto start_idx = i - 1;
       const auto end_idx = i % attrs->radii.size();
@@ -142,9 +142,9 @@ void RegionGrowingBoundaryPlugin::draw(const std_msgs::msg::Header& header,
         marker.colors.emplace_back(color);
       } else {
         const auto start_color = makeBoundaryColor(
-            config.colors, attrs->states[start_idx], info.config.nodes.alpha);
-        const auto end_color = makeBoundaryColor(
-            config.colors, attrs->states[end_idx], info.config.nodes.alpha);
+            config.colors, attrs->states[start_idx], info.nodes.alpha);
+        const auto end_color =
+            makeBoundaryColor(config.colors, attrs->states[end_idx], info.nodes.alpha);
         marker.colors.emplace_back(start_color);
         marker.colors.emplace_back(end_color);
       }

@@ -21,7 +21,7 @@ static const auto registration =
                                    std::string>("MeshPointPlugin");
 
 void fillMarker(const MeshPointPlugin::Config& config,
-                const visualizer::LayerInfo& info,
+                const visualizer::DrawingContext& info,
                 const Place2dNodeAttributes& attrs,
                 const spark_dsg::Mesh& mesh,
                 const spark_dsg::Color& node_color,
@@ -44,7 +44,7 @@ void fillMarker(const MeshPointPlugin::Config& config,
 }
 
 void fillMarker(const MeshPointPlugin::Config& config,
-                const visualizer::LayerInfo& info,
+                const visualizer::DrawingContext& info,
                 const ObjectNodeAttributes& attrs,
                 const spark_dsg::Mesh& mesh,
                 const spark_dsg::Color& node_color,
@@ -84,7 +84,7 @@ MeshPointPlugin::MeshPointPlugin(const Config& config, const std::string& ns)
       config_(ns + "_mesh_point_plugin", config, [this]() { has_change_ = true; }) {}
 
 void MeshPointPlugin::draw(const std_msgs::msg::Header& header,
-                           const visualizer::LayerInfo& info,
+                           const visualizer::DrawingContext& info,
                            const spark_dsg::SceneGraphLayer& layer,
                            const spark_dsg::Mesh* mesh,
                            MarkerArray& msg,
@@ -111,7 +111,7 @@ void MeshPointPlugin::draw(const std_msgs::msg::Header& header,
   marker.points.reserve(layer.numNodes());
   marker.colors.reserve(layer.numNodes());
   for (const auto& [node_id, node] : layer.nodes()) {
-    if (info.filter && !info.filter(*node)) {
+    if (!info.valid(*node)) {
       continue;
     }
 

@@ -87,7 +87,7 @@ void declare_config(AttributeColorAdapter::Config& config) {
 
 AttributeColorAdapter::AttributeColorAdapter(const Config& config) : config(config) {}
 
-Color AttributeColorAdapter::getColor(const DynamicSceneGraph&,
+Color AttributeColorAdapter::getColor(const SceneGraph&,
                                       const SceneGraphNode& node) const {
   try {
     return node.attributes<SemanticNodeAttributes>().color;
@@ -104,7 +104,7 @@ void declare_config(UniformColorAdapter::Config& config) {
 
 UniformColorAdapter::UniformColorAdapter(const Config& config) : config(config) {}
 
-Color UniformColorAdapter::getColor(const DynamicSceneGraph&,
+Color UniformColorAdapter::getColor(const SceneGraph&,
                                     const SceneGraphNode& /* node */) const {
   return config.color;
 }
@@ -112,8 +112,7 @@ Color UniformColorAdapter::getColor(const DynamicSceneGraph&,
 LabelColorAdapter::LabelColorAdapter(const Config& config)
     : config(config::checkValid(config)), colormap_(config.colormap) {}
 
-Color LabelColorAdapter::getColor(const DynamicSceneGraph&,
-                                  const SceneGraphNode& node) const {
+Color LabelColorAdapter::getColor(const SceneGraph&, const SceneGraphNode& node) const {
   SemanticLabel label = SemanticNodeAttributes::NO_SEMANTIC_LABEL;
   try {
     label = node.attributes<SemanticNodeAttributes>().semantic_label;
@@ -133,8 +132,7 @@ void declare_config(LabelColorAdapter::Config& config) {
 IdColorAdapter::IdColorAdapter(const Config& config)
     : config(config::checkValid(config)), colormap_(config.colormap) {}
 
-Color IdColorAdapter::getColor(const DynamicSceneGraph&,
-                               const SceneGraphNode& node) const {
+Color IdColorAdapter::getColor(const SceneGraph&, const SceneGraphNode& node) const {
   return colormap_.getColor(NodeSymbol(node.id).categoryId());
 }
 
@@ -148,7 +146,7 @@ ParentColorAdapter::ParentColorAdapter(const Config& config)
     : config(config::checkValid(config)),
       parent_adapter_(config.parent_adapter.create()) {}
 
-Color ParentColorAdapter::getColor(const DynamicSceneGraph& graph,
+Color ParentColorAdapter::getColor(const SceneGraph& graph,
                                    const SceneGraphNode& node) const {
   auto parent = node.getParent();
   if (!parent || !parent_adapter_) {
@@ -166,12 +164,11 @@ void declare_config(ParentColorAdapter::Config& config) {
   field(config.default_color, "default_color");
 }
 
-bool IsActiveFunctor::eval(const DynamicSceneGraph&, const SceneGraphNode& node) const {
+bool IsActiveFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {
   return node.attributes().is_active;
 }
 
-bool HasActiveMeshFunctor::eval(const DynamicSceneGraph&,
-                                const SceneGraphNode& node) const {
+bool HasActiveMeshFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {
   return node.attributes<Place2dNodeAttributes>().has_active_mesh_indices;
 }
 
@@ -180,7 +177,7 @@ StatusColorAdapter::StatusColorAdapter(const Config& config)
   CHECK(functor_) << "invalid functor type: " << config.status_functor;
 }
 
-Color StatusColorAdapter::getColor(const DynamicSceneGraph& graph,
+Color StatusColorAdapter::getColor(const SceneGraph& graph,
                                    const SceneGraphNode& node) const {
   bool status = false;
   try {
@@ -203,7 +200,7 @@ void declare_config(StatusColorAdapter::Config& config) {
 PartitionColorAdapter::PartitionColorAdapter(const Config& config)
     : config(config), colormap_(config.colormap) {}
 
-Color PartitionColorAdapter::getColor(const DynamicSceneGraph&,
+Color PartitionColorAdapter::getColor(const SceneGraph&,
                                       const SceneGraphNode& node) const {
   return colormap_.getColor(node.layer.partition);
 }
@@ -216,7 +213,7 @@ void declare_config(PartitionColorAdapter::Config& config) {
 
 FrontierColorAdapter::FrontierColorAdapter(const Config& config) : config(config) {}
 
-Color FrontierColorAdapter::getColor(const DynamicSceneGraph&,
+Color FrontierColorAdapter::getColor(const SceneGraph&,
                                      const SceneGraphNode& node) const {
   try {
     const auto& attrs = node.attributes<FrontierNodeAttributes>();
@@ -247,13 +244,11 @@ void declare_config(FrontierColorAdapter::Config& config) {
   field(config.archived, "archived");
 }
 
-double DistanceFunctor::eval(const DynamicSceneGraph&,
-                             const SceneGraphNode& node) const {
+double DistanceFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {
   return node.attributes<PlaceNodeAttributes>().distance;
 }
 
-double LastUpdatedFunctor::eval(const DynamicSceneGraph&,
-                                const SceneGraphNode& node) const {
+double LastUpdatedFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {
   return node.attributes().last_update_time_ns;
 }
 
@@ -264,7 +259,7 @@ ValueColorAdapter::ValueColorAdapter(const Config& config)
       functor_(config::create<ValueFunctor>(config.value_functor)),
       colormap_(config.colormap) {}
 
-void ValueColorAdapter::setGraph(const DynamicSceneGraph& graph, LayerKey layer_key) {
+void ValueColorAdapter::setGraph(const SceneGraph& graph, LayerKey layer_key) {
   if (!functor_) {
     return;
   }
@@ -288,7 +283,7 @@ void ValueColorAdapter::setGraph(const DynamicSceneGraph& graph, LayerKey layer_
   }
 }
 
-Color ValueColorAdapter::getColor(const DynamicSceneGraph& graph,
+Color ValueColorAdapter::getColor(const SceneGraph& graph,
                                   const SceneGraphNode& node) const {
   try {
     return colormap_.getColor(functor_->eval(graph, node), min_value_, max_value_);
@@ -308,7 +303,7 @@ void declare_config(ValueColorAdapter::Config& config) {
 LabelDistributionAdapter::LabelDistributionAdapter(const Config& config)
     : config(config::checkValid(config)), colormap_(config.colormap) {}
 
-Color LabelDistributionAdapter::getColor(const DynamicSceneGraph&,
+Color LabelDistributionAdapter::getColor(const SceneGraph&,
                                          const SceneGraphNode& node) const {
   SemanticLabel label = SemanticNodeAttributes::NO_SEMANTIC_LABEL;
   auto attrs = node.tryAttributes<SemanticNodeAttributes>();

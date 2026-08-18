@@ -51,7 +51,7 @@ static const auto registration_ =
                                    ianvs::NodeHandle>("GraphFromFile");
 }
 
-using spark_dsg::DynamicSceneGraph;
+using namespace spark_dsg;
 using std_msgs::msg::String;
 using std_srvs::srv::Empty;
 
@@ -71,7 +71,7 @@ GraphFileWrapper::GraphFileWrapper(const Config& config, ianvs::NodeHandle nh)
       has_change_(true),
       nh_(nh / config.wrapper_ns),
       filepath_(config.filepath),
-      graph_(DynamicSceneGraph::load(filepath_)),
+      graph_(SceneGraph::load(filepath_)),
       service_(nh_.create_service<Empty>("reload", &GraphFileWrapper::reload, this)),
       sub_(nh_.create_subscription<String>("load", 1, &GraphFileWrapper::load, this)) {}
 
@@ -84,7 +84,7 @@ StampedGraph GraphFileWrapper::get() const { return {graph_, config.frame_id}; }
 void GraphFileWrapper::reload(const std_srvs::srv::Empty::Request::SharedPtr&,
                               std_srvs::srv::Empty::Response::SharedPtr) {
   // TODO(nathan) consider deferring load
-  graph_ = DynamicSceneGraph::load(filepath_);
+  graph_ = SceneGraph::load(filepath_);
   has_change_ = true;
 }
 
@@ -97,7 +97,7 @@ void GraphFileWrapper::load(const std_msgs::msg::String::ConstSharedPtr& msg) {
 
   filepath_ = req_path;
   // TODO(nathan) consider deferring load
-  graph_ = DynamicSceneGraph::load(filepath_);
+  graph_ = SceneGraph::load(filepath_);
   has_change_ = true;
 }
 

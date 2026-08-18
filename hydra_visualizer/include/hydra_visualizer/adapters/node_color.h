@@ -35,7 +35,7 @@
 #pragma once
 #include <config_utilities/factory.h>
 #include <spark_dsg/color.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <memory>
 
@@ -54,7 +54,7 @@ struct NodeColorAdapter {
    * @param node Node to get color for
    * @returns Visualizer color for node
    */
-  virtual spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  virtual spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                                     const spark_dsg::SceneGraphNode& node) const = 0;
 
   /**
@@ -65,7 +65,7 @@ struct NodeColorAdapter {
    * Allows color adapters to gather statistics about the scene graph before generating
    * any node colors when drawing the scene graph
    */
-  virtual void setGraph(const spark_dsg::DynamicSceneGraph& /* graph */,
+  virtual void setGraph(const spark_dsg::SceneGraph& /* graph */,
                         spark_dsg::LayerKey /* layer */) {}
 };
 
@@ -75,7 +75,7 @@ struct AttributeColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit AttributeColorAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 };
 
@@ -87,7 +87,7 @@ struct UniformColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit UniformColorAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 };
 
@@ -99,7 +99,7 @@ struct LabelColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit LabelColorAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
  private:
@@ -114,7 +114,7 @@ struct IdColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit IdColorAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
  private:
@@ -132,7 +132,7 @@ struct ParentColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit ParentColorAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
  private:
@@ -143,17 +143,17 @@ void declare_config(ParentColorAdapter::Config& config);
 
 struct StatusFunctor {
   virtual ~StatusFunctor() = default;
-  virtual bool eval(const spark_dsg::DynamicSceneGraph& graph,
+  virtual bool eval(const spark_dsg::SceneGraph& graph,
                     const spark_dsg::SceneGraphNode& node) const = 0;
 };
 
 struct IsActiveFunctor : StatusFunctor {
-  virtual bool eval(const spark_dsg::DynamicSceneGraph& graph,
+  virtual bool eval(const spark_dsg::SceneGraph& graph,
                     const spark_dsg::SceneGraphNode& node) const override;
 };
 
 struct HasActiveMeshFunctor : StatusFunctor {
-  virtual bool eval(const spark_dsg::DynamicSceneGraph& graph,
+  virtual bool eval(const spark_dsg::SceneGraph& graph,
                     const spark_dsg::SceneGraphNode& node) const override;
 };
 
@@ -165,7 +165,7 @@ struct StatusColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit StatusColorAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
  private:
@@ -184,7 +184,7 @@ struct FrontierColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit FrontierColorAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 };
 
@@ -196,7 +196,7 @@ struct PartitionColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit PartitionColorAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
  private:
@@ -207,17 +207,17 @@ void declare_config(PartitionColorAdapter::Config& config);
 
 struct ValueFunctor {
   virtual ~ValueFunctor() = default;
-  virtual double eval(const spark_dsg::DynamicSceneGraph& graph,
+  virtual double eval(const spark_dsg::SceneGraph& graph,
                       const spark_dsg::SceneGraphNode& node) const = 0;
 };
 
 struct DistanceFunctor : ValueFunctor {
-  double eval(const spark_dsg::DynamicSceneGraph& graph,
+  double eval(const spark_dsg::SceneGraph& graph,
               const spark_dsg::SceneGraphNode& node) const override;
 };
 
 struct LastUpdatedFunctor : ValueFunctor {
-  double eval(const spark_dsg::DynamicSceneGraph& graph,
+  double eval(const spark_dsg::SceneGraph& graph,
               const spark_dsg::SceneGraphNode& node) const override;
 };
 
@@ -228,9 +228,8 @@ struct ValueColorAdapter : NodeColorAdapter {
   } const config;
 
   explicit ValueColorAdapter(const Config& config);
-  void setGraph(const spark_dsg::DynamicSceneGraph& graph,
-                spark_dsg::LayerKey layer) override;
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  void setGraph(const spark_dsg::SceneGraph& graph, spark_dsg::LayerKey layer) override;
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
  private:
@@ -248,7 +247,7 @@ struct LabelDistributionAdapter : NodeColorAdapter {
   } const config;
 
   explicit LabelDistributionAdapter(const Config& config);
-  spark_dsg::Color getColor(const spark_dsg::DynamicSceneGraph& graph,
+  spark_dsg::Color getColor(const spark_dsg::SceneGraph& graph,
                             const spark_dsg::SceneGraphNode& node) const override;
 
  private:

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 #include <yaml-cpp/node/node.h>
 
 #include <std_msgs/msg/header.hpp>
@@ -49,7 +49,7 @@ class VisualizerPlugin {
   virtual ~VisualizerPlugin() = default;
 
   virtual void draw(const std_msgs::msg::Header& header,
-                    const spark_dsg::DynamicSceneGraph& graph) = 0;
+                    const spark_dsg::SceneGraph& graph) = 0;
 
   virtual void reset(const std_msgs::msg::Header& header) = 0;
 
