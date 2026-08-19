@@ -125,7 +125,6 @@ def load_configs(
             "show_stats": False,
             "pose_graphs": {"make_pose_graph": True},
         },
-        "lcd": {"lcd_use_bow_vectors": False},
     }
     update_nested(contents, overrides)
     return contents

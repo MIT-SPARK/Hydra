@@ -1,6 +1,9 @@
-#include <config_utilities/config_utilities.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+#include <config_utilities/types/conversions.h>
+#include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <spatial_hash/neighbor_utils.h>
 
@@ -26,8 +29,17 @@
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
+#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<GraphBuilderFunctor,
+                                   FrontierExtractor,
+                                   FrontierExtractor::Config>("FrontierExtractor");
+
+}
 
 using spatial_hash::IndexSet;
 using SpatialCloud = pcl::PointCloud<pcl::PointXYZ>;
@@ -117,10 +129,45 @@ void splitAllFrontiers(std::vector<std::vector<Eigen::Vector3f>>& frontiers,
   }
 }
 
+Frontier::Frontier() {}
+
+Frontier::Frontier(Eigen::Vector3d c,
+                   Eigen::Vector3d s,
+                   Eigen::Quaterniond o,
+                   size_t n,
+                   spatial_hash::BlockIndex b)
+    : center(c),
+      scale(s),
+      orientation(o),
+      num_frontier_voxels(n),
+      block_index(b),
+      has_shape_information(true) {}
+
+Frontier::Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
+    : center(c), num_frontier_voxels(n), block_index(b), has_shape_information(false) {}
+
 FrontierExtractor::FrontierExtractor(const Config& config)
     : config(config),
       next_node_id_(config.prefix, 0),
       map_window_(GlobalInfo::instance().createVolumetricWindow()) {}
+
+void FrontierExtractor::call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) {
+  const auto timestamp = msg.timestamp_ns;
+  updateRecentBlocks(msg.world_t_body, msg.map().blockSize());
+
+  std::lock_guard<std::mutex> graph_lock(dsg.mutex);
+  timing::ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
+
+  NodeIdSet active_nodes;
+  for (const auto& [node_id, node] : dsg.graph->getLayer(DsgLayers::PLACES).nodes()) {
+    if (node->attributes().is_active) {
+      active_nodes.insert(node_id);
+    }
+  }
+
+  detectFrontiers(msg, *dsg.graph, active_nodes);
+  addFrontiers(timestamp, *dsg.graph);
+}
 
 void clusterFrontiers(const SpatialCloud::Ptr cloud,
                       const double cluster_tolerance,

@@ -40,10 +40,6 @@
 #include "hydra/common/message_queue.h"
 #include "hydra/loop_closure/registration_solution.h"
 
-namespace pose_graph_tools {
-struct BowQuery;
-}  // namespace pose_graph_tools
-
 namespace hydra {
 
 struct BackendInput;
@@ -52,7 +48,6 @@ struct FeatureView;
 
 class PipelineQueues {
  public:
-  using BowQueue = MessageQueue<std::shared_ptr<const pose_graph_tools::BowQuery>>;
   using LcdQueue = MessageQueue<std::shared_ptr<LcdInput>>;
 
   ~PipelineQueues();
@@ -70,8 +65,6 @@ class PipelineQueues {
 
   //! Optional input queue to LCD module
   LcdQueue::Ptr lcd_queue;
-  //! Optional BoW descriptor queue to LCD module
-  BowQueue::Ptr bow_queue;
 
  private:
   PipelineQueues();

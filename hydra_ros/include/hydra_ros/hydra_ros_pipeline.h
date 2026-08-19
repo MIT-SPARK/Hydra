@@ -47,7 +47,6 @@
 
 namespace hydra {
 
-class BowSubscriber;
 class ExternalLoopClosureSubscriber;
 
 class HydraRosPipeline : public HydraPipeline {
@@ -95,7 +94,6 @@ class HydraRosPipeline : public HydraPipeline {
   std::shared_ptr<GraphBuilder> frontend_;
   std::shared_ptr<BackendModule> backend_;
 
-  std::unique_ptr<BowSubscriber> bow_sub_;
   std::unique_ptr<ExternalLoopClosureSubscriber> external_loop_closure_sub_;
 };
 

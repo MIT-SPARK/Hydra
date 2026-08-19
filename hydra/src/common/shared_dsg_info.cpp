@@ -78,7 +78,7 @@ using namespace spark_dsg;
 
 SharedDsgInfo::SharedDsgInfo(const Config& config)
     : updated(false), sequence_number(0) {
-  graph = DynamicSceneGraph::fromNames(config.layers);
+  graph = SceneGraph::fromNames(config.layers);
 }
 
 SharedDsgInfo::Ptr SharedDsgInfo::clone() const {

@@ -48,7 +48,6 @@
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
@@ -73,7 +72,6 @@ void declare_config(GraphBuilder::Config& config) {
   using namespace config;
   name("GraphBuilder::Config");
   base<VerbosityConfig>(config);
-  field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
 
   {
     NameSpace ns("pgmo");
@@ -84,13 +82,15 @@ void declare_config(GraphBuilder::Config& config) {
 
   field(config.graph_connector, "graph_connector");
   field(config.graph_updater, "graph_updater");
-  field(config.enable_mesh_objects, "enable_mesh_objects");
-  field(config.object_config, "objects");
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
+
+  field(config.enable_mesh_objects, "enable_mesh_objects");
+  field(config.object_config, "objects");
   // surface (i.e., 2D) places
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
+
   // traversability places
   config.traversability_places.setOptional();
   field(config.traversability_places, "traversability_places");
@@ -100,6 +100,7 @@ void declare_config(GraphBuilder::Config& config) {
   // frontier (i.e. 3D, boundary to unknown space) places
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
+
   field(config.view_database, "view_database");
   field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
@@ -155,10 +156,6 @@ GraphBuilder::GraphBuilder(const Config& config,
       std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
   addPostMeshCallback(
       std::bind(&GraphBuilder::updatePlaces2d, this, std::placeholders::_1));
-
-  if (config.lcd_use_bow_vectors) {
-    PipelineQueues::instance().bow_queue.reset(new PipelineQueues::BowQueue());
-  }
 }
 
 GraphBuilder::~GraphBuilder() {
@@ -416,9 +413,6 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
         return !map_window_->inBounds(
             msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
       });
-
-  // TODO(nathan) follow up on whether or not we need to do stuff with the 3D places and
-  // mesh
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
@@ -506,25 +500,7 @@ void GraphBuilder::updateFrontiers(const ActiveWindowOutput& input) {
     return;
   }
 
-  const auto timestamp = input.timestamp_ns;
-  frontier_places_->updateRecentBlocks(input.world_t_body, input.map().blockSize());
-
-  {  // start graph critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-
-    ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
-    // TODO(nathan) this should get wiped out when we updated the frontiers
-    NodeIdSet active_nodes;
-    for (const auto& [node_id, node] :
-         dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
-      if (node->attributes().is_active) {
-        active_nodes.insert(node_id);
-      }
-    }
-
-    frontier_places_->detectFrontiers(input, *dsg_->graph, active_nodes);
-    frontier_places_->addFrontiers(timestamp, *dsg_->graph);
-  }  // end graph update critical section
+  frontier_places_->call(input, *dsg_);
 }
 
 void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
@@ -532,10 +508,15 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
     return;
   }
 
-  freespace_places_->detect(input);
+  freespace_places_->call(input, *dsg_);
+}
 
-  std::lock_guard<std::mutex> graph_lock(dsg_->mutex);
-  freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
+void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
+  if (!traversability_places_) {
+    return;
+  }
+
+  traversability_places_->call(input, *dsg_);
 }
 
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
@@ -554,17 +535,6 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
   surface_places_->updateGraph(input, mesh_offsets_, *dsg_->graph);
-}
-
-void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
-  if (!traversability_places_) {
-    return;
-  }
-
-  traversability_places_->detect(input);
-
-  std::lock_guard<std::mutex> graph_lock(dsg_->mutex);
-  traversability_places_->updateGraph(input, *dsg_->graph);
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
@@ -586,62 +556,6 @@ void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
   if (lcd_input_) {
     lcd_input_->new_agent_nodes = new_node_ids;
   }
-
-  assignBowVectors();
-}
-
-void GraphBuilder::assignBowVectors() {
-  auto& queue = PipelineQueues::instance().bow_queue;
-  if (!queue) {
-    return;
-  }
-
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  const auto layer_id = dsg_->graph->getLayerKey(DsgLayers::AGENTS)->layer;
-  const auto agents = dsg_->graph->findLayer(layer_id, prefix.key);
-  if (!agents) {
-    // we have no nodes added to the pose graph yet, so don't do work
-    return;
-  }
-
-  // TODO(nathan) take care of synchronization better
-  // lcd_input_->new_agent_nodes.clear();
-
-  // add bow messages received since last spin
-  while (!queue->empty()) {
-    cached_bow_messages_.push_back(queue->pop());
-  }
-
-  const auto prior_size = cached_bow_messages_.size();
-
-  auto iter = cached_bow_messages_.begin();
-  while (iter != cached_bow_messages_.end()) {
-    const auto& msg = *iter;
-    if (static_cast<int>(msg->robot_id) != prefix.id) {
-      VLOG(1) << "[Hydra Frontend] rejected bow message from robot " << msg->robot_id;
-      iter = cached_bow_messages_.erase(iter);
-    }
-
-    const NodeSymbol node_id(prefix.key, msg->pose_id);
-    const auto node = agents->findNode(node_id);
-    if (!node) {
-      ++iter;
-      continue;
-    }
-
-    auto& attrs = node->attributes<AgentNodeAttributes>();
-    attrs.dbow_ids = Eigen::Map<const AgentNodeAttributes::BowIdVector>(
-        msg->bow_vector.word_ids.data(), msg->bow_vector.word_ids.size());
-    attrs.dbow_values = Eigen::Map<const Eigen::VectorXf>(
-        msg->bow_vector.word_values.data(), msg->bow_vector.word_values.size());
-    VLOG(5) << "[Hydra Frontend] assigned bow vector for " << node_id.str();
-
-    iter = cached_bow_messages_.erase(iter);
-  }
-
-  size_t num_assigned = prior_size - cached_bow_messages_.size();
-  VLOG(3) << "[Hydra Frontend] assigned " << num_assigned << " bow vectors of "
-          << prior_size << " original";
 }
 
 }  // namespace hydra

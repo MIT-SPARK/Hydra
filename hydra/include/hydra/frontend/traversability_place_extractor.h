@@ -38,13 +38,14 @@
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/output_sink.h"
+#include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/places/traversability_clustering.h"
 #include "hydra/places/traversability_estimator.h"
 #include "hydra/places/traversability_postprocessing.h"
 
 namespace hydra::places {
 
-class TraversabilityPlaceExtractor {
+class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
  public:
   using Sink = OutputSink<uint64_t, const Eigen::Vector3d&, const TraversabilityLayer&>;
 
@@ -64,6 +65,8 @@ class TraversabilityPlaceExtractor {
   explicit TraversabilityPlaceExtractor(const Config& config);
 
   virtual ~TraversabilityPlaceExtractor() = default;
+
+  void call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) override;
 
   void detect(const ActiveWindowOutput& msg);
 

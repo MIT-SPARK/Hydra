@@ -1,35 +1,25 @@
 #pragma once
-#include <config_utilities/virtual_config.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <spatial_hash/types.h>
 
-#include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
-#include "hydra/common/dsg_types.h"
+#include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
 struct Frontier {
  public:
-  Frontier() {};
+  Frontier();
+
   Frontier(Eigen::Vector3d c,
            Eigen::Vector3d s,
            Eigen::Quaterniond o,
            size_t n,
-           spatial_hash::BlockIndex b)
-      : center(c),
-        scale(s),
-        orientation(o),
-        num_frontier_voxels(n),
-        block_index(b),
-        has_shape_information(true) {};
-  Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
-      : center(c),
-        num_frontier_voxels(n),
-        block_index(b),
-        has_shape_information(false) {};
+           spatial_hash::BlockIndex b);
+
+  Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b);
 
  public:
   Eigen::Vector3d center;
@@ -40,7 +30,7 @@ struct Frontier {
   bool has_shape_information = false;
 };
 
-class FrontierExtractor {
+class FrontierExtractor : public GraphBuilderFunctor {
  public:
   struct Config {
     char prefix = 'f';
@@ -59,6 +49,8 @@ class FrontierExtractor {
   } const config;
 
   explicit FrontierExtractor(const Config& config);
+
+  void call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) override;
 
   void updateRecentBlocks(const Eigen::Vector3d& current_position, double block_size);
 
@@ -91,10 +83,6 @@ class FrontierExtractor {
   void computeSparseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                               const TsdfLayer& layer,
                               std::vector<Frontier>& frontiers) const;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<FrontierExtractor, FrontierExtractor, Config>(
-          "voxel_clustering");
 };
 
 Eigen::Vector3d frontiersToCenters(const std::vector<Eigen::Vector3f>& positions);

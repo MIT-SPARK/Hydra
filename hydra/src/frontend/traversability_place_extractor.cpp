@@ -45,7 +45,7 @@ namespace hydra::places {
 namespace {
 
 static const auto registration =
-    config::RegistrationWithConfig<TraversabilityPlaceExtractor,
+    config::RegistrationWithConfig<GraphBuilderFunctor,
                                    TraversabilityPlaceExtractor,
                                    TraversabilityPlaceExtractor::Config>(
         "traversability");
@@ -68,6 +68,14 @@ TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
       postprocessing_(config.postprocessing),
       clustering_(config.clustering.create()),
       sinks_(Sink::instantiate(config.sinks)) {}
+
+void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
+                                        SharedDsgInfo& dsg) {
+  detect(msg);
+
+  std::lock_guard<std::mutex> graph_lock(dsg.mutex);
+  updateGraph(msg, *dsg.graph);
+}
 
 void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
