@@ -7,7 +7,7 @@ renderer:
   collapse_layers: false  # whether or not to apply offsets to each of the layers
   layers:
     2:
-      z_offset_scale: 2.0
+      z_offset_scale: 1.5
       visualize: true
       nodes: {scale: 0.40, color: {type: LabelColorAdapter}, alpha: 0.8}
       text: {draw: true, collapse: true, adapter: {type: LabelTextAdapter}, height: 0.5, scale: 0.45}
@@ -15,7 +15,7 @@ renderer:
     3:
       z_offset_scale: 3.0
       visualize: true
-      nodes: {scale: 0.4, color: {type: FeatureScoreColor}, alpha: 0.9, use_sphere: true}
+      nodes: {scale: 0.4, color: {type: ParentColorAdapter, colormap: {palette: {type: colorbrewer}}}, alpha: 0.9, use_sphere: true}
       edges: {scale: 0.01, alpha: 0.5}
     4:
       z_offset_scale: 4.2

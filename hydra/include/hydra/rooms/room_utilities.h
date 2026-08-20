@@ -33,24 +33,28 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <unordered_set>
+#include <spark_dsg/bounding_box.h>
+#include <spark_dsg/scene_graph_types.h>
+#include <spark_dsg/spark_dsg_fwd.h>
 
-#include "hydra/common/dsg_types.h"
-#include "hydra/rooms/graph_filtration.h"
+#include <Eigen/Dense>
+#include <filesystem>
+#include <map>
+#include <set>
+#include <unordered_set>
 
 namespace hydra {
 
-Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
-                                const std::unordered_set<NodeId>& cluster,
-                                const DistanceAdaptor& get_distance = {});
+Eigen::Vector3d getRoomPosition(const spark_dsg::SceneGraphLayer& places,
+                                const std::unordered_set<spark_dsg::NodeId>& cluster);
 
-void addEdgesToRoomLayer(const SceneGraphLayer& places,
-                         const std::map<NodeId, size_t>& labels,
-                         const std::map<size_t, NodeId>& label_to_room_map,
-                         SceneGraphLayer& rooms);
+void addEdgesToRoomLayer(const spark_dsg::SceneGraphLayer& places,
+                         const std::map<spark_dsg::NodeId, size_t>& labels,
+                         const std::map<size_t, spark_dsg::NodeId>& label_to_room_map,
+                         spark_dsg::SceneGraphLayer& rooms);
 
-void addEdgesToRoomLayer(DynamicSceneGraph& graph,
-                         const std::set<NodeId>& active_rooms);
+void addEdgesToRoomLayer(spark_dsg::SceneGraph& graph,
+                         const std::set<spark_dsg::NodeId>& active_rooms);
 
 struct RoomExtents {
   using BoundingBoxes = std::vector<std::vector<spark_dsg::BoundingBox>>;
