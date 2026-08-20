@@ -26,6 +26,19 @@ backend:
     agents: {type: UpdateAgentsFunctor}
     objects: {type: UpdateObjectsFunctor}
     places: {type: UpdateRegionGrowingTraversabilityFunctor, layer: PLACES}
+    regions:
+      type: IBRegionsUpdateFunctor
+      clustering:
+        max_delta: 0.010
+        score_threshold: 0.21
+        top_k: 2
+        cumulative: true
+        null_task_preprune: true
+        tasks:
+          type: RosEmbeddingGroup
+          ns: ~/regions
+          verbosity: 1
+          prompts: [an image of a cubicle group, an image of a hallway, an image of a bathroom, an image of a conference room, an image of a reception area, an image of a personal office]
   pgmo:
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 3

@@ -8,6 +8,7 @@ launch:
   - set_remap: {from: hydra/input/left_cam/rgb/camera_info, to: /tesse/left_cam/camera_info}
   - set_remap: {from: hydra/input/left_cam/semantic/image_raw, to: /tesse/seg_cam/converted/image_raw}
   - set_remap: {from: hydra/input/left_cam/feature, to: /tesse/left_cam/semantic/feature}
+  - set_remap: {from: hydra/regions/embed, to: /tesse/left_cam/semantic/embed}
   - node:
       pkg: tf2_ros
       name: world_to_map

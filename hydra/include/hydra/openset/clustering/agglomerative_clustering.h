@@ -20,8 +20,7 @@ class AgglomerativeClustering {
     double max_delta = 1.0e-3;
   };
 
-  struct Config : VerbosityConfig {
-    ClusteringConfig clustering;
+  struct Config : VerbosityConfig, ClusteringConfig {
     config::VirtualConfig<EmbeddingGroup> tasks;
     config::VirtualConfig<EmbeddingDistance> metric{CosineDistance::Config()};
     bool filter_clusters = false;

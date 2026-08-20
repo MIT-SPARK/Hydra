@@ -340,7 +340,7 @@ void declare_config(AgglomerativeClustering::Config& config) {
   using namespace config;
   name("AgglomerativeClustering::Config");
   base<VerbosityConfig>(config);
-  field(config.clustering, "clustering");
+  base<AgglomerativeClustering::ClusteringConfig>(config);
   field(config.tasks, "tasks");
   config.metric.setOptional();
   field(config.metric, "metric");
@@ -359,7 +359,7 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
     return {};
   }
 
-  Workspace ws(config.clustering, layer.edges(), features, *tasks_, *metric_);
+  Workspace ws(config, layer.edges(), features, *tasks_, *metric_);
   MLOG(1) << "starting clustering with " << ws.edges.size() << " edges";
   cluster(ws);
   MLOG(1) << ws.summary();
@@ -382,12 +382,12 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
     cluster->feature /= cluster->nodes.size();
 
     const auto info = tasks_->getBestScore(*metric_, cluster->feature);
-    if (config.filter_clusters && info.score < config.clustering.score_threshold) {
+    if (config.filter_clusters && info.score < config.score_threshold) {
       continue;
     }
 
     cluster->score = info.score;
-    if (info.score >= config.clustering.score_threshold) {
+    if (info.score >= config.score_threshold) {
       cluster->best_task_index = info.index;
       cluster->best_task_name = tasks_->names.at(info.index);
     } else {

@@ -17,7 +17,8 @@ namespace {
 static const auto functor_reg =
     config::RegistrationWithConfig<UpdateFunctor,
                                    IBRegionsUpdateFunctor,
-                                   IBRegionsUpdateFunctor::Config>("RegionsIBFunctor");
+                                   IBRegionsUpdateFunctor::Config>(
+        "IBRegionsUpdateFunctor");
 
 void clearRegions(SceneGraph& graph, const std::string& layer) {
   std::vector<NodeId> prev_regions;
