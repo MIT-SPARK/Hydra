@@ -40,7 +40,6 @@
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include <algorithm>
 #include <tf2_eigen/tf2_eigen.hpp>
@@ -130,13 +129,11 @@ struct convert<spark_dsg::BoundingBox> {
 
 namespace hydra {
 
-using spark_dsg::BoundingBox;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
 
 namespace {
 
-// TODO(nathan) clean this up
 std::string printBoxes(const BoundingBoxPublisher::Annotations& annotations) {
   std::stringstream ss;
   ss << "{";
@@ -221,7 +218,6 @@ void BoundingBoxPublisher::drawBoxes(const std_msgs::msg::Header& header,
 void BoundingBoxPublisher::drawLabels(const std_msgs::msg::Header& header,
                                       const Annotations& annotations,
                                       MarkerArray& msg) const {
-  // TODO(nathan) line to bbox center
   size_t idx = 0;
   const auto max_z = maxHeight(annotations);
   for (auto&& [label, boxes] : annotations) {
@@ -245,12 +241,6 @@ void BoundingBoxPublisher::drawLabels(const std_msgs::msg::Header& header,
       marker.text = label;
       tracker_.add(marker, msg);
       ++idx;
-
-      /*      if (config.draw_labels && config.text_height > 0.0) {*/
-      /*geometry_msgs::Point center_point;*/
-      /*tf2::convert(pos, center_point);*/
-      /*center_point.z += max_z + config.text_height;*/
-      /*}*/
     }
   }
 }
@@ -258,13 +248,16 @@ void BoundingBoxPublisher::drawLabels(const std_msgs::msg::Header& header,
 void BoundingBoxPublisher::load(const std_msgs::msg::String& msg) {
   const std::filesystem::path filepath(msg.data);
   if (!std::filesystem::exists(filepath)) {
-    LOG(WARNING) << "Filepath '" << filepath.string() << "' does not exist!";
+    RCLCPP_ERROR_STREAM(get_logger(),
+                        "Filepath '" << filepath.string() << "' does not exist!");
     return;
   }
 
   const auto node = YAML::LoadFile(msg.data);
   const auto boxes = node.as<Annotations>();
-  VLOG(3) << "Loaded bounding boxes from '" << msg.data << "':\n" << printBoxes(boxes);
+  RCLCPP_DEBUG_STREAM(get_logger(),
+                      "Loaded bounding boxes from '" << msg.data << "':\n"
+                                                     << printBoxes(boxes));
 
   std_msgs::msg::Header header;
   header.stamp = get_clock()->now();

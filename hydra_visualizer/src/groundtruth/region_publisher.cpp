@@ -39,13 +39,11 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
 #include <tf2_eigen/tf2_eigen.hpp>
 
-#include "hydra_visualizer/color/colormap_utilities.h"
 #include "hydra_visualizer/utils/polygon_utilities.h"
 
 namespace hydra {
@@ -108,10 +106,15 @@ std::optional<Region> parseRegion(const YAML::Node& node) {
 
 bool loadRegions(const std::filesystem::path& region_filepath,
                  bool skip_unknown,
-                 std::vector<Region>& regions) {
+                 std::vector<Region>& regions,
+                 const rclcpp::Logger& logger) {
   if (!std::filesystem::exists(region_filepath)) {
-    LOG_IF(ERROR, !region_filepath.empty())
-        << "Provided filepath: '" << region_filepath.string() << "' does not exist";
+    if (!region_filepath.empty()) {
+      RCLCPP_ERROR_STREAM(
+          logger,
+          "Provided filepath: '" << region_filepath.string() << "' does not exist");
+    }
+
     return false;
   }
 
@@ -120,7 +123,7 @@ bool loadRegions(const std::filesystem::path& region_filepath,
   for (const auto& node : region_config) {
     const auto new_region = parseRegion(node);
     if (!new_region) {
-      LOG(ERROR) << "Invalid YAML region: " << node;
+      RCLCPP_ERROR_STREAM(logger, "Invalid YAML region: " << node);
       continue;
     }
 
@@ -140,12 +143,12 @@ RegionPublisher::RegionPublisher(const rclcpp::NodeOptions& options)
       config(config::checkValid(config::fromContext<RegionPublisher::Config>())),
       published_(false),
       pub_(create_publisher<MarkerArray>("regions", rclcpp::QoS(1).transient_local())) {
-  VLOG(1) << config::toString(config);
+  RCLCPP_DEBUG_STREAM(get_logger(), config::toString(config));
   if (config.region_filepath.empty()) {
     return;
   }
 
-  loadRegions(config.region_filepath, config.skip_unknown, regions_);
+  loadRegions(config.region_filepath, config.skip_unknown, regions_, get_logger());
   publish();
 }
 
