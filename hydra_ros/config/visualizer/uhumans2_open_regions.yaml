@@ -36,4 +36,4 @@ renderer:
   layer_plugins:
     - layer: 3
       plugins:
-        - {type: RegionGrowingBoundaryPlugin}
+        - {type: RegionGrowingBoundaryPlugin, use_node_color: true, fill_boundaries: true, fill_alpha: 0.3}
