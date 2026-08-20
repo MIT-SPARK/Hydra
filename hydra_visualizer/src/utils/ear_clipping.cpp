@@ -35,8 +35,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_visualizer/utils/ear_clipping.h"
 
-#include <glog/logging.h>
-
 #include <numeric>
 
 namespace hydra {
@@ -208,7 +206,6 @@ Polygon::Polygon(const std::vector<Vertex>& vertices, bool is_ccw)
   }
 
   filter();
-  VLOG(10) << "counter clockwise: " << std::boolalpha << is_ccw_;
 }
 
 void Polygon::filter() {
@@ -297,12 +294,9 @@ TriangleIter Polygon::minAngleEar(const std::vector<bool>& ears) const {
   auto iter = begin();
   auto max_ear = end();
   double max_cosine = 0.0;
-  VLOG(10) << "Finding minimum ear:";
   while (iter != end()) {
     const auto is_ear = ears[iter->v1->id];
     const auto curr_cosine = iter->interiorAngle(is_ccw_);
-    VLOG(10) << std::boolalpha << *iter << ": ear=" << is_ear
-             << ", angle=" << curr_cosine;
     if (!is_ear) {
       ++iter;
       continue;
@@ -316,7 +310,6 @@ TriangleIter Polygon::minAngleEar(const std::vector<bool>& ears) const {
     ++iter;
   }
 
-  VLOG(10) << "Best ear: " << *max_ear << " (angle: " << max_cosine << ")";
   return max_ear;
 }
 

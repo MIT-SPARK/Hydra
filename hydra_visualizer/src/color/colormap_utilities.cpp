@@ -39,7 +39,6 @@
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <config_utilities/virtual_config.h>
-#include <glog/logging.h>
 #include <spark_dsg/colormaps.h>
 
 #include <fstream>
@@ -282,7 +281,8 @@ PaletteFromCsvFile::PaletteFromCsvFile(const Config& config)
     : config(config::checkValid(config)) {
   std::ifstream file(config.filepath);
   if (!file.is_open()) {
-    LOG(ERROR) << "Could not open csv file '" << config.filepath << "'.";
+    throw std::domain_error(std::string("Could not open csv file '") +
+                            config.filepath.c_str() + "'.");
     return;
   }
 

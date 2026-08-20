@@ -34,8 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_visualizer/utils/layer_key_selector.h"
 
-#include <glog/logging.h>
-
 #include <regex>
 
 namespace hydra {
@@ -49,7 +47,11 @@ std::optional<LayerKeySelector> LayerKeySelector::parse(const std::string& str) 
     return std::nullopt;
   }
 
-  CHECK_EQ(match.size(), 6);
+  if (match.size() != 6) {
+    throw std::runtime_error(
+        "regex groups are the wrong size: " + std::to_string(match.size()) + " != 6");
+  }
+
   if (!match.str(1).empty()) {
     // partitions >= 1
     return LayerKeySelector{LayerKey{std::stol(match.str(1))}, true, false};
@@ -140,7 +142,11 @@ void LayerKeyConversion::fromIntermediate(const std::string& intermediate,
     return;
   }
 
-  CHECK_EQ(match.size(), 4);
+  if (match.size() != 4) {
+    throw std::runtime_error(
+        "regex groups are the wrong size: " + std::to_string(match.size()) + " != 6");
+  }
+
   if (!match.str(1).empty()) {
     // layer and partition
     const auto part_id = static_cast<PartitionId>(std::stoi(match.str(2)));
