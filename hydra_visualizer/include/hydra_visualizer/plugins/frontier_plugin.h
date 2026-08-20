@@ -51,12 +51,12 @@ class FrontierPlugin : public LayerPlugin {
 
   virtual ~FrontierPlugin() = default;
 
-  virtual void draw(const std_msgs::msg::Header& header,
-                    const visualizer::DrawingContext& context,
-                    const spark_dsg::SceneGraphLayer& layer,
-                    const spark_dsg::Mesh* mesh,
-                    visualization_msgs::msg::MarkerArray& msg,
-                    MarkerTracker& tracker) override;
+  void draw(const std_msgs::msg::Header& header,
+            const visualizer::DrawingContext& context,
+            const spark_dsg::SceneGraphLayer& layer,
+            const spark_dsg::Mesh* mesh,
+            visualization_msgs::msg::MarkerArray& msg,
+            MarkerTracker& tracker) override;
 
   YAML::Node dumpConfig() const override;
 

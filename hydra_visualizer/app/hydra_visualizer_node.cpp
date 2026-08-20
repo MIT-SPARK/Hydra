@@ -34,10 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include <config_utilities/config_utilities.h>
 #include <config_utilities/external_registry.h>
-#include <config_utilities/logging/log_to_glog.h>
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/settings.h>
-#include <glog/logging.h>
 #include <ianvs/node_init.h>
 
 #include <rclcpp/rclcpp.hpp>
@@ -47,16 +45,12 @@
 namespace hydra::visualizer {
 
 struct NodeSettings {
-  int glog_verbosity = 1;
-  int glog_level = 0;
   std::vector<std::string> external_library_paths;
 };
 
 void declare_config(NodeSettings& config) {
   using namespace config;
   name("NodeSettings");
-  field(config.glog_verbosity, "glog_verbosity");
-  field(config.glog_level, "glog_level");
   field(config.external_library_paths, "external_library_paths");
 }
 
@@ -71,19 +65,7 @@ int main(int argc, char** argv) {
       ianvs::init_node(argc, argv, "hydra_visualizer_node");
   auto nh = ianvs::NodeHandle::this_node("~");
 
-  FLAGS_minloglevel = node_settings.glog_level;
-  FLAGS_v = node_settings.glog_verbosity;
-  FLAGS_logtostderr = 1;
-  FLAGS_colorlogtostderr = 1;
-
-  // TODO(nathan) ROS2 arguments and GLOG do not mix because both Google and OSRF have
-  // bad conventions
-  google::InitGoogleLogging(argv[0]);
-  google::InstallFailureSignalHandler();
-
-  config::Settings().setLogger("glog");
-
-  VLOG(1) << "Settings:\n" << config::toString(node_settings);
+  RCLCPP_DEBUG_STREAM(nh.logger(), "Settings:\n" << config::toString(node_settings));
 
   [[maybe_unused]] const auto plugins =
       config::loadExternalFactories(node_settings.external_library_paths);
@@ -91,7 +73,7 @@ int main(int argc, char** argv) {
   rclcpp::executors::MultiThreadedExecutor executor;
   {  // start visualizer scope
     const auto config = config::fromContext<hydra::DsgVisualizer::Config>();
-    VLOG(1) << "Config:\n" << config::toString(config);
+    RCLCPP_DEBUG_STREAM(nh.logger(), "Config:\n" << config::toString(config));
     auto node = std::make_shared<hydra::DsgVisualizer>(config, nh);
     node->start();
 
