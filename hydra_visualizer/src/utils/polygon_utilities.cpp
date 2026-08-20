@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_visualizer/utils/polygon_utilities.h"
 
-#include <glog/logging.h>
 #include <spark_dsg/bounding_box_extraction.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
@@ -138,9 +137,9 @@ void makeFilledPolygon(const Eigen::MatrixXd& points,
                        visualization_msgs::msg::Marker& marker,
                        std::optional<double> height) {
   if (points.cols() <= 1 || points.rows() != 3) {
-    LOG(ERROR) << "Invalid point dimensions: [" << points.rows() << ", "
-               << points.cols() << "]";
-    return;
+    throw std::domain_error("Invalid point dimensions: [" +
+                            std::to_string(points.rows()) + ", " +
+                            std::to_string(points.cols()) + "]");
   }
 
   auto polygon = Polygon::fromPoints(points);
@@ -164,9 +163,9 @@ void makePolygonBoundary(const Eigen::MatrixXd& points,
                          std::optional<double> height,
                          visualization_msgs::msg::Marker* corners) {
   if (points.cols() <= 1 || points.rows() != 3) {
-    LOG(ERROR) << "Invalid point dimensions: [" << points.rows() << ", "
-               << points.cols() << "]";
-    return;
+    throw std::domain_error("Invalid point dimensions: [" +
+                            std::to_string(points.rows()) + ", " +
+                            std::to_string(points.cols()) + "]");
   }
 
   geometry_msgs::msg::Point prev;
