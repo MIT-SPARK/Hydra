@@ -36,7 +36,6 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 using namespace spark_dsg;
 
@@ -68,9 +67,7 @@ GraphZmqWrapper::GraphZmqWrapper(const Config& config, ianvs::NodeHandle)
 GraphZmqWrapper::~GraphZmqWrapper() {
   should_shutdown_ = true;
   if (recv_thread_) {
-    LOG(INFO) << "joining receive thread...";
     recv_thread_->join();
-    LOG(INFO) << "joined receive thread";
     recv_thread_.reset();
   }
   receiver_.reset();
@@ -109,7 +106,6 @@ void GraphZmqWrapper::spin() {
     }
 
     has_change_ = true;
-    VLOG(1) << "Got graph!";
   }
 }
 

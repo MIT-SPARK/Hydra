@@ -37,7 +37,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/serialization/graph_binary_serialization.h>
 
 #include <rclcpp/create_subscription.hpp>
@@ -80,7 +79,7 @@ void GraphRosWrapper::callback(const DsgUpdate::ConstSharedPtr& msg) {
   last_time_ = msg->header.stamp;
   last_frame_id_ = msg->header.frame_id;
   if (last_frame_id_.empty()) {
-    LOG(ERROR) << "Received scene graph with empty frame_id field!";
+    RCLCPP_ERROR_STREAM(nh_.logger(), "Received scene graph with empty frame_id!");
     return;
   }
 
@@ -93,7 +92,7 @@ void GraphRosWrapper::callback(const DsgUpdate::ConstSharedPtr& msg) {
 
     has_change_ = true;
   } catch (const std::exception& e) {
-    LOG(ERROR) << "Received invalid message: " << e.what();
+    RCLCPP_ERROR_STREAM(nh_.logger(), "Received invalid message: " << e.what());
     return;
   }
 }

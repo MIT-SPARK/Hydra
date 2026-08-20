@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_visualizer/drawing.h"
 
-#include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/printing.h>
@@ -86,13 +85,6 @@ struct JitterGenerator {
 void drawBoundingBox(const spark_dsg::BoundingBox& bbox,
                      const std_msgs::msg::ColorRGBA& color,
                      Marker& marker) {
-  // marker.header = header;
-  // marker.type = Marker::LINE_LIST;
-  // marker.action = visualization_msgs::Marker::ADD;
-  // marker.id = 0;
-  // marker.ns = ns;
-  // marker.scale.x = info.config.bounding_box_scale;
-
   const static std::array<size_t, 8> remapping{0, 1, 3, 2, 4, 5, 7, 6};
   const auto corners = bbox.corners();
 
@@ -165,7 +157,6 @@ MarkerArray makeLayerBoundingBoxes(const std_msgs::msg::Header& header,
 
     const auto attrs = node->tryAttributes<SemanticNodeAttributes>();
     if (!attrs || attrs->bounding_box.type == BoundingBox::Type::INVALID) {
-      // TODO(nathan) log warning
       continue;
     }
 
@@ -213,7 +204,6 @@ MarkerArray makeLayerNodeTextMarkers(const std_msgs::msg::Header& header,
                                      const std::string& ns) {
   MarkerArray msg;
   if (!info.node_text) {
-    // TODO(nathan) log warning
     return msg;
   }
 

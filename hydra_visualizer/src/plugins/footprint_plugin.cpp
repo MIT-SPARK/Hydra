@@ -38,7 +38,6 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 #include <tf2_eigen/tf2_eigen.hpp>
