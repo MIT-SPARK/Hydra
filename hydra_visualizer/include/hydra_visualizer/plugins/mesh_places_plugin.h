@@ -33,48 +33,51 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-#include <ianvs/node_handle.h>
-#include <spark_dsg/zmq_interface.h>
 
-#include <atomic>
-#include <mutex>
-#include <thread>
+#include <config_utilities/dynamic_config.h>
 
-#include "hydra_visualizer/io/graph_wrapper.h"
+#include "hydra_visualizer/plugins/layer_plugin.h"
 
 namespace hydra {
 
-class GraphZmqWrapper : public GraphWrapper {
+class MeshPlacesPlugin : public LayerPlugin {
  public:
+  //! @brief configuration for polygon boundaries
   struct Config {
-    std::string frame_id;
-    std::string url = "tcp://127.0.0.1:8001";
-    size_t num_threads = 2;
-    size_t poll_time_ms = 10;
-  } const config;
+    //! @brief display polygon boundaries
+    bool draw = true;
+    //! @brief draw polygons at mesh level
+    bool collapse = false;
+    //! @brief scale of boundary wireframe
+    double wireframe_scale = 0.1;
+    //! @brief draw polygons using node semantic color
+    bool use_node_color = true;
+    //! @brief alpha of boundary
+    double alpha = 0.5;
+    //! @brief display minimum bounding ellipse
+    bool draw_ellipse = false;
+    //! @brief alpha of bounding ellipse
+    double ellipse_alpha = 0.5;
+  };
 
-  explicit GraphZmqWrapper(const Config& config, ianvs::NodeHandle nh);
+  MeshPlacesPlugin(const Config& config, const std::string& ns);
 
-  virtual ~GraphZmqWrapper();
+  virtual ~MeshPlacesPlugin() = default;
 
-  bool hasChange() const override;
+  virtual void draw(const std_msgs::msg::Header& header,
+                    const visualizer::DrawingContext& context,
+                    const spark_dsg::SceneGraphLayer& layer,
+                    const spark_dsg::Mesh* mesh,
+                    visualization_msgs::msg::MarkerArray& msg,
+                    MarkerTracker& tracker) override;
 
-  void clearChangeFlag() override;
+  YAML::Node dumpConfig() const override;
 
-  StampedGraph get() const override;
-
- private:
-  void spin();
-
-  bool has_change_;
-  std::atomic<bool> should_shutdown_;
-  mutable std::mutex graph_mutex_;
-  std::unique_ptr<std::thread> recv_thread_;
-  std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
-  spark_dsg::SceneGraph::Ptr graph_;
+ protected:
+  const std::string ns_;
+  config::DynamicConfig<Config> config_;
 };
 
-void declare_config(GraphZmqWrapper::Config& config);
+void declare_config(MeshPlacesPlugin::Config& config);
 
 }  // namespace hydra

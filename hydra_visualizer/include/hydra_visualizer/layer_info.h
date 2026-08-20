@@ -33,13 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/dynamic_config.h>
 #include <config_utilities/virtual_config.h>
 #include <spark_dsg/color.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra_visualizer/adapters/edge_color.h"
 #include "hydra_visualizer/adapters/node_color.h"
 #include "hydra_visualizer/adapters/text.h"
+#include "hydra_visualizer/filters/node_filters.h"
 
 namespace hydra::visualizer {
 
@@ -48,8 +50,8 @@ struct LayerConfig {
   bool visualize = false;
   //! @brief number of steps of offset to apply
   double z_offset_scale = 0.0;
-  //! @brief Draw current frontiers as ellipses
-  bool draw_frontier_ellipse = false;
+  //! @brief optional filter to apply to nodes
+  config::VirtualConfig<NodeFilter> node_filter;
 
   //! @brief Node settings
   struct Nodes {
@@ -115,63 +117,66 @@ struct LayerConfig {
     //! @brief point at which to break the edge into many edges
     double edge_break_ratio = 0.5;
   } bounding_boxes;
-
-  //! @brief configuration for polygon boundaries
-  struct Boundaries {
-    //! @brief display polygon boundaries
-    bool draw = false;
-    //! @brief draw polygons at mesh level
-    bool collapse = false;
-    //! @brief scale of boundary wireframe
-    double wireframe_scale = 0.1;
-    //! @brief draw polygons using node semantic color
-    bool use_node_color = true;
-    //! @brief alpha of boundary
-    double alpha = 0.5;
-    //! @brief display minimum bounding ellipse
-    bool draw_ellipse = false;
-    //! @brief alpha of bounding ellipse
-    double ellipse_alpha = 0.5;
-  } boundaries;
 };
 
 void declare_config(LayerConfig::Nodes& config);
 void declare_config(LayerConfig::Edges& config);
 void declare_config(LayerConfig::Text& config);
 void declare_config(LayerConfig::BoundingBoxes& config);
-void declare_config(LayerConfig::Boundaries& config);
 void declare_config(LayerConfig& config);
 
-class LayerInfo {
- public:
+struct DrawingContext {
+  using Ptr = std::shared_ptr<DrawingContext>;
   using Color = spark_dsg::Color;
   using Node = spark_dsg::SceneGraphNode;
   using Edge = spark_dsg::SceneGraphEdge;
   using FilterFunction = std::function<bool(const Node&)>;
+  using TextFunction = std::function<std::string(const Node&)>;
   using ColorFunction = std::function<Color(const Node&)>;
   using EdgeColorFunction = std::function<std::pair<Color, Color>(const Edge&)>;
-  using TextFunction = std::function<std::string(const Node&)>;
-
-  LayerInfo(const LayerConfig& config);
-  LayerInfo& offset(double offset_size = 1.0, bool collapse = true);
-  LayerInfo& graph(const spark_dsg::DynamicSceneGraph& graph,
-                   spark_dsg::LayerKey layer);
-
-  bool shouldVisualize(const Node& node) const;
-  Color text_color() const;
-
-  const LayerConfig config;
 
   double z_offset;
+
+  LayerConfig::Nodes nodes;
+  LayerConfig::Edges edges;
+
+  Color text_color;
+  LayerConfig::Text text;
+
+  LayerConfig::BoundingBoxes bounding_boxes;
+
+  FilterFunction filter;
+  TextFunction node_text;
   ColorFunction node_color;
   EdgeColorFunction edge_color;
-  TextFunction node_text;
-  mutable FilterFunction filter;
+
+  bool valid(const Node& node) const;
+};
+
+class LayerInfo {
+ public:
+  LayerInfo(const std::string& ns, const LayerConfig& config);
+
+  bool hasChange() const;
+
+  void clearChangeFlag();
+
+  YAML::Node dumpConfig() const;
+
+  DrawingContext::Ptr context(const spark_dsg::SceneGraph& graph,
+                              spark_dsg::LayerKey layer,
+                              double offset_size = 1.0,
+                              bool collapse = true) const;
 
  private:
+  void onConfigChange();
+
+  bool has_change_ = false;
+  config::DynamicConfig<LayerConfig> config_;
+  std::unique_ptr<NodeFilter> node_filter_;
+  std::unique_ptr<NodeTextAdapter> text_adapter_;
   std::unique_ptr<NodeColorAdapter> node_color_adapter_;
   std::unique_ptr<EdgeColorAdapter> edge_color_adapter_;
-  std::unique_ptr<NodeTextAdapter> text_adapter_;
 };
 
 }  // namespace hydra::visualizer

@@ -97,9 +97,8 @@ static const auto registration =
 }  // namespace
 
 namespace colormaps = spark_dsg::colormaps;
-using spark_dsg::Color;
-using spark_dsg::DynamicSceneGraph;
-using spark_dsg::KhronosObjectAttributes;
+using namespace spark_dsg;
+;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
 
@@ -131,7 +130,7 @@ KhronosObjectPlugin::KhronosObjectPlugin(const Config& config,
       tf_broadcaster_(nh.node()) {}
 
 void KhronosObjectPlugin::draw(const std_msgs::msg::Header& header,
-                               const DynamicSceneGraph& graph) {
+                               const SceneGraph& graph) {
   const auto config = config_.get();
   if (!graph.hasLayer(config.layer)) {
     return;
@@ -157,7 +156,7 @@ void KhronosObjectPlugin::reset(const std_msgs::msg::Header& header) {
 
 void KhronosObjectPlugin::drawDynamicObjects(const Config& config,
                                              const std_msgs::msg::Header& header,
-                                             const DynamicSceneGraph& graph) {
+                                             const SceneGraph& graph) {
   if (dynamic_pub_->get_subscription_count() == 0) {
     return;
   }
@@ -225,7 +224,7 @@ void KhronosObjectPlugin::drawDynamicObjects(const Config& config,
 
 void KhronosObjectPlugin::drawStaticObjects(const Config& config,
                                             const std_msgs::msg::Header& header,
-                                            const DynamicSceneGraph& dsg) {
+                                            const SceneGraph& dsg) {
   if (static_pub_->get_subscription_count() == 0) {
     return;
   }

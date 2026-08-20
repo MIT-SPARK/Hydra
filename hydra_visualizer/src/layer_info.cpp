@@ -35,6 +35,7 @@
 #include "hydra_visualizer/layer_info.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/enum.h>
 #include <spark_dsg/node_attributes.h>
 
@@ -113,95 +114,105 @@ void declare_config(LayerConfig::BoundingBoxes& config) {
   checkInRange(config.edge_break_ratio, 0.0, 1.0, "edge_break_ratio");
 }
 
-void declare_config(LayerConfig::Boundaries& config) {
-  using namespace config;
-  name("LayerConfig::Boundaries");
-  field(config.draw, "draw");
-  field(config.collapse, "collapse");
-  field(config.wireframe_scale, "wireframe_scale");
-  field(config.use_node_color, "use_node_color");
-  field(config.alpha, "alpha");
-  field(config.draw_ellipse, "draw_ellipse");
-  field(config.ellipse_alpha, "ellipse_alpha");
-
-  check(config.wireframe_scale, GT, 0.0, "wireframe_scale");
-  checkInRange(config.alpha, 0.0, 1.0, "alpha");
-  checkInRange(config.ellipse_alpha, 0.0, 1.0, "ellipse_alpha");
-}
-
 void declare_config(LayerConfig& config) {
   using namespace config;
   name("LayerConfig");
   field(config.visualize, "visualize");
   field(config.z_offset_scale, "z_offset_scale");
-  field(config.draw_frontier_ellipse, "draw_frontier_ellipse");
+  config.node_filter.setOptional();
+  field(config.node_filter, "node_filter");
 
   // subconfigs
   field(config.nodes, "nodes");
   field(config.edges, "edges");
   field(config.text, "text");
   field(config.bounding_boxes, "bounding_boxes");
-  field(config.boundaries, "boundaries");
 }
 
-LayerInfo::LayerInfo(const LayerConfig& config)
-    : config(config),
-      z_offset(0.0),
-      node_color(&getNodeColor),
-      node_text([](const SceneGraphNode&) { return ""; }) {}
+bool DrawingContext::valid(const Node& node) const {
+  if (!filter) {
+    return true;
+  }
 
-LayerInfo& LayerInfo::offset(double offset_size, bool collapse) {
-  z_offset = collapse ? 0.0 : offset_size * config.z_offset_scale;
-  return *this;
+  return filter(node);
 }
 
-LayerInfo& LayerInfo::graph(const DynamicSceneGraph& graph, LayerKey layer) {
+LayerInfo::LayerInfo(const std::string& ns, const LayerConfig& config)
+    : config_(ns, config, [this]() { onConfigChange(); }) {
+  onConfigChange();
+}
+
+bool LayerInfo::hasChange() const { return has_change_; }
+
+void LayerInfo::clearChangeFlag() { has_change_ = false; }
+
+YAML::Node LayerInfo::dumpConfig() const { return config::toYaml(config_.get()); }
+
+void LayerInfo::onConfigChange() {
+  const auto config = config_.get();
+
+  // TODO(nathan) make it so config changes don't override adapters
+
+  has_change_ = true;
+  node_filter_ = config.node_filter.create();
+  text_adapter_ = config.text.adapter.create();
   node_color_adapter_ = config.nodes.color.create();
+  edge_color_adapter_ = config.edges.color.create();
+}
+
+DrawingContext::Ptr LayerInfo::context(const SceneGraph& graph,
+                                       LayerKey layer,
+                                       double offset_size,
+                                       bool collapse) const {
+  const auto config = config_.get();
+  if (!config.visualize) {
+    return nullptr;
+  }
+
   if (node_color_adapter_) {
     node_color_adapter_->setGraph(graph, layer);
-    node_color = [this, &graph](const SceneGraphNode& node) {
-      return node_color_adapter_->getColor(graph, node);
-    };
   }
 
-  edge_color_adapter_ = config.edges.color.create();
   if (edge_color_adapter_) {
     edge_color_adapter_->setGraph(graph, layer);
-    edge_color = [this, &graph](const SceneGraphEdge& edge) {
-      return edge_color_adapter_->getColor(graph, edge);
-    };
-  } else {
-    // If not specified, use node colors.
-    // TODO(lschmid): This is not the prettiest, but e.g. handing the layerinfo to the
-    // adapters or so also didn't seem right.
-    edge_color = [this, &graph](const SceneGraphEdge& edge) {
-      return std::make_pair(node_color(graph.getNode(edge.source)),
-                            node_color(graph.getNode(edge.target)));
-    };
   }
 
-  text_adapter_ = config.text.adapter.create();
-  if (text_adapter_) {
-    node_text = [this, &graph](const SceneGraphNode& node) {
-      return text_adapter_->getText(graph, node);
+  auto context = std::make_shared<DrawingContext>();
+  context->z_offset = collapse ? 0.0 : offset_size * config.z_offset_scale;
+  context->nodes = config.nodes;
+  context->edges = config.edges;
+  context->text_color = colorFromName(config.text.color);
+  context->text = config.text;
+  context->bounding_boxes = config.bounding_boxes;
+
+  if (node_filter_) {
+    context->filter = [this, &graph](const SceneGraphNode& node) {
+      return node_filter_->valid(graph, node);
     };
   }
 
-  return *this;
-}
+  context->node_text = [this, &graph](const SceneGraphNode& node) {
+    return text_adapter_ ? text_adapter_->getText(graph, node) : "";
+  };
 
-Color LayerInfo::text_color() const { return colorFromName(config.text.color); }
+  context->node_color = [this, &graph](const SceneGraphNode& node) {
+    if (!node_color_adapter_) {
+      return getNodeColor(node);
+    }
 
-bool LayerInfo::shouldVisualize(const spark_dsg::SceneGraphNode& node) const {
-  if (!config.visualize) {
-    return false;
-  }
+    return node_color_adapter_->getColor(graph, node);
+  };
 
-  if (filter && !filter(node)) {
-    return false;
-  }
+  context->edge_color = [this, context, &graph](const SceneGraphEdge& edge) {
+    if (!edge_color_adapter_) {
+      return std::make_pair(context->node_color(graph.getNode(edge.source)),
+                            context->node_color(graph.getNode(edge.target)));
+    }
 
-  return true;
+    return edge_color_adapter_->getColor(graph, edge);
+  };
+
+  return context;
 }
 
 }  // namespace hydra::visualizer

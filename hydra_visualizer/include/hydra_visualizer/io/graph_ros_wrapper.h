@@ -68,7 +68,7 @@ class GraphRosWrapper : public GraphWrapper {
   rclcpp::Time last_time_;
   std::string last_frame_id_;
   mutable std::mutex graph_mutex_;
-  spark_dsg::DynamicSceneGraph::Ptr graph_;
+  spark_dsg::SceneGraph::Ptr graph_;
 };
 
 void declare_config(GraphRosWrapper::Config& config);

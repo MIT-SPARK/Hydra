@@ -32,73 +32,86 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_visualizer/io/graph_file_wrapper.h"
+#include "hydra_visualizer/plugins/frontier_plugin.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/factory.h>
-#include <config_utilities/types/path.h>
+#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
 
-#include <rclcpp/create_subscription.hpp>
+#include <tf2_eigen/tf2_eigen.hpp>
+
+#include "hydra_visualizer/color/color_parsing.h"
+
+using hydra::visualizer::makeColorMsg;
+using visualization_msgs::msg::Marker;
+using visualization_msgs::msg::MarkerArray;
+using namespace spark_dsg;
 
 namespace hydra {
 namespace {
+
 static const auto registration_ =
-    config::RegistrationWithConfig<GraphWrapper,
-                                   GraphFileWrapper,
-                                   GraphFileWrapper::Config,
-                                   ianvs::NodeHandle>("GraphFromFile");
-}
+    config::RegistrationWithConfig<LayerPlugin,
+                                   FrontierPlugin,
+                                   FrontierPlugin::Config,
+                                   std::string>("FrontierPlugin");
 
-using namespace spark_dsg;
-using std_msgs::msg::String;
-using std_srvs::srv::Empty;
+}  // namespace
 
-void declare_config(GraphFileWrapper::Config& config) {
+void declare_config(FrontierPlugin::Config& config) {
   using namespace config;
-  name("GraphFileWrapper::Config");
-  field(config.frame_id, "frame_id");
-  field<Path::Absolute>(config.filepath, "filepath");
-  field(config.wrapper_ns, "wrapper_ns");
-
-  checkCondition(!config.frame_id.empty(), "'frame_id' must be non-empty");
-  check<Path::Exists>(config.filepath, "filepath");
+  name("FrontierPlugin::Config");
+  field(config.alpha, "alpha");
+  checkInRange(config.alpha, 0.0, 1.0, "alpha");
 }
 
-GraphFileWrapper::GraphFileWrapper(const Config& config, ianvs::NodeHandle nh)
-    : config(config::checkValid(config)),
-      has_change_(true),
-      nh_(nh / config.wrapper_ns),
-      filepath_(config.filepath),
-      graph_(SceneGraph::load(filepath_)),
-      service_(nh_.create_service<Empty>("reload", &GraphFileWrapper::reload, this)),
-      sub_(nh_.create_subscription<String>("load", 1, &GraphFileWrapper::load, this)) {}
+FrontierPlugin::FrontierPlugin(const Config& config, const std::string& ns)
+    : ns_(ns),
+      config_(ns + "_frontier_plugin", config, [this]() { has_change_ = true; }) {}
 
-bool GraphFileWrapper::hasChange() const { return has_change_; }
+void FrontierPlugin::draw(const std_msgs::msg::Header& header,
+                          const visualizer::DrawingContext& info,
+                          const SceneGraphLayer& layer,
+                          const Mesh*,
+                          MarkerArray& msg,
+                          MarkerTracker& tracker) {
+  const auto config = config_.get();
+  const auto ns = ns_ + "_frontier_ellipses";
 
-void GraphFileWrapper::clearChangeFlag() { has_change_ = false; }
+  size_t id = 0;
+  MarkerArray markers;
+  for (const auto& [node_id, node] : layer.nodes()) {
+    const auto attrs = node->tryAttributes<PlaceNodeAttributes>();
+    if (!attrs || attrs->real_place) {
+      continue;
+    }
 
-StampedGraph GraphFileWrapper::get() const { return {graph_, config.frame_id}; }
+    auto& marker = markers.markers.emplace_back();
+    marker.header = header;
+    marker.type = Marker::SPHERE;
+    marker.action = Marker::ADD;
+    marker.id = id++;
+    marker.ns = ns;
+    marker.scale.x = attrs->frontier_scale.x();
+    marker.scale.y = attrs->frontier_scale.y();
+    marker.scale.z = attrs->frontier_scale.z();
 
-void GraphFileWrapper::reload(const std_srvs::srv::Empty::Request::SharedPtr&,
-                              std_srvs::srv::Empty::Response::SharedPtr) {
-  // TODO(nathan) consider deferring load
-  graph_ = SceneGraph::load(filepath_);
-  has_change_ = true;
-}
+    tf2::convert(attrs->position, marker.pose.position);
+    tf2::convert(attrs->orientation, marker.pose.orientation);
 
-void GraphFileWrapper::load(const std_msgs::msg::String::ConstSharedPtr& msg) {
-  std::filesystem::path req_path(msg->data);
-  if (!std::filesystem::exists(req_path)) {
-    LOG(ERROR) << "Graph does not exist at '" << req_path.string() << "'";
-    return;
+    marker.pose.position.z += info.z_offset;
+    marker.color = makeColorMsg(info.node_color(*node), config.alpha);
+    msg.markers.push_back(marker);
   }
 
-  filepath_ = req_path;
-  // TODO(nathan) consider deferring load
-  graph_ = SceneGraph::load(filepath_);
-  has_change_ = true;
+  tracker.add(markers, msg);
+}
+
+YAML::Node FrontierPlugin::dumpConfig() const {
+  auto root = config::toYaml(config_.get());
+  root["type"] = "FrontierPlugin";
+  return root;
 }
 
 }  // namespace hydra

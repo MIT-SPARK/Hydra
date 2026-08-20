@@ -45,13 +45,12 @@
 
 namespace hydra {
 
-using spark_dsg::DynamicSceneGraph;
 using spark_dsg::NodeId;
+using spark_dsg::SceneGraph;
 using spark_dsg::SceneGraphLayer;
 using spark_dsg::SceneGraphNode;
 
-double getMeanChildHeight(const DynamicSceneGraph& graph,
-                          const SceneGraphNode& parent) {
+double getMeanChildHeight(const SceneGraph& graph, const SceneGraphNode& parent) {
   double total = 0.0;
   for (const auto& child : parent.children()) {
     total += graph.getNode(child).attributes().position.z();
@@ -101,7 +100,7 @@ Eigen::MatrixXd getCirclePolygon(const SceneGraphNode& node,
 }
 
 struct NodeAdapter : public ::spark_dsg::bounding_box::PointAdaptor {
-  NodeAdapter(const DynamicSceneGraph* graph, const std::vector<NodeId>& nodes)
+  NodeAdapter(const SceneGraph* graph, const std::vector<NodeId>& nodes)
       : graph(graph), nodes(nodes) {}
 
   size_t size() const override { return nodes.size(); }
@@ -114,11 +113,11 @@ struct NodeAdapter : public ::spark_dsg::bounding_box::PointAdaptor {
     return graph->getNode(nodes.at(index)).attributes().position.cast<float>();
   }
 
-  const DynamicSceneGraph* graph;
+  const SceneGraph* graph;
   const std::vector<NodeId>& nodes;
 };
 
-Eigen::MatrixXd getChildrenConvexHull(const DynamicSceneGraph& graph,
+Eigen::MatrixXd getChildrenConvexHull(const SceneGraph& graph,
                                       const SceneGraphNode& parent) {
   std::vector<NodeId> children(parent.children().begin(), parent.children().end());
   const NodeAdapter adapter(&graph, children);

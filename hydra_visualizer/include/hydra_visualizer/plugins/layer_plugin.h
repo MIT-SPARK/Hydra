@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <visualization_msgs/msg/marker_array.hpp>
 
@@ -49,7 +49,7 @@ struct LayerPlugin {
   virtual ~LayerPlugin() = default;
 
   virtual void draw(const std_msgs::msg::Header& header,
-                    const visualizer::LayerInfo& info,
+                    const visualizer::DrawingContext& context,
                     const spark_dsg::SceneGraphLayer& layer,
                     const spark_dsg::Mesh* mesh,
                     visualization_msgs::msg::MarkerArray& msg,

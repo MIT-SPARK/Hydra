@@ -131,7 +131,7 @@ class KhronosObjectPlugin : public VisualizerPlugin {
 
   // Implement visualization interfaces.
   void draw(const std_msgs::msg::Header& header,
-            const spark_dsg::DynamicSceneGraph& graph) override;
+            const spark_dsg::SceneGraph& graph) override;
   void reset(const std_msgs::msg::Header& header) override;
 
   YAML::Node dumpConfig() const override;
@@ -140,10 +140,10 @@ class KhronosObjectPlugin : public VisualizerPlugin {
   // Helper functions.
   void drawDynamicObjects(const Config& config,
                           const std_msgs::msg::Header& header,
-                          const spark_dsg::DynamicSceneGraph& graph);
+                          const spark_dsg::SceneGraph& graph);
   void drawStaticObjects(const Config& config,
                          const std_msgs::msg::Header& header,
-                         const spark_dsg::DynamicSceneGraph& graph);
+                         const spark_dsg::SceneGraph& graph);
 
   // Mesh namespace for the visualizer plugin.
   static std::string getNamespace(const uint64_t id);

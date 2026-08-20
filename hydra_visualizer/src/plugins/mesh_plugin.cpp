@@ -56,7 +56,7 @@ static const auto registration =
 using MeshMsg = kimera_pgmo_msgs::msg::Mesh;
 
 using config::checkValid;
-using spark_dsg::DynamicSceneGraph;
+using spark_dsg::SceneGraph;
 using visualizer::makeMeshMsg;
 
 void declare_config(MeshPlugin::Config& config) {
@@ -75,8 +75,7 @@ MeshPlugin::MeshPlugin(const Config& config,
 
 MeshPlugin::~MeshPlugin() {}
 
-void MeshPlugin::draw(const std_msgs::msg::Header& header,
-                      const DynamicSceneGraph& graph) {
+void MeshPlugin::draw(const std_msgs::msg::Header& header, const SceneGraph& graph) {
   auto mesh = graph.mesh();
   if (!mesh || mesh->empty()) {
     return;

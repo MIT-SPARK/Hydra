@@ -33,48 +33,38 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-#include <ianvs/node_handle.h>
-#include <spark_dsg/zmq_interface.h>
 
-#include <atomic>
-#include <mutex>
-#include <thread>
+#include <config_utilities/dynamic_config.h>
 
-#include "hydra_visualizer/io/graph_wrapper.h"
+#include "hydra_visualizer/plugins/layer_plugin.h"
 
 namespace hydra {
 
-class GraphZmqWrapper : public GraphWrapper {
+class FrontierPlugin : public LayerPlugin {
  public:
   struct Config {
-    std::string frame_id;
-    std::string url = "tcp://127.0.0.1:8001";
-    size_t num_threads = 2;
-    size_t poll_time_ms = 10;
-  } const config;
+    //! @brief alpha of boundary
+    double alpha = 0.5;
+  };
 
-  explicit GraphZmqWrapper(const Config& config, ianvs::NodeHandle nh);
+  FrontierPlugin(const Config& config, const std::string& ns);
 
-  virtual ~GraphZmqWrapper();
+  virtual ~FrontierPlugin() = default;
 
-  bool hasChange() const override;
+  virtual void draw(const std_msgs::msg::Header& header,
+                    const visualizer::DrawingContext& context,
+                    const spark_dsg::SceneGraphLayer& layer,
+                    const spark_dsg::Mesh* mesh,
+                    visualization_msgs::msg::MarkerArray& msg,
+                    MarkerTracker& tracker) override;
 
-  void clearChangeFlag() override;
+  YAML::Node dumpConfig() const override;
 
-  StampedGraph get() const override;
-
- private:
-  void spin();
-
-  bool has_change_;
-  std::atomic<bool> should_shutdown_;
-  mutable std::mutex graph_mutex_;
-  std::unique_ptr<std::thread> recv_thread_;
-  std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
-  spark_dsg::SceneGraph::Ptr graph_;
+ protected:
+  const std::string ns_;
+  config::DynamicConfig<Config> config_;
 };
 
-void declare_config(GraphZmqWrapper::Config& config);
+void declare_config(FrontierPlugin::Config& config);
 
 }  // namespace hydra

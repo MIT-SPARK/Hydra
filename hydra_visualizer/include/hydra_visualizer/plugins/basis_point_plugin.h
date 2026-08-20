@@ -35,63 +35,42 @@
 #pragma once
 
 #include <config_utilities/dynamic_config.h>
-#include <ianvs/node_handle.h>
 
-#include <rclcpp/publisher.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "hydra_visualizer/color/colormap_utilities.h"
-#include "hydra_visualizer/layer_info.h"
-#include "hydra_visualizer/plugins/visualizer_plugin.h"
-#include "hydra_visualizer/utils/marker_tracker.h"
+#include "hydra_visualizer/plugins/layer_plugin.h"
 
 namespace hydra {
 
-class BasisPointPlugin : public VisualizerPlugin {
+class BasisPointPlugin : public LayerPlugin {
  public:
   struct Config {
-    bool show_voxblox_connections = false;
-    bool draw_basis_points = true;
-    bool draw_layer_edges = false;
-    double places_edge_scale = 0.05;
-    double places_edge_alpha = 0.5;
-    double basis_point_scale = 0.1;
-    double basis_point_alpha = 0.8;
+    bool collapse = false;
+    bool use_voxblox = false;
+    double edge_scale = 0.05;
+    double edge_alpha = 0.5;
+    double point_scale = 0.1;
+    double point_alpha = 0.8;
     visualizer::CategoricalColormap::Config colormap;
-    visualizer::LayerConfig graph;
   };
 
-  BasisPointPlugin(const Config& config, ianvs::NodeHandle nh, const std::string& name);
+  BasisPointPlugin(const Config& config, const std::string& ns);
 
   virtual ~BasisPointPlugin() = default;
 
   void draw(const std_msgs::msg::Header& header,
-            const spark_dsg::DynamicSceneGraph& graph) override;
-
-  void reset(const std_msgs::msg::Header& header) override;
+            const visualizer::DrawingContext& context,
+            const spark_dsg::SceneGraphLayer& layer,
+            const spark_dsg::Mesh* mesh,
+            visualization_msgs::msg::MarkerArray& msg,
+            MarkerTracker& tracker) override;
 
   YAML::Node dumpConfig() const override;
 
  protected:
-  void fillMarkers(const std_msgs::msg::Header& header,
-                   const spark_dsg::DynamicSceneGraph& graph,
-                   visualization_msgs::msg::MarkerArray& msg) const;
-
-  void drawEdges(const Config& config,
-                 const visualizer::CategoricalColormap& colormap,
-                 const std_msgs::msg::Header& header,
-                 const spark_dsg::DynamicSceneGraph& graph,
-                 visualization_msgs::msg::MarkerArray& msg) const;
-
-  void drawBasisPoints(const Config& config,
-                       const visualizer::CategoricalColormap& colormap,
-                       const std_msgs::msg::Header& header,
-                       const spark_dsg::DynamicSceneGraph& graph,
-                       visualization_msgs::msg::MarkerArray& msg) const;
-
-  mutable MarkerTracker tracker_;
+  const std::string ns_;
   config::DynamicConfig<Config> config_;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_;
 };
 
 void declare_config(BasisPointPlugin::Config& config);

@@ -32,73 +32,39 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_visualizer/io/graph_file_wrapper.h"
+#include "hydra_visualizer/filters/node_filters.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <config_utilities/types/path.h>
-#include <config_utilities/validation.h>
-#include <glog/logging.h>
-
-#include <rclcpp/create_subscription.hpp>
+#include <spark_dsg/node_attributes.h>
 
 namespace hydra {
 namespace {
-static const auto registration_ =
-    config::RegistrationWithConfig<GraphWrapper,
-                                   GraphFileWrapper,
-                                   GraphFileWrapper::Config,
-                                   ianvs::NodeHandle>("GraphFromFile");
+
+static const auto real_place_reg =
+    config::RegistrationWithConfig<NodeFilter,
+                                   RealPlaceFilter,
+                                   RealPlaceFilter::Config>("RealPlaceFilter");
+
 }
 
-using namespace spark_dsg;
-using std_msgs::msg::String;
-using std_srvs::srv::Empty;
-
-void declare_config(GraphFileWrapper::Config& config) {
+void declare_config(RealPlaceFilter::Config& config) {
   using namespace config;
-  name("GraphFileWrapper::Config");
-  field(config.frame_id, "frame_id");
-  field<Path::Absolute>(config.filepath, "filepath");
-  field(config.wrapper_ns, "wrapper_ns");
-
-  checkCondition(!config.frame_id.empty(), "'frame_id' must be non-empty");
-  check<Path::Exists>(config.filepath, "filepath");
+  name("RealPlaceFilter::Config");
+  field(config.real_is_valid, "real_is_valid");
+  field(config.place_attributes_required, "place_attributes_required");
 }
 
-GraphFileWrapper::GraphFileWrapper(const Config& config, ianvs::NodeHandle nh)
-    : config(config::checkValid(config)),
-      has_change_(true),
-      nh_(nh / config.wrapper_ns),
-      filepath_(config.filepath),
-      graph_(SceneGraph::load(filepath_)),
-      service_(nh_.create_service<Empty>("reload", &GraphFileWrapper::reload, this)),
-      sub_(nh_.create_subscription<String>("load", 1, &GraphFileWrapper::load, this)) {}
+RealPlaceFilter::RealPlaceFilter(const Config& config) : config(config) {}
 
-bool GraphFileWrapper::hasChange() const { return has_change_; }
-
-void GraphFileWrapper::clearChangeFlag() { has_change_ = false; }
-
-StampedGraph GraphFileWrapper::get() const { return {graph_, config.frame_id}; }
-
-void GraphFileWrapper::reload(const std_srvs::srv::Empty::Request::SharedPtr&,
-                              std_srvs::srv::Empty::Response::SharedPtr) {
-  // TODO(nathan) consider deferring load
-  graph_ = SceneGraph::load(filepath_);
-  has_change_ = true;
-}
-
-void GraphFileWrapper::load(const std_msgs::msg::String::ConstSharedPtr& msg) {
-  std::filesystem::path req_path(msg->data);
-  if (!std::filesystem::exists(req_path)) {
-    LOG(ERROR) << "Graph does not exist at '" << req_path.string() << "'";
-    return;
+bool RealPlaceFilter::valid(const spark_dsg::SceneGraph&,
+                            const spark_dsg::SceneGraphNode& node) const {
+  const auto attrs = node.tryAttributes<spark_dsg::PlaceNodeAttributes>();
+  if (!attrs) {  // still draw non-place nodes if flags are set correctly
+    return !config.place_attributes_required && !config.real_is_valid;
   }
 
-  filepath_ = req_path;
-  // TODO(nathan) consider deferring load
-  graph_ = SceneGraph::load(filepath_);
-  has_change_ = true;
+  return config.real_is_valid ? attrs->real_place : !attrs->real_place;
 }
 
 }  // namespace hydra

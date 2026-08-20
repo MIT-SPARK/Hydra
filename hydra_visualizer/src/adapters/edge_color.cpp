@@ -70,13 +70,12 @@ void declare_config(UniformEdgeColorAdapter::Config& config) {
 UniformEdgeColorAdapter::UniformEdgeColorAdapter(const Config& config)
     : config(config) {}
 
-EdgeColor UniformEdgeColorAdapter::getColor(const DynamicSceneGraph&,
+EdgeColor UniformEdgeColorAdapter::getColor(const SceneGraph&,
                                             const SceneGraphEdge&) const {
   return {config.color, config.color};
 }
 
-double EdgeWeightFunctor::eval(const DynamicSceneGraph&,
-                               const SceneGraphEdge& edge) const {
+double EdgeWeightFunctor::eval(const SceneGraph&, const SceneGraphEdge& edge) const {
   return edge.attributes().weight;
 }
 
@@ -87,8 +86,7 @@ ValueEdgeColorAdapter::ValueEdgeColorAdapter(const Config& config)
       functor_(config::create<EdgeValueFunctor>(config.value_functor)),
       colormap_(config.colormap) {}
 
-void ValueEdgeColorAdapter::setGraph(const DynamicSceneGraph& graph,
-                                     LayerKey layer_key) {
+void ValueEdgeColorAdapter::setGraph(const SceneGraph& graph, LayerKey layer_key) {
   if (!functor_) {
     return;
   }
@@ -112,7 +110,7 @@ void ValueEdgeColorAdapter::setGraph(const DynamicSceneGraph& graph,
   }
 }
 
-EdgeColor ValueEdgeColorAdapter::getColor(const DynamicSceneGraph& graph,
+EdgeColor ValueEdgeColorAdapter::getColor(const SceneGraph& graph,
                                           const SceneGraphEdge& edge) const {
   try {
     const auto color =
@@ -134,8 +132,7 @@ void declare_config(ValueEdgeColorAdapter::Config& config) {
 TraversabilityEdgeColorAdapter::TraversabilityEdgeColorAdapter(const Config& config)
     : config(config), min_value_(0.0), max_value_(1.0), colormap_(config.colormap) {}
 
-void TraversabilityEdgeColorAdapter::setGraph(const DynamicSceneGraph& graph,
-                                              LayerKey key) {
+void TraversabilityEdgeColorAdapter::setGraph(const SceneGraph& graph, LayerKey key) {
   const auto layer = graph.findLayer(key.layer, key.partition);
   if (!layer) {
     return;
@@ -158,7 +155,7 @@ void TraversabilityEdgeColorAdapter::setGraph(const DynamicSceneGraph& graph,
   }
 }
 
-EdgeColor TraversabilityEdgeColorAdapter::getColor(const DynamicSceneGraph&,
+EdgeColor TraversabilityEdgeColorAdapter::getColor(const SceneGraph&,
                                                    const SceneGraphEdge& edge) const {
   const double weight = edge.attributes().weight;
   if (weight == -1.0) {

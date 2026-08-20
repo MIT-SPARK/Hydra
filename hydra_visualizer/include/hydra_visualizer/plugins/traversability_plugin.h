@@ -40,7 +40,6 @@
 
 #include <visualization_msgs/msg/marker_array.hpp>
 
-#include "hydra_visualizer/color/colormap_utilities.h"
 #include "hydra_visualizer/plugins/visualizer_plugin.h"
 #include "hydra_visualizer/utils/marker_tracker.h"
 
@@ -71,7 +70,7 @@ class TraversabilityPlugin : public VisualizerPlugin {
   virtual ~TraversabilityPlugin() = default;
 
   void draw(const std_msgs::msg::Header& header,
-            const spark_dsg::DynamicSceneGraph& graph) override;
+            const spark_dsg::SceneGraph& graph) override;
 
   void reset(const std_msgs::msg::Header& header) override;
 
@@ -79,7 +78,7 @@ class TraversabilityPlugin : public VisualizerPlugin {
 
  protected:
   void fillMarkers(const std_msgs::msg::Header& header,
-                   const spark_dsg::DynamicSceneGraph& graph,
+                   const spark_dsg::SceneGraph& graph,
                    visualization_msgs::msg::MarkerArray& msg) const;
 
   void drawBoundaries(const Config& config,

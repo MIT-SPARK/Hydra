@@ -34,11 +34,10 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <spark_dsg/bounding_box.h>
-#include <spark_dsg/color.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/mesh.h>
+#include <spark_dsg/scene_graph_layer.h>
 
 #include <kimera_pgmo_msgs/msg/mesh.hpp>
-#include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "hydra_visualizer/adapters/mesh_color.h"
@@ -46,9 +45,6 @@
 
 namespace hydra::visualizer {
 
-using spark_dsg::DynamicSceneGraph;
-using spark_dsg::EdgeContainer;
-using spark_dsg::SceneGraphLayer;
 using MarkerMsg = visualization_msgs::msg::Marker;
 using MarkerArrayMsg = visualization_msgs::msg::MarkerArray;
 
@@ -57,50 +53,28 @@ void drawBoundingBox(const spark_dsg::BoundingBox& bbox,
                      MarkerMsg& marker);
 
 MarkerArrayMsg makeLayerBoundingBoxes(const std_msgs::msg::Header& header,
-                                      const LayerInfo& info,
-                                      const SceneGraphLayer& layer,
+                                      const DrawingContext& context,
+                                      const spark_dsg::SceneGraphLayer& layer,
                                       const std::string& ns);
 
-MarkerMsg makeLayerEllipseBoundaries(const std_msgs::msg::Header& header,
-                                     const LayerInfo& info,
-                                     const SceneGraphLayer& layer,
-                                     const std::string& ns);
-
-MarkerMsg makeLayerPolygonEdges(const std_msgs::msg::Header& header,
-                                const LayerInfo& info,
-                                const SceneGraphLayer& layer,
-                                const std::string& ns);
-
-MarkerMsg makeLayerPolygonBoundaries(const std_msgs::msg::Header& header,
-                                     const LayerInfo& info,
-                                     const SceneGraphLayer& layer,
-                                     const std::string& ns);
-
-MarkerArrayMsg makeEllipsoidMarkers(const std_msgs::msg::Header& header,
-                                    const LayerInfo& info,
-                                    const SceneGraphLayer& layer,
-                                    const std::string& ns);
-
 MarkerArrayMsg makeLayerNodeTextMarkers(const std_msgs::msg::Header& header,
-                                        const LayerInfo& info,
-                                        const SceneGraphLayer& layer,
+                                        const DrawingContext& context,
+                                        const spark_dsg::SceneGraphLayer& layer,
                                         const std::string& ns);
 
 MarkerMsg makeLayerNodeMarkers(const std_msgs::msg::Header& header,
-                               const LayerInfo& info,
-                               const SceneGraphLayer& layer,
+                               const DrawingContext& context,
+                               const spark_dsg::SceneGraphLayer& layer,
                                const std::string& ns);
 
 MarkerMsg makeLayerEdgeMarkers(const std_msgs::msg::Header& header,
-                               const LayerInfo& config,
-                               const SceneGraphLayer& layer,
+                               const DrawingContext& context,
+                               const spark_dsg::SceneGraphLayer& layer,
                                const std::string& ns);
 
-// TODO(nathan) add ability to draw mesh points for given 2D place or object
-
 MarkerMsg makeLayerTextMarker(const std_msgs::msg::Header& header,
-                              const LayerInfo& info,
-                              const SceneGraphLayer& layer,
+                              const DrawingContext& context,
+                              const spark_dsg::SceneGraphLayer& layer,
                               const std::string& ns);
 
 kimera_pgmo_msgs::msg::Mesh makeMeshMsg(const std_msgs::msg::Header& header,

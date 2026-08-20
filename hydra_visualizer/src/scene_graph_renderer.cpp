@@ -83,22 +83,6 @@ struct MarkerNamespaces {
   static std::string layerBboxNamespace(LayerKey key) {
     return keyToLayerName(key) + "_bounding_boxes";
   }
-
-  static std::string layerBoundaryNamespace(LayerKey key) {
-    return keyToLayerName(key) + "_polygon_boundaries";
-  }
-
-  static std::string layerBoundaryEllipseNamespace(LayerKey key) {
-    return keyToLayerName(key) + "_ellipsoid_boundaries";
-  }
-
-  static std::string layerBoundaryEdgeNamespace(LayerKey key) {
-    return keyToLayerName(key) + "_polygon_boundaries_edges";
-  }
-
-  static std::string meshEdgeNamespace(LayerKey key) {
-    return keyToLayerName(key) + "_mesh_edges";
-  }
 };
 
 struct InterlayerInfo {
@@ -180,6 +164,12 @@ bool SceneGraphRenderer::hasChange() const {
     return true;
   }
 
+  for (const auto& [key, info] : layers_) {
+    if (info->hasChange()) {
+      return true;
+    }
+  }
+
   for (const auto& [key, plugins] : layer_plugins_) {
     for (const auto& plugin : plugins) {
       if (plugin && plugin->hasChange()) {
@@ -193,6 +183,10 @@ bool SceneGraphRenderer::hasChange() const {
 
 void SceneGraphRenderer::clearChangeFlag() {
   has_change_ = false;
+  for (const auto& [key, info] : layers_) {
+    info->clearChangeFlag();
+  }
+
   for (const auto& [key, plugins] : layer_plugins_) {
     for (const auto& plugin : plugins) {
       if (plugin) {
@@ -203,18 +197,27 @@ void SceneGraphRenderer::clearChangeFlag() {
 }
 
 void SceneGraphRenderer::draw(const std_msgs::msg::Header& header,
-                              const DynamicSceneGraph& graph) const {
-  setConfigs(graph);
+                              const SceneGraph& graph) const {
+  setContext(graph);
 
   MarkerArray msg;
   for (const auto& [_, layer] : graph.layers()) {
-    drawLayer(header, layer_infos_.at(layer->id), *layer, graph.mesh().get(), msg);
+    const auto context = contexts_.at(layer->id);
+    if (!context) {
+      continue;
+    }
+
+    drawLayer(header, *context, *layer, graph.mesh().get(), msg);
   }
 
   for (const auto& [_, partitions] : graph.layer_partitions()) {
     for (const auto& [_, partition] : partitions) {
-      const auto& partition_info = layer_infos_.at(partition->id);
-      drawLayer(header, partition_info, *partition, graph.mesh().get(), msg);
+      const auto context = contexts_.at(partition->id);
+      if (!context) {
+        continue;
+      }
+
+      drawLayer(header, *context, *partition, graph.mesh().get(), msg);
     }
   }
 
@@ -229,8 +232,8 @@ void SceneGraphRenderer::draw(const std_msgs::msg::Header& header,
 
 YAML::Node SceneGraphRenderer::dumpConfig() const {
   YAML::Node layers(YAML::NodeType::Map);
-  for (const auto& [key, wrapper] : layers_) {
-    layers[LayerKeySelector{key}.str()] = config::toYaml(wrapper->get());
+  for (const auto& [key, info] : layers_) {
+    layers[LayerKeySelector{key}.str()] = info->dumpConfig();
   }
 
   YAML::Node layer_plugins(YAML::NodeType::Sequence);
@@ -265,49 +268,21 @@ YAML::Node SceneGraphRenderer::dumpConfig() const {
   return root;
 }
 
-InterlayerEdgeConfig SceneGraphRenderer::getInterlayerEdgeConfig(LayerKey parent,
-                                                                 LayerKey child) const {
-  const auto name = keyToLayerName(parent) + "_to_" + keyToLayerName(child);
-  auto iter = interlayer_edges_.find(name);
-  if (iter == interlayer_edges_.end()) {
-    InterlayerEdgeConfig config;
-    for (const auto& info : init_config_.interlayer_edges) {
-      bool from_parent = info.from.matches(parent) && info.to.matches(child);
-      bool to_parent = info.to.matches(parent) && info.from.matches(child);
-      if (!from_parent && !to_parent) {
-        continue;
-      }
-
-      config = info.config;
-      if (info.from.wildcard || info.to.wildcard) {
-        continue;  // allow more specific keys to take precedence
-      } else {
-        break;
-      }
-    }
-
-    const auto ns = "scene_graph_interlayer_" + name;
-    auto wrapper = std::make_unique<EdgeConfigWrapper>(ns, config);
-    wrapper->setCallback([this]() { has_change_ = true; });
-    iter = interlayer_edges_
-               .emplace(name, EdgeConfigInfo{parent, child, std::move(wrapper)})
-               .first;
-  }
-
-  return iter->second.config->get();
-}
-
 void SceneGraphRenderer::drawInterlayerEdges(const std_msgs::msg::Header& header,
-                                             const DynamicSceneGraph& graph,
+                                             const SceneGraph& graph,
                                              MarkerArray& msg) const {
   const std::string ns_prefix = "interlayer_edges_";
   std::map<std::pair<LayerKey, LayerKey>, InterlayerInfo> edge_info;
   for (const auto& [key, edge] : graph.interlayer_edges()) {
     const auto& source = graph.getNode(edge.source);
     const auto& target = graph.getNode(edge.target);
-    const auto& source_info = getLayerInfo(source.layer);
-    const auto& target_info = getLayerInfo(target.layer);
-    if (!source_info.shouldVisualize(source) || !target_info.shouldVisualize(target)) {
+    const auto source_context = contexts_.at(source.layer);
+    const auto target_context = contexts_.at(target.layer);
+    if (!source_context || !target_context) {
+      continue;
+    }
+
+    if (!source_context->valid(source) || !target_context->valid(target)) {
       continue;
     }
 
@@ -352,11 +327,11 @@ void SceneGraphRenderer::drawInterlayerEdges(const std_msgs::msg::Header& header
     auto& marker = msg.markers.at(info.marker_idx);
     auto& source_point = marker.points.emplace_back();
     tf2::convert(source.attributes().position, source_point);
-    source_point.z += source_info.z_offset;
+    source_point.z += source_context->z_offset;
 
     auto& target_point = marker.points.emplace_back();
     tf2::convert(target.attributes().position, target_point);
-    target_point.z += target_info.z_offset;
+    target_point.z += target_context->z_offset;
 
     if (info.adapter) {
       const auto [c_s, c_t] = info.adapter->getColor(graph, edge);
@@ -364,8 +339,8 @@ void SceneGraphRenderer::drawInterlayerEdges(const std_msgs::msg::Header& header
       marker.colors.push_back(makeColorMsg(c_t, info.config.alpha));
     } else {
       bool use_source = !target_is_parent ^ info.config.use_child_color;
-      const auto color =
-          use_source ? source_info.node_color(source) : target_info.node_color(target);
+      const auto color = use_source ? source_context->node_color(source)
+                                    : target_context->node_color(target);
       marker.colors.push_back(makeColorMsg(color, info.config.alpha));
       marker.colors.push_back(makeColorMsg(color, info.config.alpha));
     }
@@ -373,64 +348,34 @@ void SceneGraphRenderer::drawInterlayerEdges(const std_msgs::msg::Header& header
 }
 
 void SceneGraphRenderer::drawLayer(const std_msgs::msg::Header& header,
-                                   const LayerInfo& info,
+                                   const DrawingContext& context,
                                    const SceneGraphLayer& layer,
                                    const Mesh* mesh,
                                    MarkerArray& msg) const {
-  if (!info.config.visualize) {
-    return;
-  }
-
-  if (info.config.draw_frontier_ellipse) {
-    info.filter = [](const SceneGraphNode& node) {
-      auto attrs = node.tryAttributes<PlaceNodeAttributes>();
-      return attrs ? attrs->real_place : true;
-    };
-  }
-
   const auto node_ns = MarkerNamespaces::layerNodeNamespace(layer.id);
-  if (info.config.nodes.draw) {
-    tracker_.add(makeLayerNodeMarkers(header, info, layer, node_ns), msg);
+  if (context.nodes.draw) {
+    tracker_.add(makeLayerNodeMarkers(header, context, layer, node_ns), msg);
   }
 
-  if (info.config.text.draw) {
-    if (info.config.text.draw_layer) {
+  if (context.text.draw) {
+    if (context.text.draw_layer) {
       LOG_FIRST_N(WARNING, 5) << "use_text and use_layer_text are mutually exclusive!";
     }
 
     const auto ns = MarkerNamespaces::layerTextNamespace(layer.id);
-    tracker_.add(makeLayerNodeTextMarkers(header, info, layer, ns), msg);
-  } else if (info.config.text.draw_layer && !layer.nodes().empty()) {
+    tracker_.add(makeLayerNodeTextMarkers(header, context, layer, ns), msg);
+  } else if (context.text.draw_layer && !layer.nodes().empty()) {
     const auto ns = MarkerNamespaces::layerTextNamespace(layer.id);
-    tracker_.add(makeLayerTextMarker(header, info, layer, ns), msg);
+    tracker_.add(makeLayerTextMarker(header, context, layer, ns), msg);
   }
 
-  if (info.config.bounding_boxes.draw) {
+  if (context.bounding_boxes.draw) {
     const auto ns = MarkerNamespaces::layerBboxNamespace(layer.id);
-    tracker_.add(makeLayerBoundingBoxes(header, info, layer, ns), msg);
-  }
-
-  if (info.config.boundaries.draw) {
-    const auto ns = MarkerNamespaces::layerBoundaryNamespace(layer.id);
-    const auto edge_ns = MarkerNamespaces::layerBoundaryEdgeNamespace(layer.id);
-    tracker_.add(makeLayerPolygonBoundaries(header, info, layer, ns), msg);
-    if (info.config.boundaries.collapse) {
-      tracker_.add(makeLayerPolygonEdges(header, info, layer, edge_ns), msg);
-    }
-  }
-
-  if (info.config.boundaries.draw_ellipse) {
-    const auto ns = MarkerNamespaces::layerBoundaryEllipseNamespace(layer.id);
-    tracker_.add(makeLayerEllipseBoundaries(header, info, layer, ns), msg);
-  }
-
-  if (info.config.draw_frontier_ellipse) {
-    tracker_.add(makeEllipsoidMarkers(header, info, layer, "frontier_ns"), msg);
-    info.filter = {};  // we reset the manual filter to draw edges to frontiers
+    tracker_.add(makeLayerBoundingBoxes(header, context, layer, ns), msg);
   }
 
   const auto edge_ns = MarkerNamespaces::layerEdgeNamespace(layer.id);
-  tracker_.add(makeLayerEdgeMarkers(header, info, layer, edge_ns), msg);
+  tracker_.add(makeLayerEdgeMarkers(header, context, layer, edge_ns), msg);
 
   // dispatch drawing to layer plugins
   auto plugins = layer_plugins_.find(layer.id);
@@ -440,12 +385,12 @@ void SceneGraphRenderer::drawLayer(const std_msgs::msg::Header& header,
         continue;
       }
 
-      plugin->draw(header, info, layer, mesh, msg, tracker_);
+      plugin->draw(header, context, layer, mesh, msg, tracker_);
     }
   }
 }
 
-LayerConfig SceneGraphRenderer::getLayerConfig(spark_dsg::LayerKey key) const {
+const LayerInfo& SceneGraphRenderer::getLayerInfo(LayerKey key) const {
   auto iter = layers_.find(key);
   if (iter == layers_.end()) {
     // TODO(nathan) actually allow layer names when looking up configs
@@ -464,36 +409,60 @@ LayerConfig SceneGraphRenderer::getLayerConfig(spark_dsg::LayerKey key) const {
     }
 
     const auto ns = "scene_graph_" + keyToLayerName(key);
-    iter = layers_.emplace(key, std::make_unique<LayerConfigWrapper>(ns, init_config))
-               .first;
-    iter->second->setCallback([this]() { has_change_ = true; });
+    iter = layers_.emplace(key, std::make_unique<LayerInfo>(ns, init_config)).first;
   }
 
-  return iter->second->get();
+  return *(iter->second);
 }
 
-void SceneGraphRenderer::setConfigs(const DynamicSceneGraph& graph) const {
-  layer_infos_.clear();
+void SceneGraphRenderer::setContext(const SceneGraph& graph) const {
+  contexts_.clear();
   const auto graph_config = graph_config_.get();
   const auto z_step = graph_config.layer_z_step;
   const auto collapse = graph_config.collapse_layers;
   for (const auto& [_, layer] : graph.layers()) {
-    const auto layer_config = getLayerConfig(layer->id);
-    auto& [_key, info] = *layer_infos_.emplace(layer->id, layer_config).first;
-    info.offset(z_step, collapse).graph(graph, layer->id);
+    const auto& info = getLayerInfo(layer->id);
+    contexts_.emplace(layer->id, info.context(graph, layer->id, z_step, collapse));
   }
 
   for (const auto& [_, partitions] : graph.layer_partitions()) {
     for (const auto& [_, layer] : partitions) {
-      const auto layer_config = getLayerConfig(layer->id);
-      auto& [_key, info] = *layer_infos_.emplace(layer->id, layer_config).first;
-      info.offset(z_step, collapse).graph(graph, layer->id);
+      const auto& info = getLayerInfo(layer->id);
+      contexts_.emplace(layer->id, info.context(graph, layer->id, z_step, collapse));
     }
   }
 }
 
-const LayerInfo& SceneGraphRenderer::getLayerInfo(LayerKey layer) const {
-  return layer_infos_.at(layer);
+InterlayerEdgeConfig SceneGraphRenderer::getInterlayerEdgeConfig(LayerKey parent,
+                                                                 LayerKey child) const {
+  const auto name = keyToLayerName(parent) + "_to_" + keyToLayerName(child);
+  auto iter = interlayer_edges_.find(name);
+  if (iter == interlayer_edges_.end()) {
+    InterlayerEdgeConfig config;
+    for (const auto& info : init_config_.interlayer_edges) {
+      bool from_parent = info.from.matches(parent) && info.to.matches(child);
+      bool to_parent = info.to.matches(parent) && info.from.matches(child);
+      if (!from_parent && !to_parent) {
+        continue;
+      }
+
+      config = info.config;
+      if (info.from.wildcard || info.to.wildcard) {
+        continue;  // allow more specific keys to take precedence
+      } else {
+        break;
+      }
+    }
+
+    const auto ns = "scene_graph_interlayer_" + name;
+    auto wrapper = std::make_unique<EdgeConfigWrapper>(ns, config);
+    wrapper->setCallback([this]() { has_change_ = true; });
+    iter = interlayer_edges_
+               .emplace(name, EdgeConfigInfo{parent, child, std::move(wrapper)})
+               .first;
+  }
+
+  return iter->second.config->get();
 }
 
 }  // namespace hydra

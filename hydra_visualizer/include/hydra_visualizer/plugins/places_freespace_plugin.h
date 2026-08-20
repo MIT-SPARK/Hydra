@@ -34,51 +34,35 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/dynamic_config.h>
-#include <ianvs/node_handle.h>
 
-#include <visualization_msgs/msg/marker_array.hpp>
-
-#include "hydra_visualizer/layer_info.h"
-#include "hydra_visualizer/plugins/visualizer_plugin.h"
-#include "hydra_visualizer/utils/marker_tracker.h"
+#include "hydra_visualizer/plugins/layer_plugin.h"
 
 namespace hydra {
 
-class PlacesFreespacePlugin : public VisualizerPlugin {
+class PlacesFreespacePlugin : public LayerPlugin {
  public:
   struct Config {
-    bool draw_edges = true;
+    bool collapse = true;
     spark_dsg::Color sphere_color{spark_dsg::Color::red()};
     double sphere_alpha = 0.5;
-    visualizer::LayerConfig graph;
   };
 
-  PlacesFreespacePlugin(const Config& config,
-                        ianvs::NodeHandle nh,
-                        const std::string& name);
+  PlacesFreespacePlugin(const Config& config, const std::string& ns);
 
   virtual ~PlacesFreespacePlugin() = default;
 
   void draw(const std_msgs::msg::Header& header,
-            const spark_dsg::DynamicSceneGraph& graph) override;
-
-  void reset(const std_msgs::msg::Header& header) override;
+            const visualizer::DrawingContext& context,
+            const spark_dsg::SceneGraphLayer& layer,
+            const spark_dsg::Mesh* mesh,
+            visualization_msgs::msg::MarkerArray& msg,
+            MarkerTracker& tracker) override;
 
   YAML::Node dumpConfig() const override;
 
  protected:
-  void fillMarkers(const std_msgs::msg::Header& header,
-                   const spark_dsg::DynamicSceneGraph& graph,
-                   visualization_msgs::msg::MarkerArray& msg) const;
-
-  void drawSpheres(const Config& config,
-                   const std_msgs::msg::Header& header,
-                   const spark_dsg::SceneGraphLayer& places,
-                   visualization_msgs::msg::MarkerArray& msg) const;
-
-  mutable MarkerTracker tracker_;
+  const std::string ns_;
   config::DynamicConfig<Config> config_;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_;
 };
 
 void declare_config(PlacesFreespacePlugin::Config& config);

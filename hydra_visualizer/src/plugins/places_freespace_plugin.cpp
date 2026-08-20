@@ -38,100 +38,55 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 #include <tf2_eigen/tf2_eigen.hpp>
 
 #include "hydra_visualizer/color/color_parsing.h"
-#include "hydra_visualizer/drawing.h"
 
 namespace hydra {
 namespace {
 
 inline static const auto registration_ =
-    config::RegistrationWithConfig<VisualizerPlugin,
+    config::RegistrationWithConfig<LayerPlugin,
                                    PlacesFreespacePlugin,
                                    PlacesFreespacePlugin::Config,
-                                   ianvs::NodeHandle,
                                    std::string>("PlacesFreespacePlugin");
 
 }
 
 using spark_dsg::Color;
-using spark_dsg::DsgLayers;
-using spark_dsg::DynamicSceneGraph;
 using spark_dsg::PlaceNodeAttributes;
-using spark_dsg::SceneGraphLayer;
 using visualization_msgs::msg::Marker;
-using visualization_msgs::msg::MarkerArray;
 
 void declare_config(PlacesFreespacePlugin::Config& config) {
   using namespace config;
   name("PlacesFreespacePlugin::Config");
-  field(config.draw_edges, "draw_edges");
+  field(config.collapse, "collapse");
   field(config.sphere_color, "sphere_color");
   field(config.sphere_alpha, "sphere_alpha");
-  field(config.graph, "graph");
+  checkInRange(config.sphere_alpha, 0.0, 1.0, "sphere_alpha", false);
 }
 
 PlacesFreespacePlugin::PlacesFreespacePlugin(const Config& config,
-                                             ianvs::NodeHandle nh,
-                                             const std::string& name)
-    : VisualizerPlugin(name),
-      config_(name, config::checkValid(config)),
-      pub_(nh.create_publisher<MarkerArray>(name, rclcpp::QoS(1).transient_local())) {}
+                                             const std::string& ns)
+    : LayerPlugin(),
+      config_(ns, config::checkValid(config), [this]() { has_change_ = true; }) {}
 
 void PlacesFreespacePlugin::draw(const std_msgs::msg::Header& header,
-                                 const DynamicSceneGraph& graph) {
-  if (!pub_->get_subscription_count()) {
-    return;
-  }
-
-  MarkerArray msg;
-  fillMarkers(header, graph, msg);
-  tracker_.clearPrevious(header, msg);
-  if (!msg.markers.empty()) {
-    pub_->publish(msg);
-  }
-}
-
-void PlacesFreespacePlugin::reset(const std_msgs::msg::Header& header) {
-  MarkerArray msg;
-  tracker_.clearPrevious(header, msg);
-  if (!msg.markers.empty()) {
-    pub_->publish(msg);
-  }
-}
-
-void PlacesFreespacePlugin::fillMarkers(const std_msgs::msg::Header& header,
-                                        const DynamicSceneGraph& graph,
-                                        MarkerArray& msg) const {
-  if (!graph.hasLayer(DsgLayers::PLACES)) {
-    return;
-  }
-
+                                 const visualizer::DrawingContext& context,
+                                 const spark_dsg::SceneGraphLayer& layer,
+                                 const spark_dsg::Mesh*,
+                                 visualization_msgs::msg::MarkerArray& msg,
+                                 MarkerTracker& tracker) {
   const auto config = config_.get();
-  const auto& places = graph.getLayer(DsgLayers::PLACES);
-  if (!config.graph.visualize) {
-    return;
-  }
 
-  tracker_.add(makeLayerNodeMarkers(header, config.graph, places, "nodes"), msg);
-  if (config.draw_edges) {
-    tracker_.add(makeLayerEdgeMarkers(header, config.graph, places, "edges"), msg);
-  }
-
-  drawSpheres(config, header, places, msg);
-}
-
-void PlacesFreespacePlugin::drawSpheres(const Config& config,
-                                        const std_msgs::msg::Header& header,
-                                        const SceneGraphLayer& layer,
-                                        MarkerArray& msg) const {
   size_t id = 0;
-  for (const auto& id_node_pair : layer.nodes()) {
-    const auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+  for (const auto& [node_id, node] : layer.nodes()) {
+    const auto attrs = node->tryAttributes<PlaceNodeAttributes>();
+    if (!attrs) {
+      continue;
+    }
 
     Marker marker;
     marker.header = header;
@@ -140,18 +95,21 @@ void PlacesFreespacePlugin::drawSpheres(const Config& config,
     marker.id = id;
     marker.ns = "places_spheres";
 
-    marker.scale.x = 2 * attrs.distance;
-    marker.scale.y = 2 * attrs.distance;
-    marker.scale.z = 2 * attrs.distance;
+    marker.scale.x = 2.0 * attrs->distance;
+    marker.scale.y = 2.0 * attrs->distance;
+    marker.scale.z = 2.0 * attrs->distance;
     marker.pose.orientation.w = 1.0;
     marker.pose.orientation.x = 0.0;
     marker.pose.orientation.y = 0.0;
     marker.pose.orientation.z = 0.0;
-    tf2::convert(id_node_pair.second->attributes().position, marker.pose.position);
+    tf2::convert(attrs->position, marker.pose.position);
+    if (!config.collapse) {
+      marker.pose.position.z += context.z_offset;
+    }
 
     marker.color = visualizer::makeColorMsg(config.sphere_color);
     marker.color.a = config.sphere_alpha;
-    tracker_.add(marker, msg);
+    tracker.add(marker, msg);
     ++id;
   }
 }

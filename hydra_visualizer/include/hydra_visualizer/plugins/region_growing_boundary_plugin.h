@@ -63,7 +63,7 @@ class RegionGrowingBoundaryPlugin : public LayerPlugin {
   virtual ~RegionGrowingBoundaryPlugin() = default;
 
   virtual void draw(const std_msgs::msg::Header& header,
-                    const visualizer::LayerInfo& info,
+                    const visualizer::DrawingContext& info,
                     const spark_dsg::SceneGraphLayer& layer,
                     const spark_dsg::Mesh* mesh,
                     visualization_msgs::msg::MarkerArray& msg,

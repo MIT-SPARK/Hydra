@@ -33,48 +33,38 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-#include <ianvs/node_handle.h>
-#include <spark_dsg/zmq_interface.h>
-
-#include <atomic>
-#include <mutex>
-#include <thread>
-
-#include "hydra_visualizer/io/graph_wrapper.h"
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra {
 
-class GraphZmqWrapper : public GraphWrapper {
- public:
-  struct Config {
-    std::string frame_id;
-    std::string url = "tcp://127.0.0.1:8001";
-    size_t num_threads = 2;
-    size_t poll_time_ms = 10;
-  } const config;
+struct NodeFilter {
+  virtual ~NodeFilter() = default;
 
-  explicit GraphZmqWrapper(const Config& config, ianvs::NodeHandle nh);
-
-  virtual ~GraphZmqWrapper();
-
-  bool hasChange() const override;
-
-  void clearChangeFlag() override;
-
-  StampedGraph get() const override;
-
- private:
-  void spin();
-
-  bool has_change_;
-  std::atomic<bool> should_shutdown_;
-  mutable std::mutex graph_mutex_;
-  std::unique_ptr<std::thread> recv_thread_;
-  std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
-  spark_dsg::SceneGraph::Ptr graph_;
+  /**
+   * @brief Get whether a node should be drawn or not
+   * @param graph Current scene graph node is from
+   * @param node Node to determine validity for
+   * @returns True if the node is valid to draw
+   */
+  virtual bool valid(const spark_dsg::SceneGraph& graph,
+                     const spark_dsg::SceneGraphNode& node) const = 0;
 };
 
-void declare_config(GraphZmqWrapper::Config& config);
+//! Filter that discards or keeps places with the real_place flag
+struct RealPlaceFilter : public NodeFilter {
+  using Ptr = std::shared_ptr<NodeFilter>;
+  struct Config {
+    bool real_is_valid = true;
+    bool place_attributes_required = true;
+  } const config;
+
+  explicit RealPlaceFilter(const Config& config);
+  virtual ~RealPlaceFilter() = default;
+
+  virtual bool valid(const spark_dsg::SceneGraph& graph,
+                     const spark_dsg::SceneGraphNode& node) const override;
+};
+
+void declare_config(RealPlaceFilter::Config& config);
 
 }  // namespace hydra

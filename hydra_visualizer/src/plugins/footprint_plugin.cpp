@@ -57,10 +57,7 @@ static const auto registration_ =
                                    std::string>("FootprintPlugin");
 }
 
-using spark_dsg::DynamicSceneGraph;
-using spark_dsg::LayerId;
-using spark_dsg::PlaceNodeAttributes;
-using spark_dsg::SemanticNodeAttributes;
+using namespace spark_dsg;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
 
@@ -89,7 +86,7 @@ FootprintPlugin::FootprintPlugin(const Config& config,
       pub_(nh.create_publisher<MarkerArray>(name, rclcpp::QoS(1).transient_local())) {}
 
 void FootprintPlugin::draw(const std_msgs::msg::Header& header,
-                           const DynamicSceneGraph& graph) {
+                           const SceneGraph& graph) {
   MarkerArray markers;
   markers.markers.resize(
       config.draw_boundaries ? (config.draw_boundary_vertices ? 3 : 2) : 1);

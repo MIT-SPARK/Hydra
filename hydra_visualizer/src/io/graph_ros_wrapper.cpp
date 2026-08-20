@@ -52,7 +52,7 @@ static const auto registration =
 }
 
 using hydra_msgs::msg::DsgUpdate;
-using spark_dsg::DynamicSceneGraph;
+using namespace spark_dsg;
 
 GraphRosWrapper::GraphRosWrapper(const Config& config, ianvs::NodeHandle nh)
     : config(config::checkValid(config)),

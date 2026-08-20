@@ -35,6 +35,7 @@ add_library(
   src/adapters/text.cpp
   src/color/colormap_utilities.cpp
   src/drawing.cpp
+  src/filters/node_filters.cpp
   src/groundtruth/bounding_box_publisher.cpp
   src/groundtruth/region_publisher.cpp
   src/io/graph_file_wrapper.cpp
@@ -43,7 +44,9 @@ add_library(
   src/layer_info.cpp
   src/plugins/basis_point_plugin.cpp
   src/plugins/footprint_plugin.cpp
+  src/plugins/frontier_plugin.cpp
   src/plugins/khronos_object_plugin.cpp
+  src/plugins/mesh_places_plugin.cpp
   src/plugins/mesh_plugin.cpp
   src/plugins/mesh_point_plugin.cpp
   src/plugins/places_freespace_plugin.cpp

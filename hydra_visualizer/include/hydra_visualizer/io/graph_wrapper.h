@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <mutex>
 #include <rclcpp/time.hpp>
@@ -42,7 +42,7 @@ namespace hydra {
 
 struct StampedGraph {
   //! Underlying scene graph
-  spark_dsg::DynamicSceneGraph::Ptr graph;
+  spark_dsg::SceneGraph::Ptr graph;
   //! Frame ID for scene graph
   std::string frame_id = "";
   //! Timestamp of scene graph

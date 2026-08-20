@@ -35,7 +35,7 @@
 #pragma once
 #include <config_utilities/dynamic_config.h>
 #include <ianvs/node_handle.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <visualization_msgs/msg/marker_array.hpp>
 
@@ -66,7 +66,6 @@ void declare_config(InterlayerEdgeConfig& config);
 class SceneGraphRenderer {
  public:
   using Ptr = std::shared_ptr<SceneGraphRenderer>;
-  using LayerConfigWrapper = config::DynamicConfig<visualizer::LayerConfig>;
   using EdgeConfigWrapper = config::DynamicConfig<InterlayerEdgeConfig>;
 
   struct LayerPluginsConfig {
@@ -100,7 +99,7 @@ class SceneGraphRenderer {
   virtual void reset(const std_msgs::msg::Header& header);
 
   virtual void draw(const std_msgs::msg::Header& header,
-                    const spark_dsg::DynamicSceneGraph& graph) const;
+                    const spark_dsg::SceneGraph& graph) const;
 
   virtual bool hasChange() const;
 
@@ -109,21 +108,19 @@ class SceneGraphRenderer {
   YAML::Node dumpConfig() const;
 
  protected:
-  virtual void setConfigs(const spark_dsg::DynamicSceneGraph& graph) const;
+  void drawInterlayerEdges(const std_msgs::msg::Header& header,
+                           const spark_dsg::SceneGraph& graph,
+                           visualization_msgs::msg::MarkerArray& msg) const;
 
-  virtual void drawInterlayerEdges(const std_msgs::msg::Header& header,
-                                   const spark_dsg::DynamicSceneGraph& graph,
-                                   visualization_msgs::msg::MarkerArray& msg) const;
+  void drawLayer(const std_msgs::msg::Header& header,
+                 const visualizer::DrawingContext& context,
+                 const spark_dsg::SceneGraphLayer& layer,
+                 const spark_dsg::Mesh* mesh,
+                 visualization_msgs::msg::MarkerArray& msg) const;
 
-  virtual void drawLayer(const std_msgs::msg::Header& header,
-                         const visualizer::LayerInfo& info,
-                         const spark_dsg::SceneGraphLayer& layer,
-                         const spark_dsg::Mesh* mesh,
-                         visualization_msgs::msg::MarkerArray& msg) const;
+  const visualizer::LayerInfo& getLayerInfo(spark_dsg::LayerKey key) const;
 
-  const visualizer::LayerInfo& getLayerInfo(spark_dsg::LayerKey layer) const;
-
-  visualizer::LayerConfig getLayerConfig(spark_dsg::LayerKey key) const;
+  void setContext(const spark_dsg::SceneGraph& graph) const;
 
   InterlayerEdgeConfig getInterlayerEdgeConfig(spark_dsg::LayerKey l1,
                                                spark_dsg::LayerKey l2) const;
@@ -138,8 +135,8 @@ class SceneGraphRenderer {
 
   mutable MarkerTracker tracker_;
   mutable std::atomic<bool> has_change_;
-  mutable std::map<spark_dsg::LayerKey, visualizer::LayerInfo> layer_infos_;
-  mutable std::map<spark_dsg::LayerKey, std::unique_ptr<LayerConfigWrapper>> layers_;
+  mutable std::map<spark_dsg::LayerKey, std::unique_ptr<visualizer::LayerInfo>> layers_;
+  mutable std::map<spark_dsg::LayerKey, visualizer::DrawingContext::Ptr> contexts_;
 
   struct EdgeConfigInfo {
     spark_dsg::LayerKey parent;

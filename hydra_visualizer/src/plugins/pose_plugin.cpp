@@ -76,8 +76,7 @@ PosePlugin::PosePlugin(const Config& config,
       num_received_(0),
       pub_(nh.create_publisher<PoseArray>(name, rclcpp::QoS(1).transient_local())) {}
 
-void PosePlugin::draw(const std_msgs::msg::Header& header,
-                      const DynamicSceneGraph& graph) {
+void PosePlugin::draw(const std_msgs::msg::Header& header, const SceneGraph& graph) {
   ++num_received_;
   PoseArray msg;
   msg.header = header;
