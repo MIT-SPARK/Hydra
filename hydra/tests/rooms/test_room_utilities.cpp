@@ -34,9 +34,13 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/rooms/room_utilities.h>
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
+
+using namespace spark_dsg;
 
 namespace hydra {
-
 namespace {
 
 void addNode(SceneGraphLayer& layer,

@@ -14,11 +14,13 @@ add_executable(
   backend/test_external_loop_closure.cpp
   backend/test_merge_tracker.cpp
   backend/updates/test_generic_update_functor.cpp
+  backend/updates/test_ib_objects_update_functor.cpp
   backend/updates/test_update_agents_functor.cpp
   backend/updates/test_update_buildings_functor.cpp
   backend/updates/test_update_objects_functor.cpp
   backend/updates/test_update_places_functor.cpp
   common/test_config_utilities.cpp
+  common/test_node_matchers.cpp
   common/test_partial_graph.cpp
   common/test_shared_dsg_info.cpp
   frontend/test_graph_connector.cpp
@@ -34,6 +36,7 @@ add_executable(
   loop_closure/test_subgraph_extraction.cpp
   odometry/test_pose_graph_from_odom.cpp
   openset/test_embedding_distances.cpp
+  openset/clustering/test_agglomerative_clustering.cpp
   places/gvd_places/test_graph_extractor.cpp
   places/gvd_places/test_graph_extractor_utilities.cpp
   places/gvd_places/test_gvd_graph.cpp
@@ -56,6 +59,7 @@ add_executable(
   utils/test_mesh_utilities.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp
+  utils/test_probability_utilities.cpp
   utils/test_timing_utilities.cpp
 )
 target_include_directories(

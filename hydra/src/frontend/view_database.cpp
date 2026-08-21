@@ -4,9 +4,11 @@
 #include <config_utilities/factory.h>
 #include <glog/logging.h>
 #include <spark_dsg/printing.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/input/input_data.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 
@@ -32,7 +34,7 @@ ViewDatabase::ViewDatabase(const Config& config)
 
 ViewDatabase::~ViewDatabase() {}
 
-void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
+void ViewDatabase::updateAssignments(const SceneGraph& graph,
                                      const ArchivalCheck& should_archive) const {
   auto& queue = PipelineQueues::instance().input_features_queue;
   size_t new_views = 0;

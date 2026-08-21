@@ -374,7 +374,7 @@ SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
     auto attrs = std::make_unique<RoomNodeAttributes>();
     // TODO(nathan) define unknown label somewhere
     attrs->semantic_label = 0;
-    attrs->position = getRoomPosition(places, cluster, *distance_adaptor_);
+    attrs->position = getRoomPosition(places, cluster);
     rooms->emplaceNode(room_id, std::move(attrs));
     ++room_id;
   }

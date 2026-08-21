@@ -1,0 +1,47 @@
+---
+launch:
+  - arg: {name: log_path, default: $(env HOME)/.hydra/uhumans2_open_regions, description: Directory to output to}
+  - arg: {name: exit_after_clock, default: 'false', description: Shutdown hydra node after a rosbag finishes playing}
+  - let: {name: label_remap_path, value: $(find-pkg-share hydra)/config/label_remaps/uhumans2_office.yaml}
+  - set_remap: {from: hydra/input/left_cam/depth_registered/image_rect, to: /tesse/depth_cam/mono/image_raw}
+  - set_remap: {from: hydra/input/left_cam/rgb/image_raw, to: /tesse/left_cam/rgb/image_raw}
+  - set_remap: {from: hydra/input/left_cam/rgb/camera_info, to: /tesse/left_cam/camera_info}
+  - set_remap: {from: hydra/input/left_cam/semantic/image_raw, to: /tesse/seg_cam/converted/image_raw}
+  - set_remap: {from: hydra/input/left_cam/feature, to: /tesse/left_cam/semantic/feature}
+  - set_remap: {from: hydra/regions/embed, to: /tesse/left_cam/semantic/embed}
+  - node:
+      pkg: tf2_ros
+      name: world_to_map
+      exec: static_transform_publisher
+      args: --frame-id world --child-frame-id map
+  - group:
+      - push_ros_namespace: {namespace: tesse/left_cam}
+      - set_remap: {from: color/image_raw, to: rgb/image_raw}
+      - include:
+          file: $(find-pkg-share semantic_inference_ros)/launch/image_embedding_node.launch.yaml
+          arg:
+            - {name: min_period_s, value: '0.2'}
+  - node:
+      pkg: hydra_ros
+      exec: hydra_ros_node
+      name: hydra
+      on_exit: shutdown
+      param:
+        - {name: use_sim_time, value: true}
+      args: >
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/uhumans2_open_regions.yaml
+        --config-utilities-file $(find-pkg-share hydra)/config/label_spaces/uhumans2_office_label_space.yaml@labelspace
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/mesh_segmenter_sinks.yaml@frontend/objects
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/active_window_sinks.yaml@active_window
+        --config-utilities-yaml {semantic_label_remap_filepath: $(var label_remap_path)}
+        --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
+        --config-utilities-yaml {robot_id: 0, odom_frame: world, robot_frame: base_link_gt, map_frame: map}
+  - set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
+  - set_remap: {from: hydra_visualizer/feature, to: /tesse/left_cam/semantic/embed/feature}
+  - arg: {name: start_visualizer, default: 'true', description: run hydra visualizer}
+  - include:
+      file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
+      if: $(var start_visualizer)
+      arg:
+        - {name: external_plugins_path, value: $(find-pkg-share hydra_ros)/config/hydra_ros_visualizer_plugins.yaml}
+        - {name: visualizer_config_path, value: $(find-pkg-share hydra_ros)/config/visualizer/uhumans2_open_regions.yaml}

@@ -1,0 +1,39 @@
+---
+plugins:
+  mesh: {type: MeshPlugin, coloring: {type: ''}}
+  agent_poses: {type: PosePlugin}
+renderer:
+  layer_z_step: 5.5  # unit separation between layers
+  collapse_layers: false  # whether or not to apply offsets to each of the layers
+  layers:
+    2:
+      z_offset_scale: 1.5
+      visualize: true
+      nodes: {scale: 0.40, color: {type: LabelColorAdapter}, alpha: 0.8}
+      text: {draw: true, collapse: true, adapter: {type: LabelTextAdapter}, height: 0.5, scale: 0.45}
+      bounding_boxes: {draw: true, collapse: true, scale: 0.05, edge_scale: 0.05, alpha: 0.9}
+    3:
+      z_offset_scale: 3.0
+      visualize: true
+      nodes: {scale: 0.4, color: {type: ParentColorAdapter, colormap: {palette: {type: colorbrewer}}}, alpha: 0.9, use_sphere: true}
+      edges: {scale: 0.01, alpha: 0.5}
+    4:
+      z_offset_scale: 4.2
+      visualize: true
+      nodes: {scale: 0.6, color: {type: IdColorAdapter, colormap: {palette: {type: colorbrewer}}}, alpha: 0.8}
+      text: {draw: true, height: 1.25, scale: 1.0}
+      edges: {scale: 0.1, alpha: 0.2}
+    2p*:
+      z_offset_scale: 0.0
+      visualize: true
+      nodes: {scale: 0.15, alpha: 1.0, use_sphere: true, color: {type: PartitionColorAdapter}}
+      edges: {scale: 0.15, alpha: 1.0, draw_interlayer: false, color: {type: ''}}
+      text: {draw_layer: true, height: 0.9, scale: 0.8}
+  interlayer_edges:
+    - {from: 3*, to: 2p*, draw: false}
+    - {from: 3*, to: 2, use_child_color: true, scale: 0.08, alpha: 0.5}
+    - {from: 4, to: 3*, scale: 0.08, alpha: 0.4}
+  layer_plugins:
+    - layer: 3
+      plugins:
+        - {type: RegionGrowingBoundaryPlugin, use_node_color: true, fill_boundaries: true, fill_alpha: 0.3}

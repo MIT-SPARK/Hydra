@@ -1,22 +1,19 @@
 #pragma once
-#include <config_utilities/factory.h>
 #include <hydra/openset/embedding_group.h>
+#include <hydra/utils/logging.h>
 
 namespace hydra {
 
 struct RosEmbeddingGroup : public EmbeddingGroup {
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config();
+
     std::string ns = "~";
-    bool silent_wait = false;
+    size_t prompt_timeout_ms = 0;
     std::vector<std::string> prompts;
   };
 
   explicit RosEmbeddingGroup(const Config& config);
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<EmbeddingGroup, RosEmbeddingGroup, Config>(
-          "RosEmbeddingGroup");
 };
 
 void declare_config(RosEmbeddingGroup::Config& config);

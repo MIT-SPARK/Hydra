@@ -34,21 +34,30 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/rooms/room_utilities.h"
 
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 #include <yaml-cpp/yaml.h>
 
 namespace hydra {
 
+using spark_dsg::NodeId;
+using spark_dsg::PlaceNodeAttributes;
+using spark_dsg::SceneGraph;
+using spark_dsg::SceneGraphLayer;
+using spark_dsg::TravNodeAttributes;
+
 Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
-                                const std::unordered_set<NodeId>& cluster,
-                                const DistanceAdaptor& get_distance) {
+                                const std::unordered_set<NodeId>& cluster) {
   if (cluster.empty()) {
     return Eigen::Vector3d::Zero();
   }
 
   Eigen::Vector3d room_position = Eigen::Vector3d::Zero();
   for (const auto& place : cluster) {
-    room_position += getNodePosition(places, place);
+    room_position += places.getNode(place).attributes().position;
   }
+
   room_position /= cluster.size();
 
   double best_radius = 0.0;
@@ -60,9 +69,15 @@ Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
     const auto& node = places.getNode(place);
     const auto& position = node.attributes().position;
     const double room_distance = (room_position - position).norm();
-    const double distance = get_distance(node);
-    const double distance_to_freespace = room_distance - distance;
 
+    double distance = 0.0;
+    if (auto attrs = node.tryAttributes<PlaceNodeAttributes>()) {
+      distance = attrs->distance;
+    } else if (auto attrs = node.tryAttributes<TravNodeAttributes>()) {
+      distance = attrs->min_radius;
+    }
+
+    const double distance_to_freespace = room_distance - distance;
     if (distance_to_freespace < best_distance) {
       best_distance = distance_to_freespace;
       best_radius = distance;
@@ -116,8 +131,7 @@ void addEdgesToRoomLayer(const SceneGraphLayer& places,
   }
 }
 
-void addEdgesToRoomLayer(DynamicSceneGraph& graph,
-                         const std::set<NodeId>& active_rooms) {
+void addEdgesToRoomLayer(SceneGraph& graph, const std::set<NodeId>& active_rooms) {
   for (const auto node_id : active_rooms) {
     const auto& node = graph.getNode(node_id);
     const auto room_siblings = node.siblings();
