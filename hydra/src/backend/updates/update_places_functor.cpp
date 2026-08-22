@@ -46,6 +46,7 @@
 
 namespace hydra {
 
+using namespace spark_dsg;
 using timing::ScopedTimer;
 using MergeId = std::optional<NodeId>;
 

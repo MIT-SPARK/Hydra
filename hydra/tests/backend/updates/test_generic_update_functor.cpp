@@ -42,8 +42,9 @@
 #include "hydra_test/resources.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
-namespace hydra {
+using namespace spark_dsg;
 
+namespace hydra {
 namespace {
 
 MergeList callWithUnmerged(const UpdateFunctor& functor,

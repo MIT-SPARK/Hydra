@@ -50,7 +50,7 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
     Config() : VerbosityConfig("[update_objects] ") {}
 
     //! Layer to update
-    std::string layer = DsgLayers::OBJECTS;
+    std::string layer = spark_dsg::DsgLayers::OBJECTS;
     //! Allow mesh vertices for each object to be merged
     bool allow_connection_merging = true;
     //! Association strategy for finding matches to active nodes
@@ -69,8 +69,8 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
                        const UpdateInfo::ConstPtr& info) const;
 
   void mergeAttributes(const spark_dsg::SceneGraph& layer,
-                       NodeId from,
-                       NodeId to) const;
+                       spark_dsg::NodeId from,
+                       spark_dsg::NodeId to) const;
 
   void updateMeshIndices(const spark_dsg::SceneGraph& graph,
                          const kimera_pgmo::MeshOffsetInfo& offsets) const;

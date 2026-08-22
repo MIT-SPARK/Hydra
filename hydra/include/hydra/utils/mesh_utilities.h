@@ -58,7 +58,7 @@ bool updateObjectGeometry(const spark_dsg::Mesh& mesh,
 MeshLayer::Ptr getActiveMesh(const MeshLayer& mesh_layer,
                              const BlockIndices& archived_blocks);
 
-spark_dsg::BoundingBox fitBoxToFilteredMesh(const Mesh& mesh,
+spark_dsg::BoundingBox fitBoxToFilteredMesh(const spark_dsg::Mesh& mesh,
                                             BoxType type = BoxType::AABB,
                                             int inlier_min_neighbors = 5,
                                             double inlier_search_radius = 0.1);

@@ -45,10 +45,11 @@
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
+using namespace spark_dsg;
+
 namespace hydra {
 
 using Timer = timing::ScopedTimer;
-using spark_dsg::TraversabilityNodeAttributes;
 
 void declare_config(UpdateBlockTraversabilityFunctor::Config& config) {
   using namespace config;

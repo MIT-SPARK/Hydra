@@ -69,8 +69,9 @@ struct GenericUpdateFunctor : public UpdateFunctor {
   MergeList findMerges(const spark_dsg::SceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const SceneGraphNode& node) const;
+  std::optional<spark_dsg::NodeId> proposeMerge(
+      const spark_dsg::SceneGraphLayer& layer,
+      const spark_dsg::SceneGraphNode& node) const;
 
   mutable ActiveWindowTracker active_tracker;
   const std::unique_ptr<NodeMatcher> node_matcher;

@@ -50,7 +50,7 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
     Config() : VerbosityConfig("[update_2d_places] ") {}
 
     //! Layer to update
-    std::string layer = DsgLayers::MESH_PLACES;
+    std::string layer = spark_dsg::DsgLayers::MESH_PLACES;
     //! If two places differ by at least this much in z, they won't be merged
     double merge_max_delta_z = 0.5;
     //! Amount of overlap between places necessary to add edge
@@ -74,8 +74,8 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
   MergeList findMerges(const spark_dsg::SceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
-  bool shouldMerge(const Place2dNodeAttributes& from_attrs,
-                   const Place2dNodeAttributes& to_attrs) const;
+  bool shouldMerge(const spark_dsg::Place2dNodeAttributes& from_attrs,
+                   const spark_dsg::Place2dNodeAttributes& to_attrs) const;
 
   void cleanup(SharedDsgInfo& dsg) const;
 

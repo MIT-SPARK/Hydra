@@ -87,7 +87,7 @@ kimera_pgmo::MeshInterface::Ptr PgmoMeshLayerInterface::clone() const {
   return std::make_shared<PgmoMeshLayerInterface>(*this);
 }
 
-PgmoMeshInterface::PgmoMeshInterface(const Mesh& mesh) : mesh_(mesh) {
+PgmoMeshInterface::PgmoMeshInterface(const spark_dsg::Mesh& mesh) : mesh_(mesh) {
   block_indices_ = {BlockIndex(0, 0, 0)};
 }
 

@@ -48,6 +48,7 @@
 namespace hydra {
 
 using spark_dsg::BoundingBox;
+using spark_dsg::Mesh;
 using spark_dsg::NodeAttributes;
 using spark_dsg::ObjectNodeAttributes;
 
