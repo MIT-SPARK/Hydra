@@ -37,6 +37,9 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/node_symbol.h>
+
+using namespace spark_dsg;
 
 namespace hydra {
 namespace {
@@ -48,16 +51,13 @@ static const auto reg = config::RegistrationWithConfig<UpdateFunctor,
 
 }
 
-void declare_config(UpdateBuildingsFunctor::Config& config) {
-  using namespace config;
-  name("UpdateBuildingsFunctor::Config");
-  field(config.semantic_label, "semantic_label");
+void declare_config(UpdateBuildingsFunctor::Config&) {
+  config::name("UpdateBuildingsFunctor::Config");
 }
 
-UpdateBuildingsFunctor::UpdateBuildingsFunctor(const Config& config)
-    : config(config::checkValid(config)) {}
+UpdateBuildingsFunctor::UpdateBuildingsFunctor(const Config&) {}
 
-void UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
+void UpdateBuildingsFunctor::call(const SceneGraph&,
                                   SharedDsgInfo& dsg,
                                   const UpdateInfo::ConstPtr&) const {
   const NodeSymbol building_id('B', 0);
@@ -78,9 +78,8 @@ void UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
   centroid /= rooms.numNodes();
 
   if (!dsg.graph->hasNode(building_id)) {
-    SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
+    NodeAttributes::Ptr attrs(new NodeAttributes());
     attrs->position = centroid;
-    attrs->semantic_label = config.semantic_label;
     dsg.graph->emplaceNode(DsgLayers::BUILDINGS, building_id, std::move(attrs));
   } else {
     dsg.graph->getNode(building_id).attributes().position = centroid;

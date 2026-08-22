@@ -48,7 +48,7 @@ class BatchPipeline {
 
   virtual ~BatchPipeline();
 
-  DynamicSceneGraph::Ptr construct(
+  spark_dsg::SceneGraph::Ptr construct(
       const config::VirtualConfig<GraphBuilder>& graph_config,
       VolumetricMap& map,
       const RoomFinderConfig* room_config = nullptr) const;

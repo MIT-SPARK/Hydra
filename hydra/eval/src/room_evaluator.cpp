@@ -35,9 +35,12 @@
 #include "hydra/eval/room_evaluator.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
 
 #include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/layer_io.h"
+
+using namespace spark_dsg;
 
 namespace hydra::eval {
 
@@ -75,7 +78,7 @@ void RoomEvaluator::computeRoomIndices() {
 
 const RoomIndices& RoomEvaluator::getRoomIndices() const { return room_indices_; }
 
-void RoomEvaluator::computeDsgIndices(const DynamicSceneGraph& graph,
+void RoomEvaluator::computeDsgIndices(const SceneGraph& graph,
                                       RoomIndices& indices) const {
   const auto& rooms = graph.getLayer(DsgLayers::ROOMS);
   for (auto&& [room, room_node] : rooms.nodes()) {
@@ -117,7 +120,7 @@ void RoomEvaluator::computeDsgIndices(const DynamicSceneGraph& graph,
 }
 
 RoomMetrics RoomEvaluator::eval(const std::string& graph_filepath) const {
-  const auto graph = DynamicSceneGraph::load(graph_filepath);
+  const auto graph = SceneGraph::load(graph_filepath);
   if (!graph->hasLayer(DsgLayers::ROOMS)) {
     LOG(ERROR) << "Graph file: " << graph_filepath << " does not have rooms";
     return {};

@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/scene_graph_layer.h>
+
 #include "hydra/rooms/room_utilities.h"
 
 namespace hydra {

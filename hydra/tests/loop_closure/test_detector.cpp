@@ -35,6 +35,8 @@
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/detector.h>
 
+using namespace spark_dsg;
+
 namespace hydra::lcd {
 
 struct LcdDetectorTests : public ::testing::Test {
@@ -43,7 +45,7 @@ struct LcdDetectorTests : public ::testing::Test {
   virtual ~LcdDetectorTests() = default;
 
   virtual void SetUp() override {
-    dsg.reset(new DynamicSceneGraph());
+    dsg.reset(new SceneGraph());
 
     config.object_extraction = SubgraphConfig(5.0);
     config.places_extraction = SubgraphConfig(5.0);
@@ -55,7 +57,7 @@ struct LcdDetectorTests : public ::testing::Test {
   }
 
   LcdDetector::Config config;
-  DynamicSceneGraph::Ptr dsg;
+  SceneGraph::Ptr dsg;
 };
 
 TEST_F(LcdDetectorTests, TestEmptyUpdate) {

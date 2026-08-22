@@ -68,24 +68,24 @@ class RosBackendPublisher : public BackendModule::Sink {
   virtual ~RosBackendPublisher() = default;
 
   void call(uint64_t timestamp_ns,
-            const DynamicSceneGraph& graph,
+            const spark_dsg::SceneGraph& graph,
             const kimera_pgmo::DeformationGraph& dgraph) const override;
 
   std::string printInfo() const override;
 
  protected:
-  virtual void publishMeshGraph(const DynamicSceneGraph& graph,
+  virtual void publishMeshGraph(const spark_dsg::SceneGraph& graph,
                                 const kimera_pgmo::DeformationGraph& dgraph,
                                 const uint64_t& stamp) const;
 
-  virtual void publishPoseGraph(const DynamicSceneGraph& graph,
+  virtual void publishPoseGraph(const spark_dsg::SceneGraph& graph,
                                 const kimera_pgmo::DeformationGraph& dgraph,
                                 const uint64_t& stamp) const;
 
   virtual void publishDeformationGraphViz(const kimera_pgmo::DeformationGraph& dgraph,
                                           size_t timestamp_ns) const;
 
-  virtual void publishTf(const DynamicSceneGraph& graph,
+  virtual void publishTf(const spark_dsg::SceneGraph& graph,
                          const kimera_pgmo::DeformationGraph& dgraph) const;
 
  protected:

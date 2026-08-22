@@ -33,8 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-
 #include "hydra/backend/update_functions.h"
 
 namespace hydra {
@@ -44,14 +42,11 @@ struct UpdateAgentsFunctor : public UpdateFunctor {
 
   explicit UpdateAgentsFunctor(const Config& /* config */ = {});
 
-  void call(const DynamicSceneGraph&,
+  void call(const spark_dsg::SceneGraph&,
             SharedDsgInfo& graph,
             const UpdateInfo::ConstPtr& info) const override;
 
  private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateAgentsFunctor, Config>(
-          "UpdateAgentsFunctor");
 };
 
 void declare_config(UpdateAgentsFunctor::Config&);

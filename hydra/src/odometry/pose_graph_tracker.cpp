@@ -35,6 +35,7 @@
 #include "hydra/odometry/pose_graph_tracker.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
 #include "hydra/common/robot_prefix_config.h"

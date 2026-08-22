@@ -43,6 +43,8 @@
 #include "hydra/common/shared_module_state.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 
+using namespace spark_dsg;
+
 namespace hydra {
 
 using VFConfig = config::VirtualConfig<GraphBuilder>;
@@ -54,9 +56,9 @@ BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
 
 BatchPipeline::~BatchPipeline() {}
 
-DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
-                                                VolumetricMap& map,
-                                                const RFConfig* room_config) const {
+SceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
+                                         VolumetricMap& map,
+                                         const RFConfig* room_config) const {
   if (!map.hasSemantics()) {
     return nullptr;
   }
@@ -85,7 +87,7 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
     UpdateInfo::ConstPtr info(new UpdateInfo);
     functor.call(*graph, *dsg, info);
 
-    UpdateBuildingsFunctor bfunctor(UpdateBuildingsFunctor::Config{0});
+    UpdateBuildingsFunctor bfunctor(UpdateBuildingsFunctor::Config{});
     bfunctor.call(*graph, *dsg, info);
   }
 

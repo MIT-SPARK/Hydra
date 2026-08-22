@@ -42,13 +42,22 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateFrontiersFunctor,
+                                   UpdateFrontiersFunctor::Config>(
+        "UpdateFrontiersFunctor");
+
+}
 
 using timing::ScopedTimer;
 
 UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
   my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info,
-                            DynamicSceneGraph& unmerged_dsg,
+                            SceneGraph& unmerged_dsg,
                             SharedDsgInfo* dsg) {
     if (dsg) {
       cleanup(info->timestamp_ns, unmerged_dsg, *dsg);
@@ -58,7 +67,7 @@ UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
   return my_hooks;
 }
 
-void UpdateFrontiersFunctor::call(const DynamicSceneGraph&,
+void UpdateFrontiersFunctor::call(const SceneGraph&,
                                   SharedDsgInfo&,
                                   const UpdateInfo::ConstPtr&) const {
   return;
@@ -122,7 +131,7 @@ bool check_against_2d_places(const SharedDsgInfo& dsg,
 }
 
 void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
-                                     DynamicSceneGraph& unmerged_dsg,
+                                     SceneGraph& unmerged_dsg,
                                      SharedDsgInfo& dsg) const {
   ScopedTimer spin_timer("backend/cleanup_frontiers", timestamp_ns);
   if (!dsg.graph->hasLayer(DsgLayers::PLACES)) {

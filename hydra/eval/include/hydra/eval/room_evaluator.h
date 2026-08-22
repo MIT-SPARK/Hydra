@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <list>
-#include <map>
+#include <spark_dsg/scene_graph.h>
+
 #include <memory>
 #include <string>
 
@@ -64,7 +64,8 @@ class RoomEvaluator {
 
   const RoomIndices& getRoomIndices() const;
 
-  void computeDsgIndices(const DynamicSceneGraph& graph, RoomIndices& indices) const;
+  void computeDsgIndices(const spark_dsg::SceneGraph& graph,
+                         RoomIndices& indices) const;
 
   RoomMetrics eval(const std::string& graph_filepath) const;
 

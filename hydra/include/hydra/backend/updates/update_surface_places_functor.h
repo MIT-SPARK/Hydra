@@ -67,11 +67,11 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
   Hooks hooks() const override;
 
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
-  MergeList findMerges(const DynamicSceneGraph& graph,
+  MergeList findMerges(const spark_dsg::SceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
   bool shouldMerge(const Place2dNodeAttributes& from_attrs,
@@ -79,7 +79,7 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
   void cleanup(SharedDsgInfo& dsg) const;
 
-  void updateMeshIndices(const DynamicSceneGraph& graph,
+  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
                          const kimera_pgmo::MeshOffsetInfo& offsets) const;
 
   mutable ActiveWindowTracker active_tracker;

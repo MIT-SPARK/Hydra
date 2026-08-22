@@ -61,16 +61,18 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
 
   Hooks hooks() const override;
 
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
-  MergeList findMerges(const DynamicSceneGraph& graph,
+  MergeList findMerges(const spark_dsg::SceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
-  void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
+  void mergeAttributes(const spark_dsg::SceneGraph& layer,
+                       NodeId from,
+                       NodeId to) const;
 
-  void updateMeshIndices(const DynamicSceneGraph& graph,
+  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
                          const kimera_pgmo::MeshOffsetInfo& offsets) const;
 
   mutable std::set<spark_dsg::NodeId> merged_nodes_;

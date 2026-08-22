@@ -56,7 +56,7 @@ class ZmqRoomLabelUpdater : public UpdateFunctor {
 
   ZmqRoomLabelUpdater(const Config& config);
   virtual ~ZmqRoomLabelUpdater();
-  void call(const DynamicSceneGraph&,
+  void call(const spark_dsg::SceneGraph&,
             SharedDsgInfo& graph,
             const UpdateInfo::ConstPtr&) const override;
 
@@ -67,7 +67,7 @@ class ZmqRoomLabelUpdater : public UpdateFunctor {
   std::unique_ptr<std::thread> thread_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
-  std::map<NodeId, std::string> room_name_map_;
+  std::map<spark_dsg::NodeId, std::string> room_name_map_;
 };
 
 void declare_config(ZmqRoomLabelUpdater::Config& conf);

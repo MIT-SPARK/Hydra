@@ -35,13 +35,16 @@
 #include "hydra/loop_closure/scene_graph_descriptors.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
+
+using namespace spark_dsg;
+using Graph = SceneGraph;
 
 namespace hydra::lcd {
 
-using Dsg = DynamicSceneGraph;
-
 Descriptor::Ptr AgentDescriptorFactory::construct(
-    const Dsg& graph, const SceneGraphNode& agent_node) const {
+    const Graph& graph, const SceneGraphNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -64,7 +67,7 @@ ObjectDescriptorFactory::ObjectDescriptorFactory(const SubgraphConfig& config,
     : config(config), num_classes(num_classes) {}
 
 Descriptor::Ptr ObjectDescriptorFactory::construct(
-    const Dsg& graph, const SceneGraphNode& agent_node) const {
+    const Graph& graph, const SceneGraphNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -101,7 +104,7 @@ PlaceDescriptorFactory::PlaceDescriptorFactory(const SubgraphConfig& config,
     : config(config), histogram(histogram) {}
 
 Descriptor::Ptr PlaceDescriptorFactory::construct(
-    const Dsg& graph, const SceneGraphNode& agent_node) const {
+    const Graph& graph, const SceneGraphNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;

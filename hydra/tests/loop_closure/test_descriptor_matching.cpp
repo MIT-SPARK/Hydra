@@ -35,6 +35,8 @@
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/descriptor_matching.h>
 
+using namespace spark_dsg;
+
 namespace hydra::lcd {
 
 TEST(LoopClosureModuleMatchingTests, TestCosineDistanceFixedSize) {

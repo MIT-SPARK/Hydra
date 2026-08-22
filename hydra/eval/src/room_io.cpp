@@ -108,6 +108,8 @@ struct convert<spark_dsg::BoundingBox> {
 
 }  // namespace YAML
 
+using namespace spark_dsg;
+
 namespace hydra::eval {
 
 RoomGeometry parseRoomGeometry(const YAML::Node& root) {

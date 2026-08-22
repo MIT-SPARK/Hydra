@@ -37,8 +37,11 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra/utils/timing_utilities.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 namespace {
@@ -51,7 +54,6 @@ static const auto reg =
 }
 
 using timing::ScopedTimer;
-using SemanticLabel = SemanticNodeAttributes::Label;
 
 void declare_config(UpdateRoomsFunctor::Config& config) {
   using namespace config;
@@ -67,7 +69,7 @@ UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
       sinks_(Sink::instantiate(config.sinks)) {}
 
 void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
-                                      DynamicSceneGraph& graph) const {
+                                      SceneGraph& graph) const {
   std::vector<NodeId> to_remove;
   const auto& prev_rooms = graph.getLayer(DsgLayers::ROOMS);
   for (const auto& id_node_pair : prev_rooms.nodes()) {
@@ -92,7 +94,7 @@ void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
   }
 }
 
-void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
+void UpdateRoomsFunctor::call(const SceneGraph&,
                               SharedDsgInfo& dsg,
                               const UpdateInfo::ConstPtr& info) const {
   if (!room_finder) {

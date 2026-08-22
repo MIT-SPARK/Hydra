@@ -46,6 +46,8 @@
 
 #include "hydra/bindings/glog_utilities.h"
 
+using namespace spark_dsg;
+
 namespace hydra::python {
 
 class PythonBatchPipeline : public BatchPipeline {
@@ -57,7 +59,7 @@ class PythonBatchPipeline : public BatchPipeline {
 
   PythonBatchPipeline(const Config& config, int robot_id = 0);
   virtual ~PythonBatchPipeline() = default;
-  DynamicSceneGraph::Ptr construct(const VolumetricMap& map) const;
+  SceneGraph::Ptr construct(const VolumetricMap& map) const;
 };
 
 void declare_config(PythonBatchPipeline::Config& config) {
@@ -74,7 +76,7 @@ PythonBatchPipeline::PythonBatchPipeline(const Config& config, int robot_id)
   GlogSingleton::instance().setLogLevel(0, 0, false);
 }
 
-DynamicSceneGraph::Ptr PythonBatchPipeline::construct(const VolumetricMap& map) const {
+SceneGraph::Ptr PythonBatchPipeline::construct(const VolumetricMap& map) const {
   const auto new_map = map.clone();
   return BatchPipeline::construct(config.frontend, *new_map, &config.room_finder);
 }

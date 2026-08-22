@@ -61,7 +61,7 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
 
   explicit UpdatePlacesFunctor(const Config& config);
   Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
@@ -69,13 +69,13 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
                           SharedDsgInfo& dsg,
                           const UpdateInfo::ConstPtr& info) const;
 
-  MergeList findMerges(const DynamicSceneGraph& graph,
+  MergeList findMerges(const spark_dsg::SceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
   std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
                                      const SceneGraphNode& node) const;
 
-  void filterMissing(DynamicSceneGraph& graph,
+  void filterMissing(spark_dsg::SceneGraph& graph,
                      const std::list<NodeId> missing_nodes) const;
 
   mutable ActiveWindowTracker active_tracker;

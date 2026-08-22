@@ -35,6 +35,7 @@
 #include <glog/logging.h>
 #include <hydra/rooms/graph_filtration.h>
 #include <hydra/utils/timing_utilities.h>
+#include <spark_dsg/scene_graph.h>
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
@@ -48,8 +49,8 @@ DEFINE_string(output_path, "filtrations.json", "output path for json file");
 using hydra::DisjointSet;
 using hydra::getGraphFiltration;
 using spark_dsg::DsgLayers;
-using spark_dsg::DynamicSceneGraph;
 using spark_dsg::NodeId;
+using spark_dsg::SceneGraph;
 
 int main(int argc, char* argv[]) {
   FLAGS_minloglevel = 0;
@@ -84,7 +85,7 @@ int main(int argc, char* argv[]) {
     const std::filesystem::path filepath(filename);
     filepaths[index] = std::filesystem::canonical(filepath).string();
     results[index] = std::list<std::pair<double, size_t>>();
-    const auto graph = DynamicSceneGraph::load(filename);
+    const auto graph = SceneGraph::load(filename);
     const auto& places = graph->getLayer(DsgLayers::PLACES);
     LOG(INFO) << "Loaded " << filename << " with " << places.numNodes() << " nodes and "
               << places.numEdges() << " edges";

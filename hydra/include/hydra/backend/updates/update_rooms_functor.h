@@ -43,17 +43,18 @@ struct UpdateRoomsFunctor : public UpdateFunctor {
   using Sink = OutputSink<uint64_t, const RoomFinder&>;
   struct Config {
     RoomFinderConfig room_finder;
-    std::string places_layer = DsgLayers::PLACES;
+    std::string places_layer = spark_dsg::DsgLayers::PLACES;
     std::vector<Sink::Factory> sinks = {};
   } const config;
 
   explicit UpdateRoomsFunctor(const Config& config);
 
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
-  void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
+  void rewriteRooms(const spark_dsg::SceneGraphLayer* new_rooms,
+                    spark_dsg::SceneGraph& graph) const;
 
   std::unique_ptr<RoomFinder> room_finder;
 

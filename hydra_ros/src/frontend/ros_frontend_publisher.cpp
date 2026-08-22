@@ -44,6 +44,7 @@
 
 namespace hydra {
 
+using namespace spark_dsg;
 using pose_graph_tools::PoseGraphTypeAdapter;
 using BaseInterface = rclcpp::node_interfaces::NodeBaseInterface;
 using rclcpp::CallbackGroupType;
@@ -85,7 +86,7 @@ RosFrontendPublisher::RosFrontendPublisher(ianvs::NodeHandle nh)
 }
 
 void RosFrontendPublisher::call(uint64_t timestamp_ns,
-                                const DynamicSceneGraph& graph,
+                                const SceneGraph& graph,
                                 const BackendInput& backend_input) const {
   // TODO(nathan) make sure pgmo stamps the deformation graph
   mesh_graph_pub_->publish(backend_input.deformation_graph);

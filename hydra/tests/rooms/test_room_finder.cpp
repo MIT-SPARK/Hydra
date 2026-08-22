@@ -34,8 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/rooms/room_finder.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra_test/config_guard.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 
@@ -69,7 +73,7 @@ void addNode(SceneGraphLayer& layer, size_t node_id, size_t timestamp_ns) {
 }  // namespace
 
 TEST(RoomFinderTests, TestRoomPlaceEdges) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   graph.emplaceNode(DsgLayers::ROOMS, "r0"_id, std::make_unique<NodeAttributes>());
   graph.emplaceNode(DsgLayers::ROOMS, "r1"_id, std::make_unique<NodeAttributes>());
   graph.emplaceNode(DsgLayers::ROOMS, "r2"_id, std::make_unique<NodeAttributes>());

@@ -40,6 +40,8 @@
 
 #include "hydra/utils/timing_utilities.h"
 
+using namespace spark_dsg;
+
 namespace hydra {
 namespace {
 
@@ -83,7 +85,7 @@ UpdateFunctor::Hooks GenericUpdateFunctor::hooks() const {
   return my_hooks;
 }
 
-void GenericUpdateFunctor::call(const DynamicSceneGraph& unmerged,
+void GenericUpdateFunctor::call(const SceneGraph& unmerged,
                                 SharedDsgInfo& dsg,
                                 const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_" + config.layer, info->timestamp_ns);
@@ -100,7 +102,7 @@ void GenericUpdateFunctor::call(const DynamicSceneGraph& unmerged,
           << " nodes";
 }
 
-MergeList GenericUpdateFunctor::findMerges(const DynamicSceneGraph& graph,
+MergeList GenericUpdateFunctor::findMerges(const SceneGraph& graph,
                                            const UpdateInfo::ConstPtr& info) const {
   if (!node_matcher) {
     LOG(WARNING) << "No node matcher!";
