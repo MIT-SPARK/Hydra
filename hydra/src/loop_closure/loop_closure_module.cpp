@@ -210,7 +210,8 @@ size_t LoopClosureModule::processFrontendOutput() {
   return timestamp_ns;
 }
 
-NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) {
+auto LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos)
+    -> NodeIdSet {
   NodeIdSet to_cache;
   auto iter = potential_lcd_root_nodes_.begin();
   while (iter != potential_lcd_root_nodes_.end()) {

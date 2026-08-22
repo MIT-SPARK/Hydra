@@ -37,7 +37,6 @@
 #include <queue>
 #include <thread>
 
-#include "hydra/common/common_types.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
@@ -46,6 +45,8 @@ namespace hydra {
 
 class LoopClosureModule : public Module {
  public:
+  using NodeIdSet = std::unordered_set<spark_dsg::NodeId>;
+
   struct Config {
     lcd::LcdDetector::Config detector;
     bool visualize_dsg_lcd = false;

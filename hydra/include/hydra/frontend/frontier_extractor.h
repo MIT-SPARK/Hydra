@@ -32,6 +32,8 @@ struct Frontier {
 
 class FrontierExtractor : public GraphBuilderFunctor {
  public:
+  using NodeIdSet = std::unordered_set<spark_dsg::NodeId>;
+
   struct Config {
     char prefix = 'f';
     double cluster_tolerance = .3;

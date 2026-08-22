@@ -150,8 +150,6 @@ class GraphBuilder : public Module {
   void updatePoseGraph(const ActiveWindowOutput& msg);
 
  protected:
-  void archivePlaces2d(const NodeIdSet active_places);
-
   void processNextInput(const ActiveWindowOutput& msg);
 
  protected:

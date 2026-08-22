@@ -35,11 +35,9 @@
 #pragma once
 
 #include <cstdint>
-#include <unordered_set>
 
 namespace hydra {
 
-using NodeIdSet = std::unordered_set<uint64_t>;
 using TimeStamp = uint64_t;
 
 inline double toSeconds(TimeStamp time) { return static_cast<double>(time) / 1e9; }
