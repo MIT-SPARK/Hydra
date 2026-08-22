@@ -1,4 +1,3 @@
-find_package(kimera_rpgo REQUIRED)
 find_package(gflags REQUIRED)
 
 add_library(
@@ -7,10 +6,7 @@ add_library(
   src/room_evaluator.cpp src/room_io.cpp src/room_metrics.cpp
 )
 target_include_directories(${PROJECT_NAME}_eval PUBLIC include)
-target_link_libraries(
-  ${PROJECT_NAME}_eval PUBLIC ${PROJECT_NAME} ${gflags_LIBRARIES}
-  PRIVATE nanoflann::nanoflann
-)
+target_link_libraries(${PROJECT_NAME}_eval PUBLIC ${PROJECT_NAME})
 
 add_executable(compute_filtrations tools/compute_filtrations.cpp)
 target_link_libraries(compute_filtrations ${PROJECT_NAME}_eval)
