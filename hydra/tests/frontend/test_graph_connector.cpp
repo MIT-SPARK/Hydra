@@ -35,10 +35,10 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/frontend/graph_connector.h>
-#include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/printing.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra {
 
@@ -47,7 +47,7 @@ using namespace spark_dsg;
 namespace {
 
 // set to preserve ordering
-std::set<EdgeKey> getEdges(const DynamicSceneGraph& graph) {
+std::set<EdgeKey> getEdges(const SceneGraph& graph) {
   std::set<EdgeKey> edges;
   for (const auto& [key, edge] : graph.interlayer_edges()) {
     edges.insert(key);
@@ -63,7 +63,7 @@ NodeAttributes::Ptr makeAttrs(double x_coordinate) {
   return attrs;
 }
 
-void setupGraph(DynamicSceneGraph& graph) {
+void setupGraph(SceneGraph& graph) {
   for (size_t i = 0; i < 5; ++i) {
     graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', i), makeAttrs(i));
     graph.emplaceNode(DsgLayers::OBJECTS, NodeSymbol('o', i), makeAttrs(i));
@@ -86,7 +86,7 @@ GraphConnector::Config getDefaultConfig(bool include_primary, bool include_parti
 }  // namespace
 
 TEST(GraphConnector, TestStatic) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   setupGraph(graph);
 
   GraphConnector connector(getDefaultConfig(true, false));
@@ -101,7 +101,7 @@ TEST(GraphConnector, TestStatic) {
 }
 
 TEST(GraphConnector, TestDynamic) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   setupGraph(graph);
 
   GraphConnector connector(getDefaultConfig(false, true));
@@ -116,7 +116,7 @@ TEST(GraphConnector, TestDynamic) {
 }
 
 TEST(GraphConnector, TestNewNodes) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   setupGraph(graph);
 
   GraphConnector connector(getDefaultConfig(true, true));
@@ -152,7 +152,7 @@ TEST(GraphConnector, TestNewNodes) {
 }
 
 TEST(GraphConnector, TestRewiring) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   setupGraph(graph);
 
   GraphConnector connector(getDefaultConfig(true, false));
@@ -181,7 +181,7 @@ TEST(GraphConnector, TestRewiring) {
 }
 
 TEST(GraphConnector, TestArchiving) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   setupGraph(graph);
 
   GraphConnector connector(getDefaultConfig(true, false));

@@ -36,11 +36,11 @@
 
 #include <gtsam/inference/Symbol.h>
 #include <kimera_pgmo/mesh_offset_info.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra::utils {
 
-std::optional<uint64_t> getTimeNs(const spark_dsg::DynamicSceneGraph& graph,
+std::optional<uint64_t> getTimeNs(const spark_dsg::SceneGraph& graph,
                                   gtsam::Symbol key);
 
 template <typename T>

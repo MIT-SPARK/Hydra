@@ -41,8 +41,8 @@
 
 namespace hydra::lcd {
 
-using Dsg = DynamicSceneGraph;
-using DsgNode = DynamicSceneGraphNode;
+using Dsg = SceneGraph;
+using DsgNode = SceneGraphNode;
 
 ObjectGnnDescriptor::ObjectGnnDescriptor(const std::string& model_path,
                                          const SubgraphConfig& config,
@@ -72,7 +72,7 @@ ObjectGnnDescriptor::ObjectGnnDescriptor(const std::string& model_path,
   model_.reset(new gnn::GnnInterface(model_path));
 }
 
-gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
+gnn::TensorMap ObjectGnnDescriptor::makeInput(const SceneGraph& graph,
                                               const std::set<NodeId>& nodes) const {
   const size_t feature_size = label_embedding_size_ + (use_pos_in_feature_ ? 6 : 3);
   gnn::Tensor x(nodes.size(), feature_size, gnn::Tensor::Type::FLOAT32);
@@ -187,7 +187,7 @@ PlaceGnnDescriptor::PlaceGnnDescriptor(const std::string& model_path,
   model_.reset(new gnn::GnnInterface(model_path));
 }
 
-gnn::TensorMap PlaceGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
+gnn::TensorMap PlaceGnnDescriptor::makeInput(const SceneGraph& graph,
                                              const std::set<NodeId>& nodes) const {
   gnn::Tensor x(nodes.size(), use_pos_in_feature_ ? 5 : 2, gnn::Tensor::Type::FLOAT32);
   auto x_map = x.map<float>();

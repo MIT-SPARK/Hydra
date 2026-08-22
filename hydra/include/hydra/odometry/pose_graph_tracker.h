@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <pose_graph_tools/pose_graph.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <Eigen/Geometry>
 #include <list>
@@ -57,8 +57,7 @@ struct PoseGraphPacket {
 
   //! @brief Add all pose graph nodes and edges to graph
   std::vector<spark_dsg::NodeId> addToGraph(
-      spark_dsg::DynamicSceneGraph& graph,
-      std::optional<int> robot_id = std::nullopt) const;
+      spark_dsg::SceneGraph& graph, std::optional<int> robot_id = std::nullopt) const;
 };
 
 struct PoseGraphTracker {

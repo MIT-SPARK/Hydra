@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/virtual_config.h>
-#include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <list>
 #include <map>
@@ -101,12 +101,12 @@ struct GraphUpdater {
   } const config;
 
   explicit GraphUpdater(const Config& config);
-  void update(const GraphUpdate& update, spark_dsg::DynamicSceneGraph& graph);
+  void update(const GraphUpdate& update, spark_dsg::SceneGraph& graph);
 
  private:
   std::map<std::string, LayerTracker> trackers_;
 
-  void addNode(spark_dsg::DynamicSceneGraph& graph,
+  void addNode(spark_dsg::SceneGraph& graph,
                LayerTracker& tracker,
                spark_dsg::LayerId target_layer_id,
                spark_dsg::LayerId source_layer_id,
@@ -114,14 +114,14 @@ struct GraphUpdater {
 
   bool updateNode(const NodeUpdate& entry,
                   LayerTracker& tracker,
-                  spark_dsg::DynamicSceneGraph& graph);
+                  spark_dsg::SceneGraph& graph);
   void deleteNode(const NodeUpdate& entry,
                   LayerTracker& tracker,
-                  spark_dsg::DynamicSceneGraph& graph);
+                  spark_dsg::SceneGraph& graph);
 
   void computeMergeGroup(spark_dsg::NodeId node_id,
                          LayerTracker& tracker,
-                         spark_dsg::DynamicSceneGraph& graph);
+                         spark_dsg::SceneGraph& graph);
 };
 
 void declare_config(GraphUpdater::Config& config);

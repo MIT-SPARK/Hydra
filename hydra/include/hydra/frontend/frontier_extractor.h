@@ -57,10 +57,10 @@ class FrontierExtractor : public GraphBuilderFunctor {
   void updateRecentBlocks(const Eigen::Vector3d& current_position, double block_size);
 
   void detectFrontiers(const ActiveWindowOutput& input,
-                       DynamicSceneGraph& graph,
+                       SceneGraph& graph,
                        const NodeIdSet& active_places);
 
-  void addFrontiers(const uint64_t timestamp_ns, DynamicSceneGraph& graph);
+  void addFrontiers(const uint64_t timestamp_ns, SceneGraph& graph);
 
  private:
   NodeSymbol next_node_id_;

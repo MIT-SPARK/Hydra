@@ -47,11 +47,11 @@ struct ObjectGnnDescriptor : DescriptorFactory {
                       const LabelEmbeddings& label_embeddings,
                       bool use_pos_in_feature = true);
 
-  gnn::TensorMap makeInput(const DynamicSceneGraph& graph,
+  gnn::TensorMap makeInput(const SceneGraph& graph,
                            const std::set<NodeId>& nodes) const;
 
-  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const DynamicSceneGraphNode& agent_node) const override;
+  Descriptor::Ptr construct(const SceneGraph& graph,
+                            const SceneGraphNode& agent_node) const override;
 
  protected:
   const SubgraphConfig config_;
@@ -68,11 +68,11 @@ struct PlaceGnnDescriptor : DescriptorFactory {
                      const SubgraphConfig& config,
                      bool use_pos_in_feature = true);
 
-  gnn::TensorMap makeInput(const DynamicSceneGraph& graph,
+  gnn::TensorMap makeInput(const SceneGraph& graph,
                            const std::set<NodeId>& nodes) const;
 
-  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const DynamicSceneGraphNode& agent_node) const override;
+  Descriptor::Ptr construct(const SceneGraph& graph,
+                            const SceneGraphNode& agent_node) const override;
 
  protected:
   const SubgraphConfig config_;

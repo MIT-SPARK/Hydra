@@ -13,7 +13,7 @@ def trajectory_from_scene_graph(filepath, agent_prefix="a"):
     if not filepath.exists():
         return None
 
-    G = dsg.DynamicSceneGraph.load(filepath)
+    G = dsg.SceneGraph.load(filepath)
     agents = G.get_layer(dsg.DsgLayers.AGENTS, agent_prefix)
 
     times = []

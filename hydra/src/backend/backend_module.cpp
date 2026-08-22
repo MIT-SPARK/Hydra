@@ -304,7 +304,7 @@ void BackendModule::loadState(const std::filesystem::path& mesh_path,
                               bool force_loopclosures) {
   spark_dsg::Mesh::Ptr mesh;
   if (mesh_path.extension() == ".sparkdsg" || mesh_path.extension() == ".json") {
-    auto graph = DynamicSceneGraph::load(mesh_path);
+    auto graph = SceneGraph::load(mesh_path);
     if (!graph) {
       LOG(ERROR) << "Invalid graph path: " << mesh_path;
       return;

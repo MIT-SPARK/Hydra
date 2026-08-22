@@ -38,7 +38,7 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <algorithm>
 
@@ -118,7 +118,7 @@ GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(con
   }
 }
 
-void GraphUpdater::addNode(DynamicSceneGraph& graph,
+void GraphUpdater::addNode(SceneGraph& graph,
                            LayerTracker& tracker,
                            LayerId target,
                            LayerId source,
@@ -170,7 +170,7 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
 
 void GraphUpdater::deleteNode(const NodeUpdate& entry,
                               LayerTracker& tracker,
-                              DynamicSceneGraph& graph) {
+                              SceneGraph& graph) {
   if (!entry.track_id) {
     LOG(WARNING) << "Delete graph update missing track_id";
     return;
@@ -196,7 +196,7 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
 
 bool GraphUpdater::updateNode(const NodeUpdate& entry,
                               LayerTracker& tracker,
-                              DynamicSceneGraph& graph) {
+                              SceneGraph& graph) {
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter != tracker.track_to_node.end()) {
     tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
@@ -209,7 +209,7 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
 
 void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
                                      LayerTracker& tracker,
-                                     spark_dsg::DynamicSceneGraph& graph) {
+                                     spark_dsg::SceneGraph& graph) {
   auto& track_ids = tracker.node_to_tracks[node_id];
   std::vector<const spark_dsg::NodeAttributes*> attrs;
   for (size_t id : track_ids) {
@@ -244,7 +244,7 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
   graph.setNodeAttributes(node_id, std::move(merged));
 }
 
-void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
+void GraphUpdater::update(const GraphUpdate& update, SceneGraph& graph) {
   std::map<LayerId, LayerTracker&> trackers_by_id;
   for (auto& [name, tracker] : trackers_) {
     const auto key = graph.getLayerKey(name);

@@ -47,10 +47,10 @@
 
 namespace hydra {
 
-using spark_dsg::DynamicSceneGraph;
 using spark_dsg::EdgeAttributes;
 using spark_dsg::NodeId;
 using spark_dsg::Place2dNodeAttributes;
+using spark_dsg::SceneGraph;
 
 using AttrMap = std::map<NodeId, Place2dNodeAttributes>;
 
@@ -201,7 +201,7 @@ void SurfacePlaceExtractor::detect(const ActiveWindowOutput& msg,
 
 void SurfacePlaceExtractor::updateGraph(const ActiveWindowOutput&,
                                         const kimera_pgmo::MeshOffsetInfo& offsets,
-                                        DynamicSceneGraph& graph) {
+                                        SceneGraph& graph) {
   // Remove old empty nodes and previous active nodes
   for (const auto& nid : to_remove_) {
     graph.removeNode(nid);

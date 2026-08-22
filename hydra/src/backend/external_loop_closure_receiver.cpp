@@ -44,8 +44,8 @@ namespace hydra {
 
 using LookupResult = ExternalLoopClosureReceiver::LookupResult;
 using spark_dsg::AgentNodeAttributes;
-using spark_dsg::DynamicSceneGraph;
 using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraph;
 using spark_dsg::SceneGraphLayer;
 using spark_dsg::SceneGraphNode;
 
@@ -109,7 +109,7 @@ ExternalLoopClosureReceiver::getPreviousLoopsForRobotPair(size_t robot_a,
   return added_loop_closures_.at(key);
 }
 
-LookupResult ExternalLoopClosureReceiver::findClosest(const DynamicSceneGraph& graph,
+LookupResult ExternalLoopClosureReceiver::findClosest(const SceneGraph& graph,
                                                       uint64_t stamp_ns,
                                                       int robot_id,
                                                       double max_diff_s) const {
@@ -212,7 +212,7 @@ bool ExternalLoopClosureReceiver::should_add_lc(const OrderedPreviousLoops& adde
   return true;
 }
 
-void ExternalLoopClosureReceiver::update(const DynamicSceneGraph& graph,
+void ExternalLoopClosureReceiver::update(const SceneGraph& graph,
                                          const Callback& callback) {
   if (!input_queue_) {
     return;
