@@ -11,14 +11,10 @@ license = "BSD-3-Clause"
 requires-python = ">=3.8"
 dependencies = [
     "click",
-    "distinctipy",
     "imageio",
-    "networkx",
     "numpy",
-    "pyqtgraph",
     "pyyaml",
     "scipy",
-    "spark_dataset_interfaces @ git+https://github.com/MIT-SPARK/spark_dataset_interfaces",
 ]
 authors = [
   {name = "Nathan Hughes", email="na26933@mit.edu"},
