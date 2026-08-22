@@ -36,7 +36,6 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
@@ -92,34 +91,25 @@ void ValueEdgeColorAdapter::setGraph(const SceneGraph& graph, LayerKey layer_key
   }
 
   bool is_first = true;
-  try {
-    const auto& layer = graph.getLayer(layer_key.layer, layer_key.partition);
-    for (const auto& [key, edge] : layer.edges()) {
-      const auto value = functor_->eval(graph, edge);
-      if (is_first) {
-        min_value_ = value;
-        max_value_ = value;
-        is_first = false;
-      } else {
-        min_value_ = std::min(value, min_value_);
-        max_value_ = std::max(value, max_value_);
-      }
+  const auto& layer = graph.getLayer(layer_key.layer, layer_key.partition);
+  for (const auto& [key, edge] : layer.edges()) {
+    const auto value = functor_->eval(graph, edge);
+    if (is_first) {
+      min_value_ = value;
+      max_value_ = value;
+      is_first = false;
+    } else {
+      min_value_ = std::min(value, min_value_);
+      max_value_ = std::max(value, max_value_);
     }
-  } catch (const std::exception& e) {
-    LOG_FIRST_N(ERROR, 1) << "Value functor unable to evaluate: " << e.what();
   }
 }
 
 EdgeColor ValueEdgeColorAdapter::getColor(const SceneGraph& graph,
                                           const SceneGraphEdge& edge) const {
-  try {
-    const auto color =
-        colormap_.getColor(functor_->eval(graph, edge), min_value_, max_value_);
-    return {color, color};
-  } catch (const std::exception& e) {
-    LOG_FIRST_N(ERROR, 1) << "Value functor unable to evaluate: " << e.what();
-    return {Color(), Color()};
-  }
+  const auto color =
+      colormap_.getColor(functor_->eval(graph, edge), min_value_, max_value_);
+  return {color, color};
 }
 
 void declare_config(ValueEdgeColorAdapter::Config& config) {
@@ -161,12 +151,15 @@ EdgeColor TraversabilityEdgeColorAdapter::getColor(const SceneGraph&,
   if (weight == -1.0) {
     return {config.active_color, config.active_color};
   }
+
   if (weight == -2.0) {
     return {config.backend_color, config.backend_color};
   }
+
   if (weight < 0.0) {
     return {Color::gray(), Color::gray()};
   }
+
   const auto color = colormap_.getColor(weight, min_value_, max_value_);
   return {color, color};
 }

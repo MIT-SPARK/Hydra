@@ -14,8 +14,6 @@ option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 find_package(ament_cmake REQUIRED)
 find_package(config_utilities REQUIRED)
 find_package(config_utilities_ros REQUIRED)
-find_package(glog REQUIRED)
-find_package(gflags REQUIRED)
 find_package(hydra_msgs REQUIRED)
 find_package(ianvs REQUIRED)
 find_package(kimera_pgmo_msgs REQUIRED)
@@ -73,7 +71,7 @@ target_link_libraries(
          rclcpp::rclcpp
          spark_dsg::spark_dsg
          tf2_ros::tf2_ros
-  PRIVATE tf2_eigen::tf2_eigen glog::glog
+  PRIVATE tf2_eigen::tf2_eigen
 )
 ament_target_dependencies(
   ${PROJECT_NAME}
@@ -86,12 +84,7 @@ ament_target_dependencies(
 )
 
 add_executable(hydra_visualizer_node app/hydra_visualizer_node.cpp)
-target_link_libraries(
-  hydra_visualizer_node
-  ${PROJECT_NAME}
-  gflags
-  glog::glog
-)
+target_link_libraries(hydra_visualizer_node ${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest)
@@ -100,12 +93,7 @@ if(BUILD_TESTING)
       tests/test_ear_clipping.cpp
       tests/test_layer_key_selector.cpp
   )
-  target_link_libraries(
-    test_${PROJECT_NAME}
-    ${PROJECT_NAME}
-    gflags
-    glog::glog
-  )
+  target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME})
 endif()
 
 install(

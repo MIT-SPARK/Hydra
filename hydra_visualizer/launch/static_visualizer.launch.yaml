@@ -1,6 +1,5 @@
 ---
 launch:
-  - arg: {name: verbosity, default: '0', description: visualizer verbosity}
   - arg: {name: debug, default: 'false', description: launch with gdb server}
   - arg: {name: scene_graph, default: '', description: filepath for scene graph to show}
   - arg: {name: visualizer_frame, default: map, description: frame_id for visualizations}
@@ -17,7 +16,6 @@ launch:
       args: >
         --config-utilities-file $(var visualizer_config)
         --config-utilities-file $(var external_plugins)
-        --config-utilities-yaml {glog_level: 0, glog_verbosity: $(var verbosity)}
         --config-utilities-yaml {graph: {type: GraphFromFile, frame_id: $(var visualizer_frame), filepath: $(var scene_graph)}}
   # rviz node and control for launching
   - arg: {name: start_rviz, default: 'true', description: automatically start rviz}

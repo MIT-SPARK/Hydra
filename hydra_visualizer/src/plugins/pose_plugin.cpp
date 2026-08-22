@@ -38,7 +38,6 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
@@ -47,7 +46,7 @@
 namespace hydra {
 namespace {
 
-inline static const auto registration =
+static const auto registration =
     config::RegistrationWithConfig<VisualizerPlugin,
                                    PosePlugin,
                                    PosePlugin::Config,
