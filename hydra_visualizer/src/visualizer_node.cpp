@@ -37,7 +37,6 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include <fstream>
 
@@ -164,7 +163,8 @@ void DsgVisualizer::saveConfigs(const std::filesystem::path& output) {
 
   std::ofstream fout(output);
   fout << root;
-  LOG(INFO) << "Saved config to " << output;
+
+  RCLCPP_INFO_STREAM(nh_.logger(), "Saved config to " << output);
 }
 
 }  // namespace hydra

@@ -61,6 +61,8 @@ struct LayerPlugin {
 
   virtual YAML::Node dumpConfig() const { return YAML::Node(); }
 
+  virtual void reset(const std_msgs::msg::Header& /* header */) {}
+
  protected:
   bool has_change_ = false;
 };

@@ -47,7 +47,7 @@
 namespace hydra {
 namespace {
 
-inline static const auto registration_ =
+static const auto registration_ =
     config::RegistrationWithConfig<LayerPlugin,
                                    PlacesFreespacePlugin,
                                    PlacesFreespacePlugin::Config,

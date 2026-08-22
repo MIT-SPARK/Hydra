@@ -1,7 +1,6 @@
 ---
 launch:
   # development args
-  - arg: {name: verbosity, default: '0'}
   - arg: {name: debug, default: 'false'}
   # visualizer configuration
   - arg: {name: visualizer_ns, default: hydra_visualizer}
@@ -23,7 +22,6 @@ launch:
       args: >
         --config-utilities-file $(var visualizer_config_path)
         --config-utilities-file $(var external_plugins_path)
-        --config-utilities-yaml {glog_level: 0, glog_verbosity: $(var verbosity)}
         --config-utilities-yaml {graph: {type: $(if $(var use_zmq) GraphFromZmq GraphFromRos), url: $(var zmq_url), frame_id: $(var visualizer_frame)}}
   # rviz node and control for launching
   - arg: {name: start_rviz, default: 'true', description: automatically start rviz}

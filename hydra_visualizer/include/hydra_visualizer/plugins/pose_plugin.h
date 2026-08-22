@@ -64,6 +64,7 @@ class PosePlugin : public VisualizerPlugin {
 
  protected:
   size_t num_received_;
+  ianvs::NodeHandle nh_;
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pub_;
 };
 

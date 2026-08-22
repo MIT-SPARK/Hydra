@@ -38,7 +38,6 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include <rclcpp/create_subscription.hpp>
 
@@ -91,7 +90,8 @@ void GraphFileWrapper::reload(const std_srvs::srv::Empty::Request::SharedPtr&,
 void GraphFileWrapper::load(const std_msgs::msg::String::ConstSharedPtr& msg) {
   std::filesystem::path req_path(msg->data);
   if (!std::filesystem::exists(req_path)) {
-    LOG(ERROR) << "Graph does not exist at '" << req_path.string() << "'";
+    RCLCPP_ERROR_STREAM(nh_.logger(),
+                        "Graph does not exist at '" << req_path.string() << "'");
     return;
   }
 

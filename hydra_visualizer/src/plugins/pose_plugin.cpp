@@ -38,7 +38,6 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
@@ -47,7 +46,7 @@
 namespace hydra {
 namespace {
 
-inline static const auto registration =
+static const auto registration =
     config::RegistrationWithConfig<VisualizerPlugin,
                                    PosePlugin,
                                    PosePlugin::Config,
@@ -74,6 +73,7 @@ PosePlugin::PosePlugin(const Config& config,
     : VisualizerPlugin(name),
       config(config::checkValid(config)),
       num_received_(0),
+      nh_(nh),
       pub_(nh.create_publisher<PoseArray>(name, rclcpp::QoS(1).transient_local())) {}
 
 void PosePlugin::draw(const std_msgs::msg::Header& header, const SceneGraph& graph) {
@@ -90,9 +90,11 @@ void PosePlugin::draw(const std_msgs::msg::Header& header, const SceneGraph& gra
 
   const auto layer = graph.findLayer(layer_id->layer, config.partition);
   if (!layer) {
-    const auto should_warn = num_received_ >= config.num_received_before_warn;
-    LOG_IF(WARNING, should_warn)
-        << "Missing layer '" << config.layer << "' and partition " << config.partition;
+    if (num_received_ >= config.num_received_before_warn) {
+      RCLCPP_WARN_STREAM(
+          nh_.logger(),
+          "Missing layer '" << config.layer << "' and partition " << config.partition);
+    }
     return;
   }
 
@@ -105,8 +107,9 @@ void PosePlugin::draw(const std_msgs::msg::Header& header, const SceneGraph& gra
     ++num_seen;
     auto attrs = node->tryAttributes<AgentNodeAttributes>();
     if (!attrs) {
-      LOG(WARNING) << "Node " << NodeSymbol(node_id).str()
-                   << " does not have pose information!";
+      RCLCPP_WARN_STREAM(
+          nh_.logger(),
+          "Node " << NodeSymbol(node_id).str() << " does not have pose information!");
       continue;
     }
 

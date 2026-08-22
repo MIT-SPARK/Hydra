@@ -36,7 +36,6 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
@@ -113,14 +112,12 @@ LabelColorAdapter::LabelColorAdapter(const Config& config)
     : config(config::checkValid(config)), colormap_(config.colormap) {}
 
 Color LabelColorAdapter::getColor(const SceneGraph&, const SceneGraphNode& node) const {
-  SemanticLabel label = SemanticNodeAttributes::NO_SEMANTIC_LABEL;
-  try {
-    label = node.attributes<SemanticNodeAttributes>().semantic_label;
-  } catch (const std::bad_cast&) {
-    VLOG(5) << "Node " << NodeSymbol(node.id).str() << " has no label!";
+  const auto attrs = node.tryAttributes<SemanticNodeAttributes>();
+  if (!attrs) {
+    return colormap_.getColor(SemanticNodeAttributes::NO_SEMANTIC_LABEL);
   }
 
-  return colormap_.getColor(label);
+  return colormap_.getColor(attrs->semantic_label);
 }
 
 void declare_config(LabelColorAdapter::Config& config) {
@@ -173,19 +170,11 @@ bool HasActiveMeshFunctor::eval(const SceneGraph&, const SceneGraphNode& node) c
 }
 
 StatusColorAdapter::StatusColorAdapter(const Config& config)
-    : config(config), functor_(config::create<StatusFunctor>(config.status_functor)) {
-  CHECK(functor_) << "invalid functor type: " << config.status_functor;
-}
+    : config(config), functor_(config::create<StatusFunctor>(config.status_functor)) {}
 
 Color StatusColorAdapter::getColor(const SceneGraph& graph,
                                    const SceneGraphNode& node) const {
-  bool status = false;
-  try {
-    status = functor_->eval(graph, node);
-  } catch (const std::bad_cast& e) {
-    LOG_FIRST_N(ERROR, 1) << "Status functor unable to cast correctly: " << e.what();
-  }
-
+  const auto status = functor_->eval(graph, node);
   return status ? config.true_color : config.false_color;
 }
 
@@ -265,32 +254,23 @@ void ValueColorAdapter::setGraph(const SceneGraph& graph, LayerKey layer_key) {
   }
 
   bool is_first = true;
-  try {
-    const auto& layer = graph.getLayer(layer_key.layer, layer_key.partition);
-    for (const auto& [node_id, node] : layer.nodes()) {
-      const auto value = functor_->eval(graph, *node);
-      if (is_first) {
-        min_value_ = value;
-        max_value_ = value;
-        is_first = false;
-      } else {
-        min_value_ = std::min(value, min_value_);
-        max_value_ = std::max(value, max_value_);
-      }
+  const auto& layer = graph.getLayer(layer_key.layer, layer_key.partition);
+  for (const auto& [node_id, node] : layer.nodes()) {
+    const auto value = functor_->eval(graph, *node);
+    if (is_first) {
+      min_value_ = value;
+      max_value_ = value;
+      is_first = false;
+    } else {
+      min_value_ = std::min(value, min_value_);
+      max_value_ = std::max(value, max_value_);
     }
-  } catch (const std::exception& e) {
-    LOG_FIRST_N(ERROR, 1) << "Value functor unable to evaluate: " << e.what();
   }
 }
 
 Color ValueColorAdapter::getColor(const SceneGraph& graph,
                                   const SceneGraphNode& node) const {
-  try {
-    return colormap_.getColor(functor_->eval(graph, node), min_value_, max_value_);
-  } catch (const std::exception& e) {
-    LOG_FIRST_N(ERROR, 1) << "Value functor unable to evaluate: " << e.what();
-    return Color();
-  }
+  return colormap_.getColor(functor_->eval(graph, node), min_value_, max_value_);
 }
 
 void declare_config(ValueColorAdapter::Config& config) {
