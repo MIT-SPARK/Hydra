@@ -39,6 +39,7 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <pose_graph_tools/pose_graph.h>
+#include <spark_dsg/node_attributes.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/utils/minimum_spanning_tree.h"
@@ -55,6 +56,7 @@ static const auto registration =
 }
 
 using timing::ScopedTimer;
+using namespace spark_dsg;
 
 void declare_config(MstPlaceFactors::Config& config) {
   using namespace config;
@@ -69,7 +71,7 @@ MstPlaceFactors::MstPlaceFactors(const Config& config)
     : config(config::checkValid(config)) {}
 
 void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
-                                    const spark_dsg::SceneGraph& graph,
+                                    const SceneGraph& graph,
                                     kimera_pgmo::DeformationGraph& deformation_graph,
                                     const NodeRobotMap* robot_lookup) const {
   const auto& places = graph.getLayer(DsgLayers::PLACES);
@@ -123,12 +125,12 @@ void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
     ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
     const auto robot_id = GlobalInfo::instance().getRobotPrefix().id;
     pose_graph_tools::PoseGraph mst_edges;
-    for (const auto& edge : mst_info.edges) {
-      gtsam::Pose3 source(gtsam::Rot3(), getNodePosition(places, edge.source));
-      gtsam::Pose3 target(gtsam::Rot3(), getNodePosition(places, edge.target));
+    for (const auto& [s_id, t_id, dist] : mst_info.edges) {
+      gtsam::Pose3 source(gtsam::Rot3(), places.getNode(s_id).attributes().position);
+      gtsam::Pose3 target(gtsam::Rot3(), places.getNode(t_id).attributes().position);
       pose_graph_tools::PoseGraphEdge mst_e;
-      mst_e.key_from = edge.source;
-      mst_e.key_to = edge.target;
+      mst_e.key_from = s_id;
+      mst_e.key_to = t_id;
       mst_e.robot_from = robot_id;
       mst_e.robot_to = robot_id;
       // TODO(nathan) this should technically be something else

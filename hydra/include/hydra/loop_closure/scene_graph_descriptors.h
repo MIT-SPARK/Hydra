@@ -33,7 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/dsg_types.h"
+#include <spark_dsg/scene_graph.h>
+
+#include <Eigen/Dense>
+
 #include "hydra/loop_closure/subgraph_extraction.h"
 
 namespace hydra::lcd {
@@ -44,8 +47,8 @@ struct Descriptor {
   Eigen::VectorXf values;
   bool normalized = false;
   bool is_null = false;
-  std::set<NodeId> nodes;
-  NodeId root_node;
+  std::set<spark_dsg::NodeId> nodes;
+  spark_dsg::NodeId root_node;
   Eigen::Vector3d root_position;
   std::chrono::nanoseconds timestamp;
 };
@@ -55,8 +58,9 @@ struct DescriptorFactory {
 
   virtual ~DescriptorFactory() = default;
 
-  virtual Descriptor::Ptr construct(const DynamicSceneGraph& dsg,
-                                    const SceneGraphNode& agent_node) const = 0;
+  virtual Descriptor::Ptr construct(
+      const spark_dsg::SceneGraph& dsg,
+      const spark_dsg::SceneGraphNode& agent_node) const = 0;
 };
 
 struct AgentDescriptorFactory : DescriptorFactory {
@@ -64,15 +68,15 @@ struct AgentDescriptorFactory : DescriptorFactory {
 
   virtual ~AgentDescriptorFactory() = default;
 
-  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const SceneGraphNode& agent_node) const override;
+  Descriptor::Ptr construct(const spark_dsg::SceneGraph& graph,
+                            const spark_dsg::SceneGraphNode& agent_node) const override;
 };
 
 struct ObjectDescriptorFactory : DescriptorFactory {
   ObjectDescriptorFactory(const SubgraphConfig& config, size_t num_classes);
 
-  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const SceneGraphNode& agent_node) const override;
+  Descriptor::Ptr construct(const spark_dsg::SceneGraph& graph,
+                            const spark_dsg::SceneGraphNode& agent_node) const override;
 
   const SubgraphConfig config;
   const size_t num_classes;
@@ -106,8 +110,8 @@ struct PlaceDescriptorFactory : DescriptorFactory {
   PlaceDescriptorFactory(const SubgraphConfig& config,
                          const HistogramConfig<double>& histogram);
 
-  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const SceneGraphNode& agent_node) const override;
+  Descriptor::Ptr construct(const spark_dsg::SceneGraph& graph,
+                            const spark_dsg::SceneGraphNode& agent_node) const override;
 
   const SubgraphConfig config;
   const HistogramConfig<double> histogram;

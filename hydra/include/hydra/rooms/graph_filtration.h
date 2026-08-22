@@ -33,7 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/dsg_types.h"
+#include <spark_dsg/scene_graph_layer.h>
+
 #include "hydra/utils/disjoint_set.h"
 
 namespace hydra {
@@ -48,23 +49,23 @@ struct ComponentLifetime {
   double end;
 };
 
-using LifetimeMap = std::unordered_map<NodeId, ComponentLifetime>;
+using LifetimeMap = std::unordered_map<spark_dsg::NodeId, ComponentLifetime>;
 
 struct DistanceAdaptor {
   virtual ~DistanceAdaptor() = default;
-  virtual double operator()(const SceneGraphNode& node) const;
-  virtual double operator()(const SceneGraphEdge& edge) const;
+  virtual double operator()(const spark_dsg::SceneGraphNode& node) const;
+  virtual double operator()(const spark_dsg::SceneGraphEdge& edge) const;
 };
 
 struct TraversabilityDistanceAdaptor : public DistanceAdaptor {
-  explicit TraversabilityDistanceAdaptor(const SceneGraphLayer& layer)
+  explicit TraversabilityDistanceAdaptor(const spark_dsg::SceneGraphLayer& layer)
       : layer(layer) {};
 
-  double operator()(const SceneGraphNode& node) const override;
-  double operator()(const SceneGraphEdge& edge) const override;
+  double operator()(const spark_dsg::SceneGraphNode& node) const override;
+  double operator()(const spark_dsg::SceneGraphEdge& edge) const override;
 
  private:
-  const SceneGraphLayer& layer;
+  const spark_dsg::SceneGraphLayer& layer;
 };
 
 struct BarcodeTracker : public DisjointSet {
@@ -74,12 +75,12 @@ struct BarcodeTracker : public DisjointSet {
 
   virtual ~BarcodeTracker() = default;
 
-  void addNode(NodeId node, double distance);
+  void addNode(spark_dsg::NodeId node, double distance);
 
   bool doUnion(DisjointSet& components,
-               const std::unordered_map<NodeId, double>& node_distances,
-               NodeId node,
-               NodeId rhs,
+               const std::unordered_map<spark_dsg::NodeId, double>& node_distances,
+               spark_dsg::NodeId node,
+               spark_dsg::NodeId rhs,
                double distance);
 
   size_t min_component_size;
@@ -93,14 +94,16 @@ std::ostream& operator<<(std::ostream& out, const FiltrationInfo& info);
 
 std::ostream& operator<<(std::ostream& out, const Filtration& info);
 
-Filtration getGraphFiltration(const SceneGraphLayer& layer,
+Filtration getGraphFiltration(const spark_dsg::SceneGraphLayer& layer,
                               double diff_threshold_m = 1.0e-4,
                               const DistanceAdaptor& get_distance = {});
-Filtration getGraphFiltration(const SceneGraphLayer& layer,
+
+Filtration getGraphFiltration(const spark_dsg::SceneGraphLayer& layer,
                               size_t min_component_size,
                               double diff_threshold_m = 1.0e-4,
                               const DistanceAdaptor& get_distance = {});
-Filtration getGraphFiltration(const SceneGraphLayer& layer,
+
+Filtration getGraphFiltration(const spark_dsg::SceneGraphLayer& layer,
                               BarcodeTracker& tracker,
                               double diff_threshold_m,
                               const ComponentCallback& count_components,

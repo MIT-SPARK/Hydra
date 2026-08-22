@@ -33,10 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <fstream>
-#include <unordered_set>
+#include <spark_dsg/scene_graph.h>
 
-#include "hydra/common/dsg_types.h"
+#include <fstream>
+
 #include "hydra/rooms/graph_clustering.h"
 #include "hydra/rooms/room_finder_config.h"
 #include "hydra/rooms/room_utilities.h"
@@ -54,34 +54,35 @@ struct GraphInfo {
 
 class RoomFinder {
  public:
-  using ClusterMap = std::map<NodeId, std::vector<NodeId>>;
+  using Layer = spark_dsg::SceneGraphLayer;
+  using ClusterMap = std::map<spark_dsg::NodeId, std::vector<spark_dsg::NodeId>>;
 
   explicit RoomFinder(const RoomFinderConfig& config);
 
   virtual ~RoomFinder();
 
-  SceneGraphLayer::Ptr findRooms(const SceneGraphLayer& places);
+  Layer::Ptr findRooms(const Layer& places);
 
-  void addRoomPlaceEdges(DynamicSceneGraph& graph, const std::string& layer) const;
+  void addRoomPlaceEdges(spark_dsg::SceneGraph& graph, const std::string& layer) const;
 
   void enableLogging(const std::string& log_path);
 
-  void fillClusterMap(const SceneGraphLayer& places, ClusterMap& assignments) const;
+  void fillClusterMap(const Layer& places, ClusterMap& assignments) const;
 
   const RoomFinderConfig config;
 
   const RoomExtents room_extents;
 
  protected:
-  InitialClusters getBestComponents(const SceneGraphLayer& places) const;
+  InitialClusters getBestComponents(const Layer& places) const;
 
-  SceneGraphLayer::Ptr makeRoomLayer(const SceneGraphLayer& places);
+  Layer::Ptr makeRoomLayer(const Layer& places);
 
-  void setupDistanceAdaptor(const SceneGraphLayer& places);
+  void setupDistanceAdaptor(const Layer& places);
 
   std::unique_ptr<DistanceAdaptor> distance_adaptor_;
   ClusterResults last_results_;
-  std::map<size_t, NodeId> cluster_room_map_;
+  std::map<size_t, spark_dsg::NodeId> cluster_room_map_;
   mutable bool logged_once_ = false;
   std::unique_ptr<std::ofstream> log_file_;
   std::unique_ptr<std::ofstream> graph_log_file_;

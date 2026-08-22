@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/spark_dsg_fwd.h>
+
 #include <memory>
 
 #include "hydra/backend/backend_module.h"
@@ -54,7 +56,7 @@ class ZmqSink : public BackendModule::Sink {
   explicit ZmqSink(const Config& config);
   virtual ~ZmqSink();
   void call(uint64_t timestamp_ns,
-            const DynamicSceneGraph& graph,
+            const spark_dsg::SceneGraph& graph,
             const kimera_pgmo::DeformationGraph& dgraph) const override;
   std::string printInfo() const override;
 

@@ -52,9 +52,9 @@ class DsgUpdater {
  public:
   using Ptr = std::shared_ptr<DsgUpdater>;
   using Sink = OutputSink<uint64_t,
-                          const DynamicSceneGraph&,
+                          const spark_dsg::SceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
-  using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
+  using NodeToRobotMap = std::unordered_map<spark_dsg::NodeId, size_t>;
 
   struct Config : public VerbosityConfig {
     using FunctorConfig = config::VirtualConfig<UpdateFunctor, true>;
@@ -73,7 +73,7 @@ class DsgUpdater {
   } const config;
 
   DsgUpdater(const Config& config,
-             DynamicSceneGraph::Ptr source,
+             spark_dsg::SceneGraph::Ptr source,
              SharedDsgInfo::Ptr target);
 
   virtual ~DsgUpdater() = default;
@@ -95,7 +95,7 @@ class DsgUpdater {
   GroupedMergeTracker merge_tracker;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
-  DynamicSceneGraph::Ptr source_graph_;
+  spark_dsg::SceneGraph::Ptr source_graph_;
   SharedDsgInfo::Ptr target_dsg_;
 };
 

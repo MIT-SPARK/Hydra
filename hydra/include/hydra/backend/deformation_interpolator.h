@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/bounding_box.h>
 
 #include "hydra/backend/update_functions.h"
 
@@ -41,7 +42,7 @@ namespace hydra {
 struct NodeCache {
   struct Entry {
     //! Node entry ID
-    NodeId id;
+    spark_dsg::NodeId id;
     //! Associated update timestamp
     uint64_t timestamp;
     //! Odometric node position
@@ -49,12 +50,13 @@ struct NodeCache {
     //! Odometric bounding box for node
     spark_dsg::BoundingBox init_bbox;
 
-    void update(NodeAttributes& attrs, const Eigen::Isometry3d& transform) const;
+    void update(spark_dsg::NodeAttributes& attrs,
+                const Eigen::Isometry3d& transform) const;
   };
 
-  Entry* add(NodeId node, const NodeAttributes& attrs);
+  Entry* add(spark_dsg::NodeId node, const spark_dsg::NodeAttributes& attrs);
 
-  std::map<NodeId, Entry> nodes;
+  std::map<spark_dsg::NodeId, Entry> nodes;
 };
 
 /**
@@ -81,10 +83,10 @@ class DeformationInterpolator {
    * @param info Update information containing deformation graph.
    * @param view View on the unmerged scene graph selecting all nodes to update.
    */
-  void interpolate(const DynamicSceneGraph& unmerged,
-                   DynamicSceneGraph& dsg,
+  void interpolate(const spark_dsg::SceneGraph& unmerged,
+                   spark_dsg::SceneGraph& dsg,
                    const UpdateInfo::ConstPtr& info,
-                   const LayerView& view) const;
+                   const spark_dsg::LayerView& view) const;
 
   /**
    * @brief Interpolate the node positions based on the deformation graph, using the
@@ -95,10 +97,10 @@ class DeformationInterpolator {
    * @param info Update information containing deformation graph.
    * @param view View on the unmerged scene graph selecting all nodes to update.
    */
-  void interpolateNodePositions(const DynamicSceneGraph& unmerged,
-                                DynamicSceneGraph& dsg,
+  void interpolateNodePositions(const spark_dsg::SceneGraph& unmerged,
+                                spark_dsg::SceneGraph& dsg,
                                 const UpdateInfo::ConstPtr& info,
-                                const LayerView& view) const {
+                                const spark_dsg::LayerView& view) const {
     interpolate(unmerged, dsg, info, view);
   }
 

@@ -37,7 +37,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/dsg_types.h>
 #include <hydra/utils/display_utilities.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <hydra/utils/timing_utilities.h>
@@ -49,6 +48,7 @@ namespace hydra {
 
 using hydra_msgs::msg::DsgUpdate;
 using MeshMsg = kimera_pgmo_msgs::msg::Mesh;
+using namespace spark_dsg;
 
 void declare_config(DsgSender::Config& config) {
   using namespace config;

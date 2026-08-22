@@ -1,5 +1,6 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
+#include <spark_dsg/node_symbol.h>
 
 #include <map>
 
@@ -62,7 +63,7 @@ class IBObjectsUpdateFunctor : public UpdateFunctor {
   std::unique_ptr<NodeMatcher> edge_checker_;
 
   IdTracker components_ids_;
-  mutable NodeSymbol next_node_id_;
+  mutable spark_dsg::NodeSymbol next_node_id_;
   mutable std::set<spark_dsg::NodeId> ignored_;
   mutable std::set<spark_dsg::NodeId> active_;
   mutable std::map<size_t, ComponentInfo::Ptr> components_;

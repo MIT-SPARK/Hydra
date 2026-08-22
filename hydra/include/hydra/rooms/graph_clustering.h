@@ -33,20 +33,20 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/dsg_types.h"
 #include "hydra/rooms/room_utilities.h"
 
 namespace hydra {
 
-using InitialClusters = std::vector<std::vector<NodeId>>;
-using EdgeWeightFunc = std::function<double(const SceneGraphLayer&, NodeId, NodeId)>;
+using InitialClusters = std::vector<std::vector<spark_dsg::NodeId>>;
+using EdgeWeightFunc = std::function<double(
+    const spark_dsg::SceneGraphLayer&, spark_dsg::NodeId, spark_dsg::NodeId)>;
 
 struct ClusterResults {
-  using Cluster = std::unordered_set<NodeId>;
+  using Cluster = std::unordered_set<spark_dsg::NodeId>;
   using Clusters = std::map<size_t, Cluster>;
 
   Clusters clusters;
-  std::map<NodeId, size_t> labels;
+  std::map<spark_dsg::NodeId, size_t> labels;
   size_t total_iters;
   bool valid = false;
 
@@ -55,20 +55,20 @@ struct ClusterResults {
   void fillFromInitialClusters(const InitialClusters& initial_clusters);
 };
 
-ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
+ClusterResults clusterGraphByModularity(const spark_dsg::SceneGraphLayer& layer,
                                         const InitialClusters& initial_clusters,
                                         size_t max_iters = 5,
                                         double gamma = 1.0);
 
-ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
+ClusterResults clusterGraphByModularity(const spark_dsg::SceneGraphLayer& layer,
                                         const InitialClusters& initial_clusters,
                                         const EdgeWeightFunc& edge_weight_func,
                                         size_t max_iters = 5,
                                         double gamma = 1.0);
 
-ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
+ClusterResults clusterGraphByNeighbors(const spark_dsg::SceneGraphLayer& layer,
                                        const InitialClusters& initial_clusters);
 
-ClusterResults clusterGraphByGt(const SceneGraphLayer& layer,
+ClusterResults clusterGraphByGt(const spark_dsg::SceneGraphLayer& layer,
                                 const RoomExtents& room_extents);
 }  // namespace hydra

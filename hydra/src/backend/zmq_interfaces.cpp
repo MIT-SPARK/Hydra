@@ -41,6 +41,8 @@
 #include <glog/logging.h>
 #include <spark_dsg/zmq_interface.h>
 
+using spark_dsg::SceneGraph;
+
 namespace hydra {
 namespace {
 
@@ -65,7 +67,7 @@ ZmqSink::ZmqSink(const Config& config) : config(config::checkValid(config)) {
 ZmqSink::~ZmqSink() = default;
 
 void ZmqSink::call(uint64_t timestamp_ns,
-                   const DynamicSceneGraph& graph,
+                   const SceneGraph& graph,
                    const kimera_pgmo::DeformationGraph&) const {
   VLOG(5) << "Sending graph via zmq to '" << config.url << "' @ " << timestamp_ns
           << " [ns]";

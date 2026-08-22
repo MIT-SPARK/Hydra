@@ -77,16 +77,16 @@ struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
 
   Hooks hooks() const override;
 
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
  protected:
   // Hook callbacks.
-  MergeList findNodeMerges(const DynamicSceneGraph& dsg,
+  MergeList findNodeMerges(const spark_dsg::SceneGraph& dsg,
                            const UpdateInfo::ConstPtr& info) const;
 
-  NodeAttributes::Ptr mergeNodes(const DynamicSceneGraph& dsg,
+  NodeAttributes::Ptr mergeNodes(const spark_dsg::SceneGraph& dsg,
                                  const std::vector<NodeId>& merge_ids) const;
 
   void cleanup(const UpdateInfo::ConstPtr& /* info */, SharedDsgInfo* dsg) const;
@@ -96,13 +96,13 @@ struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
    * @brief Update the positions of all traversability nodes in the DSG. Propagates to
    * the complete DSG in case of new loop closures.
    */
-  void updateDeformation(const DynamicSceneGraph& unmerged,
+  void updateDeformation(const spark_dsg::SceneGraph& unmerged,
                          SharedDsgInfo& dsg,
                          const UpdateInfo::ConstPtr& info) const;
 
-  EdgeSet findActiveWindowEdges(DynamicSceneGraph& dsg) const;
+  EdgeSet findActiveWindowEdges(spark_dsg::SceneGraph& dsg) const;
 
-  void pruneActiveWindowEdges(DynamicSceneGraph& dsg,
+  void pruneActiveWindowEdges(spark_dsg::SceneGraph& dsg,
                               const EdgeSet& active_edges) const;
 
   void updateDistances(const SceneGraphLayer& layer) const;
@@ -114,7 +114,7 @@ struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
    * connection in the active window.
    */
   std::vector<NodeId> findConnections(
-      const DynamicSceneGraph& dsg,
+      const spark_dsg::SceneGraph& dsg,
       const TraversabilityNodeAttributes& from_attrs) const;
 
   /**
@@ -143,7 +143,7 @@ struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
 
   void computeTopologicalDistances(const SceneGraphLayer& layer) const;
 
-  void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
+  void resetNeighborFinder(const spark_dsg::SceneGraph& dsg) const;
 
  protected:
   // Cached constants.

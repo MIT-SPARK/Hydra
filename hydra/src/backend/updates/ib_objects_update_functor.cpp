@@ -5,6 +5,7 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/graph_utilities.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/utils/nearest_neighbor_utilities.h"

@@ -54,6 +54,7 @@ namespace hydra {
 using hydra::timing::ScopedTimer;
 using kimera_pgmo::KimeraPgmoInterface;
 using pose_graph_tools::PoseGraph;
+using namespace spark_dsg;
 
 namespace {
 

@@ -43,6 +43,7 @@
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/mesh_traits.h>
 #include <spark_dsg/bounding_box_extraction.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/utils/mesh_utilities.h"
@@ -50,6 +51,7 @@
 
 namespace hydra {
 
+using namespace spark_dsg;
 using Cluster = MeshSegmenter::Cluster;
 using LabelClusters = MeshSegmenter::LabelClusters;
 using timing::ScopedTimer;
@@ -162,7 +164,7 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
 }
 
 void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
-                                   DynamicSceneGraph& graph) {
+                                   SceneGraph& graph) {
   for (auto& [label, label_nodes] : active_nodes_) {
     auto iter = label_nodes.begin();
     while (iter != label_nodes.end()) {
@@ -200,7 +202,7 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
 void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
                                 const kimera_pgmo::MeshOffsetInfo& offsets,
                                 const LabelClusters& clusters,
-                                DynamicSceneGraph& graph) {
+                                SceneGraph& graph) {
   ScopedTimer timer(config.timer_namespace + "_graph_update", timestamp_ns);
   updateOldNodes(offsets, graph);
   if (!graph.hasMesh()) {
@@ -230,7 +232,7 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
   }
 }
 
-void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
+void MeshSegmenter::mergeActiveNodes(SceneGraph& graph, uint32_t label) {
   std::set<NodeId> merged_nodes;
 
   auto& curr_active = active_nodes_.at(label);
@@ -283,7 +285,7 @@ std::unordered_set<NodeId> MeshSegmenter::getActiveNodes() const {
   return active_nodes;
 }
 
-void MeshSegmenter::updateNodeInGraph(DynamicSceneGraph& graph,
+void MeshSegmenter::updateNodeInGraph(SceneGraph& graph,
                                       const Cluster& cluster,
                                       const SceneGraphNode& node,
                                       uint64_t timestamp) {
@@ -295,7 +297,7 @@ void MeshSegmenter::updateNodeInGraph(DynamicSceneGraph& graph,
   updateObjectGeometry(*graph.mesh(), attrs);
 }
 
-void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
+void MeshSegmenter::addNodeToGraph(SceneGraph& graph,
                                    const Cluster& cluster,
                                    uint32_t label,
                                    uint64_t timestamp) {

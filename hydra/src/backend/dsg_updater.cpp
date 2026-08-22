@@ -40,10 +40,13 @@
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
+#include <spark_dsg/node_attributes.h>
 
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 namespace {
@@ -51,7 +54,7 @@ namespace {
 void findAndApplyMerges(const VerbosityConfig& config,
                         const UpdateFunctor::Hooks& hooks,
                         const UpdateInfo::ConstPtr& info,
-                        const DynamicSceneGraph& source,
+                        const SceneGraph& source,
                         SharedDsgInfo& target,
                         MergeTracker& tracker,
                         bool exhaustive) {
@@ -92,7 +95,7 @@ void declare_config(DsgUpdater::Config& config) {
 }
 
 DsgUpdater::DsgUpdater(const Config& config,
-                       DynamicSceneGraph::Ptr source,
+                       SceneGraph::Ptr source,
                        SharedDsgInfo::Ptr target)
     : config(config::checkValid(config)), source_graph_(source), target_dsg_(target) {
   for (const auto& [name, functor] : config.update_functors) {

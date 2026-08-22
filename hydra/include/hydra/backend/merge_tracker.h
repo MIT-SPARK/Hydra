@@ -40,30 +40,31 @@ namespace hydra {
 struct MergeTracker {
   using MergeFunc = UpdateFunctor::Hooks::MergeFunc;
 
-  size_t applyMerges(const DynamicSceneGraph& unmerged,
+  size_t applyMerges(const spark_dsg::SceneGraph& unmerged,
                      const MergeList& proposals,
                      SharedDsgInfo& dsg,
                      const MergeFunc& merge_attrs = MergeFunc());
 
-  void updateAllMergeAttributes(const DynamicSceneGraph& unmerged,
-                                DynamicSceneGraph& merged,
+  void updateAllMergeAttributes(const spark_dsg::SceneGraph& unmerged,
+                                spark_dsg::SceneGraph& merged,
                                 const MergeFunc& merge_attrs);
 
   void clear();
 
-  void erase_nodes(std::vector<NodeId> nodes_to_erase);
+  void erase_nodes(std::vector<spark_dsg::NodeId> nodes_to_erase);
   std::string print() const;
 
  private:
-  void updateParents(std::map<NodeId, NodeId>& prior_merges, const Merge& merge);
+  void updateParents(std::map<spark_dsg::NodeId, spark_dsg::NodeId>& prior_merges,
+                     const Merge& merge);
 
-  std::map<NodeId, std::set<NodeId>> merge_sets_;
+  std::map<spark_dsg::NodeId, std::set<spark_dsg::NodeId>> merge_sets_;
 };
 
 struct GroupedMergeTracker {
   void initializeTracker(std::string name);
   void clear();
-  void erase_nodes(std::vector<NodeId> nodes);
+  void erase_nodes(std::vector<spark_dsg::NodeId> nodes);
   std::string print() const;
   MergeTracker& getMergeGroup(std::string name);
 

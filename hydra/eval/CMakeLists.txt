@@ -12,9 +12,6 @@ target_link_libraries(
   PRIVATE nanoflann::nanoflann
 )
 
-add_executable(compress_graph tools/compress_graph.cpp)
-target_link_libraries(compress_graph ${PROJECT_NAME}_eval nanoflann::nanoflann)
-
 add_executable(compute_filtrations tools/compute_filtrations.cpp)
 target_link_libraries(compute_filtrations ${PROJECT_NAME}_eval)
 
@@ -24,9 +21,6 @@ target_link_libraries(evaluate_places ${PROJECT_NAME}_eval)
 add_executable(evaluate_rooms tools/evaluate_rooms.cpp)
 target_link_libraries(evaluate_rooms ${PROJECT_NAME}_eval)
 
-add_executable(gt_trajectory_optimizer tools/gt_trajectory_optimizer.cpp)
-target_link_libraries(gt_trajectory_optimizer ${PROJECT_NAME}_eval kimera_rpgo::kimera_rpgo)
-
 add_executable(merge_graphs tools/merge_graphs.cpp)
 target_link_libraries(merge_graphs ${PROJECT_NAME}_eval)
 
@@ -35,8 +29,8 @@ target_link_libraries(optimize_graph ${PROJECT_NAME}_eval)
 
 if(${HYDRA_ENABLE_ROS_INSTALL_LAYOUT})
   install(
-    TARGETS ${PROJECT_NAME}_eval compress_graph compute_filtrations evaluate_places
-            evaluate_rooms gt_trajectory_optimizer merge_graphs optimize_graph
+    TARGETS ${PROJECT_NAME}_eval compute_filtrations evaluate_places
+            evaluate_rooms merge_graphs optimize_graph
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}

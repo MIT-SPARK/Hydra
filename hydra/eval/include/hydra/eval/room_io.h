@@ -33,12 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/bounding_box.h>
+
 #include <list>
 #include <map>
 #include <optional>
 #include <string>
-
-#include "hydra/common/dsg_types.h"
 
 namespace hydra::eval {
 
@@ -46,7 +46,7 @@ class RoomGeometry {
  public:
   RoomGeometry();
 
-  bool addRoom(size_t room_id, const std::list<BoundingBox>& boxes);
+  bool addRoom(size_t room_id, const std::list<spark_dsg::BoundingBox>& boxes);
 
   std::optional<size_t> findRoomIndex(const Eigen::Vector3f& pos) const;
 
@@ -58,7 +58,7 @@ class RoomGeometry {
   static RoomGeometry fromYaml(const std::string& contents);
 
  private:
-  std::map<size_t, std::list<BoundingBox>> rooms_;
+  std::map<size_t, std::list<spark_dsg::BoundingBox>> rooms_;
 };
 
 }  // namespace hydra::eval

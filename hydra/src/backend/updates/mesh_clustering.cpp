@@ -40,10 +40,13 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
+#include <spark_dsg/node_attributes.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
 #include "hydra/utils/timing_utilities.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 namespace {
@@ -152,7 +155,7 @@ UpdateMeshClustersFunctor::UpdateMeshClustersFunctor(const Config& config)
       next_node_id_(config.prefix, 0),
       clustering_(config.resolution) {}
 
-void UpdateMeshClustersFunctor::call(const DynamicSceneGraph&,
+void UpdateMeshClustersFunctor::call(const SceneGraph&,
                                      SharedDsgInfo& dsg,
                                      const UpdateInfo::ConstPtr& info) const {
   auto mesh = dsg.graph->mesh();
