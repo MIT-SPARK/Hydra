@@ -39,6 +39,8 @@
 #include <config_utilities/factory.h>
 #include <glog/logging.h>
 
+using namespace spark_dsg;
+
 namespace hydra::association {
 namespace {
 

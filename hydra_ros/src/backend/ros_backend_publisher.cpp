@@ -38,10 +38,11 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/common/common_types.h>
 #include <hydra/common/global_info.h>
 #include <ianvs/node_handle.h>
 #include <kimera_pgmo_ros/visualization_functions.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
@@ -50,8 +51,8 @@
 
 namespace hydra {
 
+using namespace spark_dsg;
 using kimera_pgmo::DeformationGraph;
-using kimera_pgmo::KimeraPgmoConfig;
 using kimera_pgmo_msgs::msg::Mesh;
 using pose_graph_tools::PoseGraphTypeAdapter;
 using visualization_msgs::msg::Marker;
@@ -87,7 +88,7 @@ RosBackendPublisher::RosBackendPublisher(ianvs::NodeHandle nh)
 }
 
 void RosBackendPublisher::call(uint64_t timestamp_ns,
-                               const DynamicSceneGraph& graph,
+                               const SceneGraph& graph,
                                const DeformationGraph& dgraph) const {
   const rclcpp::Time stamp(timestamp_ns);
   dsg_sender_->sendGraph(graph, stamp);
@@ -112,7 +113,7 @@ void RosBackendPublisher::call(uint64_t timestamp_ns,
 
 std::string RosBackendPublisher::printInfo() const { return config::toString(config); }
 
-void RosBackendPublisher::publishTf(const DynamicSceneGraph& graph,
+void RosBackendPublisher::publishTf(const SceneGraph& graph,
                                     const DeformationGraph& dgraph) const {
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
 
@@ -165,7 +166,7 @@ void RosBackendPublisher::publishTf(const DynamicSceneGraph& graph,
   tf_br_.sendTransform(transforms);
 }
 
-void RosBackendPublisher::publishPoseGraph(const DynamicSceneGraph& graph,
+void RosBackendPublisher::publishPoseGraph(const SceneGraph& graph,
                                            const DeformationGraph& dgraph,
                                            const uint64_t& stamp) const {
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
@@ -188,7 +189,7 @@ void RosBackendPublisher::publishPoseGraph(const DynamicSceneGraph& graph,
   pose_graph_pub_->publish(pose_graph);
 }
 
-void RosBackendPublisher::publishMeshGraph(const DynamicSceneGraph&,
+void RosBackendPublisher::publishMeshGraph(const SceneGraph&,
                                            const DeformationGraph& dgraph,
                                            const uint64_t& stamp) const {
   std::map<size_t, std::vector<size_t>> id_timestamps_temp;

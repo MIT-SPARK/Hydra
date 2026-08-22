@@ -36,7 +36,7 @@
 
 #include <hydra/common/output_sink.h>
 #include <kimera_pgmo/mesh_delta.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <memory>
 #include <optional>

@@ -42,8 +42,6 @@
 
 namespace hydra {
 
-using namespace spark_dsg;
-
 class NearestNodeFinder {
  public:
   using Callback = std::function<void(spark_dsg::NodeId, size_t, double)>;

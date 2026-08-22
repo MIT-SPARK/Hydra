@@ -60,7 +60,7 @@ class RosFrontendPublisher : public GraphBuilder::Sink {
   explicit RosFrontendPublisher(ianvs::NodeHandle);
 
   void call(uint64_t timestamp_ns,
-            const DynamicSceneGraph& graph,
+            const spark_dsg::SceneGraph& graph,
             const BackendInput& backend_input) const override;
 
   std::string printInfo() const override;

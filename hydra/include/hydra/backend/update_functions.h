@@ -37,7 +37,6 @@
 #include <kimera_pgmo/mesh_offset_info.h>
 
 #include "hydra/backend/merge_proposer.h"
-#include "hydra/common/dsg_types.h"  // IWYU pragma: keep
 #include "hydra/common/shared_dsg_info.h"
 
 namespace kimera_pgmo {
@@ -49,7 +48,7 @@ namespace hydra {
 struct UpdateInfo {
   using Ptr = std::shared_ptr<UpdateInfo>;
   using ConstPtr = std::shared_ptr<const UpdateInfo>;
-  using LayerMerges = std::map<LayerId, MergeList>;
+  using LayerMerges = std::map<spark_dsg::LayerId, MergeList>;
 
   uint64_t timestamp_ns = 0;
   const gtsam::Values* places_values = nullptr;
@@ -60,22 +59,25 @@ struct UpdateInfo {
   // TODO(nathan) flip to const when we have mutable state
   kimera_pgmo::DeformationGraph* deformation_graph = nullptr;
   //! Mapping between nodes and robots
-  const std::unordered_map<NodeId, size_t>* node_to_robot_id = nullptr;
+  const std::unordered_map<spark_dsg::NodeId, size_t>* node_to_robot_id = nullptr;
   //! Archival information for mesh
   kimera_pgmo::MeshOffsetInfo mesh_offsets = {};
 };
 
 struct UpdateFunctor {
   using Ptr = std::shared_ptr<UpdateFunctor>;
+  using Graph = spark_dsg::SceneGraph;
+  using AttrPtr = std::unique_ptr<spark_dsg::NodeAttributes>;
+
   struct Hooks {
-    using CleanupFunc = std::function<void(
-        const UpdateInfo::ConstPtr&, DynamicSceneGraph&, SharedDsgInfo*)>;
+    using CleanupFunc =
+        std::function<void(const UpdateInfo::ConstPtr&, Graph&, SharedDsgInfo*)>;
     using FindMergeFunc =
-        std::function<MergeList(const DynamicSceneGraph&, const UpdateInfo::ConstPtr&)>;
-    using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,
-                                                        const std::vector<NodeId>&)>;
-    using MeshUpdateFunc = std::function<void(const DynamicSceneGraph&,
-                                              const kimera_pgmo::MeshOffsetInfo&)>;
+        std::function<MergeList(const Graph&, const UpdateInfo::ConstPtr&)>;
+    using MergeFunc =
+        std::function<AttrPtr(const Graph&, const std::vector<spark_dsg::NodeId>&)>;
+    using MeshUpdateFunc =
+        std::function<void(const Graph&, const kimera_pgmo::MeshOffsetInfo&)>;
 
     MeshUpdateFunc mesh_update;
     CleanupFunc cleanup;
@@ -85,7 +87,7 @@ struct UpdateFunctor {
 
   virtual ~UpdateFunctor() = default;
   virtual Hooks hooks() const;
-  virtual void call(const DynamicSceneGraph& unmerged,
+  virtual void call(const Graph& unmerged,
                     SharedDsgInfo& dsg,
                     const UpdateInfo::ConstPtr& info) const = 0;
 };

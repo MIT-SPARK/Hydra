@@ -35,6 +35,8 @@
 #include <gtest/gtest.h>
 #include <hydra/rooms/graph_clustering.h>
 
+using namespace spark_dsg;
+
 namespace hydra {
 
 TEST(GraphClusteringTests, ClearResultsCorrect) {

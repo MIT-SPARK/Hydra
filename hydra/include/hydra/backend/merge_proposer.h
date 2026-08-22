@@ -37,14 +37,12 @@
 #include <config_utilities/virtual_config.h>
 #include <spark_dsg/layer_view.h>
 
-#include "hydra/common/dsg_types.h"
-
 namespace hydra {
 
 struct Merge {
-  NodeId from;
-  NodeId to;
-  Merge remap(const std::map<NodeId, NodeId>& remapping) const;
+  spark_dsg::NodeId from;
+  spark_dsg::NodeId to;
+  Merge remap(const std::map<spark_dsg::NodeId, spark_dsg::NodeId>& remapping) const;
 };
 
 std::ostream& operator<<(std::ostream& out, const Merge& merge);
@@ -56,13 +54,17 @@ inline bool operator==(const Merge& lhs, const Merge& rhs) {
 using MergeList = std::list<Merge>;
 
 struct AssociationStrategy {
+  using Layer = spark_dsg::SceneGraphLayer;
+  using Node = spark_dsg::SceneGraphNode;
+
   virtual ~AssociationStrategy() = default;
-  virtual spark_dsg::LayerView candidates(const SceneGraphLayer& layer,
-                                          const SceneGraphNode& node) const = 0;
+  virtual spark_dsg::LayerView candidates(const Layer& layer,
+                                          const Node& node) const = 0;
 };
 
 struct MergeProposer {
-  using MergeCheck = std::function<bool(const SceneGraphNode&, const SceneGraphNode&)>;
+  using MergeCheck = std::function<bool(const spark_dsg::SceneGraphNode&,
+                                        const spark_dsg::SceneGraphNode&)>;
 
   struct Config {
     config::VirtualConfig<AssociationStrategy> strategy;
@@ -70,7 +72,7 @@ struct MergeProposer {
 
   explicit MergeProposer(const Config& config) : config(config) {}
 
-  void findMerges(const SceneGraphLayer& layer,
+  void findMerges(const spark_dsg::SceneGraphLayer& layer,
                   const spark_dsg::LayerView& view,
                   const MergeCheck& should_merge,
                   MergeList& nodes_to_merge) const;

@@ -90,7 +90,7 @@ void optimize_graph(const OptimizationConfig& info) {
   GlobalInfo::init(global_config, 0);
   SharedModuleState::Ptr state(new SharedModuleState());
   state->backend_graph = GlobalInfo::instance().createSharedDsg();
-  state->backend_graph->graph = spark_dsg::DynamicSceneGraph::load(info.graph);
+  state->backend_graph->graph = spark_dsg::SceneGraph::load(info.graph);
 
   auto dsg = state->backend_graph->clone();
   const auto config = config::fromYamlFile<BackendModule::Config>(info.config_path);

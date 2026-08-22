@@ -1,8 +1,8 @@
 #include "hydra/places/2d_places/place_splitting.h"
 
 #include <kimera_pgmo/mesh_delta.h>
-#include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <opencv2/imgproc.hpp>
 

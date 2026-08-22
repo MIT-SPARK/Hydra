@@ -46,6 +46,7 @@
 
 namespace hydra {
 
+using namespace spark_dsg;
 using timing::ScopedTimer;
 using MergeId = std::optional<NodeId>;
 
@@ -75,7 +76,7 @@ UpdateFunctor::Hooks UpdatePlacesFunctor::hooks() const {
 }
 
 // drops any isolated place nodes that would cause an inderminate system error
-void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
+void UpdatePlacesFunctor::filterMissing(SceneGraph& graph,
                                         const std::list<NodeId> missing_nodes) const {
   if (missing_nodes.empty()) {
     return;
@@ -126,7 +127,7 @@ size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
   return num_changed;
 }
 
-void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
+void UpdatePlacesFunctor::call(const SceneGraph& unmerged,
                                SharedDsgInfo& dsg,
                                const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_places", info->timestamp_ns);
@@ -150,7 +151,7 @@ void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
   VLOG(2) << "[Hydra Backend] Places update: " << num_changed << " nodes";
 }
 
-MergeList UpdatePlacesFunctor::findMerges(const DynamicSceneGraph& graph,
+MergeList UpdatePlacesFunctor::findMerges(const SceneGraph& graph,
                                           const UpdateInfo::ConstPtr& info) const {
   const auto new_lcd = info->loop_closure_detected;
   const auto& places = graph.getLayer(config.layer);

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra/backend/update_functions.h"
 
@@ -51,20 +51,17 @@ struct UpdateFrontiersFunctor : public UpdateFunctor {
 
   explicit UpdateFrontiersFunctor(const Config& config) : config(config) {}
   Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo&,
             const UpdateInfo::ConstPtr&) const override;
 
   void cleanup(uint64_t timestamp_ns,
-               DynamicSceneGraph& unmerged_dsg,
+               spark_dsg::SceneGraph& unmerged_dsg,
                SharedDsgInfo& dsg) const;
 
  private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateFrontiersFunctor, Config>(
-          "UpdateFrontiersFunctor");
-  mutable NodeSymbol next_node_id_ = NodeSymbol('G', 0);
-  mutable std::set<NodeId> deleted_frontiers_;
+  mutable spark_dsg::NodeSymbol next_node_id_ = spark_dsg::NodeSymbol('G', 0);
+  mutable std::set<spark_dsg::NodeId> deleted_frontiers_;
 };
 
 void declare_config(UpdateFrontiersFunctor::Config& config);

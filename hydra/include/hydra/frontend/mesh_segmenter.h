@@ -33,7 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/dsg_types.h"
+#include <spark_dsg/bounding_box.h>
+#include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
+
+#include <Eigen/Dense>
+
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
 
@@ -61,9 +66,9 @@ class MeshSegmenter {
                           const LabelClusters&>;
 
   struct Config {
-    std::string layer_id = DsgLayers::OBJECTS;
+    std::string layer_id = spark_dsg::DsgLayers::OBJECTS;
     clustering::ClusteringConfig clustering;
-    BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
+    spark_dsg::BoundingBox::Type bounding_box_type = spark_dsg::BoundingBox::Type::AABB;
     std::string timer_namespace = "frontend/objects";
     std::vector<Sink::Factory> sinks;
   } const config;
@@ -77,30 +82,30 @@ class MeshSegmenter {
   void updateGraph(uint64_t timestamp,
                    const kimera_pgmo::MeshOffsetInfo& offsets,
                    const LabelClusters& clusters,
-                   DynamicSceneGraph& graph);
+                   spark_dsg::SceneGraph& graph);
 
-  std::unordered_set<NodeId> getActiveNodes() const;
+  std::unordered_set<spark_dsg::NodeId> getActiveNodes() const;
 
  private:
   void updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
-                      DynamicSceneGraph& graph);
+                      spark_dsg::SceneGraph& graph);
 
-  void addNodeToGraph(DynamicSceneGraph& graph,
+  void addNodeToGraph(spark_dsg::SceneGraph& graph,
                       const Cluster& cluster,
                       uint32_t label,
                       uint64_t timestamp);
 
-  void updateNodeInGraph(DynamicSceneGraph& graph,
+  void updateNodeInGraph(spark_dsg::SceneGraph& graph,
                          const Cluster& cluster,
-                         const SceneGraphNode& node,
+                         const spark_dsg::SceneGraphNode& node,
                          uint64_t timestamp);
 
-  void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
+  void mergeActiveNodes(spark_dsg::SceneGraph& graph, uint32_t label);
 
  private:
-  NodeSymbol next_node_id_;
+  spark_dsg::NodeSymbol next_node_id_;
   std::set<uint32_t> labels_;
-  std::map<uint32_t, std::set<NodeId>> active_nodes_;
+  std::map<uint32_t, std::set<spark_dsg::NodeId>> active_nodes_;
   Sink::List sinks_;
 };
 

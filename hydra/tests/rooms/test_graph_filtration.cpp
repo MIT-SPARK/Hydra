@@ -34,6 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/rooms/graph_filtration.h>
+#include <spark_dsg/node_attributes.h>
+
+using namespace spark_dsg;
 
 namespace hydra {
 

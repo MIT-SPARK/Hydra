@@ -37,9 +37,11 @@
 
 #include <config_utilities/config.h>
 #include <glog/logging.h>
+#include <spark_dsg/node_symbol.h>
+
+using namespace spark_dsg;
 
 namespace hydra {
-
 namespace {
 
 inline NodeId getRemappedNode(const std::map<NodeId, NodeId>& remapping, NodeId node) {

@@ -35,8 +35,11 @@
 #include "hydra/rooms/graph_filtration.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
 
 #include <iomanip>
+
+using namespace spark_dsg;
 
 namespace hydra {
 

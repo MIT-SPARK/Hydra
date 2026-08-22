@@ -39,7 +39,10 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/zmq_interface.h>
+
+using namespace spark_dsg;
 
 namespace hydra {
 namespace {
@@ -88,7 +91,7 @@ void ZmqRoomLabelUpdater::checkForUpdates() {
   }
 }
 
-void ZmqRoomLabelUpdater::call(const DynamicSceneGraph&,
+void ZmqRoomLabelUpdater::call(const SceneGraph&,
                                SharedDsgInfo& dsg,
                                const UpdateInfo::ConstPtr&) const {
   // start critical section for reading from room label map

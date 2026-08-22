@@ -41,6 +41,8 @@
 
 #include "hydra/utils/timing_utilities.h"
 
+using namespace spark_dsg;
+
 namespace hydra {
 
 using Timer = timing::ScopedTimer;
@@ -67,22 +69,21 @@ UpdateRegionGrowingTraversabilityFunctor::UpdateRegionGrowingTraversabilityFunct
 
 UpdateFunctor::Hooks UpdateRegionGrowingTraversabilityFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
-  my_hooks.find_merges = [this](const DynamicSceneGraph& dsg,
+  my_hooks.find_merges = [this](const SceneGraph& dsg,
                                 const UpdateInfo::ConstPtr& info) {
     return findNodeMerges(dsg, info);
   };
-  my_hooks.merge = [this](const DynamicSceneGraph& dsg,
-                          const std::vector<NodeId>& merge_ids) {
+  my_hooks.merge = [this](const SceneGraph& dsg, const std::vector<NodeId>& merge_ids) {
     return mergeNodes(dsg, merge_ids);
   };
   my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info,
-                            DynamicSceneGraph&,
+                            SceneGraph&,
                             SharedDsgInfo* dsg) { cleanup(info, dsg); };
   return my_hooks;
 }
 
 void UpdateRegionGrowingTraversabilityFunctor::call(
-    const DynamicSceneGraph& unmerged,
+    const SceneGraph& unmerged,
     SharedDsgInfo& dsg,
     const UpdateInfo::ConstPtr& info) const {
   Timer timer("backend/update_traversability", info->timestamp_ns);
@@ -112,7 +113,7 @@ void UpdateRegionGrowingTraversabilityFunctor::call(
 }
 
 void UpdateRegionGrowingTraversabilityFunctor::updateDeformation(
-    const DynamicSceneGraph& unmerged,
+    const SceneGraph& unmerged,
     SharedDsgInfo& dsg,
     const UpdateInfo::ConstPtr& info) const {
   // Update global poses (deformation) of all nodes.
@@ -122,8 +123,7 @@ void UpdateRegionGrowingTraversabilityFunctor::updateDeformation(
   deformation_interpolator_.interpolateNodePositions(unmerged, *dsg.graph, info, view);
 }
 
-void UpdateRegionGrowingTraversabilityFunctor::resetAddedEdges(
-    DynamicSceneGraph& dsg) const {
+void UpdateRegionGrowingTraversabilityFunctor::resetAddedEdges(SceneGraph& dsg) const {
   EdgeSet to_remove;
   for (const auto& [key, edge] : dsg.getLayer(config.layer).edges()) {
     if (edge.attributes<EdgeAttributes>().weight < 0.0) {
@@ -137,7 +137,7 @@ void UpdateRegionGrowingTraversabilityFunctor::resetAddedEdges(
 }
 
 void UpdateRegionGrowingTraversabilityFunctor::findInactiveEdges(
-    DynamicSceneGraph& dsg) const {
+    SceneGraph& dsg) const {
   EdgeSet visited;
   for (const auto& [from_id, node] : dsg.getLayer(config.layer).nodes()) {
     const auto& from_attrs = node->attributes<TravNodeAttributes>();
@@ -167,7 +167,7 @@ void UpdateRegionGrowingTraversabilityFunctor::findInactiveEdges(
 }
 
 void UpdateRegionGrowingTraversabilityFunctor::findActiveWindowEdges(
-    DynamicSceneGraph& dsg) const {
+    SceneGraph& dsg) const {
   active_edges_.clear();
   const auto& layer = dsg.getLayer(config.layer);
   for (const auto& node : activeNodes(layer)) {
@@ -181,7 +181,7 @@ void UpdateRegionGrowingTraversabilityFunctor::findActiveWindowEdges(
 }
 
 void UpdateRegionGrowingTraversabilityFunctor::pruneActiveWindowEdges(
-    DynamicSceneGraph& dsg) const {
+    SceneGraph& dsg) const {
   EdgeSet to_remove;
   for (const auto& [edge_key, edge] : dsg.getLayer(config.layer).edges()) {
     if (active_edges_.count(edge_key) || edge.attributes().weight != -1.0) {
@@ -208,7 +208,7 @@ void UpdateRegionGrowingTraversabilityFunctor::pruneActiveWindowEdges(
 }
 
 MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
-    const DynamicSceneGraph& dsg, const UpdateInfo::ConstPtr& /* info */) const {
+    const SceneGraph& dsg, const UpdateInfo::ConstPtr& /* info */) const {
   // TODO(lschmid): Consider an incremental version in the future.
   MergeList result;
   std::set<NodeId> merged;
@@ -242,7 +242,7 @@ MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
 }
 
 NodeAttributes::Ptr UpdateRegionGrowingTraversabilityFunctor::mergeNodes(
-    const DynamicSceneGraph& dsg, const std::vector<NodeId>& merge_ids) const {
+    const SceneGraph& dsg, const std::vector<NodeId>& merge_ids) const {
   auto result = dsg.getNode(merge_ids.front()).attributes().clone();
   return result;
 }
@@ -251,7 +251,7 @@ void UpdateRegionGrowingTraversabilityFunctor::cleanup(const UpdateInfo::ConstPt
                                                        SharedDsgInfo*) const {}
 
 std::vector<NodeId> UpdateRegionGrowingTraversabilityFunctor::findConnections(
-    const DynamicSceneGraph& dsg, const TravNodeAttributes& from_attrs) const {
+    const SceneGraph& dsg, const TravNodeAttributes& from_attrs) const {
   std::vector<NodeId> connections;
   // NOTE(lschmid): Radius search doesn't work right, brute force for now.
   for (const auto& [to_id, to_node] : dsg.getLayer(config.layer).nodes()) {

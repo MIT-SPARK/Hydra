@@ -53,15 +53,15 @@ void declare_config(DescriptorMatchConfig& config);
 
 struct LayerSearchResults {
   std::vector<float> score;
-  std::set<NodeId> valid_matches;
-  std::set<NodeId> query_nodes;
-  std::vector<std::set<NodeId>> match_nodes;
-  NodeId query_root;
-  std::vector<NodeId> match_root;
+  std::set<spark_dsg::NodeId> valid_matches;
+  std::set<spark_dsg::NodeId> query_nodes;
+  std::vector<std::set<spark_dsg::NodeId>> match_nodes;
+  spark_dsg::NodeId query_root;
+  std::vector<spark_dsg::NodeId> match_root;
 };
 
-using DescriptorCache = std::map<NodeId, Descriptor::Ptr>;
-using DescriptorCacheMap = std::map<NodeId, DescriptorCache>;
+using DescriptorCache = std::map<spark_dsg::NodeId, Descriptor::Ptr>;
+using DescriptorCacheMap = std::map<spark_dsg::NodeId, DescriptorCache>;
 
 float computeDistance(const Descriptor& lhs,
                       const Descriptor& rhs,
@@ -78,15 +78,16 @@ float computeDescriptorScore(const Descriptor& lhs,
 LayerSearchResults searchDescriptors(
     const Descriptor& descriptor,
     const DescriptorMatchConfig& match_config,
-    const std::set<NodeId>& valid_matches,
+    const std::set<spark_dsg::NodeId>& valid_matches,
     const DescriptorCache& descriptors,
-    const std::map<NodeId, std::set<NodeId>>& root_leaf_map,
-    NodeId query_id);
+    const std::map<spark_dsg::NodeId, std::set<spark_dsg::NodeId>>& root_leaf_map,
+    spark_dsg::NodeId query_id);
 
-LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
-                                         const DescriptorMatchConfig& match_config,
-                                         const std::set<NodeId>& valid_matches,
-                                         const DescriptorCacheMap& leaf_cache_map,
-                                         NodeId query_id);
+LayerSearchResults searchLeafDescriptors(
+    const Descriptor& descriptor,
+    const DescriptorMatchConfig& match_config,
+    const std::set<spark_dsg::NodeId>& valid_matches,
+    const DescriptorCacheMap& leaf_cache_map,
+    spark_dsg::NodeId query_id);
 
 }  // namespace hydra::lcd

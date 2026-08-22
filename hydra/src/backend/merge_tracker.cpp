@@ -35,10 +35,13 @@
 #include "hydra/backend/merge_tracker.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_symbol.h>
+
+using namespace spark_dsg;
 
 namespace hydra {
 
-size_t MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
+size_t MergeTracker::applyMerges(const SceneGraph& unmerged,
                                  const MergeList& proposals,
                                  SharedDsgInfo& dsg,
                                  const MergeFunc& merge_attrs) {
@@ -108,8 +111,8 @@ size_t MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
   return num_applied;
 }
 
-void MergeTracker::updateAllMergeAttributes(const DynamicSceneGraph& unmerged,
-                                            DynamicSceneGraph& merged,
+void MergeTracker::updateAllMergeAttributes(const SceneGraph& unmerged,
+                                            SceneGraph& merged,
                                             const MergeFunc& merge_attrs) {
   auto iter = merge_sets_.begin();
   while (iter != merge_sets_.end()) {

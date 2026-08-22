@@ -69,6 +69,9 @@ void declare_config(RobustRegistrationSolver::Params& conf) {
 }
 
 }  // namespace teaser
+
+using namespace spark_dsg;
+
 namespace hydra::lcd {
 
 template <typename Scalar>
@@ -345,7 +348,7 @@ void LcdDetector::resetLayerAssignments(const SearchConfigMap& search_configs,
   }
 }
 
-bool LcdDetector::addNewDescriptors(const DynamicSceneGraph& graph,
+bool LcdDetector::addNewDescriptors(const SceneGraph& graph,
                                     const SceneGraphNode& agent_node) {
   auto parent = agent_node.getParent();
   if (!parent) {
@@ -379,7 +382,7 @@ bool LcdDetector::addNewDescriptors(const DynamicSceneGraph& graph,
 }
 
 void LcdDetector::updateDescriptorCache(
-    const DynamicSceneGraph& dsg,
+    const SceneGraph& dsg,
     const std::unordered_set<NodeId>& archived_places,
     uint64_t timestamp) {
   ScopedTimer timer("lcd/update_descriptors", timestamp, true, 2, false);
@@ -405,7 +408,7 @@ void LcdDetector::updateDescriptorCache(
 }
 
 std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
-    const DynamicSceneGraph& dsg,
+    const SceneGraph& dsg,
     const std::map<size_t, LayerSearchResults>& matches,
     NodeId agent_id,
     uint64_t timestamp) const {
@@ -483,7 +486,7 @@ std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
   return results;
 }
 
-std::vector<RegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& dsg,
+std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
                                                       NodeId agent_id,
                                                       uint64_t timestamp) {
   ScopedTimer timer("lcd/detect", timestamp, true, 2, false);

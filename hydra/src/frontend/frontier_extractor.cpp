@@ -43,6 +43,7 @@ static const auto registration =
 
 using spatial_hash::IndexSet;
 using SpatialCloud = pcl::PointCloud<pcl::PointXYZ>;
+using namespace spark_dsg;
 
 template <typename T, size_t N>
 std::pair<T, Eigen::Matrix<T, N, 1>> getMaxEigenvector(Eigen::Matrix<T, N, N> cov) {
@@ -212,7 +213,7 @@ void clusterFrontiers(const SpatialCloud::Ptr cloud,
 }
 
 std::vector<std::pair<Eigen::Vector3d, double>> getPlacesForBlock(
-    const DynamicSceneGraph& graph,
+    const SceneGraph& graph,
     const Eigen::Vector3f& block_center,
     NearestNodeFinder& finder,
     const double block_size,
@@ -362,7 +363,7 @@ void FrontierExtractor::updateTsdf(const ActiveWindowOutput& msg) {
 }
 
 void FrontierExtractor::detectFrontiers(const ActiveWindowOutput& input,
-                                        DynamicSceneGraph& graph,
+                                        SceneGraph& graph,
                                         const NodeIdSet& active_nodes) {
   frontiers_.clear();
   archived_frontiers_.clear();
@@ -406,8 +407,7 @@ void FrontierExtractor::detectFrontiers(const ActiveWindowOutput& input,
   just_archived_blocks_.clear();
 }
 
-void FrontierExtractor::addFrontiers(const uint64_t timestamp_ns,
-                                     DynamicSceneGraph& graph) {
+void FrontierExtractor::addFrontiers(const uint64_t timestamp_ns, SceneGraph& graph) {
   for (auto nid_bix : nodes_to_remove_) {
     if (tsdf_->hasBlock(nid_bix.second)) {
       graph.removeNode(nid_bix.first);

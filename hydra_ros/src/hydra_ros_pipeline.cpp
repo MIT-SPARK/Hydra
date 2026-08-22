@@ -41,7 +41,6 @@
 #include <hydra/active_window/reconstruction_module.h>
 #include <hydra/backend/backend_module.h>
 #include <hydra/backend/zmq_interfaces.h>
-#include <hydra/common/dsg_types.h>
 #include <hydra/common/global_info.h>
 #include <hydra/frontend/graph_builder.h>
 #include <hydra/loop_closure/loop_closure_module.h>

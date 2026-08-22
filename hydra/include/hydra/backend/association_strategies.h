@@ -42,11 +42,11 @@ namespace hydra::association {
 struct Pairwise : AssociationStrategy {
   struct Config {};
 
-  Pairwise(const Config, const SceneGraphLayer&) {}
+  Pairwise(const Config, const spark_dsg::SceneGraphLayer&) {}
   virtual ~Pairwise() = default;
 
-  LayerView candidates(const SceneGraphLayer& layer,
-                       const SceneGraphNode& node) const override;
+  spark_dsg::LayerView candidates(const spark_dsg::SceneGraphLayer& layer,
+                                  const spark_dsg::SceneGraphNode& node) const override;
 };
 
 void declare_config(Pairwise::Config& config);
@@ -54,11 +54,11 @@ void declare_config(Pairwise::Config& config);
 struct SemanticPairwise : AssociationStrategy {
   struct Config {};
 
-  SemanticPairwise(const Config, const SceneGraphLayer&) {}
+  SemanticPairwise(const Config, const spark_dsg::SceneGraphLayer&) {}
   virtual ~SemanticPairwise() = default;
 
-  LayerView candidates(const SceneGraphLayer& layer,
-                       const SceneGraphNode& node) const override;
+  spark_dsg::LayerView candidates(const spark_dsg::SceneGraphLayer& layer,
+                                  const spark_dsg::SceneGraphNode& node) const override;
 };
 
 void declare_config(SemanticPairwise::Config& config);
@@ -69,12 +69,12 @@ struct NearestNode : AssociationStrategy {
     size_t num_merges_to_consider = 1;
   } const config;
 
-  NearestNode(const Config& config, const SceneGraphLayer& layer);
+  NearestNode(const Config& config, const spark_dsg::SceneGraphLayer& layer);
 
   virtual ~NearestNode();
 
-  LayerView candidates(const SceneGraphLayer& layer,
-                       const SceneGraphNode& node) const override;
+  spark_dsg::LayerView candidates(const spark_dsg::SceneGraphLayer& layer,
+                                  const spark_dsg::SceneGraphNode& node) const override;
 
   NearestNodeFinder::Ptr node_finder;
 };
@@ -87,12 +87,12 @@ struct SemanticNearestNode : AssociationStrategy {
     size_t num_merges_to_consider = 1;
   } const config;
 
-  SemanticNearestNode(const Config& config, const SceneGraphLayer& layer);
+  SemanticNearestNode(const Config& config, const spark_dsg::SceneGraphLayer& layer);
 
   virtual ~SemanticNearestNode();
 
-  LayerView candidates(const SceneGraphLayer& layer,
-                       const SceneGraphNode& node) const override;
+  spark_dsg::LayerView candidates(const spark_dsg::SceneGraphLayer& layer,
+                                  const spark_dsg::SceneGraphNode& node) const override;
 
   SemanticNodeFinders node_finders;
 };

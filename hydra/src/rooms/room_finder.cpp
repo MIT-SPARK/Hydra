@@ -37,13 +37,16 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/graph_utilities.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 #include <Eigen/Dense>
-#include <algorithm>
 #include <queue>
 
 #include "hydra/rooms/graph_filtration.h"
 #include "hydra/rooms/room_utilities.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 
@@ -198,8 +201,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
     if (window_size < config.min_window_size) {
       VLOG(2) << "[RoomFinder] Bad window bounds: [" << config.min_dilation_m << ", "
               << config.max_dilation_m << "],  window: [" << window.first << ", "
-              << window.second << "]"
-              << " with size: " << window_size;
+              << window.second << "]" << " with size: " << window_size;
 
       window = getTrimmedFiltration(
           filtration, config.min_dilation_m, config.max_dilation_m, false);
@@ -329,7 +331,9 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
           components,
           [](const SceneGraphLayer& G, NodeId n1, NodeId n2) {
             // weight should be 1 / distance
-            return 1.0 / (getNodePosition(G, n1) - getNodePosition(G, n2)).norm();
+            return 1.0 / (G.getNode(n1).attributes().position -
+                          G.getNode(n2).attributes().position)
+                             .norm();
           },
           config.max_modularity_iters,
           config.modularity_gamma);
@@ -383,8 +387,7 @@ SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
   return rooms;
 }
 
-void RoomFinder::addRoomPlaceEdges(DynamicSceneGraph& graph,
-                                   const std::string& layer) const {
+void RoomFinder::addRoomPlaceEdges(SceneGraph& graph, const std::string& layer) const {
   for (const auto& id_node_pair : graph.getLayer(layer).nodes()) {
     const auto cluster = last_results_.labels.find(id_node_pair.first);
     if (cluster == last_results_.labels.end()) {

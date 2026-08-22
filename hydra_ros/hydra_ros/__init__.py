@@ -71,9 +71,7 @@ class DsgSubscriber:
         self._logger.debug(f"Received dsg update message of {size_bytes} bytes")
 
         if not self._graph_set:
-            self._graph = dsg.DynamicSceneGraph.from_binary(
-                msg.layer_contents.tobytes()
-            )
+            self._graph = dsg.SceneGraph.from_binary(msg.layer_contents.tobytes())
             self._graph_set = True
         else:
             self._graph.update_from_binary(msg.layer_contents.tobytes())

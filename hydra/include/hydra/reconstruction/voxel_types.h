@@ -46,9 +46,6 @@ namespace hydra {
 // Geometry types.
 using spatial_hash::Point;
 
-// Mesh types.
-using spark_dsg::Mesh;
-
 // Index types.
 using spatial_hash::BlockIndex;
 using spatial_hash::GlobalIndex;
@@ -138,7 +135,7 @@ struct TsdfBlock : public spatial_hash::VoxelBlock<TsdfVoxel> {
   static bool trackingUpdated(const TsdfBlock& block) { return block.tracking_updated; }
 };
 
-struct MeshBlock : public Mesh, public spatial_hash::Block {
+struct MeshBlock : public spark_dsg::Mesh, public spatial_hash::Block {
   using Ptr = std::shared_ptr<MeshBlock>;
   using ConstPtr = std::shared_ptr<const MeshBlock>;
   MeshBlock(const float block_size,

@@ -18,7 +18,7 @@ struct IBRegionsUpdateFunctor : public UpdateFunctor {
 
   explicit IBRegionsUpdateFunctor(const Config& config);
 
-  void call(const spark_dsg::DynamicSceneGraph& unmmerged,
+  void call(const spark_dsg::SceneGraph& unmmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 

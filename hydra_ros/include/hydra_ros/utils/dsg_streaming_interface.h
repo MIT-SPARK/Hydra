@@ -33,8 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/common/dsg_types.h>
 #include <ianvs/node_handle.h>
+#include <spark_dsg/mesh.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <hydra_msgs/msg/dsg_update.hpp>
 #include <kimera_pgmo_msgs/msg/mesh.hpp>
@@ -76,12 +77,12 @@ class DsgSender {
             double min_mesh_separation_s = 0.0,
             bool serialize_dsg_mesh = true);
 
-  void sendGraph(const DynamicSceneGraph& graph, const rclcpp::Time& stamp) const;
+  void sendGraph(const spark_dsg::SceneGraph& graph, const rclcpp::Time& stamp) const;
 
  private:
-  void publishMesh(const DynamicSceneGraph& graph, uint64_t timestamp_ns) const;
+  void publishMesh(const spark_dsg::SceneGraph& graph, uint64_t timestamp_ns) const;
 
-  void publishGraph(const DynamicSceneGraph& graph, uint64_t timestamp_ns) const;
+  void publishGraph(const spark_dsg::SceneGraph& graph, uint64_t timestamp_ns) const;
 
   rclcpp::Publisher<hydra_msgs::msg::DsgUpdate>::SharedPtr pub_;
   rclcpp::Publisher<kimera_pgmo_msgs::msg::Mesh>::SharedPtr mesh_pub_;
@@ -97,7 +98,7 @@ class DsgReceiver {
 
   DsgReceiver(ianvs::NodeHandle nh, const LogCallback& cb);
 
-  inline DynamicSceneGraph::Ptr graph() const { return graph_; }
+  inline spark_dsg::SceneGraph::Ptr graph() const { return graph_; }
 
   inline bool updated() const { return has_update_; }
 
@@ -112,8 +113,8 @@ class DsgReceiver {
   rclcpp::Subscription<kimera_pgmo_msgs::msg::Mesh>::SharedPtr mesh_sub_;
 
   bool has_update_;
-  DynamicSceneGraph::Ptr graph_;
-  Mesh::Ptr mesh_;
+  spark_dsg::SceneGraph::Ptr graph_;
+  spark_dsg::Mesh::Ptr mesh_;
 
   std::unique_ptr<LogCallback> log_callback_;
 };

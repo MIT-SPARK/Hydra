@@ -42,13 +42,14 @@
 
 #include "hydra/common/global_info.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/loop_closure/lcd_input.h"
+#include "hydra/loop_closure/lcd_input.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
-using lcd::LayerRegistrationConfig;
 
 void declare_config(LoopClosureModule::Config& config) {
   using namespace config;
@@ -62,7 +63,7 @@ void declare_config(LoopClosureModule::Config& config) {
 
 LoopClosureModule::LoopClosureModule(const Config& config,
                                      const SharedModuleState::Ptr& state)
-    : config(config), state_(state), lcd_graph_(new DynamicSceneGraph()) {
+    : config(config), state_(state), lcd_graph_(new SceneGraph()) {
   lcd_detector_.reset(new lcd::LcdDetector(config.detector));
 }
 
@@ -209,7 +210,8 @@ size_t LoopClosureModule::processFrontendOutput() {
   return timestamp_ns;
 }
 
-NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) {
+auto LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos)
+    -> NodeIdSet {
   NodeIdSet to_cache;
   auto iter = potential_lcd_root_nodes_.begin();
   while (iter != potential_lcd_root_nodes_.end()) {

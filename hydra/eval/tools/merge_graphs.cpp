@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <iostream>
 
@@ -45,11 +45,11 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  std::vector<spark_dsg::DynamicSceneGraph::Ptr> input_graphs;
+  std::vector<spark_dsg::SceneGraph::Ptr> input_graphs;
   for (int i = 2; i < argc; ++i) {
     const std::string filename(argv[i]);
     std::cout << "Merging " << filename << std::endl;
-    input_graphs.push_back(spark_dsg::DynamicSceneGraph::load(filename));
+    input_graphs.push_back(spark_dsg::SceneGraph::load(filename));
   }
 
   const std::string output_path(argv[1]);

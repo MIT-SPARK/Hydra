@@ -38,7 +38,6 @@
 
 #include "hydra/backend/association_strategies.h"
 #include "hydra/backend/deformation_interpolator.h"
-#include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/common/node_matchers.h"
 #include "hydra/utils/active_window_tracker.h"
@@ -63,15 +62,16 @@ struct GenericUpdateFunctor : public UpdateFunctor {
 
   explicit GenericUpdateFunctor(const Config& config);
   Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
-  MergeList findMerges(const DynamicSceneGraph& graph,
+  MergeList findMerges(const spark_dsg::SceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const SceneGraphNode& node) const;
+  std::optional<spark_dsg::NodeId> proposeMerge(
+      const spark_dsg::SceneGraphLayer& layer,
+      const spark_dsg::SceneGraphNode& node) const;
 
   mutable ActiveWindowTracker active_tracker;
   const std::unique_ptr<NodeMatcher> node_matcher;

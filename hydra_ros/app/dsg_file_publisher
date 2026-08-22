@@ -31,7 +31,7 @@ class DsgFilePublisher(Node):
 
         self._frame = frame
         self.get_logger().info(f"Loading '{filepath}'...")
-        self._graph = dsg.DynamicSceneGraph.load(filepath)
+        self._graph = dsg.SceneGraph.load(filepath)
         self.get_logger().info(f"Loaded '{filepath}'!")
         self._pub = hydra_ros.DsgPublisher(self, "dsg")
         if publish_rate > 0.0:

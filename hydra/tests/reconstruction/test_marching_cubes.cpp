@@ -42,6 +42,7 @@ namespace hydra {
 
 static constexpr float TEST_TOLERANCE = 1.0e-6f;
 
+using spark_dsg::Mesh;
 using PointMatrix = Eigen::Matrix<float, 3, 8>;
 using SdfMatrix = std::array<float, 8>;
 

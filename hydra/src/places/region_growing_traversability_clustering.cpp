@@ -310,7 +310,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceEdgesInDsg(
       continue;
     }
 
-    NodeIdSet to_remove;
+    std::unordered_set<NodeId> to_remove;
     for (const auto n_id : node->siblings()) {
       // Do not remove edges to archived regions.
       // TODO(lschmid): Revisit this assumption for regions that move away from archived

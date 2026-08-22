@@ -34,12 +34,15 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/scene_graph_descriptors.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
+
+using namespace spark_dsg;
 
 namespace hydra::lcd {
-
 namespace {
 
-inline const SceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
+inline const SceneGraphNode& makeDefaultAgentNode(SceneGraph& graph) {
   using namespace std::chrono_literals;
   Eigen::Quaterniond q = Eigen::Quaterniond::Identity();
   Eigen::Vector3d t = Eigen::Vector3d::Zero();
@@ -48,7 +51,7 @@ inline const SceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
   return graph.getNode("a0"_id);
 }
 
-inline void emplacePlaceNode(DynamicSceneGraph& graph,
+inline void emplacePlaceNode(SceneGraph& graph,
                              const Eigen::Vector3d& pos,
                              double distance,
                              size_t& next_index) {
@@ -61,7 +64,7 @@ inline void emplacePlaceNode(DynamicSceneGraph& graph,
 }  // namespace
 
 TEST(LoopClosureModuleDescriptorTests, TestAgentDescriptor) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   const auto& node = makeDefaultAgentNode(graph);
 
   auto& attrs = node.attributes<AgentNodeAttributes>();
@@ -109,7 +112,7 @@ TEST(LoopClosureModuleDescriptorTests, TestGetBinCorrect) {
 }
 
 TEST(LoopClosureModuleDescriptorTests, TestPlaceDescriptor) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   const auto& node = makeDefaultAgentNode(graph);
 
   size_t next_node_index = 0;
@@ -186,7 +189,7 @@ TEST(LoopClosureModuleDescriptorTests, TestPlaceDescriptor) {
   }
 }
 
-void emplaceObjectNode(DynamicSceneGraph& graph,
+void emplaceObjectNode(SceneGraph& graph,
                        const Eigen::Vector3d& pos,
                        uint8_t label,
                        size_t& next_index) {
@@ -198,7 +201,7 @@ void emplaceObjectNode(DynamicSceneGraph& graph,
 }
 
 TEST(LoopClosureModuleDescriptorTests, TestObjectDescriptor) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   const auto& node = makeDefaultAgentNode(graph);
 
   size_t next_place_index = 0;

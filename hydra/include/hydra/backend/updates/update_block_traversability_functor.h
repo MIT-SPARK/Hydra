@@ -50,7 +50,7 @@ namespace hydra {
 struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
   struct Config {
     //! Layer to update traversability in
-    std::string layer = DsgLayers::TRAVERSABILITY;
+    std::string layer = spark_dsg::DsgLayers::TRAVERSABILITY;
 
     //! Minimum side length of a traversability area to be considered [m].
     double min_place_size = 0.5;
@@ -69,25 +69,26 @@ struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
     DeformationInterpolator::Config deformation;
   } const config;
 
-  using EdgeSet = std::set<EdgeKey>;
-  using NodeSet = std::set<NodeId>;
+  using EdgeSet = std::set<spark_dsg::EdgeKey>;
+  using NodeSet = std::set<spark_dsg::NodeId>;
   using State = spark_dsg::TraversabilityState;
 
   explicit UpdateBlockTraversabilityFunctor(const Config& config);
 
   Hooks hooks() const override;
 
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
  protected:
   // Hook callbacks.
-  MergeList findNodeMerges(const DynamicSceneGraph& dsg,
+  MergeList findNodeMerges(const spark_dsg::SceneGraph& dsg,
                            const UpdateInfo::ConstPtr& info) const;
 
-  NodeAttributes::Ptr mergeNodes(const DynamicSceneGraph& dsg,
-                                 const std::vector<NodeId>& merge_ids) const;
+  spark_dsg::NodeAttributes::Ptr mergeNodes(
+      const spark_dsg::SceneGraph& dsg,
+      const std::vector<spark_dsg::NodeId>& merge_ids) const;
 
   void cleanup(const UpdateInfo::ConstPtr& /* info */, SharedDsgInfo* dsg) const;
 
@@ -96,16 +97,16 @@ struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
    * @brief Update the positions of all traversability nodes in the DSG. Propagates to
    * the complete DSG in case of new loop closures.
    */
-  void updateDeformation(const DynamicSceneGraph& unmerged,
+  void updateDeformation(const spark_dsg::SceneGraph& unmerged,
                          SharedDsgInfo& dsg,
                          const UpdateInfo::ConstPtr& info) const;
 
-  EdgeSet findActiveWindowEdges(DynamicSceneGraph& dsg) const;
+  EdgeSet findActiveWindowEdges(spark_dsg::SceneGraph& dsg) const;
 
-  void pruneActiveWindowEdges(DynamicSceneGraph& dsg,
+  void pruneActiveWindowEdges(spark_dsg::SceneGraph& dsg,
                               const EdgeSet& active_edges) const;
 
-  void updateDistances(const SceneGraphLayer& layer) const;
+  void updateDistances(const spark_dsg::SceneGraphLayer& layer) const;
 
   // Helper functions.
 
@@ -113,37 +114,38 @@ struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
    * @brief Find connections of places that should be considered for merging or
    * connection in the active window.
    */
-  std::vector<NodeId> findConnections(
-      const DynamicSceneGraph& dsg,
-      const TraversabilityNodeAttributes& from_attrs) const;
+  std::vector<spark_dsg::NodeId> findConnections(
+      const spark_dsg::SceneGraph& dsg,
+      const spark_dsg::TraversabilityNodeAttributes& from_attrs) const;
 
   /**
    * @brief Check whether the two traversability areas overlap sufficiently to be
    * considered traversable in-place.
    */
-  bool hasTraversableOverlap(const TraversabilityNodeAttributes& from,
-                             const TraversabilityNodeAttributes& to) const;
+  bool hasTraversableOverlap(const spark_dsg::TraversabilityNodeAttributes& from,
+                             const spark_dsg::TraversabilityNodeAttributes& to) const;
 
   /**
    * @brief Check whether the from boundary is contained in the in boundary.
    */
-  bool isContained(const Boundary& from, const Boundary& in) const;
+  bool isContained(const spark_dsg::Boundary& from,
+                   const spark_dsg::Boundary& in) const;
 
   /**
    * @brief Recursively compute the metrc distance to the nearest intraversable
    * obstacle for the query place.
    */
-  double computeMetricDistance(const SceneGraphLayer& layer,
+  double computeMetricDistance(const spark_dsg::SceneGraphLayer& layer,
                                const Eigen::Vector2d& point,
                                const NodeSet& to_visit,
                                NodeSet& visited) const;
 
-  double distanceToIntraversable(const TraversabilityNodeAttributes& attrs,
+  double distanceToIntraversable(const spark_dsg::TraversabilityNodeAttributes& attrs,
                                  const Eigen::Vector2d& point) const;
 
-  void computeTopologicalDistances(const SceneGraphLayer& layer) const;
+  void computeTopologicalDistances(const spark_dsg::SceneGraphLayer& layer) const;
 
-  void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
+  void resetNeighborFinder(const spark_dsg::SceneGraph& dsg) const;
 
  protected:
   // Cached constants.
@@ -152,7 +154,7 @@ struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
 
   // State.
   mutable EdgeSet previous_active_edges_;
-  mutable std::set<EdgeKey> overlapping_nodes_to_cleanup_;
+  mutable std::set<spark_dsg::EdgeKey> overlapping_nodes_to_cleanup_;
 
   // Members.
   mutable ActiveWindowTracker active_tracker_;

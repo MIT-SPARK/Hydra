@@ -36,12 +36,16 @@
 
 #include <config_utilities/config.h>
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra/places/2d_places/ellipsoid_math.h"
 #include "hydra/places/2d_places/index_remapping.h"
 #include "hydra/places/2d_places/place_reallocation.h"
 #include "hydra/places/2d_places/place_splitting.h"
 #include "hydra/utils/timing_utilities.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 namespace {
@@ -87,7 +91,7 @@ inline void updateNode(const spark_dsg::Mesh& mesh,
   }
 }
 
-NodeAttributes::Ptr merge2dPlaceAttributes(const DynamicSceneGraph& graph,
+NodeAttributes::Ptr merge2dPlaceAttributes(const SceneGraph& graph,
                                            const std::vector<NodeId>& nodes) {
   if (nodes.empty()) {
     return nullptr;
@@ -173,7 +177,7 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
   return my_hooks;
 }
 
-void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
+void Update2dPlacesFunctor::call(const SceneGraph& unmerged,
                                  SharedDsgInfo& dsg,
                                  const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_2d_places", info->timestamp_ns);
@@ -210,7 +214,7 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
   MLOG(1) << "updated " << num_changed << " node(s)";
 }
 
-MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
+MergeList Update2dPlacesFunctor::findMerges(const SceneGraph& graph,
                                             const UpdateInfo::ConstPtr& info) const {
   const auto layer = graph.findLayer(config.layer);
   if (!layer) {
@@ -329,7 +333,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   }
 }
 
-void Update2dPlacesFunctor::updateMeshIndices(const DynamicSceneGraph& graph,
+void Update2dPlacesFunctor::updateMeshIndices(const SceneGraph& graph,
                                               const MeshOffsetInfo& offsets) const {
   const auto surface_places = graph.findLayer(config.layer);
   if (!surface_places) {

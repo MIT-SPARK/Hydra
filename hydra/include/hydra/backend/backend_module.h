@@ -80,7 +80,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
   using Ptr = std::shared_ptr<BackendModule>;
   using Sink = OutputSink<uint64_t,
-                          const DynamicSceneGraph&,
+                          const spark_dsg::SceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
 
   struct Config : DsgUpdater::Config {
@@ -164,7 +164,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   uint64_t last_sequence_number_ = 0;
 
   SharedDsgInfo::Ptr private_dsg_;
-  DynamicSceneGraph::Ptr unmerged_graph_;
+  spark_dsg::SceneGraph::Ptr unmerged_graph_;
   SharedModuleState::Ptr state_;
 
   DsgUpdater::Ptr dsg_updater_;
@@ -178,7 +178,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   size_t last_deformed_vertices_ = 0;
 
   std::vector<BackendModuleStatus> status_log_;
-  SceneGraphLogger backend_graph_logger_;
+  spark_dsg::SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
   ExternalLoopClosureReceiver external_lc_receiver_;
 

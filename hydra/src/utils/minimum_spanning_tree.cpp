@@ -38,6 +38,8 @@
 
 #include "hydra/utils/disjoint_set.h"
 
+using namespace spark_dsg;
+
 namespace hydra {
 
 MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer) {
@@ -50,17 +52,17 @@ MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer,
                                                 const EdgeFilter& filter) {
   std::vector<MinimalEdge> sorted_edges;
   sorted_edges.reserve(layer.edges().size());
-  for (const auto& id_edge_pair : layer.edges()) {
-    const auto& edge = id_edge_pair.second;
+  for (const auto& [key, edge] : layer.edges()) {
     if (filter && !filter(layer, edge)) {
       continue;
     }
 
-    sorted_edges.emplace_back(
-        edge.source,
-        edge.target,
-        (getNodePosition(layer, edge.source) - getNodePosition(layer, edge.target))
-            .norm());
+    const auto& [source, target] = key;
+    sorted_edges.emplace_back(edge.source,
+                              edge.target,
+                              (layer.getNode(source).attributes().position -
+                               layer.getNode(target).attributes().position)
+                                  .norm());
   }
   std::make_heap(sorted_edges.begin(), sorted_edges.end(), std::greater<>{});
 

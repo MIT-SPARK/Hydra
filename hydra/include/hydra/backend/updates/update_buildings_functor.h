@@ -38,14 +38,11 @@
 namespace hydra {
 
 struct UpdateBuildingsFunctor : public UpdateFunctor {
-  struct Config {
-    //! Semantic label assigned to every building node
-    SemanticNodeAttributes::Label semantic_label = 22u;
-  } const config;
+  struct Config {};
 
   explicit UpdateBuildingsFunctor(const Config& config);
 
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 };

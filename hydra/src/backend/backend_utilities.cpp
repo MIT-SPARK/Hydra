@@ -41,10 +41,10 @@
 namespace hydra::utils {
 
 using spark_dsg::AgentNodeAttributes;
-using spark_dsg::DynamicSceneGraph;
 using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraph;
 
-std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
+std::optional<uint64_t> getTimeNs(const SceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
   if (!graph.hasNode(node)) {
     LOG(ERROR) << "Missing node << " << node.str() << "when logging loop closure";

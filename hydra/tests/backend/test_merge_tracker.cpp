@@ -84,7 +84,7 @@ TEST(MergeTracker, NullAttributesCorrect) {
   const auto unmerged = merged.clone();
 
   MergeTracker tracker;
-  const auto null_attrs = [](const DynamicSceneGraph&,
+  const auto null_attrs = [](const SceneGraph&,
                              const std::vector<NodeId>&) -> NodeAttributes::Ptr {
     return nullptr;
   };

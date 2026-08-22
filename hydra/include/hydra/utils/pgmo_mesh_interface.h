@@ -70,7 +70,7 @@ struct PgmoMeshLayerInterface : public kimera_pgmo::MeshInterface {
  * @brief Interface for PGMO to access a spark-dsg mesh.
  */
 struct PgmoMeshInterface : public kimera_pgmo::MeshInterface {
-  PgmoMeshInterface(const Mesh& mesh);
+  PgmoMeshInterface(const spark_dsg::Mesh& mesh);
 
   const BlockIndices& blockIndices() const override;
 
@@ -87,7 +87,7 @@ struct PgmoMeshInterface : public kimera_pgmo::MeshInterface {
   kimera_pgmo::MeshInterface::Ptr clone() const override;
 
  private:
-  const Mesh& mesh_;
+  const spark_dsg::Mesh& mesh_;
   BlockIndices block_indices_;
 };
 

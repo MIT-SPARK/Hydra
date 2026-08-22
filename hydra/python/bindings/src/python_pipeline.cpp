@@ -57,9 +57,10 @@
 #include <filesystem>
 
 #include "hydra/bindings/glog_utilities.h"
-#include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
+
+using namespace spark_dsg;
 
 namespace hydra::python {
 
@@ -105,7 +106,7 @@ class PythonPipeline : public HydraPipeline {
 
   bool step(const InputPacket::Ptr& input);
 
-  DynamicSceneGraph::Ptr getSceneGraph() const;
+  SceneGraph::Ptr getSceneGraph() const;
 
   const std::string sensor_name;
   const std::string zmq_url;
@@ -117,7 +118,7 @@ class PythonPipeline : public HydraPipeline {
   std::shared_ptr<BackendModule> backend_;
   std::shared_ptr<LoopClosureModule> loop_closure_;
 
-  DynamicSceneGraph::Ptr graph_;
+  SceneGraph::Ptr graph_;
 
  private:
   void initModules();
@@ -241,7 +242,7 @@ bool PythonPipeline::step(const InputPacket::Ptr& input) {
   return true;
 }
 
-DynamicSceneGraph::Ptr PythonPipeline::getSceneGraph() const {
+SceneGraph::Ptr PythonPipeline::getSceneGraph() const {
   return backend_dsg_->graph->clone();
 }
 

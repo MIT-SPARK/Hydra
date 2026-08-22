@@ -49,7 +49,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 #include <pybind11/stl_bind.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 #include <spark_dsg/zmq_interface.h>
 
 #include "hydra/bindings/glog_utilities.h"
@@ -69,7 +69,7 @@ struct MeshUpdater {
       : compression(voxel_size / 4.0),
         queue(new ReconstructionModule::OutputQueue()),
         zmq_sender(url, 2) {
-    graph.reset(new DynamicSceneGraph());
+    graph.reset(new SceneGraph());
     graph->setMesh(std::make_shared<Mesh>());
   }
 
@@ -101,7 +101,7 @@ struct MeshUpdater {
   std::atomic<bool> should_shutdown = false;
   kimera_pgmo::DeltaCompression compression;
   kimera_pgmo::MeshOffsetInfo mesh_offsets;
-  std::shared_ptr<spark_dsg::DynamicSceneGraph> graph;
+  std::shared_ptr<spark_dsg::SceneGraph> graph;
   std::vector<uint64_t> mesh_timestamps;
   ReconstructionModule::OutputQueue::Ptr queue;
   ZmqSender zmq_sender;

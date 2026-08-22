@@ -37,7 +37,6 @@
 #include <queue>
 #include <thread>
 
-#include "hydra/common/common_types.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
@@ -46,6 +45,8 @@ namespace hydra {
 
 class LoopClosureModule : public Module {
  public:
+  using NodeIdSet = std::unordered_set<spark_dsg::NodeId>;
+
   struct Config {
     lcd::LcdDetector::Config detector;
     bool visualize_dsg_lcd = false;
@@ -79,7 +80,7 @@ class LoopClosureModule : public Module {
 
   NodeIdSet getPlacesToCache(const Eigen::Vector3d& agent_pos);
 
-  std::optional<NodeId> getQueryAgentId(size_t timestamp_ns);
+  std::optional<spark_dsg::NodeId> getQueryAgentId(size_t timestamp_ns);
 
  protected:
   std::atomic<bool> should_shutdown_{false};
@@ -87,11 +88,14 @@ class LoopClosureModule : public Module {
   uint64_t last_sequence_number_ = 0;
 
   SharedModuleState::Ptr state_;
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> agent_queue_;
-  std::list<NodeId> potential_lcd_root_nodes_;
+  std::priority_queue<spark_dsg::NodeId,
+                      std::vector<spark_dsg::NodeId>,
+                      std::greater<spark_dsg::NodeId>>
+      agent_queue_;
+  std::list<spark_dsg::NodeId> potential_lcd_root_nodes_;
 
   std::unique_ptr<lcd::LcdDetector> lcd_detector_;
-  DynamicSceneGraph::Ptr lcd_graph_;
+  spark_dsg::SceneGraph::Ptr lcd_graph_;
 
  private:
   void stopImpl();

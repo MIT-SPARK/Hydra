@@ -36,6 +36,8 @@
 #include <hydra/utils/disjoint_set.h>
 #include <hydra/utils/minimum_spanning_tree.h>
 
+using namespace spark_dsg;
+
 namespace hydra {
 
 // most for coverage

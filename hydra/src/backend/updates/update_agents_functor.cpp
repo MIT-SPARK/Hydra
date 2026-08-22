@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
 #include <iomanip>
@@ -44,11 +45,15 @@
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
+using namespace spark_dsg;
+
 namespace hydra {
-
-using timing::ScopedTimer;
-
 namespace {
+
+static const auto registration_ =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateAgentsFunctor,
+                                   UpdateAgentsFunctor::Config>("UpdateAgentsFunctor");
 
 inline std::string toString(const Eigen::Quaterniond& q, const Eigen::Vector3d& p) {
   const auto fmt = getDefaultFormat(3);
@@ -60,13 +65,15 @@ inline std::string toString(const Eigen::Quaterniond& q, const Eigen::Vector3d& 
 
 }  // namespace
 
+using timing::ScopedTimer;
+
 void declare_config(UpdateAgentsFunctor::Config&) {
   config::name("UpdateAgentsFunctor::Config");
 }
 
 UpdateAgentsFunctor::UpdateAgentsFunctor(const Config&) {}
 
-void UpdateAgentsFunctor::call(const DynamicSceneGraph&,
+void UpdateAgentsFunctor::call(const SceneGraph&,
                                SharedDsgInfo& dsg,
                                const UpdateInfo::ConstPtr& info) const {
   if (!info->pgmo_values || info->pgmo_values->size() == 0) {

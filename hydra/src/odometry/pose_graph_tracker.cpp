@@ -35,13 +35,16 @@
 #include "hydra/odometry/pose_graph_tracker.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
-#include "hydra/common/dsg_types.h"
 #include "hydra/common/robot_prefix_config.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 
-std::vector<NodeId> PoseGraphPacket::addToGraph(DynamicSceneGraph& graph,
+std::vector<NodeId> PoseGraphPacket::addToGraph(SceneGraph& graph,
                                                 std::optional<int> robot_id) const {
   std::vector<NodeId> new_nodes;
 

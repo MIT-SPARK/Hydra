@@ -54,29 +54,30 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
     MergeProposer::Config merge_proposer = {
         config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
     //! Layer to update
-    std::string layer = DsgLayers::PLACES;
+    std::string layer = spark_dsg::DsgLayers::PLACES;
     //! Temporary flag to update from values instead of deformation graph
     bool use_temp_values = false;
   } const config;
 
   explicit UpdatePlacesFunctor(const Config& config);
   Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
-  size_t updateFromValues(const LayerView& view,
+  size_t updateFromValues(const spark_dsg::LayerView& view,
                           SharedDsgInfo& dsg,
                           const UpdateInfo::ConstPtr& info) const;
 
-  MergeList findMerges(const DynamicSceneGraph& graph,
+  MergeList findMerges(const spark_dsg::SceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const SceneGraphNode& node) const;
+  std::optional<spark_dsg::NodeId> proposeMerge(
+      const spark_dsg::SceneGraphLayer& layer,
+      const spark_dsg::SceneGraphNode& node) const;
 
-  void filterMissing(DynamicSceneGraph& graph,
-                     const std::list<NodeId> missing_nodes) const;
+  void filterMissing(spark_dsg::SceneGraph& graph,
+                     const std::list<spark_dsg::NodeId> missing_nodes) const;
 
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;

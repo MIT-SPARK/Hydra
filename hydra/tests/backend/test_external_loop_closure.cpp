@@ -75,7 +75,7 @@ TEST(ExternalLoopClosureReceiver, FindClosest) {
   config.layer = "AGENTS";
   ExternalLoopClosureReceiver receiver(config, nullptr);
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   {  // no layer: unknown result
     std::chrono::nanoseconds stamp_ns = 100s;
     const auto result = receiver.findClosest(graph, stamp_ns.count(), 0, 1.0);
@@ -146,7 +146,7 @@ TEST(ExternalLoopClosureReceiver, QueueCorrect) {
   config.layer = "AGENTS";
   ExternalLoopClosureReceiver receiver(config, &queue);
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   graph.addLayer(2, kimera_pgmo::GetRobotPrefix(0));
   graph.addLayer(2, kimera_pgmo::GetRobotPrefix(1));
   graph.emplaceNode(2, "a0"_id, makeAttrs(10s), kimera_pgmo::GetRobotPrefix(0));

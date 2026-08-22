@@ -34,11 +34,14 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/backend/updates/update_objects_functor.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra_test/shared_dsg_fixture.h"
 
-namespace hydra {
+using namespace spark_dsg;
 
+namespace hydra {
 namespace {
 
 MergeList callWithUnmerged(const UpdateFunctor& functor,

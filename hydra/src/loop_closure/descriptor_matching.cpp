@@ -37,6 +37,9 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
 #include <glog/logging.h>
+#include <spark_dsg/node_symbol.h>
+
+using namespace spark_dsg;
 
 namespace hydra::lcd {
 

@@ -39,12 +39,10 @@
 
 #include <glog/logging.h>
 
-#include "hydra/reconstruction/mesh_integrator.h"
-#include "hydra/utils/printing.h"
-
 namespace hydra {
 
 using spark_dsg::Color;
+using spark_dsg::Mesh;
 
 std::ostream& operator<<(std::ostream& out, const SdfPoint& point) {
   out << "<";

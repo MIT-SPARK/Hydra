@@ -36,6 +36,8 @@
 
 #include <queue>
 
+using namespace spark_dsg;
+
 namespace hydra {
 
 void ClusterResults::clear() {

@@ -42,6 +42,7 @@ namespace hydra {
 
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::L2_Simple_Adaptor;
+using spark_dsg::BoundingBox;
 using spark_dsg::NodeId;
 using spark_dsg::SceneGraphLayer;
 using spark_dsg::SemanticLabel;

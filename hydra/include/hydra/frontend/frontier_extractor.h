@@ -32,6 +32,8 @@ struct Frontier {
 
 class FrontierExtractor : public GraphBuilderFunctor {
  public:
+  using NodeIdSet = std::unordered_set<spark_dsg::NodeId>;
+
   struct Config {
     char prefix = 'f';
     double cluster_tolerance = .3;
@@ -55,14 +57,14 @@ class FrontierExtractor : public GraphBuilderFunctor {
   void updateRecentBlocks(const Eigen::Vector3d& current_position, double block_size);
 
   void detectFrontiers(const ActiveWindowOutput& input,
-                       DynamicSceneGraph& graph,
+                       spark_dsg::SceneGraph& graph,
                        const NodeIdSet& active_places);
 
-  void addFrontiers(const uint64_t timestamp_ns, DynamicSceneGraph& graph);
+  void addFrontiers(const uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
 
  private:
-  NodeSymbol next_node_id_;
-  std::vector<std::pair<NodeId, BlockIndex>> nodes_to_remove_;
+  spark_dsg::NodeSymbol next_node_id_;
+  std::vector<std::pair<spark_dsg::NodeId, BlockIndex>> nodes_to_remove_;
 
   TsdfLayer::Ptr tsdf_;
   spatial_hash::IndexSet just_archived_blocks_;

@@ -33,18 +33,18 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/dsg_types.h"
+#include <spark_dsg/scene_graph_layer.h>
 
 namespace hydra {
 
 struct MinimalEdge {
-  NodeId source;
-  NodeId target;
+  spark_dsg::NodeId source;
+  spark_dsg::NodeId target;
   double distance;
 
   MinimalEdge() = default;
 
-  MinimalEdge(NodeId source, NodeId target, double distance)
+  MinimalEdge(spark_dsg::NodeId source, spark_dsg::NodeId target, double distance)
       : source(source), target(target), distance(distance) {}
 
   inline bool operator>(const MinimalEdge& other) const {
@@ -54,15 +54,17 @@ struct MinimalEdge {
 
 struct MinimumSpanningTreeInfo {
   std::vector<MinimalEdge> edges;
-  std::unordered_set<NodeId> leaves;
-  std::unordered_map<NodeId, size_t> counts;
+  std::unordered_set<spark_dsg::NodeId> leaves;
+  std::unordered_map<spark_dsg::NodeId, size_t> counts;
 };
 
-using EdgeFilter = std::function<bool(const SceneGraphLayer&, const SceneGraphEdge&)>;
+using EdgeFilter = std::function<bool(const spark_dsg::SceneGraphLayer&,
+                                      const spark_dsg::SceneGraphEdge&)>;
 
-MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer);
+MinimumSpanningTreeInfo getMinimumSpanningEdges(
+    const spark_dsg::SceneGraphLayer& layer);
 
-MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer,
+MinimumSpanningTreeInfo getMinimumSpanningEdges(const spark_dsg::SceneGraphLayer& layer,
                                                 const EdgeFilter& func);
 
 }  // namespace hydra

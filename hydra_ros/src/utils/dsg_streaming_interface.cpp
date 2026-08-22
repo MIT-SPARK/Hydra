@@ -37,7 +37,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/dsg_types.h>
 #include <hydra/utils/display_utilities.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <hydra/utils/timing_utilities.h>
@@ -49,6 +48,7 @@ namespace hydra {
 
 using hydra_msgs::msg::DsgUpdate;
 using MeshMsg = kimera_pgmo_msgs::msg::Mesh;
+using namespace spark_dsg;
 
 void declare_config(DsgSender::Config& config) {
   using namespace config;
@@ -96,8 +96,7 @@ DsgSender::DsgSender(ianvs::NodeHandle nh,
                        0.0},
                 nh) {}
 
-void DsgSender::sendGraph(const DynamicSceneGraph& graph,
-                          const rclcpp::Time& stamp) const {
+void DsgSender::sendGraph(const SceneGraph& graph, const rclcpp::Time& stamp) const {
   const uint64_t timestamp_ns = stamp.nanoseconds();
   timing::ScopedTimer timer(config.timer_name, timestamp_ns);
 
@@ -105,8 +104,7 @@ void DsgSender::sendGraph(const DynamicSceneGraph& graph,
   publishMesh(graph, timestamp_ns);
 }
 
-void DsgSender::publishGraph(const DynamicSceneGraph& graph,
-                             uint64_t timestamp_ns) const {
+void DsgSender::publishGraph(const SceneGraph& graph, uint64_t timestamp_ns) const {
   if (!pub_->get_subscription_count()) {
     return;
   }
@@ -130,8 +128,7 @@ void DsgSender::publishGraph(const DynamicSceneGraph& graph,
   pub_->publish(std::move(msg));
 }
 
-void DsgSender::publishMesh(const DynamicSceneGraph& graph,
-                            uint64_t timestamp_ns) const {
+void DsgSender::publishMesh(const SceneGraph& graph, uint64_t timestamp_ns) const {
   if (!config.publish_mesh || !mesh_pub_->get_subscription_count()) {
     return;
   }

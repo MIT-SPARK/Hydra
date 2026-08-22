@@ -36,6 +36,7 @@
 
 #include <kimera_pgmo/mesh_traits.h>
 #include <spark_dsg/bounding_box.h>
+#include <spark_dsg/node_symbol.h>
 #include <spatial_hash/hash.h>
 
 #include "hydra/backend/update_functions.h"
@@ -116,21 +117,21 @@ struct UpdateMeshClustersFunctor : public UpdateFunctor {
     //! Layer name to update
     std::string layer_name = "MESH_CLUSTERS";
     //! Partition to update
-    PartitionId partition = 0;
+    spark_dsg::PartitionId partition = 0;
     //! Node symbol prefix
     char prefix = 'l';
   } const config;
 
   explicit UpdateMeshClustersFunctor(const Config& config);
 
-  void call(const DynamicSceneGraph& unmerged,
+  void call(const spark_dsg::SceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
  private:
-  mutable NodeSymbol next_node_id_;
+  mutable spark_dsg::NodeSymbol next_node_id_;
   mutable MeshLabelClustering clustering_;
-  mutable spatial_hash::LongIndexHashMap<NodeId> node_id_map_;
+  mutable spatial_hash::LongIndexHashMap<spark_dsg::NodeId> node_id_map_;
 };
 
 void declare_config(UpdateMeshClustersFunctor::Config& config);

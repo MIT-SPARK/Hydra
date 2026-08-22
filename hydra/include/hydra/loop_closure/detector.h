@@ -93,12 +93,13 @@ class LcdDetector {
 
   void setRegistrationSolver(size_t level, DsgRegistrationSolver::Ptr&& solver);
 
-  void updateDescriptorCache(const DynamicSceneGraph& dsg,
-                             const std::unordered_set<NodeId>& archived_places,
-                             uint64_t timestamp = 0);
+  void updateDescriptorCache(
+      const spark_dsg::SceneGraph& dsg,
+      const std::unordered_set<spark_dsg::NodeId>& archived_places,
+      uint64_t timestamp = 0);
 
-  std::vector<RegistrationSolution> detect(const DynamicSceneGraph& dsg,
-                                           NodeId latest_agent_id,
+  std::vector<RegistrationSolution> detect(const spark_dsg::SceneGraph& dsg,
+                                           spark_dsg::NodeId latest_agent_id,
                                            uint64_t timestamp = 0);
 
   size_t numDescriptors() const;
@@ -122,12 +123,12 @@ class LcdDetector {
       const std::map<std::string, DescriptorMatchConfig>& match_configs,
       const std::map<std::string, LayerRegistrationConfig>& reg_configs);
 
-  bool addNewDescriptors(const DynamicSceneGraph& graph,
-                         const SceneGraphNode& agent_node);
+  bool addNewDescriptors(const spark_dsg::SceneGraph& graph,
+                         const spark_dsg::SceneGraphNode& agent_node);
 
-  std::vector<RegistrationSolution> registerAndVerify(const DynamicSceneGraph& dsg,
+  std::vector<RegistrationSolution> registerAndVerify(const spark_dsg::SceneGraph& dsg,
                                                       const SearchResultMap& matches,
-                                                      NodeId agent_node,
+                                                      spark_dsg::NodeId agent_node,
                                                       uint64_t timestamp = 0) const;
 
   DescriptorFactory::Ptr agent_factory_;
@@ -143,8 +144,8 @@ class LcdDetector {
   // std::map<size_t, ValidationFunc> validation_funcs_;
 
   std::map<std::string, DescriptorCache> cache_map_;
-  std::map<NodeId, DescriptorCache> leaf_cache_;
-  std::map<NodeId, std::set<NodeId>> root_leaf_map_;
+  std::map<spark_dsg::NodeId, DescriptorCache> leaf_cache_;
+  std::map<spark_dsg::NodeId, std::set<spark_dsg::NodeId>> root_leaf_map_;
 
   std::map<size_t, LayerSearchResults> matches_;
 };

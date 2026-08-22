@@ -42,7 +42,7 @@ namespace hydra::lcd {
 
 namespace {
 
-inline const DynamicSceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
+inline const SceneGraphNode& makeDefaultAgentNode(SceneGraph& graph) {
   using namespace std::chrono_literals;
   Eigen::Quaterniond q = Eigen::Quaterniond::Identity();
   Eigen::Vector3d t = Eigen::Vector3d::Zero();
@@ -50,7 +50,7 @@ inline const DynamicSceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& grap
   return graph.getDynamicNode(NodeSymbol('a', 0)).value();
 }
 
-inline void emplacePlaceNode(DynamicSceneGraph& graph,
+inline void emplacePlaceNode(SceneGraph& graph,
                              const Eigen::Vector3d& pos,
                              double distance,
                              int num_basis_points,
@@ -61,7 +61,7 @@ inline void emplacePlaceNode(DynamicSceneGraph& graph,
   ++next_index;
 }
 
-inline void emplaceObjectNode(DynamicSceneGraph& graph,
+inline void emplaceObjectNode(SceneGraph& graph,
                               const Eigen::Vector3d& pos,
                               const Eigen::Vector3f& dims,
                               size_t& next_index) {
@@ -80,7 +80,7 @@ TEST(GnnLcdTests, testEmptyDescriptor) {
   PlaceGnnDescriptor factory(test::get_resource_path("loop_closure/places.onnx"),
                              config);
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   const auto& root_node = makeDefaultAgentNode(graph);
   const auto descriptor = factory.construct(graph, root_node);
   EXPECT_EQ(descriptor, nullptr);
@@ -95,7 +95,7 @@ TEST(GnnLcdTests, testPlacesTensors) {
                              config);
 
   size_t node_idx = 0;
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   emplacePlaceNode(graph, Eigen::Vector3d(0.1, 0.0, 5.0), 1.1, 1, node_idx);
   emplacePlaceNode(graph, Eigen::Vector3d(0.2, 0.0, 5.0), 1.2, 2, node_idx);
   emplacePlaceNode(graph, Eigen::Vector3d(0.3, 0.0, 5.0), 1.3, 3, node_idx);
@@ -145,7 +145,7 @@ TEST(GnnLcdTests, testObjectTensors) {
                               {{0, fake_embedding}});
 
   size_t node_idx = 0;
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   emplaceObjectNode(
       graph, Eigen::Vector3d(0.1, 3.0, 7.0), Eigen::Vector3f(0.2, 0.3, 0.4), node_idx);
   emplaceObjectNode(
@@ -217,7 +217,7 @@ TEST(GnnLcdTests, testPlacesDescriptor) {
   PlaceGnnDescriptor factory(test::get_resource_path("loop_closure/places.onnx"),
                              config);
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   const auto& root_node = makeDefaultAgentNode(graph);
 
   size_t node_idx = 0;
@@ -260,7 +260,7 @@ TEST(GnnLcdTests, testObjectDescriptor) {
                               {{0, fake_embedding}});
 
   size_t node_idx = 0;
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   const auto& root_node = makeDefaultAgentNode(graph);
 
   emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
@@ -307,7 +307,7 @@ TEST(GnnLcdTests, testPlacesPosDescriptor) {
   PlaceGnnDescriptor factory(
       test::get_resource_path("loop_closure/places_pos.onnx"), config, false);
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   const auto& root_node = makeDefaultAgentNode(graph);
 
   size_t node_idx = 0;
@@ -353,7 +353,7 @@ TEST(GnnLcdTests, testObjectPosDescriptor) {
                               {{0, fake_embedding}},
                               false);
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   const auto& root_node = makeDefaultAgentNode(graph);
 
   size_t node_idx = 0;

@@ -43,6 +43,8 @@
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
+using namespace spark_dsg;
+
 namespace hydra {
 namespace {
 
@@ -60,7 +62,7 @@ using SemanticLabel = SemanticNodeAttributes::Label;
 using MergeId = std::optional<NodeId>;
 
 NodeAttributes::Ptr mergeObjectAttributes(const VerbosityConfig& config,
-                                          const DynamicSceneGraph& graph,
+                                          const SceneGraph& graph,
                                           const std::vector<NodeId>& nodes) {
   if (nodes.empty()) {
     return nullptr;
@@ -122,7 +124,7 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   return my_hooks;
 }
 
-void UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
+void UpdateObjectsFunctor::call(const SceneGraph& unmerged,
                                 SharedDsgInfo& dsg,
                                 const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_objects", info->timestamp_ns);
@@ -168,7 +170,7 @@ void UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
   MLOG(1) << "object update: " << num_changed << " node(s)";
 }
 
-MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
+MergeList UpdateObjectsFunctor::findMerges(const SceneGraph& graph,
                                            const UpdateInfo::ConstPtr& info) const {
   if (!graph.hasLayer(DsgLayers::OBJECTS)) {
     return {};
@@ -197,7 +199,7 @@ MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
   return proposals;
 }
 
-void UpdateObjectsFunctor::updateMeshIndices(const DynamicSceneGraph& graph,
+void UpdateObjectsFunctor::updateMeshIndices(const SceneGraph& graph,
                                              const MeshOffsetInfo& offsets) const {
   const auto objects = graph.findLayer(config.layer);
   if (!objects) {

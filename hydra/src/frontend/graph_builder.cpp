@@ -54,6 +54,8 @@
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
+using namespace spark_dsg;
+
 namespace hydra {
 namespace {
 

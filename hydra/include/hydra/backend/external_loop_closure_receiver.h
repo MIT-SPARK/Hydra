@@ -36,7 +36,7 @@
 
 #include <gtsam/geometry/Pose3.h>
 #include <pose_graph_tools/pose_graph.h>
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <list>
 
@@ -87,8 +87,8 @@ class ExternalLoopClosureReceiver {
   } const config;
 
   ExternalLoopClosureReceiver(const Config& config, Queue* const queue);
-  void update(const spark_dsg::DynamicSceneGraph& graph, const Callback& callback);
-  LookupResult findClosest(const spark_dsg::DynamicSceneGraph& graph,
+  void update(const spark_dsg::SceneGraph& graph, const Callback& callback);
+  LookupResult findClosest(const spark_dsg::SceneGraph& graph,
                            uint64_t timestamp_ns,
                            int robot_id,
                            double max_diff_s = 0.0) const;

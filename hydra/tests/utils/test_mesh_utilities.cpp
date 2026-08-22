@@ -38,6 +38,7 @@
 namespace hydra {
 
 using ClusterResult = std::vector<std::vector<size_t>>;
+using spark_dsg::Mesh;
 
 namespace {
 

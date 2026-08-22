@@ -35,11 +35,19 @@
 #include "hydra/eval/graph_utilities.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 namespace hydra::eval {
 
-DynamicSceneGraph::Ptr mergeGraphs(const std::vector<DynamicSceneGraph::Ptr>& graphs) {
-  DynamicSceneGraph::Ptr to_return(new DynamicSceneGraph());
+using spark_dsg::LayerId;
+using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraph;
+
+SceneGraph::Ptr mergeGraphs(const Graphs& graphs) {
+  SceneGraph::Ptr to_return(new SceneGraph());
 
   size_t num_nodes_expected = 0;
   size_t num_edges_expected = 0;

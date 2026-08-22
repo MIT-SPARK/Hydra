@@ -37,11 +37,12 @@
 #include <hydra/frontend/mesh_segmenter.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <kimera_pgmo/mesh_delta.h>
-
-namespace hydra {
+#include <spark_dsg/node_attributes.h>
 
 using kimera_pgmo::MeshDelta;
+using namespace spark_dsg;
 
+namespace hydra {
 namespace {
 
 struct NodeResult {
@@ -62,9 +63,7 @@ void checkBoundingBox(const BoundingBox& expected,
   EXPECT_NEAR(expected.world_P_center.z(), result.world_P_center.z(), tolerance);
 }
 
-bool checkNode(const DynamicSceneGraph& graph,
-               NodeId node_id,
-               const NodeResult& expected) {
+bool checkNode(const SceneGraph& graph, NodeId node_id, const NodeResult& expected) {
   const auto node = graph.findNode(node_id);
   if (!node) {
     return false;
@@ -81,7 +80,7 @@ bool checkNode(const DynamicSceneGraph& graph,
 void stepSegmenter(const MeshDelta& delta,
                    kimera_pgmo::MeshOffsetInfo& offsets,
                    MeshSegmenter& segmenter,
-                   DynamicSceneGraph& graph) {
+                   SceneGraph& graph) {
   delta.updateMesh(*graph.mesh(), offsets);
   const auto clusters = segmenter.detect(0, delta, offsets);
   segmenter.updateGraph(0, offsets, clusters, graph);
@@ -125,7 +124,7 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
   config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   kimera_pgmo::MeshOffsetInfo offsets;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
@@ -183,7 +182,7 @@ TEST(MeshSegmenter, TestDeletedObject) {
   config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   kimera_pgmo::MeshOffsetInfo offsets;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
@@ -224,7 +223,7 @@ TEST(MeshSegmenter, TestArchivedObject) {
   config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   kimera_pgmo::MeshOffsetInfo offsets;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
@@ -271,7 +270,7 @@ TEST(MeshSegmenter, TestDeltaWithOffset) {
   config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
-  DynamicSceneGraph graph;
+  SceneGraph graph;
   kimera_pgmo::MeshOffsetInfo offsets;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <map>
 #include <set>
@@ -64,10 +64,10 @@ struct LayerConnector {
 
   explicit LayerConnector(const Config& config);
 
-  void updateParents(const spark_dsg::DynamicSceneGraph& graph,
+  void updateParents(const spark_dsg::SceneGraph& graph,
                      const std::vector<spark_dsg::NodeId>& new_nodes);
 
-  void connectChildren(spark_dsg::DynamicSceneGraph& graph,
+  void connectChildren(spark_dsg::SceneGraph& graph,
                        const std::vector<spark_dsg::NodeId>& new_nodes);
 
   // tracking
@@ -89,7 +89,7 @@ class GraphConnector {
 
   virtual ~GraphConnector();
 
-  void connect(spark_dsg::DynamicSceneGraph& graph);
+  void connect(spark_dsg::SceneGraph& graph);
 
  protected:
   std::vector<LayerConnector> layers_;

@@ -133,7 +133,7 @@ max_dist = np.amax(points)
 
 dsg_path = results["filepaths"][INPUT_INDEX][1]
 
-G = dsg.DynamicSceneGraph.load(dsg_path)
+G = dsg.SceneGraph.load(dsg_path)
 places = G.get_layer(dsg.DsgLayers.PLACES)
 places_nx = spark_dsg.networkx.layer_to_networkx(places)
 

@@ -5,6 +5,8 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra/rooms/room_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -63,7 +65,7 @@ IBRegionsUpdateFunctor::Config::Config() : VerbosityConfig("[IB Regions] ") {}
 IBRegionsUpdateFunctor::IBRegionsUpdateFunctor(const Config& config)
     : config(config::checkValid(config)), clustering_(config.clustering) {}
 
-void IBRegionsUpdateFunctor::call(const DynamicSceneGraph&,
+void IBRegionsUpdateFunctor::call(const SceneGraph&,
                                   SharedDsgInfo& dsg,
                                   const UpdateInfo::ConstPtr& info) const {
   ScopedTimer timer("backend/region_clustering", info->timestamp_ns);

@@ -33,12 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <vector>
+#include <spark_dsg/scene_graph.h>
 
-#include "hydra/common/dsg_types.h"
+#include <vector>
 
 namespace hydra::eval {
 
-DynamicSceneGraph::Ptr mergeGraphs(const std::vector<DynamicSceneGraph::Ptr>& graphs);
+using Graphs = std::vector<spark_dsg::SceneGraph::Ptr>;
+
+spark_dsg::SceneGraph::Ptr mergeGraphs(const Graphs& graphs);
 
 }  // namespace hydra::eval

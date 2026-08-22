@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/output_sink.h"
@@ -78,7 +78,7 @@ class SurfacePlaceExtractor {
 
   void updateGraph(const ActiveWindowOutput& msg,
                    const kimera_pgmo::MeshOffsetInfo& offsets,
-                   spark_dsg::DynamicSceneGraph& graph);
+                   spark_dsg::SceneGraph& graph);
 
  private:
   Sink::List sinks_;

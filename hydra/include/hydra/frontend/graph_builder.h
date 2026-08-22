@@ -72,7 +72,7 @@ class GraphBuilder : public Module {
   using Ptr = std::shared_ptr<GraphBuilder>;
   using InputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
   using InputCallback = std::function<void(const ActiveWindowOutput&)>;
-  using Sink = OutputSink<uint64_t, const DynamicSceneGraph&, const BackendInput&>;
+  using Sink = OutputSink<uint64_t, const spark_dsg::SceneGraph&, const BackendInput&>;
 
   struct Config : public VerbosityConfig {
     struct DeformationConfig {
@@ -81,7 +81,7 @@ class GraphBuilder : public Module {
       double time_horizon = 10.0;
     } pgmo;
     GraphUpdater::Config graph_updater{
-        {{DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}};
+        {{spark_dsg::DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}};
     GraphConnector::Config graph_connector;
     bool enable_mesh_objects = true;
     MeshSegmenter::Config object_config;
@@ -150,8 +150,6 @@ class GraphBuilder : public Module {
   void updatePoseGraph(const ActiveWindowOutput& msg);
 
  protected:
-  void archivePlaces2d(const NodeIdSet active_places);
-
   void processNextInput(const ActiveWindowOutput& msg);
 
  protected:
@@ -185,7 +183,7 @@ class GraphBuilder : public Module {
   std::unique_ptr<GraphBuilderFunctor> frontier_places_;
   ViewDatabase view_database_;
 
-  SceneGraphLogger frontend_graph_logger_;
+  spark_dsg::SceneGraphLogger frontend_graph_logger_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
 
   Sink::List sinks_;

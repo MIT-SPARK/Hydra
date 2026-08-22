@@ -34,8 +34,11 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/backend/updates/update_buildings_functor.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra_test/shared_dsg_fixture.h"
+
+using namespace spark_dsg;
 
 namespace hydra {
 
@@ -61,7 +64,7 @@ TEST(UpdateRoomsBuildingsFunctor, BuildingUpdate) {
   graph.insertEdge("B0"_id, 5);
 
   UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, false, {}});
-  UpdateBuildingsFunctor functor(UpdateBuildingsFunctor::Config{0});
+  UpdateBuildingsFunctor functor(UpdateBuildingsFunctor::Config{});
   const auto unmerged = dsg->graph->clone();
   functor.call(*unmerged, *dsg, info);
 
