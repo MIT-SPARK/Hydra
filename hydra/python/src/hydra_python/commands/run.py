@@ -7,7 +7,6 @@ import signal
 import traceback
 
 import click
-import spark_dataset_interfaces as sdi
 
 import hydra_python as hydra
 
