@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import click
 import hydra_python as hydra
+import matplotlib.pyplot as plt
+import numpy as np
 from hydra_python.dataloaders.rosbag_dataloader import (
     RosbagDataLoader,
     load_trajectory_from_bag,
@@ -44,18 +46,33 @@ def main(
             body_frame="hamilton/body",
         )
 
+        frame_idx = 0
+        last_stamp: int | None = None
+        threshold_ns = int(0.2 * 1.0e9)
         camera = hydra.make_camera(**dataloader.intrinsics)
         pipeline = hydra.ReconstructionPipeline(camera)
-        for idx, packet in enumerate(dataloader):
-            if max_steps and idx >= max_steps:
+        for stamp, pose, images in dataloader:
+            if max_steps and frame_idx >= max_steps:
                 break
 
-            stamp, pose, images = packet
+            if last_stamp is not None and abs(stamp - last_stamp) < threshold_ns:
+                continue
+
             rgb, depth = images
-            rgb = rgb[..., :3].copy()
+            rgb = rgb[..., :3]
+            rgb = rgb[..., ::-1]
+
+            fig, ax = plt.subplots(3)
+            ax[0].imshow(rgb)
+            ax[1].imshow(depth)
+            ax[2].imshow(np.isfinite(depth))
+            plt.show()
+
             q_xyzw = pose.rotation.as_quat()
             q_wxyz = [q_xyzw[i] for i in [3, 0, 1, 2]]
             pipeline.step(stamp, q_wxyz, pose.translation, rgb, depth)
+            last_stamp = stamp
+            frame_idx += 1
 
 
 if __name__ == "__main__":
