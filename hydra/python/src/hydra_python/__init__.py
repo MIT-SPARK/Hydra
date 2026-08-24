@@ -43,6 +43,7 @@ from hydra_python._hydra_bindings import (
 )
 
 from ._hydra_bindings import *
+from .dataloaders import *
 from .pipeline import *
 from .simulators import *
 
