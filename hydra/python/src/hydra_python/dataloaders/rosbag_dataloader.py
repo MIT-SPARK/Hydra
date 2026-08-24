@@ -12,7 +12,7 @@ from hydra_python.trajectory import Pose, Trajectory
 
 def _find_camera_info(bag, topic):
     logging.info(f"Looking for camera info @ '{topic}'")
-    for _, msg, _ in bag.read_messages([topic]):
+    for _, msg, _ in bag.read_messages([topic], progress=False):
         return msg
 
     return None
@@ -64,12 +64,10 @@ class RosbagDataLoader:
         bag: BagReader,
         trajectory: Trajectory,
         rgb_topic: str,
-        other_topics: list[str] | None,
+        other_topics: list[str] | None = None,
         body_frame: str | None = None,
         rgb_info_topic: str | None = None,
-        min_separation_s: float = 0.0,
         threshold_us: int = 0,
-        is_bgr: bool = True,
         start_time_ns: int | None = None,
         progress: bool = False,
     ):
@@ -86,10 +84,9 @@ class RosbagDataLoader:
         else:
             self._rgb_info_topic = rgb_info_topic
 
-        self._topics = [self._rgb_topic] + (other_topics or [])
+        self._other_topics = other_topics or []
         self._trajectory = trajectory
         self._threshold_us = threshold_us
-        self._is_bgr = is_bgr
         self._start_time_ns = start_time_ns
         self._progress = progress
 
@@ -113,6 +110,7 @@ class RosbagDataLoader:
 
     def __iter__(self):
         """Return the iterator object."""
+        topics = [self._rgb_topic] + self._other_topics
 
         abs_start_time = 0
         if self._start_time_ns is not None:
@@ -120,7 +118,7 @@ class RosbagDataLoader:
 
         thresh_ns = int(1.0e3 * self._threshold_us)
         msg_iter = self._bag.read_synced_messages(
-            self._topics,
+            topics,
             max_diff_ns=thresh_ns,
             start_time_ns=abs_start_time,
             progress=self._progress,
@@ -135,4 +133,6 @@ class RosbagDataLoader:
 
                 pose = pose @ self._body_T_sensor
 
-            yield time, pose, [get_image(messages[t]) for t in self._topics]
+            rgb = get_image(messages[self._rgb_topic])[..., :3]
+            images = [rgb] + [get_image(messages[t]) for t in self._other_topics]
+            yield time, pose, images

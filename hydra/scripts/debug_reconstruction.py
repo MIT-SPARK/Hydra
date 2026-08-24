@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import click
 import hydra_python as hydra
-import matplotlib.pyplot as plt
-import numpy as np
+import ianvs
 from hydra_python.dataloaders.rosbag_dataloader import (
     RosbagDataLoader,
     load_trajectory_from_bag,
@@ -12,7 +11,12 @@ from ianvs.bag_reader import BagReader
 
 
 def _repair_args(values, flag):
-    return list(zip(len(values) * [flag], values))
+    all_flags = []
+    for value in values:
+        all_flags.append(flag)
+        all_flags.append(value)
+
+    return all_flags
 
 
 @click.group()
@@ -35,6 +39,7 @@ def save_trajectory(bag_path, output):
 @click.argument("bag_path", type=click.Path(exists=True))
 @click.argument("trajectory_path", type=click.Path(exists=True))
 @click.option("--max-steps", "-m", default=None, type=int)
+@click.option("--max-separation-s", "-s", default=0.0, type=float)
 @click.option("--config-utilities-files", "-f", multiple=True)
 @click.option("--config-utilities-yaml", "-c", multiple=True)
 @click.option("--config-utilities-var", "-v", multiple=True)
@@ -42,6 +47,7 @@ def run(
     bag_path,
     trajectory_path,
     max_steps,
+    max_separation_s,
     config_utilities_files,
     config_utilities_yaml,
     config_utilities_var,
@@ -54,18 +60,21 @@ def run(
     hydra.init_config_context(args)
 
     trajectory = Trajectory.from_csv(trajectory_path)
-    with BagReader(bag_path) as bag:
+    with BagReader(bag_path) as bag, ianvs.init_node_handle(
+        "hydra"
+    ), hydra.external_plugins("hydra_ros"):
         dataloader = RosbagDataLoader(
             bag,
             trajectory,
             "/hamilton/hamilton_zed/rgb/image_rect_color",
             ["/hamilton/hamilton_zed/depth/depth_registered"],
             body_frame="hamilton/body",
+            progress=False,
         )
 
         frame_idx = 0
         last_stamp: int | None = None
-        threshold_ns = int(0.2 * 1.0e9)
+        threshold_ns = int(max_separation_s * 1.0e9)
         camera = hydra.make_camera(**dataloader.intrinsics)
         pipeline = hydra.ReconstructionPipeline(camera)
         for stamp, pose, images in dataloader:
@@ -75,21 +84,18 @@ def run(
             if last_stamp is not None and abs(stamp - last_stamp) < threshold_ns:
                 continue
 
-            rgb, depth = images
-            rgb = rgb[..., :3]
-            rgb = rgb[..., ::-1]
-
-            fig, ax = plt.subplots(3)
-            ax[0].imshow(rgb)
-            ax[1].imshow(depth)
-            ax[2].imshow(np.isfinite(depth))
-            plt.show()
+            rgb = images[0][..., ::-1]
+            depth = images[1]
 
             q_xyzw = pose.rotation.as_quat()
             q_wxyz = [q_xyzw[i] for i in [3, 0, 1, 2]]
             pipeline.step(stamp, q_wxyz, pose.translation, rgb, depth)
             last_stamp = stamp
             frame_idx += 1
+
+            click.pause("Press any key to continue to next frame...")
+
+        click.pause("Press any key to exit...")
 
 
 if __name__ == "__main__":

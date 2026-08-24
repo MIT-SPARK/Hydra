@@ -32,6 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include <config_utilities/external_registry.h>
 #include <config_utilities/parsing/context.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -48,6 +49,42 @@
 namespace py = pybind11;
 using namespace py::literals;
 
+namespace hydra::python {
+namespace {
+
+struct ExternalPluginConfig {
+  bool allow = true;
+  bool verbose = false;
+  bool trace_allocations = false;
+  std::vector<std::string> paths;
+};
+
+struct PluginManager {
+  static void init(const ExternalPluginConfig& config) {
+    auto& manager = instance();
+    config::Settings().external_libraries.enabled = config.allow;
+    config::Settings().external_libraries.verbose_load = config.verbose;
+    config::Settings().external_libraries.log_allocation = config.trace_allocations;
+    manager.plugins_ = config::loadExternalFactories(config.paths);
+  }
+
+  static void deinit() {
+    auto& manager = instance();
+    // TODO(nathan) will likely segfault
+    manager.plugins_.unload();
+  }
+
+ private:
+  static PluginManager& instance() {
+    static PluginManager s_instance;
+    return s_instance;
+  }
+
+  config::internal::LibraryGuard plugins_;
+};
+
+}  // namespace
+
 PYBIND11_MODULE(_hydra_bindings, m) {
   py::module_::import("spark_dsg");
   py::options options;
@@ -59,6 +96,17 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   ::hydra::python::python_reconstruction::addBindings(m);
   ::hydra::python::python_sensor_input::addBindings(m);
   ::hydra::python::python_sensors::addBindings(m);
+
+  py::class_<ExternalPluginConfig>(m, "ExternalPluginConfig")
+      .def(py::init<>())
+      .def_readwrite("allow", &ExternalPluginConfig::allow)
+      .def_readwrite("verbose", &ExternalPluginConfig::allow)
+      .def_readwrite("trace_allocations", &ExternalPluginConfig::allow)
+      .def_readwrite("paths", &ExternalPluginConfig::paths);
+
+  m.def("init_plugins",
+        [](const ExternalPluginConfig& config) { PluginManager::init(config); });
+  m.def("deinit_plugins", []() { PluginManager::deinit(); });
 
   m.def(
       "init_config_context",
@@ -111,3 +159,5 @@ PYBIND11_MODULE(_hydra_bindings, m) {
         return ss.str();
       });
 }
+
+}  // namespace hydra::python
