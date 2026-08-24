@@ -8,6 +8,7 @@ from os import PathLike
 from typing import List, Optional
 
 import numpy as np
+import pandas as pd
 from scipy.spatial.transform import Rotation, Slerp  # type: ignore
 
 DEFAULT_HEADER_ORDER = ["tx", "ty", "tz", "qx", "qy", "qz", "qw"]

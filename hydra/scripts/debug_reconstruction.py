@@ -7,6 +7,7 @@ from hydra_python.dataloaders.rosbag_dataloader import (
     RosbagDataLoader,
     load_trajectory_from_bag,
 )
+from hydra_python.trajectory import Trajectory
 from ianvs.bag_reader import BagReader
 
 
@@ -14,14 +15,32 @@ def _repair_args(values, flag):
     return list(zip(len(values) * [flag], values))
 
 
-@click.command()
+@click.group()
+def cli():
+    pass
+
+
+@cli.command(name="trajectory")
 @click.argument("bag_path", type=click.Path(exists=True))
+@click.argument("output", type=click.Path())
+def save_trajectory(bag_path, output):
+    with BagReader(bag_path) as bag:
+        trajectory = load_trajectory_from_bag(
+            bag, "hamilton/odom", "hamilton/body", progress=True
+        )
+        trajectory.to_csv(output)
+
+
+@cli.command(name="run")
+@click.argument("bag_path", type=click.Path(exists=True))
+@click.argument("trajectory_path", type=click.Path(exists=True))
 @click.option("--max-steps", "-m", default=None, type=int)
 @click.option("--config-utilities-files", "-f", multiple=True)
 @click.option("--config-utilities-yaml", "-c", multiple=True)
 @click.option("--config-utilities-var", "-v", multiple=True)
-def main(
+def run(
     bag_path,
+    trajectory_path,
     max_steps,
     config_utilities_files,
     config_utilities_yaml,
@@ -34,10 +53,8 @@ def main(
     hydra.set_glog_level(0, 0)
     hydra.init_config_context(args)
 
+    trajectory = Trajectory.from_csv(trajectory_path)
     with BagReader(bag_path) as bag:
-        trajectory = load_trajectory_from_bag(
-            bag, "hamilton/odom", "hamilton/body", progress=True
-        )
         dataloader = RosbagDataLoader(
             bag,
             trajectory,
@@ -76,4 +93,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    cli()
