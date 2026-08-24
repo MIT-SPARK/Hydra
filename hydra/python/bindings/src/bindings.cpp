@@ -32,7 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include <config_utilities/parsing/context.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_batch.h"
@@ -56,6 +58,17 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   ::hydra::python::python_reconstruction::addBindings(m);
   ::hydra::python::python_sensor_input::addBindings(m);
   ::hydra::python::python_sensors::addBindings(m);
+
+  m.def(
+      "init_config_context",
+      [](const std::vector<std::string>& args, bool init_settings) {
+        config::initContext(args);
+        if (init_settings) {
+          config::setConfigSettingsFromContext();
+        }
+      },
+      "args"_a,
+      "init_settings"_a = true);
 
   py::class_<Eigen::Quaterniond>(m, "Quaterniond")
       .def(py::init([]() { return Eigen::Quaterniond::Identity(); }))

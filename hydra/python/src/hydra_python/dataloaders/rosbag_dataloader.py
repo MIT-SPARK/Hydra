@@ -38,10 +38,12 @@ def parse_message_timestamp(msg):
     return int(msg.header.stamp.sec * 1.0e9) + msg.header.stamp.nanosec
 
 
-def load_trajectory_from_bag(bag, map_frame, body_frame):
+def load_trajectory_from_bag(
+    bag: BagReader, map_frame: str, body_frame: str, progress: bool = False
+):
     poses = []
     timestamps = []
-    for _, msg, _ in bag.read_messages(["/tf"], progress=False):
+    for _, msg, _ in bag.read_messages(["/tf"], progress=progress):
         for x in msg.transforms:
             if map_frame != x.header.frame_id or body_frame != x.child_frame_id:
                 continue
@@ -49,6 +51,7 @@ def load_trajectory_from_bag(bag, map_frame, body_frame):
             poses.append(_tf_to_pose(x.transform))
             timestamps.append(parse_message_timestamp(x))
 
+    # TODO(nathan) think about jointly sorting
     return Trajectory(timestamps, poses)
 
 
