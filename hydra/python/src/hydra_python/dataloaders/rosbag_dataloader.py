@@ -4,6 +4,7 @@ import logging
 import pathlib
 
 import numpy as np
+from ianvs import get_image
 from ianvs.bag_reader import BagReader  # type: ignore
 
 from hydra_python.trajectory import Pose, Trajectory
@@ -134,4 +135,4 @@ class RosbagDataLoader:
 
                 pose = pose @ self._body_T_sensor
 
-            yield time, pose, [messages[t] for t in self._topics]
+            yield time, pose, [get_image(messages[t]) for t in self._topics]

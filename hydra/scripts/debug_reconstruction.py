@@ -5,7 +5,6 @@ from hydra_python.dataloaders.rosbag_dataloader import (
     RosbagDataLoader,
     load_trajectory_from_bag,
 )
-from ianvs import parse_image
 from ianvs.bag_reader import BagReader
 
 
@@ -51,10 +50,9 @@ def main(
             if max_steps and idx >= max_steps:
                 break
 
-            stamp, pose, messages = packet
-            rgb = parse_image(messages[0])
-            depth = parse_image(messages[1])
-
+            stamp, pose, images = packet
+            rgb, depth = images
+            rgb = rgb[..., :3].copy()
             q_xyzw = pose.rotation.as_quat()
             q_wxyz = [q_xyzw[i] for i in [3, 0, 1, 2]]
             pipeline.step(stamp, q_wxyz, pose.translation, rgb, depth)
