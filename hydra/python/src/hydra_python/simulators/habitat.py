@@ -104,6 +104,67 @@ def _camera_point_from_habitat(p_ah, z_offset=1.5):
     return p_bw
 
 
+class LabelConverter:
+    """Converter between one label space and another labels."""
+
+    def __init__(self, index_array, names):
+        """
+        Construct a converter between one label space and another.
+
+        Args:
+            index_array (np.ndarray): Row vector containing the new categories
+            names (List[str]): Name for each category
+        """
+        self._index_array = index_array
+        self._names = names
+
+    def __call__(self, labels):
+        """Convert original label image to new label image."""
+        return np.take(self._index_array, labels, mode="raise")
+
+    def reindex(self, remap):
+        """Combine two converters."""
+        remapped_array = []
+        for _source_idx, target_idx in enumerate(self._index_array):
+            new_target = remap.get(target_idx, target_idx)
+            remapped_array.append(new_target)
+
+        max_category = np.max(remapped_array)
+        remapped_names = [self.name(remap.get(x, x)) for x in range(max_category)]
+        remapped_array = np.array(remapped_array, dtype=self._index_array.dtype)
+        return LabelConverter(remapped_array, remapped_names)
+
+    def name(self, idx):
+        """Get name for category."""
+        return "unknown" if idx < 0 or idx >= len(self._names) else self._names[idx]
+
+    @property
+    def names(self):
+        """Get category names."""
+        return self._names
+
+    @classmethod
+    def from_mapping(cls, sublabel_to_label, name_mapping=None, unknown=0):
+        """
+        Construct conversion from map between original and new label.
+
+        Args:
+            sublabel_to_label (Dict[int, int]): Map from old to new labels
+            name_mapping (Optional[Dict[int, str]]): Map from label to name
+            unknown (int): Default label
+        """
+        N_sublabels = max(sublabel_to_label) + 1
+        label_map = unknown * np.ones(N_sublabels, dtype=np.int16)
+        for sublabel, label in sublabel_to_label.items():
+            label_map[sublabel] = label if label >= 0 else unknown
+
+        names = []
+        name_mapping = name_mapping if name_mapping is not None else {}
+        max_category = np.max(label_map)
+        names = [name_mapping.get(x, "unknown") for x in range(max_category)]
+        return cls(label_map, names)
+
+
 class HabitatInterface:
     """Class handling interfacing with habitat."""
 
