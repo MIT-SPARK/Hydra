@@ -55,7 +55,7 @@ class ActiveWindowModule : public Module {
   using Sink = OutputSink<uint64_t, const VolumetricMap&, const ActiveWindowOutput&>;
 
   struct Config {
-    size_t max_input_queue_size;
+    size_t max_input_queue_size = 0;
     VolumetricMap::Config volumetric_map;
     config::VirtualConfig<VolumetricWindow> map_window;
     std::vector<Sink::Factory> sinks;

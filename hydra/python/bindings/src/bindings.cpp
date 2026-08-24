@@ -32,7 +32,10 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include <config_utilities/external_registry.h>
+#include <config_utilities/parsing/context.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_batch.h"
@@ -41,9 +44,46 @@
 #include "hydra/bindings/python_reconstruction.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
+#include "hydra/common/global_info.h"
 
 namespace py = pybind11;
 using namespace py::literals;
+
+namespace hydra::python {
+namespace {
+
+struct ExternalPluginConfig {
+  bool allow = true;
+  bool verbose = false;
+  bool trace_allocations = false;
+  std::vector<std::string> paths;
+};
+
+struct PluginManager {
+  static void init(const ExternalPluginConfig& config) {
+    auto& manager = instance();
+    config::Settings().external_libraries.enabled = config.allow;
+    config::Settings().external_libraries.verbose_load = config.verbose;
+    config::Settings().external_libraries.log_allocation = config.trace_allocations;
+    manager.plugins_ = config::loadExternalFactories(config.paths);
+  }
+
+  static void deinit() {
+    auto& manager = instance();
+    // TODO(nathan) will likely segfault
+    manager.plugins_.unload();
+  }
+
+ private:
+  static PluginManager& instance() {
+    static PluginManager s_instance;
+    return s_instance;
+  }
+
+  config::internal::LibraryGuard plugins_;
+};
+
+}  // namespace
 
 PYBIND11_MODULE(_hydra_bindings, m) {
   py::module_::import("spark_dsg");
@@ -56,6 +96,36 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   ::hydra::python::python_reconstruction::addBindings(m);
   ::hydra::python::python_sensor_input::addBindings(m);
   ::hydra::python::python_sensors::addBindings(m);
+
+  py::class_<ExternalPluginConfig>(m, "ExternalPluginConfig")
+      .def(py::init<>())
+      .def_readwrite("allow", &ExternalPluginConfig::allow)
+      .def_readwrite("verbose", &ExternalPluginConfig::allow)
+      .def_readwrite("trace_allocations", &ExternalPluginConfig::allow)
+      .def_readwrite("paths", &ExternalPluginConfig::paths);
+
+  m.def("init_plugins",
+        [](const ExternalPluginConfig& config) { PluginManager::init(config); });
+  m.def("deinit_plugins", []() { PluginManager::deinit(); });
+
+  m.def(
+      "init_config_context",
+      [](const std::vector<std::string>& args,
+         bool init_settings,
+         bool init_global_info) {
+        config::initContext(args);
+        if (init_settings) {
+          config::setConfigSettingsFromContext();
+        }
+
+        if (init_global_info) {
+          const auto global_config = config::fromContext<hydra::PipelineConfig>();
+          hydra::GlobalInfo::init(global_config);
+        }
+      },
+      "args"_a,
+      "init_settings"_a = true,
+      "init_global_info"_a = true);
 
   py::class_<Eigen::Quaterniond>(m, "Quaterniond")
       .def(py::init([]() { return Eigen::Quaterniond::Identity(); }))
@@ -89,3 +159,5 @@ PYBIND11_MODULE(_hydra_bindings, m) {
         return ss.str();
       });
 }
+
+}  // namespace hydra::python

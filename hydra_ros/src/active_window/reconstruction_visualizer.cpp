@@ -50,8 +50,6 @@ using sensor_msgs::msg::Image;
 using std_msgs::msg::ColorRGBA;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
-using visualizer::ContinuousPalette;
-using visualizer::DivergentPalette;
 using visualizer::RangeColormap;
 
 namespace {

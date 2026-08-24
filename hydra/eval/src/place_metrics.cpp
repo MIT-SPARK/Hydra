@@ -37,12 +37,10 @@
 #include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 
-#include <nanoflann.hpp>
+#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra::eval {
 
-using nanoflann::KDTreeSingleIndexAdaptor;
-using nanoflann::L2_Simple_Adaptor;
 using places::GvdLayer;
 using spark_dsg::NodeId;
 using spark_dsg::PlaceNodeAttributes;
@@ -50,7 +48,7 @@ using spark_dsg::SceneGraph;
 
 void fillGvdPositions(const GvdLayer& layer,
                       size_t min_gvd_basis,
-                      std::vector<Eigen::Vector3d>& result) {
+                      std::vector<Eigen::Vector3f>& result) {
   result.clear();
 
   for (const auto& block : layer) {
@@ -60,48 +58,10 @@ void fillGvdPositions(const GvdLayer& layer,
         continue;
       }
 
-      result.push_back(block.getVoxelPosition(i).cast<double>());
+      result.push_back(block.getVoxelPosition(i));
     }
   }
 }
-
-struct VoxelKdTreeAdaptor {
-  VoxelKdTreeAdaptor(const std::vector<Eigen::Vector3d>& positions)
-      : positions(positions) {}
-
-  inline size_t kdtree_get_point_count() const { return positions.size(); }
-
-  inline double kdtree_get_pt(const size_t idx, const size_t dim) const {
-    return positions[idx](dim);
-  }
-
-  template <class T>
-  bool kdtree_get_bbox(T&) const {
-    return false;
-  }
-
-  std::vector<Eigen::Vector3d> positions;
-};
-
-struct DistanceFinder {
-  using Dist = L2_Simple_Adaptor<double, VoxelKdTreeAdaptor>;
-  using KDTree = KDTreeSingleIndexAdaptor<Dist, VoxelKdTreeAdaptor, 3, size_t>;
-
-  DistanceFinder(std::vector<Eigen::Vector3d>& positions) : adaptor(positions) {
-    kdtree.reset(new KDTree(3, adaptor));
-    kdtree->buildIndex();
-  }
-
-  double distance(const Eigen::Vector3d& pos) const {
-    size_t idx;
-    double dist;
-    size_t num_found = kdtree->knnSearch(pos.data(), 1, &idx, &dist);
-    return num_found ? std::sqrt(dist) : std::numeric_limits<double>::quiet_NaN();
-  }
-
-  VoxelKdTreeAdaptor adaptor;
-  std::unique_ptr<KDTree> kdtree;
-};
 
 PlaceMetrics scorePlaces(const SceneGraph& graph,
                          const GvdLayer& gvd,
@@ -114,19 +74,21 @@ PlaceMetrics scorePlaces(const SceneGraph& graph,
   }
 
   metrics.is_valid = true;
-  std::vector<Eigen::Vector3d> gvd_positions;
+  std::vector<Eigen::Vector3f> gvd_positions;
   fillGvdPositions(gvd, min_gvd_basis, gvd_positions);
-  const DistanceFinder finder(gvd_positions);
+  const PointNeighborSearch finder(gvd_positions);
 
   for (auto&& [node_id, node] : places->nodes()) {
     const auto& attrs = node->attributes<PlaceNodeAttributes>();
     metrics.node_order.push_back(node_id);
 
-    const auto pos = attrs.position;
-    metrics.node_gvd_distances.push_back(finder.distance(pos));
+    size_t idx = 0;
+    float dist_squared = 0.0;
+    const Point pos = attrs.position.cast<float>();
+    finder.search(pos, dist_squared, idx);
+    metrics.node_gvd_distances.push_back(std::sqrt(dist_squared));
 
-    const Point pos_f = pos.cast<float>();
-    const auto* voxel = gvd.getVoxelPtr(pos_f);
+    const auto* voxel = gvd.getVoxelPtr(pos);
     if (!voxel) {
       metrics.num_missing++;
       continue;

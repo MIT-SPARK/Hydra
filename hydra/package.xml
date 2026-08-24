@@ -21,6 +21,13 @@
   <depend>libgoogle-glog-dev</depend>
   <depend>libopencv-dev</depend>
   <depend>libpcl-all-dev</depend>
+  <!-- Optional dependencies for python bindings -->
+  <depend>python3-click</depend>
+  <depend>python3-imageio</depend>
+  <depend>python3-numpy</depend>
+  <depend>python3-pandas</depend>
+  <depend>python3-scipy</depend>
+  <depend>python3-tqdm</depend>
 
   <export>
     <build_type>cmake</build_type>

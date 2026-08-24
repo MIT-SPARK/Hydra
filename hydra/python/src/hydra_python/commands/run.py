@@ -7,7 +7,6 @@ import signal
 import traceback
 
 import click
-import spark_dataset_interfaces as sdi
 
 import hydra_python as hydra
 
@@ -61,7 +60,7 @@ def mp3d(scenes, visualize, zmq_url, max_steps, force, output):
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     for scene_path in scenes:
         try:
-            dataloader = sdi.FileDataLoader(scene_path)
+            dataloader = hydra.FileDataLoader(scene_path)
             sensor = hydra.make_camera(**dataloader.intrinsics)
             scene_output = _get_scene_output(output, scene_path.stem, force)
             if scene_output is None:
@@ -79,25 +78,21 @@ def mp3d(scenes, visualize, zmq_url, max_steps, force, output):
                 click.secho("Failed to load pipeline!", fg="red")
                 continue
 
-            def _step_pipeline(packet):
-                rotation, translation = _decompose_pose(packet.pose)
+            for idx, packet in enumerate(dataloader):
+                if max_steps and idx >= max_steps:
+                    break
+
+                stamp, pose, images = packet
+                rgb, depth, labels = images
+                rotation, translation = _decompose_pose(pose)
                 pipeline.step(
-                    packet.timestamp,
+                    stamp,
                     translation,
                     rotation,
-                    packet.depth,
-                    packet.labels,
-                    packet.color,
-                    **packet.extras,
+                    depth,
+                    labels,
+                    rgb,
                 )
-
-            sdi.DataLoader.run(
-                dataloader,
-                _step_pipeline,
-                max_steps=max_steps,
-                step_mode=False,
-                show_progress=True,
-            )
 
             pipeline.save(f"{output}")
 

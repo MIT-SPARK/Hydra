@@ -34,6 +34,16 @@ target_include_directories(
   _hydra_bindings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/bindings/include
 )
 
-if(DEFINED SKBUILD AND "${SKBUILD}")
+if(NOT DEFINED SKBUILD OR NOT "${SKBUILD}")
+    find_package(ament_cmake QUIET)
+    find_package(ament_cmake_python QUIET)
+    if(${ament_cmake_python_FOUND})
+        ament_get_python_install_dir(PYTHON_INSTALL_PATH)
+        set(PKG_PYTHON_INSTALL "${PYTHON_INSTALL_PATH}/${PROJECT_NAME}")
+        set(PKG_PYTHON_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/hydra_python/")
+        install(TARGETS _hydra_bindings DESTINATION ${PKG_PYTHON_INSTALL})
+        install(DIRECTORY ${PKG_PYTHON_SRC} DESTINATION ${PKG_PYTHON_INSTALL})
+    endif()
+else()
   install(TARGETS _hydra_bindings DESTINATION ${PROJECT_NAME})
 endif()
