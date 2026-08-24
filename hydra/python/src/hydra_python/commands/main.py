@@ -2,7 +2,6 @@
 
 import click
 
-import hydra_python.commands.reconstruct as reconstruct
 import hydra_python.commands.run as run
 
 
@@ -13,4 +12,3 @@ def cli():
 
 
 cli.add_command(run.cli)
-cli.add_command(reconstruct.cli)

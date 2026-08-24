@@ -5,7 +5,6 @@ import pathlib
 import imageio.v3
 import yaml
 
-from hydra_python.dataloader import InputPacket
 from hydra_python.trajectory import Trajectory
 
 
@@ -55,10 +54,4 @@ class FileDataLoader:
             else:
                 color = None
 
-            yield InputPacket(
-                timestamp=timestamp,
-                pose=pose,
-                color=color,
-                depth=depth,
-                labels=labels,
-            )
+            yield timestamp, pose, (color, depth, labels)

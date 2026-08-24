@@ -9,6 +9,7 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
+import spark_dsg as dsg
 from scipy.spatial.transform import Rotation, Slerp  # type: ignore
 
 DEFAULT_HEADER_ORDER = ["tx", "ty", "tz", "qx", "qy", "qz", "qw"]
@@ -316,3 +317,23 @@ class Trajectory:
             )
 
         return functools.reduce(lambda x, y: x + y, trajectories)
+
+    @classmethod
+    def from_scene_graph(cls, filepath, agent_prefix="a"):
+        """Construct a trajectory from a previous scene graph."""
+        filepath = pathlib.Path(filepath).expanduser().absolute()
+        if not filepath.exists():
+            return None
+
+        G = dsg.SceneGraph.load(filepath)
+        agents = G.get_layer(dsg.DsgLayers.AGENTS, agent_prefix)
+
+        times = []
+        poses = []
+        for node in agents.nodes:
+            q = node.attributes.world_R_body
+            q = [q.x, q.y, q.z, q.w]
+            times.append(node.attributes.timestamp)
+            poses.append(Pose(Rotation.from_quat(q), node.attributes.position))
+
+        return cls(times, poses)
