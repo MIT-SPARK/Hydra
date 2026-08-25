@@ -59,6 +59,10 @@
 #include "hydra/input/input_data.h"
 
 namespace hydra {
+
+using spark_dsg::Color;
+using Weights = InterpolationWeights;
+
 namespace {
 
 static const auto nearest_registration =
@@ -76,10 +80,23 @@ static const auto adaptive_registration =
                                    InterpolatorAdaptive,
                                    InterpolatorAdaptive::Config>("adaptive");
 
-}  // namespace
+inline bool pixelIsValid(int u, int v, const cv::Mat& img) {
+  const auto range = img.at<InputData::RangeType>(v, u);
+  return range >= 1.0e-6f && std::isfinite(range);
+}
 
-using spark_dsg::Color;
-using Weights = InterpolationWeights;
+inline Weights getNearestWeights(float u, float v, const cv::Mat& img) {
+  Weights weights(std::round(u), std::round(v));
+  if (weights.u < 0 || weights.u >= img.cols || weights.v < 0 ||
+      weights.v >= img.rows) {
+    return weights;
+  }
+
+  weights.valid = pixelIsValid(weights.u, weights.v, img);
+  return weights;
+}
+
+}  // namespace
 
 void declare_config(InterpolatorNearest::Config&) {
   config::name("InterpolatorNearest::Config");
@@ -88,14 +105,7 @@ void declare_config(InterpolatorNearest::Config&) {
 Weights InterpolatorNearest::computeWeights(float u,
                                             float v,
                                             const cv::Mat& img) const {
-  Weights weights(std::round(u), std::round(v));
-  if (weights.u < 0 || weights.u >= img.cols || weights.v < 0 ||
-      weights.v >= img.rows) {
-    return weights;
-  }
-
-  weights.valid = true;
-  return weights;
+  return getNearestWeights(u, v, img);
 }
 
 float InterpolatorNearest::interpolateRange(const cv::Mat& range_image,
@@ -132,14 +142,16 @@ Weights InterpolatorBilinear::computeWeights(float u,
     return weights;
   }
 
-  weights.valid = true;
-  weights.use_bilinear = true;
-  float du = u - static_cast<float>(weights.u);
-  float dv = v - static_cast<float>(weights.v);
-  weights.w0 = (1.f - du) * (1.f - dv);
-  weights.w1 = (1.f - du) * dv;
-  weights.w2 = du * (1.f - dv);
-  weights.w3 = du * dv;
+  // all range values in 2x2 grid must be finite for bilinear interpolation to work
+  weights.valid = pixelIsValid(weights.u, weights.v, img);
+  weights.valid &= pixelIsValid(weights.u + 1, weights.v, img);
+  weights.valid &= pixelIsValid(weights.u, weights.v + 1, img);
+  weights.valid &= pixelIsValid(weights.u + 1, weights.v + 1, img);
+  if (!weights.valid) {
+    return weights;
+  }
+
+  fillBilinearWeights(u, v, weights);
   return weights;
 }
 
@@ -197,6 +209,19 @@ bool InterpolatorBilinear::interpolateMask(const cv::Mat& img,
   return total >= 0.0f;  // will be negative if more weight on false
 }
 
+void InterpolatorBilinear::fillBilinearWeights(float u,
+                                               float v,
+                                               Weights& weights) const {
+  const auto du = u - static_cast<float>(weights.u);
+  const auto dv = v - static_cast<float>(weights.v);
+
+  weights.use_bilinear = true;
+  weights.w0 = (1.0f - du) * (1.0f - dv);
+  weights.w1 = (1.0f - du) * dv;
+  weights.w2 = du * (1.0f - dv);
+  weights.w3 = du * dv;
+}
+
 void declare_config(InterpolatorAdaptive::Config& config) {
   using namespace config;
   config::name("InterpolatorAdaptive::Config");
@@ -211,35 +236,44 @@ InterpolatorAdaptive::InterpolatorAdaptive(const Config& config)
 Weights InterpolatorAdaptive::computeWeights(float u,
                                              float v,
                                              const cv::Mat& ranges) const {
-  Weights weights(std::floor(u), std::floor(v));
+  const int row = std::floor(v);
+  const int col = std::floor(u);
+
   // Check max range difference.
   bool use_nearest = false;
   float min = std::numeric_limits<float>::max();
-  float max = std::numeric_limits<float>::lowest();
+  float max = 0.0f;
   for (size_t i = 0; i < 4; ++i) {
-    const auto curr_v = weights.v + v_offset_[i];
-    const auto curr_u = weights.u + u_offset_[i];
+    const auto curr_v = row + v_offset_[i];
+    const auto curr_u = col + u_offset_[i];
     if (curr_v < 0 || curr_u < 0 || curr_v >= ranges.rows || curr_u >= ranges.cols) {
-      continue;
+      use_nearest = true;  // use nearest when at corner of imaage
+      break;
     }
 
     const float range = ranges.at<InputData::RangeType>(curr_v, curr_u);
+    if (range < 1.0e-6f || !std::isfinite(range)) {
+      use_nearest = true;  // use nearest when one pixel is invalid
+      break;
+    }
+
     max = std::max(range, max);
     min = std::min(range, min);
     if (max - min > config.max_depth_difference_m) {
-      use_nearest = true;
+      use_nearest = true;  // use nearest when adaptive check is hit
       break;
     }
   }
 
   if (use_nearest) {
-    Weights weights(std::round(u), std::round(v));
-    weights.valid = weights.u >= 0 && weights.u < ranges.cols && weights.v >= 0 &&
-                    weights.v < ranges.rows;
-    return weights;
+    // will handle validating pixel at [u, v]
+    return getNearestWeights(u, v, ranges);
   }
 
-  return InterpolatorBilinear::computeWeights(u, v, ranges);
+  Weights weights(col, row);
+  weights.valid = true;
+  fillBilinearWeights(u, v, weights);
+  return weights;
 }
 
 float InterpolatorAdaptive::interpolateRange(const cv::Mat& range_image,
