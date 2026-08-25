@@ -37,6 +37,8 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/mesh_integrator.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
@@ -44,13 +46,26 @@
 #include <list>
 #include <thread>
 
+#include "hydra/common/global_info.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {
 
-MeshIntegrator::MeshIntegrator(const MeshIntegratorConfig& config)
+void declare_config(MeshIntegrator::Config& config) {
+  using namespace config;
+  name("MeshIntegratorConfig");
+  field(config.min_weight, "min_weight");
+  field<ThreadNumConversion>(config.integrator_threads, "integrator_threads");
+  check(config.min_weight, GT, 0.0f, "min_weight");
+  check(config.integrator_threads, GT, 0, "integrator_threads");
+}
+
+MeshIntegrator::Config::Config()
+    : integrator_threads(GlobalInfo::instance().getConfig().default_num_threads) {}
+
+MeshIntegrator::MeshIntegrator(const MeshIntegrator::Config& config)
     : config(config::checkValid(config)) {}
 
 void MeshIntegrator::allocateBlocks(const BlockIndices& blocks,

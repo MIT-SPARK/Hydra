@@ -35,7 +35,6 @@
 #pragma once
 
 #include "hydra/reconstruction/index_getter.h"
-#include "hydra/reconstruction/mesh_integrator_config.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
@@ -46,7 +45,14 @@ class MeshIntegrator {
  public:
   using BlockIndexGetter = IndexGetter<BlockIndex>;
 
-  explicit MeshIntegrator(const MeshIntegratorConfig& config);
+  struct Config {
+    Config();
+
+    float min_weight = 1.0e-4f;
+    int integrator_threads;
+  } const config;
+
+  explicit MeshIntegrator(const Config& config);
 
   virtual ~MeshIntegrator() = default;
 
@@ -80,11 +86,11 @@ class MeshIntegrator {
                                      int voxels_per_side,
                                      VoxelIndex& corner_index);
 
-  const MeshIntegratorConfig config;
-
  protected:
   const static Eigen::Matrix<int, 3, 8> cube_index_offsets_;
   mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
 };
+
+void declare_config(MeshIntegrator::Config& config);
 
 }  // namespace hydra

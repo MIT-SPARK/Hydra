@@ -47,10 +47,7 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 #include <memory>
-#include <string>
-#include <thread>
 
-#include "hydra/common/global_info.h"
 #include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/semantic_integrator.h"
@@ -72,6 +69,9 @@ class ProjectiveIntegrator {
   using SemanticIntegratorPtr = std::unique_ptr<const SemanticIntegrator>;
 
   struct Config : public VerbosityConfig {
+    //! Set num_threads and verbosity config defaults
+    Config();
+
     //! If nonzero, integrates negative voxels outside of the truncation distance by the
     //! specified threshold. Negative values are multiples of the voxel size
     float extra_integration_distance = 0.0f;
@@ -97,8 +97,8 @@ class ProjectiveIntegrator {
     //! Maximum weight used for TSDF updates. High max weight keeps information
     //! longer in memory, low max weight favors rapid updates
     float max_weight = 1.0e5f;
-    //! Number of threads used to perform integration (parallelized by block)
-    int num_threads = GlobalInfo::instance().getConfig().default_num_threads;
+    //! Number of threads used to perform integration (defaults to all)
+    int num_threads;
     //! Which interpolation to use in the image projection [nearest, bilinear,
     //! adaptive]
     config::VirtualConfig<ProjectionInterpolator> interpolation_method{
@@ -121,8 +121,7 @@ class ProjectiveIntegrator {
   virtual ~ProjectiveIntegrator() = default;
 
   /**
-   * @brief Update all specified blocks in the background map with the given data in
-   * parallel.
+   * @brief Update all specified blocks in the background map in parallel.
    * @param data Input data to use for the update.
    * @param map Map to update.
    * @param allocate_blocks Allocate blocks to update before integrating
@@ -179,8 +178,7 @@ class ProjectiveIntegrator {
                    VoxelTuple& voxels) const;
 
   /**
-   * @brief Check whether the point is valid to be updated and setup the interpolation
-   * weights.
+   * @brief Check whether the point is valid to be updated and get interpolation weights
    * @param p_C Center point of the voxel in camera (C) frame.
    * @param data Input data to use for the update.
    * @param weights Where to write the resulting interpolation weights to.
@@ -206,8 +204,6 @@ class ProjectiveIntegrator {
                       const Point& p_C,
                       const float sdf) const;
 
-  // TODO(lschmid): Find a good way to clean this up and integrate this more nicely.
-  // Just adding hooks here for now for Khronos updates.
   /**
    * @brief Compute the semantic label of the given measurement.
    * @returns True if the measurement is valid for integration, false otherwise.

@@ -56,6 +56,7 @@
 #include <future>
 #include <vector>
 
+#include "hydra/common/global_info.h"
 #include "hydra/input/sensor_utilities.h"
 #include "hydra/reconstruction/index_getter.h"
 #include "hydra/utils/printing.h"
@@ -80,6 +81,10 @@ inline bool measurementOutsideTruncation(const MapConfig& map_config,
 }
 
 }  // namespace
+
+ProjectiveIntegrator::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("projective_integrator")),
+      num_threads(GlobalInfo::instance().getConfig().default_num_threads) {}
 
 void declare_config(ProjectiveIntegrator::Config& config) {
   using namespace config;
