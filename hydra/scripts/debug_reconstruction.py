@@ -35,11 +35,19 @@ def save_trajectory(bag_path, output):
         trajectory.to_csv(output)
 
 
+def _convert_start_time(bag_start_s: float | None):
+    if bag_start_s is None:
+        return None
+
+    return int(bag_start_s * 1.0e9)
+
+
 @cli.command(name="run")
 @click.argument("bag_path", type=click.Path(exists=True))
 @click.argument("trajectory_path", type=click.Path(exists=True))
 @click.option("--max-steps", "-m", default=None, type=int)
-@click.option("--max-separation-s", "-s", default=0.0, type=float)
+@click.option("--min-separation-s", "-s", default=0.0, type=float)
+@click.option("--bag-start-s", default=None, type=float)
 @click.option("--config-utilities-files", "-f", multiple=True)
 @click.option("--config-utilities-yaml", "-c", multiple=True)
 @click.option("--config-utilities-var", "-v", multiple=True)
@@ -47,7 +55,8 @@ def run(
     bag_path,
     trajectory_path,
     max_steps,
-    max_separation_s,
+    min_separation_s,
+    bag_start_s,
     config_utilities_files,
     config_utilities_yaml,
     config_utilities_var,
@@ -70,11 +79,12 @@ def run(
             ["/hamilton/hamilton_zed/depth/depth_registered"],
             body_frame="hamilton/body",
             progress=False,
+            start_time_ns=_convert_start_time(bag_start_s),
         )
 
         frame_idx = 0
         last_stamp: int | None = None
-        threshold_ns = int(max_separation_s * 1.0e9)
+        threshold_ns = int(min_separation_s * 1.0e9)
         camera = hydra.make_camera(**dataloader.intrinsics)
         pipeline = hydra.ReconstructionPipeline(camera)
         for stamp, pose, images in dataloader:
