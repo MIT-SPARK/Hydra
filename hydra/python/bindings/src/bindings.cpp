@@ -38,7 +38,6 @@
 #include <pybind11/stl.h>
 
 #include "hydra/bindings/glog_utilities.h"
-#include "hydra/bindings/python_batch.h"
 #include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_pipeline.h"
 #include "hydra/bindings/python_reconstruction.h"
@@ -90,7 +89,6 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   py::options options;
 
   ::hydra::python::glog_utilities::addBindings(m);
-  ::hydra::python::python_batch::addBindings(m);
   ::hydra::python::python_image::addBindings(m);
   ::hydra::python::python_pipeline::addBindings(m);
   ::hydra::python::python_reconstruction::addBindings(m);

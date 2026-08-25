@@ -39,19 +39,18 @@
 
 #include "hydra/active_window/active_window_module.h"
 #include "hydra/input/sensor_map.h"
-#include "hydra/reconstruction/mesh_integrator_config.h"
+#include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
 
 namespace hydra {
 
-class MeshIntegrator;
 class RobotFootprintIntegrator;
 
 class ReconstructionModule : public ActiveWindowModule {
  public:
   struct Config : ActiveWindowModule::Config {
     double full_update_separation_s = 0.0;
-    MeshIntegratorConfig mesh;
+    MeshIntegrator::Config mesh;
     SensorMap<ProjectiveIntegrator>::Config tsdf;
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
   } const config;

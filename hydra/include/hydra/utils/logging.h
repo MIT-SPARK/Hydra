@@ -47,6 +47,8 @@ struct VerbosityConfig {
 
   //! Make a copy of the verbosity config with a prefix derived from the provided name
   VerbosityConfig with_name(const std::string& name) const;
+
+  static VerbosityConfig default_verbosity(const std::string& name = "");
 };
 
 void declare_config(VerbosityConfig& config);

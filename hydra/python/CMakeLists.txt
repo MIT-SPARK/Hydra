@@ -22,7 +22,6 @@ pybind11_add_module(
   bindings/src/depth_parser.cpp
   bindings/src/glog_utilities.cpp
   bindings/src/label_parser.cpp
-  bindings/src/python_batch.cpp
   bindings/src/python_image.cpp
   bindings/src/python_pipeline.cpp
   bindings/src/python_reconstruction.cpp

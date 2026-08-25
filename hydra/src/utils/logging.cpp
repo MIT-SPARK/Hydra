@@ -36,6 +36,8 @@
 
 #include <config_utilities/config.h>
 
+#include "hydra/common/global_info.h"
+
 namespace hydra {
 
 void declare_config(VerbosityConfig& config) {
@@ -52,6 +54,13 @@ VerbosityConfig VerbosityConfig::with_name(const std::string& name) const {
   auto new_config = *this;
   new_config.prefix = "[" + name + "] ";
   return new_config;
+}
+
+VerbosityConfig VerbosityConfig::default_verbosity(const std::string& name) {
+  VerbosityConfig to_return;
+  to_return.verbosity = GlobalInfo::instance().getConfig().default_verbosity;
+  to_return.prefix = "[" + name + "] ";
+  return to_return;
 }
 
 }  // namespace hydra

@@ -1,7 +1,6 @@
 target_sources(
   ${PROJECT_NAME}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/attribute_merger.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/batch_pipeline.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/config_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/global_info.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_update.cpp
