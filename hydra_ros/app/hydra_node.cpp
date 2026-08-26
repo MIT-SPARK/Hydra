@@ -148,7 +148,7 @@ int main(int argc, char* argv[]) {
   {  // start hydra scope
     std::vector<std::unique_ptr<hydra::AppPlugin>> node_plugins;
     for (const auto& plugin : settings.node_plugins) {
-      node_plugins.push_back(plugin.create(nh));
+      node_plugins.push_back(plugin.create());
     }
 
     hydra::GlobalInfo::instance().setForceShutdown(settings.force_shutdown);
