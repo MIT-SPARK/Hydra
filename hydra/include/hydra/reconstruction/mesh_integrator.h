@@ -93,4 +93,7 @@ class MeshIntegrator {
 
 void declare_config(MeshIntegrator::Config& config);
 
+// TODO(nathan) drop shim typedef when khronos is updated
+using MeshIntegratorConfig = MeshIntegrator::Config;
+
 }  // namespace hydra
