@@ -56,7 +56,7 @@ add_library(
   src/places/gvd_visualization_utilities.cpp
   src/odometry/ros_pose_graph_tracker.cpp
   src/openset/ros_embedding_group.cpp
-  src/utils/config_server_plugin.cpp
+  src/utils/node_plugins.cpp
   src/utils/dsg_streaming_interface.cpp
   src/utils/external_loop_closure_subscriber.cpp
   src/utils/input_data_to_messages.cpp

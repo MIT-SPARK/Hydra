@@ -44,7 +44,7 @@
 #include <ianvs/spin_functions.h>
 
 #include "hydra_ros/hydra_ros_pipeline.h"
-#include "hydra_ros/utils/config_server_plugin.h"
+#include "hydra_ros/utils/node_plugins.h"
 
 namespace hydra {
 

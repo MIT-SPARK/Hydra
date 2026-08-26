@@ -64,7 +64,7 @@ def run(
     args = _repair_args(config_utilities_files, "-f")
     args += _repair_args(config_utilities_yaml, "-c")
     args += _repair_args(config_utilities_var, "-v")
-    args += ["-c", "{app_plugins: [{type: ConfigServerPlugin}]}"]
+    args += ["-c", "{app_plugins: [{type: ConfigServerPlugin}, {type: SpinPlugin}]}"]
 
     hydra.set_glog_level(0, 0)
     hydra.init_config_context(args)
