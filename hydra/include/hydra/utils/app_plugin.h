@@ -34,68 +34,11 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/virtual_config.h>
-#include <config_utilities_ros/ros_dynamic_config_server.h>
-#include <ianvs/node_handle.h>
-
-#include <std_msgs/msg/string.hpp>
-#include <std_srvs/srv/empty.hpp>
-
-#include "hydra_visualizer/io/graph_wrapper.h"
-#include "hydra_visualizer/plugins/visualizer_plugin.h"
-#include "hydra_visualizer/scene_graph_renderer.h"
-
 namespace hydra {
 
-class DsgVisualizer {
- public:
-  struct Config {
-    //! How fast to check for changes
-    double loop_period_s = 0.1;
-    //! Primary visualization config for scene graph
-    SceneGraphRenderer::Config renderer;
-    //! Scene graph to draw
-    config::VirtualConfig<GraphWrapper> graph;
-    //! Additional plugins for drawing scene graph information
-    std::map<std::string, config::VirtualConfig<VisualizerPlugin, true>> plugins;
-  } const config;
-
-  //! Construct the visualizer from a config
-  DsgVisualizer(const Config& config, ianvs::NodeHandle nh);
-
-  ~DsgVisualizer() = default;
-
-  //! Loop and redraw when changes occur
-  void start();
-
-  //! Delete all currently published visualization artifacts and remake graph
-  void reset();
-
-  //! Add a new graph plugin
-  void addPlugin(VisualizerPlugin::Ptr plugin);
-
-  //! Delete all current plugins
-  void clearPlugins();
-
- private:
-  void spinOnce(bool force = false);
-
-  void saveConfigs(const std::filesystem::path& output);
-
-  ianvs::NodeHandle nh_;
-  rclcpp::TimerBase::SharedPtr loop_timer_;
-
-  GraphWrapper::Ptr graph_;
-  SceneGraphRenderer::Ptr renderer_;
-  std::vector<VisualizerPlugin::Ptr> plugins_;
-
-  const config::RosDynamicConfigServer server_;
-
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr redraw_service_;
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr save_sub_;
+//! Common base type for modifying exectuable runtime behavior
+struct AppPlugin {
+  virtual ~AppPlugin() = default;
 };
-
-void declare_config(DsgVisualizer::Config& config);
 
 }  // namespace hydra

@@ -32,6 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include <config_utilities/config.h>
 #include <config_utilities/external_registry.h>
 #include <config_utilities/parsing/context.h>
 #include <pybind11/pybind11.h>
@@ -44,6 +45,7 @@
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
 #include "hydra/common/global_info.h"
+#include "hydra/utils/app_plugin.h"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -58,6 +60,16 @@ struct ExternalPluginConfig {
   std::vector<std::string> paths;
 };
 
+struct AppPluginConfig {
+  std::vector<config::VirtualConfig<AppPlugin, true>> app_plugins;
+};
+
+[[maybe_unused]] void declare_config(AppPluginConfig& config) {
+  using namespace config;
+  name("AppPluginConfig");
+  field(config.app_plugins, "app_plugins");
+}
+
 struct PluginManager {
   static void init(const ExternalPluginConfig& config) {
     auto& manager = instance();
@@ -65,10 +77,16 @@ struct PluginManager {
     config::Settings().external_libraries.verbose_load = config.verbose;
     config::Settings().external_libraries.log_allocation = config.trace_allocations;
     manager.plugins_ = config::loadExternalFactories(config.paths);
+
+    const auto app_plugin_config = config::fromContext<AppPluginConfig>();
+    for (const auto& plugin : app_plugin_config.app_plugins) {
+      manager.app_plugins_.push_back(plugin.create());
+    }
   }
 
   static void deinit() {
     auto& manager = instance();
+    manager.app_plugins_.clear();
     // TODO(nathan) will likely segfault
     manager.plugins_.unload();
   }
@@ -80,6 +98,7 @@ struct PluginManager {
   }
 
   config::internal::LibraryGuard plugins_;
+  std::vector<std::unique_ptr<AppPlugin>> app_plugins_;
 };
 
 }  // namespace
@@ -117,8 +136,8 @@ PYBIND11_MODULE(_hydra_bindings, m) {
         }
 
         if (init_global_info) {
-          const auto global_config = config::fromContext<hydra::PipelineConfig>();
-          hydra::GlobalInfo::init(global_config);
+          const auto global_config = config::fromContext<PipelineConfig>();
+          GlobalInfo::init(global_config);
         }
       },
       "args"_a,

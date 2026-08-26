@@ -183,7 +183,7 @@ Marker drawEsdf(const GvdVisualizerConfig& config,
                 const Eigen::Isometry3d& pose,
                 const GvdLayer& layer,
                 const std::string& ns) {
-  VoxelSliceConfig slice{config.slice_height, true};
+  VoxelZSliceConfig slice{config.slice_height, true};
   return drawVoxelSlice<GvdVoxel>(
       slice,
       std_msgs::msg::Header(),

@@ -54,6 +54,12 @@ using visualizer::RangeColormap;
 
 namespace {
 
+static const auto registration =
+    config::RegistrationWithConfig<ActiveWindowModule::Sink,
+                                   ReconstructionVisualizer,
+                                   ReconstructionVisualizer::Config>(
+        "ReconstructionVisualizer");
+
 bool isVoxelObserved(const ReconstructionVisualizer::Config& config,
                      const TsdfVoxel& voxel) {
   return voxel.weight >= config.min_observation_weight;
@@ -81,31 +87,41 @@ void declare_config(ReconstructionVisualizer::Config& config) {
   using namespace config;
   name("ReconstructionVisualizerConfig");
   field(config.ns, "ns");
+
   field(config.min_weight, "min_weight");
   field(config.max_weight, "max_weight");
   field(config.marker_alpha, "marker_alpha");
-  field(config.use_relative_height, "use_relative_height");
-  field(config.slice_height, "slice_height", "m");
   field(config.min_observation_weight, "min_observation_weight");
+  field(config.voxel_slice, "voxel_slice");
+  field(config.voxel_size_ratio, "voxel_size_ratio");
+
   field(config.tsdf_block_scale, "tsdf_block_scale");
   field(config.tsdf_block_color, "tsdf_block_color");
   field(config.tsdf_block_alpha, "tsdf_block_alpha");
+
   field(config.mesh_block_scale, "mesh_block_scale");
   field(config.mesh_block_alpha, "mesh_block_alpha");
   field(config.mesh_block_color, "mesh_block_color");
+
+  config.mesh_coloring.setOptional();
+  field(config.mesh_coloring, "mesh_coloring");
+
   field(config.point_size, "point_size");
   field(config.filter_points_by_range, "filter_points_by_range");
   field(config.colormap, "colormap");
   field(config.label_colormap, "label_colormap");
   field(config.sensor_displays, "sensor_displays");
-  config.mesh_coloring.setOptional();
-  field(config.mesh_coloring, "mesh_coloring");
+
+  checkInRange(config.voxel_size_ratio, 0.0, 1.0, "voxel_size_ratio", false);
+  checkInRange(config.marker_alpha, 0.0, 1.0, "marker_alpha", false);
+  checkInRange(config.tsdf_block_alpha, 0.0, 1.0, "tsdf_block_alpha", false);
+  checkInRange(config.mesh_block_alpha, 0.0, 1.0, "mesh_block_alpha", false);
 }
 
 ReconstructionVisualizer::ReconstructionVisualizer(const Config& config)
-    : config(config),
-      nh_(ianvs::NodeHandle::this_node(config.ns)),
+    : nh_(ianvs::NodeHandle::this_node(config.ns)),
       pubs_(nh_),
+      config_("reconstruction_visualizer", config),
       active_mesh_pub_(nh_.create_publisher<kimera_pgmo_msgs::msg::Mesh>("mesh", 1)),
       pose_pub_(nh_.create_publisher<geometry_msgs::msg::PoseStamped>("pose", 10)),
       sensor_displays_(config.sensor_displays),
@@ -118,12 +134,14 @@ ReconstructionVisualizer::ReconstructionVisualizer(const Config& config)
 ReconstructionVisualizer::~ReconstructionVisualizer() {}
 
 std::string ReconstructionVisualizer::printInfo() const {
-  return config::toString(config);
+  return config::toString(config_.get());
 }
 
 void ReconstructionVisualizer::call(uint64_t timestamp_ns,
                                     const VolumetricMap& map,
                                     const ActiveWindowOutput& output) const {
+  const auto config = config_.get();
+
   const auto truncation_distance = map.config.truncation_distance;
   const auto& tsdf = map.getTsdfLayer();
   const auto pose = output.world_T_body();
@@ -145,7 +163,6 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
   pose_pub_->publish(std::move(pose_msg));
 
   const RangeColormap cmap(RangeColormap::Config{});
-  const VoxelSliceConfig slice{config.slice_height, config.use_relative_height};
   const Filter<TsdfVoxel> filter = [&](const auto& voxel) {
     return isVoxelObserved(config, voxel);
   };
@@ -159,12 +176,17 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
 
   pubs_.publish("tsdf_viz", header, [&]() -> Marker {
     return drawVoxelSlice<TsdfVoxel>(
-        slice, header, tsdf, pose, filter, distance_colormap, "distances");
+        config.voxel_slice, header, tsdf, pose, filter, distance_colormap, "distances");
   });
 
   pubs_.publish("tsdf_weight_viz", header, [&]() -> Marker {
     return drawVoxelSlice<TsdfVoxel>(
-        slice, header, tsdf, pose, filter, weight_colormap, "weights");
+        config.voxel_slice, header, tsdf, pose, filter, weight_colormap, "weights");
+  });
+
+  pubs_.publish("tsdf_voxel_viz", header, [&]() -> Marker {
+    return drawVoxelGrid<TsdfVoxel>(
+        header, tsdf, config.voxel_size_ratio, filter, distance_colormap, "distances");
   });
 
   ActiveBlockColoring block_cmap(config.tsdf_block_color);
@@ -176,7 +198,7 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
                            block_cmap.getCallback<TsdfBlock>());
   });
 
-  publishMesh(output);
+  publishMesh(config, output);
 
   if (output.sensor_data) {
     std_msgs::msg::Header header;
@@ -200,12 +222,20 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
           },
           display_config);
     });
+
     image_pubs_.publish(sensor_name + "/range", [&]() {
       return makeDistImage(header, output.sensor_data->range_image, display_config);
     });
+
     cloud_pubs_.publish(sensor_name + "/pointcloud", [&]() {
       return makeCloud(header, *output.sensor_data, config.filter_points_by_range);
     });
+
+    if (!output.sensor_data->color_image.empty()) {
+      image_pubs_.publish(sensor_name + "/color", [&]() {
+        return convertImage(header, output.sensor_data->color_image, display_config);
+      });
+    }
 
     if (!output.sensor_data->depth_image.empty()) {
       image_pubs_.publish(sensor_name + "/depth", [&]() {
@@ -213,9 +243,10 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
       });
     }
   }
-}  // namespace hydra
+}
 
-void ReconstructionVisualizer::publishMesh(const ActiveWindowOutput& out) const {
+void ReconstructionVisualizer::publishMesh(const Config& config,
+                                           const ActiveWindowOutput& out) const {
   std_msgs::msg::Header header;
   header.stamp = rclcpp::Time(out.timestamp_ns);
   header.frame_id = GlobalInfo::instance().getFrames().map;

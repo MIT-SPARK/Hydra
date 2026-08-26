@@ -32,70 +32,34 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
+#include "hydra_ros/visualizer/voxel_drawing.h"
 
-#include <config_utilities/virtual_config.h>
-#include <config_utilities_ros/ros_dynamic_config_server.h>
-#include <ianvs/node_handle.h>
-
-#include <std_msgs/msg/string.hpp>
-#include <std_srvs/srv/empty.hpp>
-
-#include "hydra_visualizer/io/graph_wrapper.h"
-#include "hydra_visualizer/plugins/visualizer_plugin.h"
-#include "hydra_visualizer/scene_graph_renderer.h"
+#include <config_utilities/config.h>
+#include <config_utilities/types/enum.h>
 
 namespace hydra {
 
-class DsgVisualizer {
- public:
-  struct Config {
-    //! How fast to check for changes
-    double loop_period_s = 0.1;
-    //! Primary visualization config for scene graph
-    SceneGraphRenderer::Config renderer;
-    //! Scene graph to draw
-    config::VirtualConfig<GraphWrapper> graph;
-    //! Additional plugins for drawing scene graph information
-    std::map<std::string, config::VirtualConfig<VisualizerPlugin, true>> plugins;
-  } const config;
+void declare_config(VoxelSliceConfig& config) {
+  using namespace config;
+  name("VoxelSliceConfig");
+  field(config.slice_offset, "slice_offset");
+  field(config.use_relative_offset, "use_relative_offset");
+  enum_field(config.axis,
+             "axis",
+             {{VoxelSliceConfig::X_AXIS, "x"},
+              {VoxelSliceConfig::Y_AXIS, "y"},
+              {VoxelSliceConfig::Z_AXIS, "z"}});
+}
 
-  //! Construct the visualizer from a config
-  DsgVisualizer(const Config& config, ianvs::NodeHandle nh);
+template <typename Block>
+using BlockColoring = std::function<std_msgs::msg::ColorRGBA(const Block&)>;
 
-  ~DsgVisualizer() = default;
+ActiveBlockColoring::ActiveBlockColoring(const spark_dsg::Color& active_color)
+    : active_color(active_color) {}
 
-  //! Loop and redraw when changes occur
-  void start();
-
-  //! Delete all currently published visualization artifacts and remake graph
-  void reset();
-
-  //! Add a new graph plugin
-  void addPlugin(VisualizerPlugin::Ptr plugin);
-
-  //! Delete all current plugins
-  void clearPlugins();
-
- private:
-  void spinOnce(bool force = false);
-
-  void saveConfigs(const std::filesystem::path& output);
-
-  ianvs::NodeHandle nh_;
-  rclcpp::TimerBase::SharedPtr loop_timer_;
-
-  GraphWrapper::Ptr graph_;
-  SceneGraphRenderer::Ptr renderer_;
-  std::vector<VisualizerPlugin::Ptr> plugins_;
-
-  const config::RosDynamicConfigServer server_;
-
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr redraw_service_;
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr save_sub_;
-};
-
-void declare_config(DsgVisualizer::Config& config);
+std_msgs::msg::ColorRGBA ActiveBlockColoring::call(
+    const spatial_hash::Block& block) const {
+  return visualizer::makeColorMsg(block.updated ? active_color : spark_dsg::Color());
+}
 
 }  // namespace hydra
