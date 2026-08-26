@@ -40,11 +40,11 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <hydra/common/global_info.h>
-#include <hydra_visualizer/node_plugins.h>
 #include <ianvs/node_init.h>
 #include <ianvs/spin_functions.h>
 
 #include "hydra_ros/hydra_ros_pipeline.h"
+#include "hydra_ros/utils/config_server_plugin.h"
 
 namespace hydra {
 
@@ -60,8 +60,8 @@ struct RunSettings {
   int glog_verbosity = 0;
   std::filesystem::path log_path;
   hydra::DataDirectory::Config output;
-  std::vector<config::VirtualConfig<NodePlugin, true>> node_plugins = {
-      config::VirtualConfig<NodePlugin, true>{DynamicConfigServer::Config{}}};
+  std::vector<config::VirtualConfig<AppPlugin, true>> node_plugins = {
+      config::VirtualConfig<AppPlugin, true>{ConfigServerPlugin::Config{}}};
 };
 
 void declare_config(RunSettings& config) {
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
   [[maybe_unused]] const auto plugins = config::loadExternalFactories(settings.paths);
 
   {  // start hydra scope
-    std::vector<std::unique_ptr<hydra::NodePlugin>> node_plugins;
+    std::vector<std::unique_ptr<hydra::AppPlugin>> node_plugins;
     for (const auto& plugin : settings.node_plugins) {
       node_plugins.push_back(plugin.create(nh));
     }

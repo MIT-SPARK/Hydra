@@ -51,18 +51,13 @@ void declare_config(DsgVisualizer::Config& config) {
   field(config.renderer, "renderer");
   field(config.graph, "graph");
   field(config.plugins, "plugins");
-  field(config.node_plugins, "node_plugins");
 }
 
 DsgVisualizer::DsgVisualizer(const Config& config, ianvs::NodeHandle nh)
-    : config(config::checkValid(config)), nh_(nh) {
+    : config(config::checkValid(config)), nh_(nh), server_(nh_.node()) {
   renderer_ = std::make_shared<SceneGraphRenderer>(config.renderer, nh_);
   for (auto&& [name, plugin] : config.plugins) {
     plugins_.push_back(plugin.create(nh_, name));
-  }
-
-  for (const auto& plugin : config.node_plugins) {
-    node_plugins_.push_back(plugin.create(nh_));
   }
 
   graph_ = config.graph.create(nh_);
