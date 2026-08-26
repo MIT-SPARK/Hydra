@@ -93,6 +93,7 @@ void declare_config(ReconstructionVisualizer::Config& config) {
   field(config.marker_alpha, "marker_alpha");
   field(config.min_observation_weight, "min_observation_weight");
   field(config.voxel_slice, "voxel_slice");
+  field(config.voxel_size_ratio, "voxel_size_ratio");
 
   field(config.tsdf_block_scale, "tsdf_block_scale");
   field(config.tsdf_block_color, "tsdf_block_color");
@@ -110,6 +111,11 @@ void declare_config(ReconstructionVisualizer::Config& config) {
   field(config.colormap, "colormap");
   field(config.label_colormap, "label_colormap");
   field(config.sensor_displays, "sensor_displays");
+
+  checkInRange(config.voxel_size_ratio, 0.0, 1.0, "voxel_size_ratio", false);
+  checkInRange(config.marker_alpha, 0.0, 1.0, "marker_alpha", false);
+  checkInRange(config.tsdf_block_alpha, 0.0, 1.0, "tsdf_block_alpha", false);
+  checkInRange(config.mesh_block_alpha, 0.0, 1.0, "mesh_block_alpha", false);
 }
 
 ReconstructionVisualizer::ReconstructionVisualizer(const Config& config)
@@ -176,6 +182,11 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
   pubs_.publish("tsdf_weight_viz", header, [&]() -> Marker {
     return drawVoxelSlice<TsdfVoxel>(
         config.voxel_slice, header, tsdf, pose, filter, weight_colormap, "weights");
+  });
+
+  pubs_.publish("tsdf_voxel_viz", header, [&]() -> Marker {
+    return drawVoxelGrid<TsdfVoxel>(
+        header, tsdf, config.voxel_size_ratio, filter, distance_colormap, "distances");
   });
 
   ActiveBlockColoring block_cmap(config.tsdf_block_color);

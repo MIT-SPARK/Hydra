@@ -68,6 +68,7 @@ class ReconstructionVisualizer : public ActiveWindowModule::Sink {
     double marker_alpha = 0.5;
     double min_observation_weight = 1.0e-5;
     VoxelSliceConfig voxel_slice;
+    double voxel_size_ratio = 0.2;
 
     double tsdf_block_scale = 0.02;
     double tsdf_block_alpha = 1.0;

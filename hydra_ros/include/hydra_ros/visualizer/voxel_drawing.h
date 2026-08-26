@@ -167,6 +167,40 @@ MarkerMsg drawVoxelSlice(const VoxelZSliceConfig& config,
       ns);
 }
 
+// adapted from khronos
+template <typename Voxel, typename Block>
+MarkerMsg drawVoxelGrid(const std_msgs::msg::Header& header,
+                        const spatial_hash::VoxelLayer<Block>& layer,
+                        double size_ratio,
+                        const Filter<Voxel>& observed,
+                        const Colormap<Voxel>& colormap,
+                        const std::string& ns) {
+  MarkerMsg msg;
+  msg.header = header;
+  msg.action = MarkerMsg::ADD;
+  msg.id = 0;
+  msg.ns = ns;
+  msg.type = MarkerMsg::CUBE_LIST;
+  msg.scale.x = size_ratio * layer.voxel_size;
+  msg.scale.y = size_ratio * layer.voxel_size;
+  msg.scale.z = size_ratio * layer.voxel_size;
+
+  for (const auto& block : layer) {
+    for (size_t i = 0; i < block.numVoxels(); ++i) {
+      const auto& voxel = block.getVoxel(i);
+      if (!observed(voxel)) {
+        continue;
+      }
+
+      const auto pos = block.getVoxelPosition(i);
+      tf2::convert(pos.template cast<double>().eval(), msg.points.emplace_back());
+      msg.colors.push_back(colormap(voxel));
+    }
+  }
+
+  return msg;
+}
+
 template <typename Block>
 using BlockColoring = std::function<std_msgs::msg::ColorRGBA(const Block&)>;
 
