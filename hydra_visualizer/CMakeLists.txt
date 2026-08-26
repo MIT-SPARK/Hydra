@@ -40,6 +40,7 @@ add_library(
   src/io/graph_ros_wrapper.cpp
   src/io/graph_zmq_wrapper.cpp
   src/layer_info.cpp
+  src/node_plugins.cpp
   src/plugins/basis_point_plugin.cpp
   src/plugins/footprint_plugin.cpp
   src/plugins/frontier_plugin.cpp

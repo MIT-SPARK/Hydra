@@ -39,8 +39,8 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
-#include <config_utilities_ros/ros_dynamic_config_server.h>
 #include <hydra/common/global_info.h>
+#include <hydra_visualizer/node_plugins.h>
 #include <ianvs/node_init.h>
 #include <ianvs/spin_functions.h>
 
@@ -60,6 +60,8 @@ struct RunSettings {
   int glog_verbosity = 0;
   std::filesystem::path log_path;
   hydra::DataDirectory::Config output;
+  std::vector<config::VirtualConfig<NodePlugin, true>> node_plugins = {
+      config::VirtualConfig<NodePlugin, true>{DynamicConfigServer::Config{}}};
 };
 
 void declare_config(RunSettings& config) {
@@ -76,6 +78,7 @@ void declare_config(RunSettings& config) {
   field(config.glog_verbosity, "glog_verbosity");
   field<Path::Absolute>(config.log_path, "log_path");
   field(config.output, "output");
+  field(config.node_plugins, "node_plugins");
 }
 
 struct RosSink : google::LogSink {
@@ -128,7 +131,6 @@ int main(int argc, char* argv[]) {
 
   [[maybe_unused]] const auto node = ianvs::init_node(argc, argv, "hydra_ros_node");
   auto nh = ianvs::NodeHandle::this_node();
-  const config::RosDynamicConfigServer config_server(nh.node());
 
   std::shared_ptr<hydra::RosSink> ros_sink;
   if (settings.forward_glog_to_ros) {
@@ -144,6 +146,11 @@ int main(int argc, char* argv[]) {
   [[maybe_unused]] const auto plugins = config::loadExternalFactories(settings.paths);
 
   {  // start hydra scope
+    std::vector<std::unique_ptr<hydra::NodePlugin>> node_plugins;
+    for (const auto& plugin : settings.node_plugins) {
+      node_plugins.push_back(plugin.create(nh));
+    }
+
     hydra::GlobalInfo::instance().setForceShutdown(settings.force_shutdown);
     hydra::HydraRosPipeline hydra(settings.robot_id, settings.config_verbosity);
     hydra.init();

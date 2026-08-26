@@ -35,13 +35,13 @@
 #pragma once
 
 #include <config_utilities/virtual_config.h>
-#include <config_utilities_ros/ros_dynamic_config_server.h>
 #include <ianvs/node_handle.h>
 
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/empty.hpp>
 
 #include "hydra_visualizer/io/graph_wrapper.h"
+#include "hydra_visualizer/node_plugins.h"
 #include "hydra_visualizer/plugins/visualizer_plugin.h"
 #include "hydra_visualizer/scene_graph_renderer.h"
 
@@ -50,11 +50,17 @@ namespace hydra {
 class DsgVisualizer {
  public:
   struct Config {
+    //! How fast to check for changes
     double loop_period_s = 0.1;
+    //! Primary visualization config for scene graph
     SceneGraphRenderer::Config renderer;
+    //! Scene graph to draw
     config::VirtualConfig<GraphWrapper> graph;
-    // Specify additional plugins that should be loaded <name, config>
+    //! Additional plugins for drawing scene graph information
     std::map<std::string, config::VirtualConfig<VisualizerPlugin, true>> plugins;
+    //! Plugins for modifying node-level behavior
+    std::vector<config::VirtualConfig<NodePlugin, true>> node_plugins = {
+        config::VirtualConfig<NodePlugin, true>{DynamicConfigServer::Config{}}};
   } const config;
 
   //! Construct the visualizer from a config
@@ -85,7 +91,8 @@ class DsgVisualizer {
   GraphWrapper::Ptr graph_;
   SceneGraphRenderer::Ptr renderer_;
   std::vector<VisualizerPlugin::Ptr> plugins_;
-  const config::RosDynamicConfigServer server_;
+  std::vector<std::unique_ptr<NodePlugin>> node_plugins_;
+
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr redraw_service_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr save_sub_;
