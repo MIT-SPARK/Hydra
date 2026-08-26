@@ -44,6 +44,7 @@
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
 #include "hydra/common/global_info.h"
+#include "hydra/utils/app_plugin.h"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -56,6 +57,7 @@ struct ExternalPluginConfig {
   bool verbose = false;
   bool trace_allocations = false;
   std::vector<std::string> paths;
+  std::vector<config::VirtualConfig<AppPlugin, true>> app_plugins;
 };
 
 struct PluginManager {
@@ -65,10 +67,15 @@ struct PluginManager {
     config::Settings().external_libraries.verbose_load = config.verbose;
     config::Settings().external_libraries.log_allocation = config.trace_allocations;
     manager.plugins_ = config::loadExternalFactories(config.paths);
+
+    for (const auto& plugin : config.app_plugins) {
+      manager.app_plugins_.push_back(plugin.create());
+    }
   }
 
   static void deinit() {
     auto& manager = instance();
+    manager.app_plugins_.clear();
     // TODO(nathan) will likely segfault
     manager.plugins_.unload();
   }
@@ -80,6 +87,7 @@ struct PluginManager {
   }
 
   config::internal::LibraryGuard plugins_;
+  std::vector<std::unique_ptr<AppPlugin>> app_plugins_;
 };
 
 }  // namespace
