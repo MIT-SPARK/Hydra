@@ -54,6 +54,12 @@ using visualizer::RangeColormap;
 
 namespace {
 
+static const auto registration =
+    config::RegistrationWithConfig<ActiveWindowModule::Sink,
+                                   ReconstructionVisualizer,
+                                   ReconstructionVisualizer::Config>(
+        "ReconstructionVisualizer");
+
 bool isVoxelObserved(const ReconstructionVisualizer::Config& config,
                      const TsdfVoxel& voxel) {
   return voxel.weight >= config.min_observation_weight;
@@ -81,25 +87,29 @@ void declare_config(ReconstructionVisualizer::Config& config) {
   using namespace config;
   name("ReconstructionVisualizerConfig");
   field(config.ns, "ns");
+
   field(config.min_weight, "min_weight");
   field(config.max_weight, "max_weight");
   field(config.marker_alpha, "marker_alpha");
-  field(config.use_relative_height, "use_relative_height");
-  field(config.slice_height, "slice_height", "m");
   field(config.min_observation_weight, "min_observation_weight");
+  field(config.voxel_slice, "voxel_slice");
+
   field(config.tsdf_block_scale, "tsdf_block_scale");
   field(config.tsdf_block_color, "tsdf_block_color");
   field(config.tsdf_block_alpha, "tsdf_block_alpha");
+
   field(config.mesh_block_scale, "mesh_block_scale");
   field(config.mesh_block_alpha, "mesh_block_alpha");
   field(config.mesh_block_color, "mesh_block_color");
+
+  config.mesh_coloring.setOptional();
+  field(config.mesh_coloring, "mesh_coloring");
+
   field(config.point_size, "point_size");
   field(config.filter_points_by_range, "filter_points_by_range");
   field(config.colormap, "colormap");
   field(config.label_colormap, "label_colormap");
   field(config.sensor_displays, "sensor_displays");
-  config.mesh_coloring.setOptional();
-  field(config.mesh_coloring, "mesh_coloring");
 }
 
 ReconstructionVisualizer::ReconstructionVisualizer(const Config& config)
@@ -147,7 +157,6 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
   pose_pub_->publish(std::move(pose_msg));
 
   const RangeColormap cmap(RangeColormap::Config{});
-  const VoxelSliceConfig slice{config.slice_height, config.use_relative_height};
   const Filter<TsdfVoxel> filter = [&](const auto& voxel) {
     return isVoxelObserved(config, voxel);
   };
@@ -161,12 +170,12 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
 
   pubs_.publish("tsdf_viz", header, [&]() -> Marker {
     return drawVoxelSlice<TsdfVoxel>(
-        slice, header, tsdf, pose, filter, distance_colormap, "distances");
+        config.voxel_slice, header, tsdf, pose, filter, distance_colormap, "distances");
   });
 
   pubs_.publish("tsdf_weight_viz", header, [&]() -> Marker {
     return drawVoxelSlice<TsdfVoxel>(
-        slice, header, tsdf, pose, filter, weight_colormap, "weights");
+        config.voxel_slice, header, tsdf, pose, filter, weight_colormap, "weights");
   });
 
   ActiveBlockColoring block_cmap(config.tsdf_block_color);

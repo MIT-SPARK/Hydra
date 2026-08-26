@@ -44,6 +44,18 @@ namespace hydra {
 using MarkerMsg = visualization_msgs::msg::Marker;
 
 struct VoxelSliceConfig {
+  enum Axis {
+    X_AXIS,
+    Y_AXIS,
+    Z_AXIS,
+  } axis = Z_AXIS;
+  double slice_offset = 0.0;
+  bool use_relative_offset = true;
+};
+
+void declare_config(VoxelSliceConfig& config);
+
+struct VoxelZSliceConfig {
   double slice_height = 0.0;
   bool use_relative_height = true;
 };
@@ -63,6 +75,21 @@ MarkerMsg drawVoxelSlice(const VoxelSliceConfig& config,
                          const Filter<Voxel>& observed,
                          const Colormap<Voxel>& colormap,
                          const std::string& ns) {
+  int axis;
+  switch (config.axis) {
+    case VoxelSliceConfig::X_AXIS:
+      axis = 0;
+      break;
+    case VoxelSliceConfig::Y_AXIS:
+      axis = 1;
+      break;
+    case VoxelSliceConfig::Z_AXIS:
+      axis = 2;
+      break;
+    default:
+      throw std::runtime_error("Invalid enum value!");
+  }
+
   MarkerMsg msg;
   msg.header = header;
   msg.action = MarkerMsg::ADD;
@@ -73,12 +100,14 @@ MarkerMsg drawVoxelSlice(const VoxelSliceConfig& config,
   msg.scale.y = layer.voxel_size;
   msg.scale.z = layer.voxel_size;
 
-  auto height = config.slice_height;
-  if (config.use_relative_height) {
-    height += world_T_sensor.translation().z();
+  auto offset = config.slice_offset;
+  if (config.use_relative_offset) {
+    offset += world_T_sensor.translation()(axis);
   }
 
-  const spatial_hash::Point slice_pos(0, 0, height);
+  spatial_hash::Point slice_pos = spatial_hash::Point::Zero();
+  slice_pos(axis) = offset;
+
   const auto slice_index = layer.getBlockIndex(slice_pos);
   const auto origin =
       spatial_hash::originPointFromIndex(slice_index, layer.blockSize());
@@ -86,13 +115,25 @@ MarkerMsg drawVoxelSlice(const VoxelSliceConfig& config,
       slice_pos - origin, layer.voxel_size_inv);
 
   for (const auto& block : layer) {
-    if (block.index.z() != slice_index.z()) {
+    if (block.index(axis) != slice_index(axis)) {
       continue;
     }
 
-    for (size_t x = 0; x < block.voxels_per_side; ++x) {
-      for (size_t y = 0; y < block.voxels_per_side; ++y) {
-        const spatial_hash::VoxelIndex voxel_idx(x, y, grid_index.z());
+    for (size_t i = 0; i < block.voxels_per_side; ++i) {
+      for (size_t j = 0; j < block.voxels_per_side; ++j) {
+        spatial_hash::VoxelIndex voxel_idx;
+        switch (config.axis) {
+          case VoxelSliceConfig::X_AXIS:
+            voxel_idx << grid_index(axis), i, j;
+            break;
+          case VoxelSliceConfig::Y_AXIS:
+            voxel_idx << i, grid_index(axis), j;
+            break;
+          case VoxelSliceConfig::Z_AXIS:
+            voxel_idx << i, j, grid_index(axis);
+            break;
+        }
+
         const auto& voxel = block.getVoxel(voxel_idx);
         if (!observed(voxel)) {
           continue;
@@ -108,16 +149,31 @@ MarkerMsg drawVoxelSlice(const VoxelSliceConfig& config,
   return msg;
 }
 
+template <typename Voxel, typename Block>
+MarkerMsg drawVoxelSlice(const VoxelZSliceConfig& config,
+                         const std_msgs::msg::Header& header,
+                         const spatial_hash::VoxelLayer<Block>& layer,
+                         const Eigen::Isometry3d& world_T_sensor,
+                         const Filter<Voxel>& observed,
+                         const Colormap<Voxel>& colormap,
+                         const std::string& ns) {
+  return drawVoxelSlice(
+      {VoxelSliceConfig::Axis::Z_AXIS, config.slice_height, config.use_relative_height},
+      header,
+      layer,
+      world_T_sensor,
+      observed,
+      colormap,
+      ns);
+}
+
 template <typename Block>
 using BlockColoring = std::function<std_msgs::msg::ColorRGBA(const Block&)>;
 
 struct ActiveBlockColoring {
-  explicit ActiveBlockColoring(const spark_dsg::Color& active_color)
-      : active_color(active_color) {}
+  explicit ActiveBlockColoring(const spark_dsg::Color& active_color);
 
-  std_msgs::msg::ColorRGBA call(const spatial_hash::Block& block) const {
-    return visualizer::makeColorMsg(block.updated ? active_color : spark_dsg::Color());
-  }
+  std_msgs::msg::ColorRGBA call(const spatial_hash::Block& block) const;
 
   template <typename Block>
   BlockColoring<Block> getCallback() const {

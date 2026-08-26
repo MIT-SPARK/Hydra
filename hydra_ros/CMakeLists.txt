@@ -65,6 +65,7 @@ add_library(
   src/utils/status_monitor.cpp
   src/utils/tf_lookup.cpp
   src/visualizer/feature_color_adaptors.cpp
+  src/visualizer/voxel_drawing.cpp
 )
 target_include_directories(
   ${PROJECT_NAME}

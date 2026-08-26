@@ -48,6 +48,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include "hydra_ros/utils/input_data_to_messages.h"
+#include "hydra_ros/visualizer/voxel_drawing.h"
 
 namespace hydra {
 
@@ -61,23 +62,27 @@ class ReconstructionVisualizer : public ActiveWindowModule::Sink {
 
   struct Config {
     std::string ns = "~/reconstruction";
+
     double min_weight = 0.0;
     double max_weight = 10.0;
     double marker_alpha = 0.5;
-    bool use_relative_height = true;
-    double slice_height = 0.0;
     double min_observation_weight = 1.0e-5;
+    VoxelSliceConfig voxel_slice;
+
     double tsdf_block_scale = 0.02;
     double tsdf_block_alpha = 1.0;
     spark_dsg::Color tsdf_block_color = spark_dsg::Color::green();
+
     double mesh_block_scale = 0.02;
     double mesh_block_alpha = 1.0;
     spark_dsg::Color mesh_block_color = spark_dsg::Color::red();
+
+    config::VirtualConfig<MeshColoring> mesh_coloring;
+
     double point_size = 0.04;
     bool filter_points_by_range = true;
     visualizer::RangeColormap::Config colormap;
     visualizer::CategoricalColormap::Config label_colormap;
-    config::VirtualConfig<MeshColoring> mesh_coloring;
     SensorMap<SensorDisplay>::Config sensor_displays;
   };
 
@@ -107,10 +112,6 @@ class ReconstructionVisualizer : public ActiveWindowModule::Sink {
   std::shared_ptr<MeshColoring> mesh_coloring_;
 
  private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<ActiveWindowModule::Sink,
-                                     ReconstructionVisualizer,
-                                     Config>("ReconstructionVisualizer");
 };
 
 void declare_config(ReconstructionVisualizer::Config& config);
