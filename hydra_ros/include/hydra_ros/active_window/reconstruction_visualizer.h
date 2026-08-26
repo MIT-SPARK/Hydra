@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/dynamic_config.h>
 #include <hydra/active_window/active_window_module.h>
 #include <hydra/input/sensor_map.h>
 #include <hydra_visualizer/adapters/mesh_color.h>
@@ -78,7 +79,7 @@ class ReconstructionVisualizer : public ActiveWindowModule::Sink {
     visualizer::CategoricalColormap::Config label_colormap;
     config::VirtualConfig<MeshColoring> mesh_coloring;
     SensorMap<SensorDisplay>::Config sensor_displays;
-  } const config;
+  };
 
   explicit ReconstructionVisualizer(const Config& config);
 
@@ -91,10 +92,11 @@ class ReconstructionVisualizer : public ActiveWindowModule::Sink {
             const ActiveWindowOutput& msg) const override;
 
  protected:
-  void publishMesh(const ActiveWindowOutput& output) const;
+  void publishMesh(const Config& config, const ActiveWindowOutput& output) const;
 
   ianvs::NodeHandle nh_;
   MarkerGroupPub pubs_;
+  config::DynamicConfig<Config> config_;
   rclcpp::Publisher<kimera_pgmo_msgs::msg::Mesh>::SharedPtr active_mesh_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
   SensorMap<SensorDisplay> sensor_displays_;

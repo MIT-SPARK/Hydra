@@ -148,11 +148,22 @@ Image::SharedPtr makeOverlayImage(const std_msgs::msg::Header& header,
 Image::SharedPtr makeDistImage(const std_msgs::msg::Header& header,
                                const cv::Mat& distances,
                                const DisplayConfig& config) {
-  double min_v = 0.0;
-  double max_v = std::numeric_limits<double>::infinity();
-  cv::minMaxIdx(distances, &min_v, &max_v);
-  const float v_min = config.min_distance >= 0.0f ? config.min_distance : min_v;
-  const float v_max = config.max_distance >= 0.0f ? config.max_distance : max_v;
+  float min_v = std::numeric_limits<float>::infinity();
+  float max_v = 0.0f;
+  for (int r = 0; r < distances.rows; ++r) {
+    for (int c = 0; c < distances.cols; ++c) {
+      const auto value = distances.at<InputData::RangeType>(r, c);
+      if (!std::isfinite(value) || value < 1.0e-6) {
+        continue;  // make sure NaNs and infinite values don't pollute range
+      }
+
+      min_v = std::min(value, min_v);
+      max_v = std::max(value, max_v);
+    }
+  }
+
+  const auto v_min = config.min_distance >= 0.0f ? config.min_distance : min_v;
+  const auto v_max = config.max_distance >= 0.0f ? config.max_distance : max_v;
   const visualizer::RangeColormap cmap(config.distance_colormap);
   return makeImage(
       header,

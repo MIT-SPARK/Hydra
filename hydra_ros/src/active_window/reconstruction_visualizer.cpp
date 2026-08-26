@@ -103,9 +103,9 @@ void declare_config(ReconstructionVisualizer::Config& config) {
 }
 
 ReconstructionVisualizer::ReconstructionVisualizer(const Config& config)
-    : config(config),
-      nh_(ianvs::NodeHandle::this_node(config.ns)),
+    : nh_(ianvs::NodeHandle::this_node(config.ns)),
       pubs_(nh_),
+      config_("reconstruction_visualizer", config),
       active_mesh_pub_(nh_.create_publisher<kimera_pgmo_msgs::msg::Mesh>("mesh", 1)),
       pose_pub_(nh_.create_publisher<geometry_msgs::msg::PoseStamped>("pose", 10)),
       sensor_displays_(config.sensor_displays),
@@ -118,12 +118,14 @@ ReconstructionVisualizer::ReconstructionVisualizer(const Config& config)
 ReconstructionVisualizer::~ReconstructionVisualizer() {}
 
 std::string ReconstructionVisualizer::printInfo() const {
-  return config::toString(config);
+  return config::toString(config_.get());
 }
 
 void ReconstructionVisualizer::call(uint64_t timestamp_ns,
                                     const VolumetricMap& map,
                                     const ActiveWindowOutput& output) const {
+  const auto config = config_.get();
+
   const auto truncation_distance = map.config.truncation_distance;
   const auto& tsdf = map.getTsdfLayer();
   const auto pose = output.world_T_body();
@@ -176,7 +178,7 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
                            block_cmap.getCallback<TsdfBlock>());
   });
 
-  publishMesh(output);
+  publishMesh(config, output);
 
   if (output.sensor_data) {
     std_msgs::msg::Header header;
@@ -200,12 +202,20 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
           },
           display_config);
     });
+
     image_pubs_.publish(sensor_name + "/range", [&]() {
       return makeDistImage(header, output.sensor_data->range_image, display_config);
     });
+
     cloud_pubs_.publish(sensor_name + "/pointcloud", [&]() {
       return makeCloud(header, *output.sensor_data, config.filter_points_by_range);
     });
+
+    if (!output.sensor_data->color_image.empty()) {
+      image_pubs_.publish(sensor_name + "/color", [&]() {
+        return convertImage(header, output.sensor_data->color_image, display_config);
+      });
+    }
 
     if (!output.sensor_data->depth_image.empty()) {
       image_pubs_.publish(sensor_name + "/depth", [&]() {
@@ -213,9 +223,10 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
       });
     }
   }
-}  // namespace hydra
+}
 
-void ReconstructionVisualizer::publishMesh(const ActiveWindowOutput& out) const {
+void ReconstructionVisualizer::publishMesh(const Config& config,
+                                           const ActiveWindowOutput& out) const {
   std_msgs::msg::Header header;
   header.stamp = rclcpp::Time(out.timestamp_ns);
   header.frame_id = GlobalInfo::instance().getFrames().map;

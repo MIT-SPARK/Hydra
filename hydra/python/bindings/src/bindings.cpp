@@ -32,6 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include <config_utilities/config.h>
 #include <config_utilities/external_registry.h>
 #include <config_utilities/parsing/context.h>
 #include <pybind11/pybind11.h>
@@ -57,8 +58,17 @@ struct ExternalPluginConfig {
   bool verbose = false;
   bool trace_allocations = false;
   std::vector<std::string> paths;
+};
+
+struct AppPluginConfig {
   std::vector<config::VirtualConfig<AppPlugin, true>> app_plugins;
 };
+
+[[maybe_unused]] void declare_config(AppPluginConfig& config) {
+  using namespace config;
+  name("AppPluginConfig");
+  field(config.app_plugins, "app_plugins");
+}
 
 struct PluginManager {
   static void init(const ExternalPluginConfig& config) {
@@ -68,7 +78,8 @@ struct PluginManager {
     config::Settings().external_libraries.log_allocation = config.trace_allocations;
     manager.plugins_ = config::loadExternalFactories(config.paths);
 
-    for (const auto& plugin : config.app_plugins) {
+    const auto app_plugin_config = config::fromContext<AppPluginConfig>();
+    for (const auto& plugin : app_plugin_config.app_plugins) {
       manager.app_plugins_.push_back(plugin.create());
     }
   }
@@ -125,8 +136,8 @@ PYBIND11_MODULE(_hydra_bindings, m) {
         }
 
         if (init_global_info) {
-          const auto global_config = config::fromContext<hydra::PipelineConfig>();
-          hydra::GlobalInfo::init(global_config);
+          const auto global_config = config::fromContext<PipelineConfig>();
+          GlobalInfo::init(global_config);
         }
       },
       "args"_a,
