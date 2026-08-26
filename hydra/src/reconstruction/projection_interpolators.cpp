@@ -54,7 +54,6 @@
 #include <Eigen/Core>
 #include <cmath>
 #include <limits>
-#include <unordered_map>
 
 #include "hydra/input/input_data.h"
 
@@ -94,6 +93,25 @@ inline Weights getNearestWeights(float u, float v, const cv::Mat& img) {
 
   weights.valid = pixelIsValid(weights.u, weights.v, img);
   return weights;
+}
+
+inline void updateConfidences(InputData::LabelType label,
+                              float weight,
+                              std::array<int, 4>& ids,
+                              std::array<float, 4>& confidences,
+                              size_t& allocated) {
+  for (size_t i = 0; i < allocated; ++i) {
+    if (ids[i] == label) {
+      // increment already seen label and return
+      confidences[i] += weight;
+      return;
+    }
+  }
+
+  // fill new slot with label and weight
+  ids[allocated] = label;
+  confidences[allocated] = weight;
+  ++allocated;
 }
 
 }  // namespace
@@ -183,20 +201,39 @@ int InterpolatorBilinear::interpolateID(const cv::Mat& id_image,
                                         const Weights& weights) const {
   // Since IDs can not be interpolated we assign weights to all IDs in the image
   // based on the corner weights and return the highest weights ID.
-  // NOTE(nathan) this is not the same as just picking the maximum weight from the
-  // pixels
-  // TODO(nathan) consider manually implementing to avoid std::unordered_map memory
-  // usage
-  std::unordered_map<int, float> ids;  // These are zero initialized by default.
-  ids[id_image.at<InputData::LabelType>(weights.v, weights.u)] += weights.w0;
-  ids[id_image.at<InputData::LabelType>(weights.v + 1, weights.u)] += weights.w1;
-  ids[id_image.at<InputData::LabelType>(weights.v, weights.u + 1)] += weights.w2;
-  ids[id_image.at<InputData::LabelType>(weights.v + 1, weights.u + 1)] += weights.w3;
-  return std::max_element(
-             std::begin(ids),
-             std::end(ids),
-             [](const auto& p1, const auto& p2) { return p1.second < p2.second; })
-      ->first;
+
+  // first pixel will always be allocated
+  size_t allocated = 1;
+  std::array<int, 4> ids{
+      id_image.at<InputData::LabelType>(weights.v, weights.u), 0, 0, 0};
+  std::array<float, 4> confidences{weights.w0, 0.0f, 0.0f, 0.0f};
+
+  updateConfidences(id_image.at<InputData::LabelType>(weights.v + 1, weights.u),
+                    weights.w1,
+                    ids,
+                    confidences,
+                    allocated);
+  updateConfidences(id_image.at<InputData::LabelType>(weights.v, weights.u + 1),
+                    weights.w2,
+                    ids,
+                    confidences,
+                    allocated);
+  updateConfidences(id_image.at<InputData::LabelType>(weights.v + 1, weights.u + 1),
+                    weights.w3,
+                    ids,
+                    confidences,
+                    allocated);
+
+  float best_confidence = confidences[0];
+  InputData::LabelType best_id = ids[0];
+  for (size_t i = 1; i < allocated; ++i) {
+    if (confidences[i] > best_confidence) {
+      best_confidence = confidences[i];
+      best_id = ids[i];
+    }
+  }
+
+  return best_id;
 }
 
 bool InterpolatorBilinear::interpolateMask(const cv::Mat& img,
