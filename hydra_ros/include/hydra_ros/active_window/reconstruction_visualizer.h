@@ -80,7 +80,7 @@ class ReconstructionVisualizer : public ActiveWindowModule::Sink {
     config::VirtualConfig<MeshColoring> mesh_coloring;
 
     double point_size = 0.04;
-    bool filter_points_by_range = true;
+    bool filter_points_by_range = false;
     visualizer::RangeColormap::Config colormap;
     visualizer::CategoricalColormap::Config label_colormap;
     SensorMap<SensorDisplay>::Config sensor_displays;
