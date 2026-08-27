@@ -171,6 +171,9 @@ class InterpolatorBilinear : public ProjectionInterpolator {
 
   bool interpolateMask(const cv::Mat& mask_image,
                        const InterpolationWeights& weights) const override;
+
+ protected:
+  void fillBilinearWeights(float u, float v, InterpolationWeights& weights) const;
 };
 
 void declare_config(InterpolatorBilinear::Config& config);
