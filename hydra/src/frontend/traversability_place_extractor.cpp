@@ -57,6 +57,8 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
   name("TraversabilityPlaceExtractor::Config");
   field(config.layer, "layer");
   field(config.estimator, "estimator");
+  config.semantic_integrator.setOptional();
+  field(config.semantic_integrator, "semantic_integrator");
   field(config.postprocessing, "postprocessing");
   field(config.clustering, "clustering");
   field(config.sinks, "sinks");
@@ -65,6 +67,7 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
 TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
     : config(config::checkValid(config)),
       estimator_(config.estimator.create()),
+      semantic_integrator_(config.semantic_integrator.create()),
       postprocessing_(config.postprocessing),
       clustering_(config.clustering.create()),
       sinks_(Sink::instantiate(config.sinks)) {}
@@ -80,6 +83,20 @@ void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
 void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
   estimator_->updateTraversability(msg);
+
+  if (!semantic_integrator_) {
+    return;
+  }
+
+  // NOTE(aryannav): this runs here rather than in updateGraph() because updateGraph()
+  // executes while holding the scene graph mutex, and projecting the whole layer is too
+  // expensive to do under that lock. The reclassify callback keeps the estimator's
+  // thresholds (min_confidence, min_traversability, pessimistic) owned by the estimator.
+  timer.reset("traversability/semantics");
+  semantic_integrator_->updateTraversability(
+      msg, estimator_->getMutableTraversabilityLayer(), [this](TraversabilityVoxel& v) {
+        estimator_->classifyTraversabilityVoxel(v);
+      });
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
@@ -88,6 +105,8 @@ void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
   // expensive though.
   Timer timer("traversability/postprocessing", msg.timestamp_ns);
   auto layer = estimator_->getTraversabilityLayer();
+
+  // THIS IS WHERE THE SEMANTIC TRAVERSABILITY INTEGRATOR SHOULD LIVE
   postprocessing_.apply(layer);
 
   timer.reset("traversability/clustering");

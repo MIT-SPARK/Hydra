@@ -115,6 +115,15 @@ class TraversabilityEstimator {
   }
 
   /**
+   * @brief Mutable access to the traversability layer, so that downstream stages (e.g. a
+   * SemanticTraversabilityIntegrator) can refine the estimate in place.
+   * @note Only valid after the first call to updateTraversability().
+   */
+  virtual TraversabilityLayer& getMutableTraversabilityLayer() {
+    return *traversability_layer_;
+  }
+
+  /**
    * @brief Classify a traversability voxel based on its confidence and traversability.
    * @note Default implementation uses min_confidence_, min_traversability_, and
    * pessimistic_ set by derived class constructors. Subclasses may override for custom

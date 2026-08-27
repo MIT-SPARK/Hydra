@@ -39,6 +39,7 @@
 
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/graph_builder_functor.h"
+#include "hydra/places/semantic_traversability_integrator.h"
 #include "hydra/places/traversability_clustering.h"
 #include "hydra/places/traversability_estimator.h"
 #include "hydra/places/traversability_postprocessing.h"
@@ -54,6 +55,8 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
     std::string layer = spark_dsg::DsgLayers::TRAVERSABILITY;
     //! Estimator for maintaining traversability state
     config::VirtualConfig<TraversabilityEstimator> estimator;
+    //! Optional semantic refinement of the geometric traversability estimate
+    config::VirtualConfig<SemanticTraversabilityIntegrator> semantic_integrator;
     //! Postprocessing filters for the traversability state (before clustering)
     TraversabilityProcessors::Config postprocessing;
     //! Clustering that produces the places layer from the traversability state
@@ -74,6 +77,7 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
 
  protected:
   TraversabilityEstimator::Ptr estimator_;
+  SemanticTraversabilityIntegrator::Ptr semantic_integrator_;
   const TraversabilityProcessors postprocessing_;
   TraversabilityClustering::Ptr clustering_;
   Sink::List sinks_;
