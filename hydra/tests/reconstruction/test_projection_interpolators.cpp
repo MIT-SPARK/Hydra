@@ -38,6 +38,9 @@
 #include <opencv2/core.hpp>
 
 namespace hydra {
+
+using spark_dsg::Color;
+
 namespace {
 
 std::optional<float> getRange(const ProjectionInterpolator& interp,
@@ -50,6 +53,45 @@ std::optional<float> getRange(const ProjectionInterpolator& interp,
   }
 
   return interp.interpolateRange(mat, weights);
+}
+
+std::optional<Color> getColor(const ProjectionInterpolator& interp,
+                              const cv::Mat& ranges,
+                              const cv::Mat& colors,
+                              float u,
+                              float v) {
+  const auto weights = interp.computeWeights(u, v, ranges);
+  if (!weights.valid) {
+    return std::nullopt;
+  }
+
+  return interp.interpolateColor(colors, weights);
+}
+
+std::optional<int> getId(const ProjectionInterpolator& interp,
+                         const cv::Mat& ranges,
+                         const cv::Mat& ids,
+                         float u,
+                         float v) {
+  const auto weights = interp.computeWeights(u, v, ranges);
+  if (!weights.valid) {
+    return std::nullopt;
+  }
+
+  return interp.interpolateID(ids, weights);
+}
+
+std::optional<bool> getMask(const ProjectionInterpolator& interp,
+                            const cv::Mat& ranges,
+                            const cv::Mat& mask,
+                            float u,
+                            float v) {
+  const auto weights = interp.computeWeights(u, v, ranges);
+  if (!weights.valid) {
+    return std::nullopt;
+  }
+
+  return interp.interpolateMask(mask, weights);
 }
 
 }  // namespace
@@ -82,6 +124,43 @@ TEST(ProjectionInterpolators, NearestCorrect) {
   }
 }
 
+TEST(ProjectionInterpolators, NearestInvalidRangeCorrect) {
+  InterpolatorNearest interp;
+  cv::Mat img = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
+
+  // setup invalid range values
+  img.at<float>(0, 1) = std::numeric_limits<float>::quiet_NaN();
+  img.at<float>(1, 0) = 0.0f;
+  img.at<float>(1, 1) = std::numeric_limits<float>::infinity();
+
+  ASSERT_TRUE(getRange(interp, img, 0.2, 0.2));
+  ASSERT_FALSE(getRange(interp, img, 1.2, 0.2));
+  ASSERT_FALSE(getRange(interp, img, 0.2, 1.2));
+  ASSERT_FALSE(getRange(interp, img, 1.2, 1.2));
+}
+
+TEST(ProjectionInterpolators, NearestCorrectNonRange) {
+  InterpolatorNearest interp;
+  cv::Mat ranges = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
+  cv::Mat colors = (cv::Mat_<cv::Vec3b>(2, 2) << cv::Vec3b(1, 2, 3),
+                    cv::Vec3b(2, 3, 4),
+                    cv::Vec3b(3, 4, 5),
+                    cv::Vec3b(4, 5, 6));
+  cv::Mat ids = (cv::Mat_<int>(2, 2) << 1, 2, 3, 1);
+  cv::Mat mask = (cv::Mat_<bool>(2, 2) << false, true, false, true);
+
+  {  // outside of image
+    const auto color = getColor(interp, ranges, colors, 0.2, 0.4);
+    EXPECT_EQ(color, Color(1, 2, 3));
+
+    const auto id = getId(interp, ranges, ids, 0.2, 0.4);
+    EXPECT_EQ(id, 1);
+
+    const auto flag = getMask(interp, ranges, mask, 0.2, 0.4);
+    EXPECT_EQ(flag, false);
+  }
+}
+
 TEST(ProjectionInterpolators, BilinearCorrect) {
   InterpolatorBilinear interp;
   cv::Mat img = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
@@ -101,6 +180,48 @@ TEST(ProjectionInterpolators, BilinearCorrect) {
     const auto range = getRange(interp, img, 0.5, 0.0);
     ASSERT_TRUE(range);
     EXPECT_EQ(range.value(), 1.5f);
+  }
+}
+
+TEST(ProjectionInterpolators, BilinearInvalidRangeCorrect) {
+  InterpolatorBilinear interp;
+  cv::Mat img = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
+  ASSERT_TRUE(getRange(interp, img, 0.0, 0.5));
+
+  // NaNs should disable interpolation
+  img.at<float>(0, 1) = std::numeric_limits<float>::quiet_NaN();
+  ASSERT_FALSE(getRange(interp, img, 0.0, 0.5));
+
+  // 0 depth should also be invalid
+  img.at<float>(0, 1) = 2.0;
+  img.at<float>(1, 0) = 0.0f;
+  ASSERT_FALSE(getRange(interp, img, 0.0, 0.5));
+
+  // infinite depth is also invalid
+  img.at<float>(1, 0) = 3.0;
+  img.at<float>(0, 0) = std::numeric_limits<float>::infinity();
+  ASSERT_FALSE(getRange(interp, img, 0.0, 0.5));
+}
+
+TEST(ProjectionInterpolators, BilinearCorrectNonRange) {
+  InterpolatorBilinear interp;
+  cv::Mat ranges = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
+  cv::Mat colors = (cv::Mat_<cv::Vec3b>(2, 2) << cv::Vec3b(1, 2, 3),
+                    cv::Vec3b(2, 3, 4),
+                    cv::Vec3b(3, 4, 5),
+                    cv::Vec3b(4, 5, 6));
+  cv::Mat ids = (cv::Mat_<int>(2, 2) << 1, 1, 3, 1);
+  cv::Mat mask = (cv::Mat_<bool>(2, 2) << false, true, false, true);
+
+  {  // outside of image
+    const auto color = getColor(interp, ranges, colors, 0.0, 0.5);
+    EXPECT_EQ(color, Color(2, 3, 4));
+
+    const auto id = getId(interp, ranges, ids, 0.5, 0.0);
+    EXPECT_EQ(id, 1);
+
+    const auto flag = getMask(interp, ranges, mask, 0.7, 0.5);
+    EXPECT_EQ(flag, true);
   }
 }
 
@@ -133,6 +254,74 @@ TEST(ProjectionInterpolators, AdaptiveCorrect) {
     EXPECT_NEAR(range_bilinear.value(), 1.5f, 1.0e-3f);
     EXPECT_NEAR(range_nearest.value(), 2.0f, 1.0e-3f);
   }
+}
+
+TEST(ProjectionInterpolators, AdaptiveCorrectNonRange) {
+  // check that bilinear values match
+  cv::Mat ranges = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
+  cv::Mat colors = (cv::Mat_<cv::Vec3b>(2, 2) << cv::Vec3b(1, 2, 3),
+                    cv::Vec3b(2, 3, 4),
+                    cv::Vec3b(3, 4, 5),
+                    cv::Vec3b(4, 5, 6));
+  cv::Mat ids = (cv::Mat_<int>(2, 2) << 1, 1, 3, 1);
+  cv::Mat mask = (cv::Mat_<bool>(2, 2) << false, true, false, true);
+
+  {  // bilinear interpolation results
+    InterpolatorAdaptive interp(InterpolatorAdaptive::Config{3.5});
+    const auto color = getColor(interp, ranges, colors, 0.0, 0.5);
+    EXPECT_EQ(color, Color(2, 3, 4));
+
+    const auto id = getId(interp, ranges, ids, 0.5, 0.0);
+    EXPECT_EQ(id, 1);
+
+    const auto flag = getMask(interp, ranges, mask, 0.7, 0.5);
+    EXPECT_EQ(flag, true);
+  }
+
+  {  // nearest interpolation results
+    InterpolatorAdaptive interp(InterpolatorAdaptive::Config{0.2});
+
+    const auto color = getColor(interp, ranges, colors, 0.0, 0.6);
+    EXPECT_EQ(color, Color(3, 4, 5));
+
+    const auto id = getId(interp, ranges, ids, 0.6, 0.0);
+    EXPECT_EQ(id, 1);
+
+    const auto flag = getMask(interp, ranges, mask, 0.7, 0.51);
+    EXPECT_EQ(flag, true);
+  }
+}
+
+TEST(ProjectionInterpolators, AdaptiveCorrectInvalidRange) {
+  cv::Mat ranges = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
+
+  InterpolatorAdaptive interp(InterpolatorAdaptive::Config{3.5});
+  ASSERT_TRUE(getRange(interp, ranges, 0.3, 0.4));
+
+  ranges.at<float>(0, 0) = 0.0;
+  ASSERT_FALSE(getRange(interp, ranges, 0.3, 0.4));
+  ASSERT_TRUE(getRange(interp, ranges, 0.6, 0.4));
+
+  ranges.at<float>(0, 0) = 1.0;
+  ranges.at<float>(0, 1) = std::numeric_limits<float>::quiet_NaN();
+  ASSERT_TRUE(getRange(interp, ranges, 0.3, 0.4));
+  ASSERT_FALSE(getRange(interp, ranges, 0.6, 0.4));
+}
+
+TEST(ProjectionInterpolators, LabelVotingCorrect) {
+  cv::Mat ranges = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
+
+  InterpolatorBilinear interp;
+  cv::Mat ids = (cv::Mat_<int>(2, 2) << 2, 1, 3, 1);
+
+  // voting should pick 2 (row 1 has no weight)
+  EXPECT_EQ(getId(interp, ranges, ids, 0.4, 0.0), 2);
+
+  // voting should pick 1 (equal weight between rows)
+  EXPECT_EQ(getId(interp, ranges, ids, 0.4, 0.5), 1);
+
+  // voting should pick 3 (row 0 has no weight)
+  EXPECT_EQ(getId(interp, ranges, ids, 0.4, 0.99), 3);
 }
 
 TEST(ProjectionInterpolators, AdaptiveOutOfRange) {
