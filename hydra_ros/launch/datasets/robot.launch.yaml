@@ -1,0 +1,44 @@
+---
+launch:
+  # robot information
+  - arg: {name: robot_name}
+  - arg: {name: camera_name, default: $(var robot_name)_zed}
+  - arg: {name: rgb_image_name, default: image_color_rect}
+  - arg: {name: depth_image_name, default: depth_registered}
+  # output control
+  - arg: {name: log_path, default: $(env HOME)/.hydra/uhumans2_open_regions, description: Directory to output to}
+  - arg: {name: exit_after_clock, default: 'false', description: Shutdown hydra node after a rosbag finishes playing}
+  # robot namespace
+  - push_ros_namespace: {namespace: $(var robot_name)}
+  # semantic segmentation
+  - group:
+      - push_ros_namespace: {namespace: $(var camera_name)}
+      - include: {file: $(find-pkg-share semantic_inference_ros)/launch/instaance_segmentation.launch.yaml}
+  # hydra
+  - node:
+      pkg: hydra_ros
+      exec: hydra_ros_node
+      name: hydra
+      on_exit: shutdown
+      param:
+        - {name: use_sim_time, value: true}
+      remap:
+        - {from: hydra/input/camera/depth_registered/image_rect, to: $(var camera_name)/depth/$(var depth_image_name)}
+        - {from: hydra/input/camera/rgb/image_raw, to: $(var camera_name)/rgb/($var color_image_name)}
+        - {from: hydra/input/camera/rgb/camera_info, to: $(var camera_name)/rgb/camera_info}
+        - {from: hydra/input/camera/semantic/image_raw, to: $(var camera_name)/semantic/image_raw}
+      args: >
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/robot.yaml
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/active_window_sinks.yaml@active_window
+        --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
+        --config-utilities-yaml {robot_id: 0, odom_frame: $(var robot_name)/odom, robot_frame: $(var robot_name)/body, map_frame: $(var robot_name)/map}
+  # visualization
+  - set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
+  - set_remap: {from: hydra_visualizer/feature, to: /tesse/left_cam/semantic/embed/feature}
+  - arg: {name: start_visualizer, default: 'true', description: run hydra visualizer}
+  - include:
+      file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
+      if: $(var start_visualizer)
+      arg:
+        - {name: external_plugins_path, value: $(find-pkg-share hydra_ros)/config/hydra_ros_visualizer_plugins.yaml}
+        - {name: visualizer_config_path, value: $(find-pkg-share hydra_ros)/config/visualizer/uhumans2_open_regions.yaml}
