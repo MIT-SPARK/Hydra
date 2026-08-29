@@ -32,18 +32,56 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
 
-#include "hydra/input/sensor_input_packet.h"
+#include "hydra/input/image_input_filters.h"
+
+#include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+#include <config_utilities/validation.h>
 
 namespace hydra {
+namespace {
 
-class InputFilter {
- public:
-  virtual ~InputFilter() = default;
+const auto registration =
+    config::RegistrationWithConfig<InputFilter,
+                                   InvalidDepthFilter,
+                                   InvalidDepthFilter::Config>("InvalidDepthFilter");
 
-  virtual bool valid(const SensorInputPacket& current,
-                     const SensorInputPacket* const prev) const = 0;
-};
+}
+
+void declare_config(InvalidDepthFilter::Config& config) {
+  using namespace config;
+  name("InvalidDepthFilter::Config");
+  field(config.max_invalid_ratio, "max_invalid_ratio");
+  checkInRange(config.max_invalid_ratio, 0.0, 1.0, "max_invalid_ratio", false);
+}
+
+InvalidDepthFilter::InvalidDepthFilter(const Config& config)
+    : config(config::checkValid(config)) {}
+
+bool InvalidDepthFilter::valid(const SensorInputPacket& current,
+                               const SensorInputPacket* const) const {
+  const auto derived = dynamic_cast<const ImageInputPacket* const>(&current);
+  if (!derived) {
+    return true;
+  }
+
+  const auto& depth = derived->depth;
+  if (depth.empty() && depth.type() != CV_32FC1) {
+    return true;
+  }
+
+  const size_t total = depth.rows * depth.cols;
+  size_t num_invalid = 0;
+  for (int r = 0; r < depth.rows; r++) {
+    for (int c = 0; c < depth.cols; c++) {
+      const auto value = depth.at<float>(r, c);
+      num_invalid += std::isfinite(value) ? 0 : 1;
+    }
+  }
+
+  const auto ratio = static_cast<double>(num_invalid) / total;
+  return ratio < config.max_invalid_ratio;
+}
 
 }  // namespace hydra

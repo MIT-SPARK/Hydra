@@ -34,16 +34,25 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include "hydra/input/sensor_input_packet.h"
+#include "hydra/input/input_filter.h"
 
 namespace hydra {
 
-class InputFilter {
+class InvalidDepthFilter : public InputFilter {
  public:
-  virtual ~InputFilter() = default;
+  struct Config {
+    //! Ratio of nonfinite to finite depth values to discard frame
+    double max_invalid_ratio = 1.0;
+  } const config;
 
-  virtual bool valid(const SensorInputPacket& current,
-                     const SensorInputPacket* const prev) const = 0;
+  explicit InvalidDepthFilter(const Config& config);
+
+  virtual ~InvalidDepthFilter() = default;
+
+  bool valid(const SensorInputPacket& current,
+             const SensorInputPacket* const prev) const override;
 };
+
+void declare_config(const InvalidDepthFilter::Config& config);
 
 }  // namespace hydra
