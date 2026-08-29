@@ -58,15 +58,11 @@ class RosInputModule : public InputModule {
   std::string printInfo() const override;
 
  protected:
-  PoseStatus getBodyPose(uint64_t timestamp_ns) override;
+  PoseStatus getBodyPose(const SensorInputPacket& packet) override;
 
  protected:
   TFLookup lookup_;
   bool have_first_pose_;
-
-  inline static const auto registration_ = config::
-      RegistrationWithConfig<InputModule, RosInputModule, Config, OutputQueue::Ptr>(
-          "RosInput");
 };
 
 void declare_config(RosInputModule::Config& config);

@@ -42,7 +42,7 @@
 namespace hydra {
 namespace {
 
-const auto registration =
+static const auto registration =
     config::RegistrationWithConfig<InputFilter,
                                    InvalidDepthFilter,
                                    InvalidDepthFilter::Config>("InvalidDepthFilter");

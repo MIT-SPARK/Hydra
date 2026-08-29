@@ -35,6 +35,7 @@
 #include "hydra_ros/input/ros_input_module.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
@@ -44,6 +45,12 @@
 
 namespace hydra {
 namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<InputModule,
+                                   RosInputModule,
+                                   RosInputModule::Config,
+                                   InputModule::OutputQueue::Ptr>("RosInput");
 
 inline bool isNumber(const std::string& name) {
   return std::find_if(name.begin(), name.end(), [](char c) {
@@ -90,8 +97,8 @@ RosInputModule::~RosInputModule() = default;
 
 std::string RosInputModule::printInfo() const { return config::toString(config); }
 
-PoseStatus RosInputModule::getBodyPose(uint64_t timestamp_ns) {
-  const auto pose_status = lookup_.getBodyPose(timestamp_ns);
+PoseStatus RosInputModule::getBodyPose(const SensorInputPacket& packet) {
+  const auto pose_status = lookup_.getBodyPose(packet.timestamp_ns);
   if (pose_status && !have_first_pose_) {
     have_first_pose_ = true;
   }

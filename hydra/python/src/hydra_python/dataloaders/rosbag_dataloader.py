@@ -116,7 +116,7 @@ class RosbagDataLoader:
         if pose is None:
             return None
 
-        pose = pose @ self._body_T_sensor
+        return pose @ self._body_T_sensor
 
     def __iter__(self):
         """Return the iterator object."""

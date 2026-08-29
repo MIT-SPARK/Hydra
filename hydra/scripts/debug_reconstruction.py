@@ -74,9 +74,9 @@ def run(
 
         dataloader = RosbagDataLoader(
             bag,
-            trajectory,
             f"/{name}/{name}_zed/rgb/image_rect_color",
-            [f"/{name}/{name}_zed/depth/depth_registered"],
+            trajectory=trajectory,
+            other_topics=[f"/{name}/{name}_zed/depth/depth_registered"],
             body_frame=f"{name}/body",
             progress=False,
             start_time_ns=_convert_start_time(bag_start_s),

@@ -42,32 +42,25 @@
 
 namespace hydra::python {
 
-struct PythonSensorInput : public SensorInputPacket {
+struct PythonImageInput : public ImageInputPacket {
+  PythonImageInput(uint64_t timestamp_ns,
+                   const std::string& name,
+                   const PythonImage& color,
+                   const PythonImage& depth,
+                   const PythonImage& labels = PythonImage(),
+                   const PythonImage& instances = PythonImage());
+};
+
+struct PythonCloudInput : public CloudInputPacket {
   using PointVec = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using LabelVec = Eigen::Matrix<int32_t, 1, Eigen::Dynamic>;
   using ColorVec = Eigen::Matrix<uint8_t, 3, Eigen::Dynamic>;
 
-  PythonSensorInput(uint64_t timestamp_ns,
-                    const PythonImage& depth,
-                    const PythonImage& labels,
-                    const PythonImage& color,
-                    const std::string& name);
-
-  PythonSensorInput(uint64_t timestamp_ns,
-                    const PointVec& points,
-                    const LabelVec& labels,
-                    const ColorVec& colors,
-                    const std::string& name);
-
-  bool valid() const;
-
-  cv::Mat points;
-  cv::Mat depth;
-  cv::Mat labels;
-  cv::Mat color;
-
- protected:
-  bool fillInputDataImpl(InputData& msg) const override;
+  PythonCloudInput(uint64_t timestamp_ns,
+                   const std::string& name,
+                   const PointVec& points,
+                   const LabelVec& labels,
+                   const ColorVec& colors);
 };
 
 namespace python_sensor_input {

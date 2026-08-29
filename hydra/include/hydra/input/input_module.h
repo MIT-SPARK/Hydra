@@ -81,7 +81,7 @@ class InputModule : public Module {
 
   void stopImpl();
 
-  virtual PoseStatus getBodyPose(uint64_t timestamp) = 0;
+  virtual PoseStatus getBodyPose(const SensorInputPacket& packet) = 0;
 
  protected:
   OutputQueue::Ptr queue_;

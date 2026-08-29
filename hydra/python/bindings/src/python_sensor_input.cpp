@@ -40,53 +40,25 @@
 
 namespace hydra::python {
 
-namespace {
-
-inline std::string showImageDim(const cv::Mat& mat) {
-  std::stringstream ss;
-  ss << "[rows=" << mat.rows << ", cols=" << mat.cols << "]";
-  return ss.str();
-}
-
-inline bool sizesMatch(const cv::Mat& lhs, const cv::Mat& rhs) {
-  return lhs.rows == rhs.rows && lhs.cols == rhs.cols;
-}
-
-inline std::string showDim(const PythonImage& img) {
-  return "[" + std::to_string(img.rows()) + ", " + std::to_string(img.cols()) + "]";
-}
-
-}  // namespace
-
-PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
-                                     const PythonImage& _depth,
-                                     const PythonImage& _labels,
-                                     const PythonImage& _color,
-                                     const std::string& sensor_name)
-    : SensorInputPacket(timestamp_ns, sensor_name) {
+PythonImageInput::PythonImageInput(uint64_t timestamp_ns,
+                                   const std::string& sensor_name,
+                                   const PythonImage& _color,
+                                   const PythonImage& _depth,
+                                   const PythonImage& _labels,
+                                   const PythonImage& _instances)
+    : ImageInputPacket(timestamp_ns, sensor_name) {
   depth = getDepthImage(_depth);
-
-  if (_color.rows() == _depth.rows() && _color.cols() == _depth.cols()) {
-    color = getColorImage(_color);
-  } else if (_color) {
-    LOG(ERROR) << "depth dimensions " << showDim(_depth)
-               << " do not match color dimensions " << showDim(_color);
-  }
-
-  if (_labels.rows() == _depth.rows() && _labels.cols() == _depth.cols()) {
-    labels = getLabelImage(_labels);
-  } else if (_labels) {
-    LOG(ERROR) << "depth dimensions " << showDim(_depth)
-               << " do not match label dimensions " << showDim(_labels);
-  }
+  color = getColorImage(_color);
+  labels = getLabelImage(_labels);
+  instances = getLabelImage(_instances);
 }
 
-PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
-                                     const PointVec& pos_vec,
-                                     const LabelVec& label_vec,
-                                     const ColorVec& color_vec,
-                                     const std::string& sensor_name)
-    : SensorInputPacket(timestamp_ns, sensor_name) {
+PythonCloudInput::PythonCloudInput(uint64_t timestamp_ns,
+                                   const std::string& sensor_name,
+                                   const PointVec& pos_vec,
+                                   const LabelVec& label_vec,
+                                   const ColorVec& color_vec)
+    : CloudInputPacket(timestamp_ns, sensor_name) {
   if (pos_vec.cols() == 0) {
     LOG(ERROR) << "received input without any points";
     return;
@@ -106,8 +78,9 @@ PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
 
   points = cv::Mat(1, pos_vec.cols(), CV_32FC3);
   if (!colors_empty) {
-    color = cv::Mat(1, pos_vec.cols(), CV_8UC3);
+    colors = cv::Mat(1, pos_vec.cols(), CV_8UC3);
   }
+
   if (!labels_empty) {
     labels = cv::Mat(1, pos_vec.cols(), CV_32SC1);
   }
@@ -120,7 +93,7 @@ PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
 
     if (!colors_empty) {
       const auto& rgb = color_vec.block<3, 1>(0, i);
-      color.at<cv::Vec3b>(0, i) = {rgb.x(), rgb.y(), rgb.z()};
+      colors.at<cv::Vec3b>(0, i) = {rgb.x(), rgb.y(), rgb.z()};
     }
 
     if (!labels_empty) {
@@ -129,79 +102,8 @@ PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
   }
 }
 
-bool PythonSensorInput::valid() const {
-  return (!points.empty() || !depth.empty()) && (!color.empty() || !labels.empty());
-}
-
-bool PythonSensorInput::fillInputDataImpl(InputData& msg) const {
-  if ((depth.empty() && points.empty()) || (color.empty() && labels.empty())) {
-    LOG(ERROR) << "Missing required data";
-    return false;
-  }
-
-  msg.vertex_map = points;
-  msg.points_in_world_frame = false;
-  msg.color_image = color;
-  msg.depth_image = depth;
-  msg.label_image = labels;
-  if (!msg.label_image.empty() && !sizesMatch(msg.depth_image, msg.label_image)) {
-    LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
-               << " do not match depth dimensions " << showImageDim(msg.depth_image);
-    return false;
-  }
-
-  if (!msg.color_image.empty() && !sizesMatch(msg.depth_image, msg.color_image)) {
-    LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
-               << " do not match depth dimensions " << showImageDim(msg.depth_image);
-    return false;
-  }
-
-  return true;
-}
-
 namespace python_sensor_input {
-
-using namespace pybind11::literals;
-namespace py = pybind11;
-
-void addBindings(pybind11::module_& m) {
-  py::class_<PythonSensorInput>(m, "PythonSensorInput")
-      .def_static(
-          "from_images",
-          [](uint64_t timestamp_ns,
-             const py::buffer& depth,
-             const std::optional<py::buffer>& labels,
-             const std::optional<py::buffer>& colors,
-             const std::string& name) {
-            return PythonSensorInput(
-                timestamp_ns,
-                depth,
-                labels ? PythonImage(labels.value()) : PythonImage(),
-                colors ? PythonImage(colors.value()) : PythonImage(),
-                name);
-          },
-          "timestamp_ns"_a,
-          "depth"_a,
-          "labels"_a = std::nullopt,
-          "colors"_a = std::nullopt,
-          "sensor_name"_a = "python")
-      .def_static(
-          "from_points",
-          [](uint64_t timestamp_ns,
-             const PythonSensorInput::PointVec& points,
-             const PythonSensorInput::LabelVec& labels,
-             const PythonSensorInput::ColorVec& colors,
-             const std::string& name) {
-            return PythonSensorInput(timestamp_ns, points, labels, colors, name);
-          },
-          "timestamp_ns"_a,
-          "points"_a,
-          "labels"_a = Eigen::Matrix<int32_t, 1, Eigen::Dynamic>(),
-          "colors"_a = Eigen::Matrix<uint8_t, 3, Eigen::Dynamic>(),
-          "sensor_name"_a = "python")
-      .def("__bool__", [](const PythonSensorInput& input) { return input.valid(); });
-}
-
+void addBindings(pybind11::module_&) {}
 }  // namespace python_sensor_input
 
 }  // namespace hydra::python
