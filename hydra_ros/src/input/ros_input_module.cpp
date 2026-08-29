@@ -99,7 +99,7 @@ PoseStatus RosInputModule::getBodyPose(uint64_t timestamp_ns) {
   if (!pose_status && !have_first_pose_ && config.clear_queue_on_fail) {
     LOG(WARNING) << "Clearing input queues while pose is unavailable";
     for (auto& receiver : receivers_) {
-      receiver->queue.clear();
+      receiver->clear();
     }
   }
 

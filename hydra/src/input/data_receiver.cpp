@@ -42,32 +42,75 @@
 
 namespace hydra {
 
-DataReceiver::DataReceiver(const Config& config, const std::string& sensor_name)
-    : config(config::checkValid(config)), sensor_name_(sensor_name) {}
+DataReceiver::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
+
+DataReceiver::DataReceiver(const Config& config, const std::string& _sensor_name)
+    : config(config::checkValid(config)),
+      sensor_name(_sensor_name),
+      queue_(config.max_packets) {
+  for (const auto& filter : config.filters) {
+    filters_.push_back(filter.create());
+  }
+}
 
 bool DataReceiver::init() { return initImpl(); }
 
-bool DataReceiver::checkInputTimestamp(uint64_t timestamp_ns) {
-  if (last_time_received_) {
-    std::chrono::nanoseconds curr_time_ns(timestamp_ns);
-    std::chrono::nanoseconds last_time_ns(*last_time_received_);
-    std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
-    if (separation_s.count() < config.input_separation_s) {
-      VLOG(10) << "[Data Receiver] Dropping input @ " << timestamp_ns
-               << " [ns] with separation of " << separation_s.count() << " [s]";
-      return false;
+SensorInputPacket::Ptr DataReceiver::poll() {
+  while (!queue_.empty()) {
+    const auto packet = pollOnce();
+    if (packet) {
+      return packet;
     }
   }
 
-  last_time_received_ = timestamp_ns;
-  VLOG(5) << "[Data Receiver] Got input @ " << timestamp_ns << " [ns]";
-  return true;
+  return nullptr;
 }
+
+SensorInputPacket::Ptr DataReceiver::pollOnce() {
+  if (queue_.empty()) {
+    return nullptr;
+  }
+
+  const auto packet = queue_.pop();
+  const auto timestamp = packet->timestamp_ns;
+  const std::chrono::nanoseconds curr_time_ns(timestamp);
+  if (last_received_) {
+    std::chrono::nanoseconds last_time_ns(last_received_->timestamp_ns);
+    std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
+    if (separation_s.count() < config.input_separation_s) {
+      MLOG(3) << "Dropping input @ " << timestamp << " [ns] with separation of "
+              << separation_s.count() << " [s]";
+      return nullptr;
+    }
+  }
+
+  for (const auto& filter : filters_) {
+    if (!filter) {
+      continue;
+    }
+
+    if (!filter->valid(*packet, last_received_.get())) {
+      return nullptr;
+    }
+  }
+
+  MLOG(2) << "Got input @ " << timestamp << " [ns]";
+  last_received_ = packet;
+  return last_received_;
+}
+
+void DataReceiver::clear() { queue_.clear(); }
+
+size_t DataReceiver::numQueued() const { return queue_.size(); }
 
 void declare_config(DataReceiver::Config& config) {
   using namespace config;
   name("DataReceiver::Config");
+  base<VerbosityConfig>(config);
+  field(config.max_packets, "max_packets");
   field(config.input_separation_s, "input_separation_s");
+  field(config.filters, "filters");
 }
 
 }  // namespace hydra

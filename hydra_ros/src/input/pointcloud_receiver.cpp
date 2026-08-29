@@ -43,17 +43,13 @@ bool PointcloudReceiver::initImpl() {
 
 void PointcloudReceiver::callback(const PointCloud2::ConstSharedPtr& msg) {
   const auto stamp = rclcpp::Time(msg->header.stamp).nanoseconds();
-  VLOG(5) << "[Hydra Reconstruction] Got raw pointcloud input @ " << stamp << " [ns]";
+  MLOG(2) << "Got raw pointcloud input @ " << stamp << " [ns]";
 
-  if (!checkInputTimestamp(stamp)) {
-    return;
-  }
-
-  auto packet = std::make_shared<CloudInputPacket>(stamp, sensor_name_);
+  auto packet = std::make_shared<CloudInputPacket>(stamp, sensor_name);
   fillPointcloudPacket(
       *msg, *packet, config.instance_ids, config.discard_transparent_color);
   packet->in_world_frame = config.in_world_frame;
-  queue.push(packet);
+  queue_.push(packet);
 }
 
 }  // namespace hydra

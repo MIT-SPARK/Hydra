@@ -54,7 +54,6 @@ void declare_config(InputModule::Config& config) {
   using namespace config;
   name("InputModule::Config");
   field(config.inputs, "inputs");
-  field(config.max_receiver_queue_size, "max_receiver_queue_size");
   checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
 
@@ -65,10 +64,6 @@ InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
   for (const auto& [name, input_pair] : config.inputs) {
     receivers_.emplace_back(input_pair.receiver.create(name));
     CHECK(info.setSensor(input_pair.sensor.create(name), false));
-  }
-
-  for (auto& receiver : receivers_) {
-    receiver->queue.max_size = config.max_receiver_queue_size;
   }
 }
 
@@ -93,9 +88,10 @@ void InputModule::stopImpl() {
     data_thread_.reset();
     VLOG(2) << "[Hydra Input] stopped input thread";
   }
+
   for (size_t i = 0; i < receivers_.size(); ++i) {
     VLOG(2) << "[Hydra Input] remaining in data queue[" << i
-            << "]: " << receivers_[i]->queue.size();
+            << "]: " << receivers_[i]->numQueued();
   }
 }
 
@@ -104,12 +100,11 @@ std::string InputModule::printInfo() const { return config::toString(config); }
 void InputModule::dataSpin() {
   while (!should_shutdown_) {
     for (const auto& receiver : receivers_) {
-      const bool has_data = receiver->queue.poll();
-      if (!has_data) {
+      const auto packet = receiver->poll();
+      if (!packet) {
         continue;
       }
 
-      const auto packet = receiver->queue.pop();
       const auto curr_time = packet->timestamp_ns;
       VLOG(2) << "[Hydra Input] popped input @ " << curr_time << " [ns]";
 

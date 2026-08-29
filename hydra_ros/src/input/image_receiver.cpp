@@ -253,14 +253,10 @@ bool RGBDImageReceiver::initImpl() {
 void RGBDImageReceiver::callback(const sensor_msgs::msg::Image::ConstSharedPtr& color,
                                  const sensor_msgs::msg::Image::ConstSharedPtr& depth) {
   const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
-  if (!checkInputTimestamp(timestamp_ns)) {
-    return;
-  }
-
-  auto packet = std::make_shared<ImageInputPacket>(timestamp_ns, sensor_name_);
+  auto packet = std::make_shared<ImageInputPacket>(timestamp_ns, sensor_name);
   color_sub_.fillInput(*color, *packet);
   depth_sub_.fillInput(*depth, *packet);
-  queue.push(packet);
+  queue_.push(packet);
 }
 
 void declare_config(RGBDImageReceiver::Config& config) {
