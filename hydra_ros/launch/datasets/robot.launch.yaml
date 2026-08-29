@@ -3,7 +3,9 @@ launch:
   # robot information
   - arg: {name: robot_name}
   - arg: {name: camera_name, default: $(var robot_name)_zed}
-  - arg: {name: rgb_image_name, default: image_color_rect}
+  - arg: {name: rgb_ns, default: rgb}
+  - arg: {name: rgb_image_name, default: image_rect_color}
+  - arg: {name: depth_ns, default: depth}
   - arg: {name: depth_image_name, default: depth_registered}
   # output control
   - arg: {name: log_path, default: $(env HOME)/.hydra/uhumans2_open_regions, description: Directory to output to}
@@ -13,7 +15,14 @@ launch:
   # semantic segmentation
   - group:
       - push_ros_namespace: {namespace: $(var camera_name)}
-      - include: {file: $(find-pkg-share semantic_inference_ros)/launch/instaance_segmentation.launch.yaml}
+      - set_remap: {from: color/image_raw, to: $(var rgb_ns)/$(var rgb_image_name)}
+      - include: {file: $(find-pkg-share semantic_inference_ros)/launch/instance_segmentation.launch.yaml}
+  # map
+  - node:
+      pkg: tf2_ros
+      name: robot_map_tf
+      exec: static_transform_publisher
+      args: --frame-id map --child-frame-id $(var robot_name)/map
   # hydra
   - node:
       pkg: hydra_ros
@@ -23,10 +32,11 @@ launch:
       param:
         - {name: use_sim_time, value: true}
       remap:
-        - {from: hydra/input/camera/depth_registered/image_rect, to: $(var camera_name)/depth/$(var depth_image_name)}
-        - {from: hydra/input/camera/rgb/image_raw, to: $(var camera_name)/rgb/($var color_image_name)}
-        - {from: hydra/input/camera/rgb/camera_info, to: $(var camera_name)/rgb/camera_info}
+        - {from: hydra/input/camera/depth_registered/image_rect, to: $(var camera_name)/$(var depth_ns)/$(var depth_image_name)}
+        - {from: hydra/input/camera/rgb/image_raw, to: $(var camera_name)/$(var rgb_ns)/$(var rgb_image_name)}
+        - {from: hydra/input/camera/rgb/camera_info, to: $(var camera_name)/$(var rgb_ns)/camera_info}
         - {from: hydra/input/camera/semantic/image_raw, to: $(var camera_name)/semantic/image_raw}
+        - {from: hydra/labelspace, to: $(var camera_name)/labelspace}
       args: >
         --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/robot.yaml
         --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/active_window_sinks.yaml@active_window
