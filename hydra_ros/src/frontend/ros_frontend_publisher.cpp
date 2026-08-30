@@ -38,6 +38,7 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 #include <hydra/common/global_info.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo_ros/conversion/mesh_delta.h>
