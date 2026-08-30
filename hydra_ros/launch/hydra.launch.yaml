@@ -15,7 +15,7 @@ launch:
   - arg: {name: map_frame, default: map, description: Backend scene graph frame}
   # configuration
   - arg: {name: hydra_config_path, default: $(find-pkg-share hydra)/config/datasets/$(var dataset).yaml, description: Primary hydra config}
-  - arg: {name: input_config_path, default: $(find-pkg-share hydra_ros)/config/datasets/$(var dataset).yaml, description: Hydra ROS input config}
+  - arg: {name: input_config_path, default: $(find-pkg-share hydra_ros)/config/input/$(var dataset).yaml, description: Hydra ROS input config}
   - arg: {name: labelspace_path, default: $(find-pkg-share hydra)/config/label_spaces/$(var labelspace)_label_space.yaml, description: Closed set label space for Hydra}
   - arg: {name: enable_lcd, default: 'false', description: Turn on scene graph loop closure detection}
   - arg: {name: lcd_config_path, default: $(find-pkg-share hydra)/config/lcd/default.yaml, description: Loop closure detection config}

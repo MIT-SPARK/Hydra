@@ -45,7 +45,7 @@ launch:
       param:
         - {name: use_sim_time, value: $(var use_sim_time)}
       args: >-
-        --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/$(var dataset).yaml
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/input/$(var dataset).yaml
         --config-utilities-file $(find-pkg-share hydra)/config/label_spaces/$(var labelspace_name)_label_space.yaml
         --config-utilities-yaml {print_missing: false, show_config: true, verbosity: 2}
         --config-utilities-yaml {log_path: $(env HOME)/.hydra/$(var dataset)}

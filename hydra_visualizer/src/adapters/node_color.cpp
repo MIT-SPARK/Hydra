@@ -234,7 +234,13 @@ void declare_config(FrontierColorAdapter::Config& config) {
 }
 
 double DistanceFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {
-  return node.attributes<PlaceNodeAttributes>().distance;
+  if (auto attrs = node.tryAttributes<PlaceNodeAttributes>()) {
+    return attrs->distance;
+  } else if (auto attrs = node.tryAttributes<TravNodeAttributes>()) {
+    return attrs->min_radius;
+  }
+
+  return 0.0;
 }
 
 double LastUpdatedFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {

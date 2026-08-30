@@ -76,12 +76,23 @@ Visualization Manager:
       Enabled: true
       Name: Scene Graph
       Namespaces:
+        interlayer_edges_3_2: true
+        interlayer_edges_4_3: true
         layer2_bounding_boxes: true
         layer2_nodes: true
         layer2_text: true
         layer2p97_edges: true
         layer2p97_nodes: true
         layer2p97_text: true
+        layer3_edges: true
+        layer3_nodes: true
+        layer3p1_edges: true
+        layer3p1_nodes: true
+        layer3p1_polygon_boundaries: true
+        layer3p2_edges: true
+        layer3p2_nodes: true
+        layer4_nodes: true
+        layer4_text: true
       Topic:
         Depth: 5
         Durability Policy: Transient Local
@@ -117,75 +128,21 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        hamilton/base_link:
+        base_link_gt:
           Value: true
-        hamilton/body:
-          Value: true
-        hamilton/front_left_hip:
-          Value: true
-        hamilton/front_left_lower_leg:
-          Value: true
-        hamilton/front_left_upper_leg:
-          Value: true
-        hamilton/front_rail:
-          Value: true
-        hamilton/front_right_hip:
-          Value: true
-        hamilton/front_right_lower_leg:
-          Value: true
-        hamilton/front_right_upper_leg:
-          Value: true
-        hamilton/frontleft:
-          Value: true
-        hamilton/frontleft_fisheye:
-          Value: true
-        hamilton/frontright:
-          Value: true
-        hamilton/frontright_fisheye:
-          Value: true
-        hamilton/gpe:
-          Value: true
-        hamilton/gps:
-          Value: true
-        hamilton/hand:
-          Value: true
-        hamilton/head:
-          Value: true
-        hamilton/kinematic:
-          Value: true
-        hamilton/livox:
+        front_lidar:
           Value: true
         hamilton/map:
           Value: true
-        hamilton/odom:
-          Value: true
-        hamilton/rear_left_hip:
-          Value: true
-        hamilton/rear_left_lower_leg:
-          Value: true
-        hamilton/rear_left_upper_leg:
-          Value: true
-        hamilton/rear_rail:
-          Value: true
-        hamilton/rear_right_hip:
-          Value: true
-        hamilton/rear_right_lower_leg:
-          Value: true
-        hamilton/rear_right_upper_leg:
-          Value: true
-        hamilton_zed_camera_center:
-          Value: true
-        hamilton_zed_camera_link:
-          Value: true
-        hamilton_zed_left_camera_frame:
-          Value: true
-        hamilton_zed_left_camera_optical_frame:
-          Value: true
-        hamilton_zed_right_camera_frame:
-          Value: true
-        hamilton_zed_right_camera_optical_frame:
+        left_cam:
           Value: true
         map:
+          Value: true
+        rear_lidar:
+          Value: true
+        right_cam:
+          Value: true
+        world:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -193,56 +150,19 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        map:
-          hamilton/map:
-            hamilton/odom:
-              hamilton/body:
-                hamilton/base_link:
-                  {}
-                hamilton/front_left_hip:
-                  hamilton/front_left_upper_leg:
-                    hamilton/front_left_lower_leg:
-                      {}
-                hamilton/front_rail:
-                  {}
-                hamilton/front_right_hip:
-                  hamilton/front_right_upper_leg:
-                    hamilton/front_right_lower_leg:
-                      {}
-                hamilton/gps:
-                  {}
-                hamilton/hand:
-                  {}
-                hamilton/head:
-                  hamilton/frontleft:
-                    hamilton/frontleft_fisheye:
-                      {}
-                    hamilton_zed_camera_link:
-                      hamilton_zed_camera_center:
-                        hamilton_zed_left_camera_frame:
-                          hamilton_zed_left_camera_optical_frame:
-                            {}
-                        hamilton_zed_right_camera_frame:
-                          hamilton_zed_right_camera_optical_frame:
-                            {}
-                  hamilton/frontright:
-                    hamilton/frontright_fisheye:
-                      {}
-                hamilton/kinematic:
-                  hamilton/gpe:
-                    {}
-                hamilton/livox:
-                  {}
-                hamilton/rear_left_hip:
-                  hamilton/rear_left_upper_leg:
-                    hamilton/rear_left_lower_leg:
-                      {}
-                hamilton/rear_rail:
-                  {}
-                hamilton/rear_right_hip:
-                  hamilton/rear_right_upper_leg:
-                    hamilton/rear_right_lower_leg:
-                      {}
+        world:
+          base_link_gt:
+            front_lidar:
+              {}
+            left_cam:
+              {}
+            rear_lidar:
+              {}
+            right_cam:
+              {}
+          map:
+            hamilton/map:
+              {}
       Update Interval: 0
       Value: true
   Enabled: true
@@ -291,25 +211,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 51.2525749206543
+      Distance: 101.16349029541016
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 21.56471824645996
-        Y: 27.24627685546875
-        Z: 0.2885385751724243
+        X: 15.844290733337402
+        Y: 23.41975212097168
+        Z: -1.3900425434112549
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5553983449935913
+      Pitch: 0.6103982925415039
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.990406036376953
+      Yaw: 3.3104007244110107
     Saved: ~
 Window Geometry:
   Displays:

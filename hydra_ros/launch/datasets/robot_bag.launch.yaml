@@ -38,17 +38,32 @@ launch:
         - {from: hydra/input/camera/semantic/image_raw, to: $(var camera_name)/semantic/image_raw}
         - {from: hydra/labelspace, to: $(var camera_name)/labelspace}
       args: >
-        --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/robot.yaml
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/robot_bag.yaml
         --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/active_window_sinks.yaml@active_window
         --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
         --config-utilities-yaml {robot_id: 0, odom_frame: $(var robot_name)/odom, robot_frame: $(var robot_name)/body, map_frame: $(var robot_name)/map}
   # visualization
-  - set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
-  - set_remap: {from: hydra_visualizer/feature, to: /tesse/left_cam/semantic/embed/feature}
   - arg: {name: start_visualizer, default: 'true', description: run hydra visualizer}
-  - include:
-      file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
+  - node:
       if: $(var start_visualizer)
-      arg:
-        - {name: external_plugins_path, value: $(find-pkg-share hydra_ros)/config/hydra_ros_visualizer_plugins.yaml}
-        - {name: visualizer_config_path, value: $(find-pkg-share hydra_ros)/config/visualizer/uhumans2_open_regions.yaml}
+      pkg: hydra_visualizer
+      exec: hydra_visualizer_node
+      name: hydra_visualizer
+      param:
+        - {name: use_sim_time, value: true}
+      remap:
+        - {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
+      args: >
+        --config-utilities-yaml {graph: {type: GraphFromRos}}
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/visualizer/robot_bag.yaml
+  # rviz node and control for launching
+  - arg: {name: start_rviz, default: 'true', description: automatically start rviz}
+  - arg: {name: rviz_path, default: $(find-pkg-share hydra_visualizer)/rviz/streaming_visualizer.rviz, description: rviz file to load}
+  - node:
+      if: $(var start_rviz)
+      name: rviz
+      pkg: rviz2
+      exec: rviz2
+      param:
+        - {name: use_sim_time, value: true}
+      args: -d $(var rviz_path)
