@@ -33,10 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <optional>
 
 #include "hydra/common/message_queue.h"
+#include "hydra/input/input_filter.h"
 #include "hydra/input/sensor_input_packet.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -44,27 +45,38 @@ class DataReceiver {
  public:
   using DataQueue = MessageQueue<SensorInputPacket::Ptr>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config();
+
+    //! Maximum queue size (0 means unlimited)
+    size_t max_packets = 0;
+    //! Enforced time separation between packets
     double input_separation_s = 0.0;
-  };
+    //! Filters to discard invalid inputs
+    std::vector<config::VirtualConfig<InputFilter, true>> filters;
+  } const config;
 
   DataReceiver(const Config& config, const std::string& sensor_name);
   virtual ~DataReceiver() = default;
 
   bool init();
 
- public:
-  const Config config;
-  DataQueue queue;
+  SensorInputPacket::Ptr poll();
+
+  void clear();
+
+  size_t numQueued() const;
+
+  const std::string sensor_name;
 
  protected:
+  SensorInputPacket::Ptr pollOnce();
+
   virtual bool initImpl() = 0;
 
-  bool checkInputTimestamp(uint64_t timestamp_ns);
-
-  std::optional<uint64_t> last_time_received_;
-
-  const std::string sensor_name_;
+  DataQueue queue_;
+  SensorInputPacket::Ptr last_received_;
+  std::vector<std::unique_ptr<InputFilter>> filters_;
 };
 
 void declare_config(DataReceiver::Config& config);

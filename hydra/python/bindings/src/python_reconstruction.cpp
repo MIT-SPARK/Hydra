@@ -38,20 +38,15 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/active_window/reconstruction_module.h>
-#include <hydra/common/global_info.h>
-#include <kimera_pgmo/compression/delta_compression.h>
-#include <kimera_pgmo/mesh_offset_info.h>
-#include <kimera_pgmo/utils/mesh_io.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
-#include <pybind11/stl_bind.h>
-#include <spark_dsg/scene_graph.h>
-#include <spark_dsg/zmq_interface.h>
 
+#include "hydra/active_window/reconstruction_module.h"
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
+#include "hydra/common/global_info.h"
+#include "hydra/input/input_filter.h"
 #include "hydra/utils/data_directory.h"
 #include "hydra/utils/logging.h"
 
@@ -72,6 +67,7 @@ class PythonReconstruction {
  public:
   struct Config : VerbosityConfig {
     Config() : VerbosityConfig("[python_reconstruction] ") {}
+    std::vector<config::VirtualConfig<InputFilter, true>> filters;
     ReconstructionModule::Config reconstruction = default_config();
   } const config;
 
@@ -88,6 +84,8 @@ class PythonReconstruction {
   const std::string sensor_name;
 
  protected:
+  SensorInputPacket::Ptr last_input_;
+  std::vector<std::unique_ptr<InputFilter>> filters_;
   std::shared_ptr<ReconstructionModule> module_;
 };
 
@@ -95,6 +93,7 @@ void declare_config(PythonReconstruction::Config& config) {
   using namespace config;
   name("PythonReconstructionConfig");
   base<VerbosityConfig>(config);
+  field(config.filters, "filters");
   field(config.reconstruction, "reconstruction");
 }
 
@@ -107,13 +106,17 @@ PythonReconstruction::PythonReconstruction(const Config& config,
 
   GlobalInfo::instance().setSensor(sensor);
 
+  for (const auto& filter : config.filters) {
+    filters_.push_back(filter.create());
+  }
+
   module_ = std::make_shared<ReconstructionModule>(config.reconstruction, nullptr);
   if (!module_) {
     throw std::runtime_error("could not create reconstruction module");
   }
 
-  MLOG(1) << GlobalInfo::instance();
-  MLOG(1) << module_->printInfo();
+  MLOG(2) << "\n" << GlobalInfo::instance();
+  MLOG(1) << "\n" << module_->printInfo();
 }
 
 void PythonReconstruction::stop() {}
@@ -121,6 +124,18 @@ void PythonReconstruction::stop() {}
 PythonReconstruction::~PythonReconstruction() { stop(); }
 
 bool PythonReconstruction::step(const std::shared_ptr<InputPacket>& input) {
+  for (const auto& filter : filters_) {
+    if (!filter) {
+      continue;
+    }
+
+    if (!filter->valid(*input->sensor_input, last_input_.get())) {
+      LOG(ERROR) << "Skipping input!";
+      return false;
+    }
+  }
+
+  last_input_ = input->sensor_input;
   return module_->step(input);
 }
 
@@ -160,15 +175,13 @@ void addBindings(pybind11::module_& m) {
              const Eigen::Vector3d& world_t_body,
              const py::buffer& rgb,
              const py::buffer& depth) {
-            auto sensor_input = std::make_unique<PythonSensorInput>(
-                timestamp_ns, depth, PythonImage(), rgb, pipeline.sensor_name);
-
             auto input = std::make_shared<InputPacket>();
             input->timestamp_ns = timestamp_ns;
             input->world_t_body = world_t_body;
             input->world_R_body = Eigen::Quaterniond(
                 world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-            input->sensor_input = std::move(sensor_input);
+            input->sensor_input = std::make_unique<PythonImageInput>(
+                timestamp_ns, pipeline.sensor_name, rgb, depth);
             return pipeline.step(input);
           },
           "timestamp_ns"_a,

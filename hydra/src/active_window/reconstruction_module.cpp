@@ -82,7 +82,6 @@ void declare_config(ReconstructionModule::Config& config) {
   name("ReconstructionModule::Config");
   base<ActiveWindowModule::Config>(config);
   field(config.full_update_separation_s, "full_update_separation_s", "s");
-  field(config.max_input_queue_size, "max_input_queue_size");
   field(config.mesh, "mesh");
   field(config.tsdf, "tsdf");
   config.robot_footprint.setOptional();

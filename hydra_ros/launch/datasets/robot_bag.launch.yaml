@@ -1,0 +1,69 @@
+---
+launch:
+  # robot information
+  - arg: {name: robot_name}
+  - arg: {name: camera_name, default: $(var robot_name)_zed}
+  - arg: {name: rgb_ns, default: rgb}
+  - arg: {name: rgb_image_name, default: image_rect_color}
+  - arg: {name: depth_ns, default: depth}
+  - arg: {name: depth_image_name, default: depth_registered}
+  # output control
+  - arg: {name: log_path, default: $(env HOME)/.hydra/uhumans2_open_regions, description: Directory to output to}
+  - arg: {name: exit_after_clock, default: 'false', description: Shutdown hydra node after a rosbag finishes playing}
+  # robot namespace
+  - push_ros_namespace: {namespace: $(var robot_name)}
+  # semantic segmentation
+  - group:
+      - push_ros_namespace: {namespace: $(var camera_name)}
+      - set_remap: {from: color/image_raw, to: $(var rgb_ns)/$(var rgb_image_name)}
+      - include: {file: $(find-pkg-share semantic_inference_ros)/launch/instance_segmentation.launch.yaml}
+  # map
+  - node:
+      pkg: tf2_ros
+      name: robot_map_tf
+      exec: static_transform_publisher
+      args: --frame-id map --child-frame-id $(var robot_name)/map
+  # hydra
+  - node:
+      pkg: hydra_ros
+      exec: hydra_ros_node
+      name: hydra
+      on_exit: shutdown
+      param:
+        - {name: use_sim_time, value: true}
+      remap:
+        - {from: hydra/input/camera/depth_registered/image_rect, to: $(var camera_name)/$(var depth_ns)/$(var depth_image_name)}
+        - {from: hydra/input/camera/rgb/image_raw, to: $(var camera_name)/$(var rgb_ns)/$(var rgb_image_name)}
+        - {from: hydra/input/camera/rgb/camera_info, to: $(var camera_name)/$(var rgb_ns)/camera_info}
+        - {from: hydra/input/camera/semantic/image_raw, to: $(var camera_name)/semantic/image_raw}
+        - {from: hydra/labelspace, to: $(var camera_name)/labelspace}
+      args: >
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/robot_bag.yaml
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/active_window_sinks.yaml@active_window
+        --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
+        --config-utilities-yaml {robot_id: 0, odom_frame: $(var robot_name)/odom, robot_frame: $(var robot_name)/body, map_frame: $(var robot_name)/map}
+  # visualization
+  - arg: {name: start_visualizer, default: 'true', description: run hydra visualizer}
+  - node:
+      if: $(var start_visualizer)
+      pkg: hydra_visualizer
+      exec: hydra_visualizer_node
+      name: hydra_visualizer
+      param:
+        - {name: use_sim_time, value: true}
+      remap:
+        - {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
+      args: >
+        --config-utilities-yaml {graph: {type: GraphFromRos}}
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/visualizer/robot_bag.yaml
+  # rviz node and control for launching
+  - arg: {name: start_rviz, default: 'true', description: automatically start rviz}
+  - arg: {name: rviz_path, default: $(find-pkg-share hydra_visualizer)/rviz/streaming_visualizer.rviz, description: rviz file to load}
+  - node:
+      if: $(var start_rviz)
+      name: rviz
+      pkg: rviz2
+      exec: rviz2
+      param:
+        - {name: use_sim_time, value: true}
+      args: -d $(var rviz_path)

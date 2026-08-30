@@ -1,0 +1,42 @@
+---
+paths: [khronos, khronos_ros]
+input:
+  type: RosInput
+  inputs:
+    camera:
+      receiver: {type: InstanceImageReceiver, filters: [{type: InvalidDepthFilter, max_invalid_ratio: 0.4}]}
+      sensor: {type: camera_info, min_range: 0.1, max_range: 5.0, extrinsics: {type: ros}}
+map_window: {type: spatial, max_radius_m: 8.0}
+labelspace: {type: from_msg}
+active_window:
+  type: ActiveWindow
+  min_output_separation: 0.2
+  volumetric_map: {voxels_per_side: 16, voxel_size: 0.1, truncation_distance: 0.3}
+  projective_integrator: {semantic_integrator: {type: SingleLabelIntegrator}}
+  object_detector: {type: InstanceForwarding}
+  tracker: {type: MaxIouTracker}
+  object_extractor: {type: MeshObjectExtractor}
+frontend:
+  enable_mesh_objects: false
+  pgmo: {d_graph_resolution: 2.5, mesh_resolution: 0.005}
+  graph_updater:
+    layer_updates:
+      OBJECTS: {prefix: O, matcher: {type: IoUNodeMatcher, min_same_iou: 0.2, min_cross_iou: 0.5}}
+  traversability_places:
+    type: traversability
+    layer: PLACES
+    estimator: {type: HeightTraversabilityEstimator, height_below: 0, height_above: 0.5, min_confidence: 1.0, min_traversability: 1.0, pessimistic: true}
+    clustering: {type: RegionGrowingTraversabilityClustering, max_radius: 2.0, num_orientation_bins: 20}
+    sinks:
+      - {type: TraversabilityVisualizer}
+backend:
+  update_functors:
+    agents: {type: UpdateAgentsFunctor}
+    places: {type: UpdateRegionGrowingTraversabilityFunctor, layer: PLACES}
+  pgmo:
+    embed_trajectory_delta_t: 5.0
+    num_interp_pts: 3
+    interp_horizon: 10.0
+    optimizer: {type: KimeraRpgoOptimizer, solver: LM, gnc: {inlier_probability: 0.9, mu_step: 1.6, max_iterations: 100}}
+    add_initial_prior: true
+    covariance: {odom: 1.0e-02, loop_close: 5.0e-02, sg_loop_close: 1.0e-01, prior: 1.0e-02, mesh_mesh: 1.0e-02, pose_mesh: 1.0e-02, place_mesh: 1.0e-02, place_edge: 10.0, place_merge: 10.0, object_merge: 10.0}

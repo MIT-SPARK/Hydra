@@ -33,65 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
 
-#include <atomic>
-#include <thread>
-
-#include "hydra/common/message_queue.h"
-#include "hydra/common/module.h"
-#include "hydra/input/data_receiver.h"
-#include "hydra/input/input_packet.h"
+#include "hydra/input/sensor_input_packet.h"
 
 namespace hydra {
 
-struct PoseStatus {
-  bool is_valid = false;
-  Eigen::Quaterniond target_R_source = Eigen::Quaterniond::Identity();
-  Eigen::Vector3d target_p_source = Eigen::Vector3d::Zero();
-  operator bool() const { return is_valid; }
-  Eigen::Isometry3d target_T_source() const {
-    return Eigen::Translation<double, 3>(target_p_source) * target_R_source;
-  }
-};
-
-class InputModule : public Module {
+class InputFilter {
  public:
-  using OutputQueue = MessageQueue<InputPacket::Ptr>;
-  struct Config {
-    struct InputPair {
-      config::VirtualConfig<DataReceiver> receiver;
-      config::VirtualConfig<Sensor> sensor;
-    };
-    std::map<std::string, InputPair> inputs;
-  } const config;
+  virtual ~InputFilter() = default;
 
-  InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
-
-  virtual ~InputModule();
-
-  void start() override;
-
-  void stop() override;
-
-  std::string printInfo() const override;
-
- protected:
-  void dataSpin();
-
-  void stopImpl();
-
-  virtual PoseStatus getBodyPose(const SensorInputPacket& packet) = 0;
-
- protected:
-  OutputQueue::Ptr queue_;
-  std::atomic<bool> should_shutdown_{false};
-
-  std::vector<std::unique_ptr<DataReceiver>> receivers_;
-  std::unique_ptr<std::thread> data_thread_;
+  virtual bool valid(const SensorInputPacket& current,
+                     const SensorInputPacket* const prev) const = 0;
 };
-
-void declare_config(InputModule::Config::InputPair& config);
-void declare_config(InputModule::Config& config);
 
 }  // namespace hydra

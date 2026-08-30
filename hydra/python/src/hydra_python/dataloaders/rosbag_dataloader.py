@@ -62,8 +62,8 @@ class RosbagDataLoader:
     def __init__(
         self,
         bag: BagReader,
-        trajectory: Trajectory,
         rgb_topic: str,
+        trajectory: Trajectory | None = None,
         other_topics: list[str] | None = None,
         body_frame: str | None = None,
         rgb_info_topic: str | None = None,
@@ -108,6 +108,16 @@ class RosbagDataLoader:
         """Get camera info."""
         return self._camera_info
 
+    def _get_pose(self, time):
+        if self._trajectory is None:
+            return None
+
+        pose = self._trajectory.pose(time)
+        if pose is None:
+            return None
+
+        return pose @ self._body_T_sensor
+
     def __iter__(self):
         """Return the iterator object."""
         topics = [self._rgb_topic] + self._other_topics
@@ -126,12 +136,9 @@ class RosbagDataLoader:
 
         for messages in msg_iter:
             time = parse_message_timestamp(messages[self._rgb_topic])
-            if self._trajectory is not None:
-                pose = self._trajectory.pose(time)
-                if pose is None:
-                    continue
-
-                pose = pose @ self._body_T_sensor
+            pose = self._get_pose(time)
+            if pose is None and self._trajectory is not None:
+                continue  # TODO(nathan) make configurable
 
             rgb = get_image(messages[self._rgb_topic])[..., :3]
             images = [rgb] + [get_image(messages[t]) for t in self._other_topics]

@@ -32,66 +32,56 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/virtual_config.h>
 
-#include <atomic>
-#include <thread>
+#include "hydra/input/image_input_filters.h"
 
-#include "hydra/common/message_queue.h"
-#include "hydra/common/module.h"
-#include "hydra/input/data_receiver.h"
-#include "hydra/input/input_packet.h"
+#include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+#include <config_utilities/validation.h>
 
 namespace hydra {
+namespace {
 
-struct PoseStatus {
-  bool is_valid = false;
-  Eigen::Quaterniond target_R_source = Eigen::Quaterniond::Identity();
-  Eigen::Vector3d target_p_source = Eigen::Vector3d::Zero();
-  operator bool() const { return is_valid; }
-  Eigen::Isometry3d target_T_source() const {
-    return Eigen::Translation<double, 3>(target_p_source) * target_R_source;
+static const auto registration =
+    config::RegistrationWithConfig<InputFilter,
+                                   InvalidDepthFilter,
+                                   InvalidDepthFilter::Config>("InvalidDepthFilter");
+
+}
+
+void declare_config(InvalidDepthFilter::Config& config) {
+  using namespace config;
+  name("InvalidDepthFilter::Config");
+  field(config.max_invalid_ratio, "max_invalid_ratio");
+  checkInRange(config.max_invalid_ratio, 0.0, 1.0, "max_invalid_ratio", false);
+}
+
+InvalidDepthFilter::InvalidDepthFilter(const Config& config)
+    : config(config::checkValid(config)) {}
+
+bool InvalidDepthFilter::valid(const SensorInputPacket& current,
+                               const SensorInputPacket* const) const {
+  const auto derived = dynamic_cast<const ImageInputPacket* const>(&current);
+  if (!derived) {
+    return true;
   }
-};
 
-class InputModule : public Module {
- public:
-  using OutputQueue = MessageQueue<InputPacket::Ptr>;
-  struct Config {
-    struct InputPair {
-      config::VirtualConfig<DataReceiver> receiver;
-      config::VirtualConfig<Sensor> sensor;
-    };
-    std::map<std::string, InputPair> inputs;
-  } const config;
+  const auto& depth = derived->depth;
+  if (depth.empty() && depth.type() != CV_32FC1) {
+    return true;
+  }
 
-  InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
+  const size_t total = depth.rows * depth.cols;
+  size_t num_invalid = 0;
+  for (int r = 0; r < depth.rows; r++) {
+    for (int c = 0; c < depth.cols; c++) {
+      const auto value = depth.at<float>(r, c);
+      num_invalid += std::isfinite(value) ? 0 : 1;
+    }
+  }
 
-  virtual ~InputModule();
-
-  void start() override;
-
-  void stop() override;
-
-  std::string printInfo() const override;
-
- protected:
-  void dataSpin();
-
-  void stopImpl();
-
-  virtual PoseStatus getBodyPose(const SensorInputPacket& packet) = 0;
-
- protected:
-  OutputQueue::Ptr queue_;
-  std::atomic<bool> should_shutdown_{false};
-
-  std::vector<std::unique_ptr<DataReceiver>> receivers_;
-  std::unique_ptr<std::thread> data_thread_;
-};
-
-void declare_config(InputModule::Config::InputPair& config);
-void declare_config(InputModule::Config& config);
+  const auto ratio = static_cast<double>(num_invalid) / total;
+  return ratio < config.max_invalid_ratio;
+}
 
 }  // namespace hydra

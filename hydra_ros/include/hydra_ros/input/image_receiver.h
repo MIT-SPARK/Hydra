@@ -207,15 +207,11 @@ void ImageReceiverImpl<SemanticT>::callback(
     const sensor_msgs::msg::Image::ConstSharedPtr& depth,
     const SemanticMsgPtr& labels) {
   const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
-  if (!checkInputTimestamp(timestamp_ns)) {
-    return;
-  }
-
-  auto packet = std::make_shared<ImageInputPacket>(timestamp_ns, sensor_name_);
+  auto packet = std::make_shared<ImageInputPacket>(timestamp_ns, sensor_name);
   color_sub_.fillInput(*color, *packet);
   depth_sub_.fillInput(*depth, *packet);
   semantic_sub_.fillInput(*labels, *packet);
-  queue.push(packet);
+  queue_.push(packet);
 }
 
 class RGBDImageReceiver : public RosDataReceiver {

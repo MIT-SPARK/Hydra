@@ -317,8 +317,8 @@ void addBindings(pybind11::module_& m) {
             input->world_t_body = world_t_body;
             input->world_R_body = Eigen::Quaterniond(
                 world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-            input->sensor_input = std::make_unique<PythonSensorInput>(
-                timestamp_ns, depth, labels, rgb, pipeline.sensor_name);
+            input->sensor_input = std::make_unique<PythonImageInput>(
+                timestamp_ns, pipeline.sensor_name, rgb, depth, labels);
             input->sensor_input->input_feature = feature;
             return pipeline.step(input);
           },
@@ -335,17 +335,17 @@ void addBindings(pybind11::module_& m) {
              size_t timestamp_ns,
              const Eigen::Vector3d& world_t_body,
              const Eigen::Vector4d& world_R_body,
-             const PythonSensorInput::PointVec& points,
-             const PythonSensorInput::LabelVec& labels,
-             const PythonSensorInput::ColorVec& colors,
+             const PythonCloudInput::PointVec& points,
+             const PythonCloudInput::LabelVec& labels,
+             const PythonCloudInput::ColorVec& colors,
              const FeatureVector& feature) {
             auto input = std::make_shared<InputPacket>();
             input->timestamp_ns = timestamp_ns;
             input->world_t_body = world_t_body;
             input->world_R_body = Eigen::Quaterniond(
                 world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-            input->sensor_input = std::make_unique<PythonSensorInput>(
-                timestamp_ns, points, labels, colors, pipeline.sensor_name);
+            input->sensor_input = std::make_unique<PythonCloudInput>(
+                timestamp_ns, pipeline.sensor_name, points, labels, colors);
             input->sensor_input->input_feature = feature;
             return pipeline.step(input);
           },

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import pathlib
+
 import click
 import hydra_python as hydra
 import ianvs
@@ -19,22 +21,6 @@ def _repair_args(values, flag):
     return all_flags
 
 
-@click.group()
-def cli():
-    pass
-
-
-@cli.command(name="trajectory")
-@click.argument("bag_path", type=click.Path(exists=True))
-@click.argument("output", type=click.Path())
-def save_trajectory(bag_path, output):
-    with BagReader(bag_path) as bag:
-        trajectory = load_trajectory_from_bag(
-            bag, "hamilton/odom", "hamilton/body", progress=True
-        )
-        trajectory.to_csv(output)
-
-
 def _convert_start_time(bag_start_s: float | None):
     if bag_start_s is None:
         return None
@@ -42,15 +28,16 @@ def _convert_start_time(bag_start_s: float | None):
     return int(bag_start_s * 1.0e9)
 
 
-@cli.command(name="run")
+@click.command()
 @click.argument("bag_path", type=click.Path(exists=True))
-@click.argument("trajectory_path", type=click.Path(exists=True))
+@click.option("--trajectory-path", "-t", type=click.Path(exists=True))
 @click.option("--max-steps", "-m", default=None, type=int)
 @click.option("--min-separation-s", "-s", default=0.0, type=float)
 @click.option("--bag-start-s", default=None, type=float)
 @click.option("--config-utilities-files", "-f", multiple=True)
 @click.option("--config-utilities-yaml", "-c", multiple=True)
 @click.option("--config-utilities-var", "-v", multiple=True)
+@click.option("--name", "-n", default="hamilton")
 def run(
     bag_path,
     trajectory_path,
@@ -60,7 +47,9 @@ def run(
     config_utilities_files,
     config_utilities_yaml,
     config_utilities_var,
+    name,
 ):
+    bag_path = pathlib.Path(bag_path).expanduser().absolute()
     args = _repair_args(config_utilities_files, "-f")
     args += _repair_args(config_utilities_yaml, "-c")
     args += _repair_args(config_utilities_var, "-v")
@@ -69,17 +58,26 @@ def run(
 
     hydra.set_glog_level(0, 0)
     hydra.init_config_context(args)
-
-    trajectory = Trajectory.from_csv(trajectory_path)
     with BagReader(bag_path) as bag, ianvs.init_node_handle(
         "hydra"
     ), hydra.external_plugins("hydra_ros"):
+        if trajectory_path is None:
+            trajectory_path = bag_path / "poses.csv"
+
+        if not trajectory_path.exists():
+            trajectory = load_trajectory_from_bag(
+                bag, f"{name}/odom", f"{name}/body", progress=True
+            )
+            trajectory.to_csv(trajectory_path)
+        else:
+            trajectory = Trajectory.from_csv(trajectory_path)
+
         dataloader = RosbagDataLoader(
             bag,
-            trajectory,
-            "/hamilton/hamilton_zed/rgb/image_rect_color",
-            ["/hamilton/hamilton_zed/depth/depth_registered"],
-            body_frame="hamilton/body",
+            f"/{name}/{name}_zed/rgb/image_rect_color",
+            trajectory=trajectory,
+            other_topics=[f"/{name}/{name}_zed/depth/depth_registered"],
+            body_frame=f"{name}/body",
             progress=False,
             start_time_ns=_convert_start_time(bag_start_s),
         )
@@ -111,4 +109,4 @@ def run(
 
 
 if __name__ == "__main__":
-    cli()
+    run()
