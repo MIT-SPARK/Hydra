@@ -38,6 +38,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 
 namespace hydra {
 namespace {
@@ -49,9 +50,13 @@ static const auto registration =
 
 }
 
+InvalidDepthFilter::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("invalid_depth_filter")) {}
+
 void declare_config(InvalidDepthFilter::Config& config) {
   using namespace config;
   name("InvalidDepthFilter::Config");
+  base<VerbosityConfig>(config);
   field(config.max_invalid_ratio, "max_invalid_ratio");
   checkInRange(config.max_invalid_ratio, 0.0, 1.0, "max_invalid_ratio", false);
 }
@@ -81,6 +86,7 @@ bool InvalidDepthFilter::valid(const SensorInputPacket& current,
   }
 
   const auto ratio = static_cast<double>(num_invalid) / total;
+  MLOG(2) << "Ratio: " << ratio << " (versus max " << config.max_invalid_ratio << ")";
   return ratio < config.max_invalid_ratio;
 }
 

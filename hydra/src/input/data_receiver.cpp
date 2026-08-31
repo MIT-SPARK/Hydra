@@ -91,6 +91,7 @@ SensorInputPacket::Ptr DataReceiver::pollOnce() {
     }
 
     if (!filter->valid(*packet, last_received_.get())) {
+      MLOG(1) << "Filtered packet @ " << timestamp << " [ns]";
       return nullptr;
     }
   }

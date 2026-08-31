@@ -35,12 +35,15 @@
 #pragma once
 
 #include "hydra/input/input_filter.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 class InvalidDepthFilter : public InputFilter {
  public:
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config();
+
     //! Ratio of nonfinite to finite depth values to discard frame
     double max_invalid_ratio = 1.0;
   } const config;
