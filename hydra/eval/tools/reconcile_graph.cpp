@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include <config_utilities/config.h>
 #include <config_utilities/parsing/context.h>
+#include <config_utilities/validation.h>
 #include <hydra/backend/merge_tracker.h>
 #include <hydra/backend/update_functions.h>
 #include <spark_dsg/scene_graph.h>
@@ -47,6 +48,8 @@ struct AppArgs {
   void add_to_app(CLI::App& app);
 
   std::filesystem::path scene_graph;
+  std::string config_ns = "backend";
+  std::filesystem::path output;
 };
 
 void AppArgs::add_to_app(CLI::App& app) {
@@ -54,30 +57,38 @@ void AppArgs::add_to_app(CLI::App& app) {
       ->required()
       ->check(CLI::ExistingFile)
       ->description("Graph to reconcile");
+  app.add_option("-n,--namespace", config_ns)->description("Config namespace to use");
+  app.add_option("-o,--output", output)->description("File to output to");
 }
 
 struct Reconciler {
+  using Graph = spark_dsg::SceneGraph;
+
   struct Config {
     using FunctorConfig = config::VirtualConfig<UpdateFunctor, true>;
 
-    Config();
-    //! Update functors that get applied in the specified order
     config::OrderedMap<std::string, FunctorConfig> update_functors;
-    //! Names of functors to use exhaustive merging for
     std::vector<std::string> exhaustive_functors;
   } const config;
 
-  void reconcile(const spark_dsg::SceneGraph& graph) const;
+  explicit Reconciler(const Config& config);
+  Graph::Ptr reconcile(Graph& graph) const;
 
   std::vector<std::pair<std::string, std::unique_ptr<UpdateFunctor>>> functors;
 };
 
-void Reconciler::reconcile(const spark_dsg::SceneGraph& graph) const {
+Reconciler::Reconciler(const Config& config) : config(config::checkValid(config)) {
+  for (const auto& [name, functor] : config.update_functors) {
+    functors.emplace_back(name, functor.create());
+  }
+}
+
+auto Reconciler::reconcile(Graph& graph) const -> Graph::Ptr {
   const std::set<std::string> exhaustive_names(config.exhaustive_functors.begin(),
                                                config.exhaustive_functors.end());
 
-  auto target = std::make_shared<SharedDsgInfo>(SharedDsgInfo::Config{});
-  target->graph = graph.clone();
+  SharedDsgInfo target(SharedDsgInfo::Config{});
+  target.graph = graph.clone();
 
   auto info = std::make_shared<UpdateInfo>();
   GroupedMergeTracker merge_tracker;
@@ -92,13 +103,13 @@ void Reconciler::reconcile(const spark_dsg::SceneGraph& graph) const {
       cleanup_hooks.push_back(hooks.cleanup);
     }
 
-    functor->call(graph, *target, info);
+    functor->call(graph, target, info);
     if (hooks.find_merges) {
       auto& tracker = merge_tracker.getMergeGroup(name);
       auto merges = hooks.find_merges(graph, info);
       auto applied = tracker.applyMerges(graph, merges, target, hooks.merge);
       if (!exhaustive_names.count(name)) {
-        return;
+        continue;
       }
 
       applied = 0;
@@ -109,9 +120,11 @@ void Reconciler::reconcile(const spark_dsg::SceneGraph& graph) const {
     }
 
     for (const auto& func : cleanup_hooks) {
-      func(info, graph, target);
+      func(info, graph, &target);
     }
   }
+
+  return target.graph;
 }
 
 void declare_config(Reconciler::Config& config) {
@@ -141,7 +154,17 @@ int main(int argc, char** argv) {
     return app.exit(e);
   }
 
-  const auto config = config::fromContext<hydra::Reconciler::Config>();
+  auto output = args.output;
+  if (output.empty()) {
+    const auto filename = args.scene_graph.stem().string() + "_reconciled.json";
+    output = args.scene_graph.parent_path() / filename;
+  }
+
+  const auto config = config::fromContext<hydra::Reconciler::Config>(args.config_ns);
+  const auto reconciler = hydra::Reconciler(config);
+
   auto graph = spark_dsg::SceneGraph::load(args.scene_graph);
+  auto new_graph = reconciler.reconcile(*graph);
+  new_graph->save(args.output, true);
   return 0;
 }
