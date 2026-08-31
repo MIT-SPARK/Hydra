@@ -115,6 +115,8 @@ void ExternalTraversabilityEstimator::callback(
           traversability_layer_->voxels_per_side);
       block.updated = true;
       auto& voxel = block.voxel(traversability_layer_->voxelIndexFromGlobal(index));
+      // The grid is a flat plane: every voxel takes the grid's own height.
+      voxel.height = msg->info.origin.position.z;
       if (voxel.confidence == 0.0f) {
         // Overwrite if this is the first observation this iteration.
         voxel.state = state;
