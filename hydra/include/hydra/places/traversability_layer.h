@@ -45,22 +45,19 @@
 namespace hydra::places {
 
 struct TraversabilityVoxel {
-  //! @brief The traversability value in the range [0, 1], where 0 means not traversable
-  // and 1 means fully traversable.
+  //! The traversability value in the range [0, 1] (not traversable to fully).
   float traversability = 0.0f;
 
-  //! @brief Confidence in the traversability value in [0, 1].
+  //! Confidence in the traversability value in [0, 1].
   float confidence = 0.0f;
 
-  //! @brief The height of the surface in meters in global coordinate, used for
-  //! debugging and visualization.
+  //! The height of the surface in meters in global coordinate
   std::optional<float> height;
 
-  //! @brief Discrete traversability state for of the voxel, computed as a function of
-  // traversability and confidence.
+  //! Discrete traversability state for of the voxel
   spark_dsg::TraversabilityState state = spark_dsg::TraversabilityState::UNKNOWN;
 
-  //! @brief Arbitrary debug value that can be set for viualization.
+  //! Arbitrary debug value that can be set for viualization.
   // TODO(lschmid): Remove this at some point.
   mutable float debug_value = -1.0f;
 
