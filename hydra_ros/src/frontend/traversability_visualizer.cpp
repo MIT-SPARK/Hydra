@@ -123,12 +123,10 @@ void TraversabilityVisualizer::visualizeLayer(
   visualization_msgs::msg::Marker msg4 = msg;
   msg4.ns = "debug";
 
-  auto height = active_config_.drawing_offset_z;
-  if (active_config_.use_relative_offset) {
-    height += world_t_body.z();
-  }
+  // Additive offset applied on top of each voxel's own surface height.
+  const auto z_offset = active_config_.drawing_offset_z +
+                        (active_config_.use_relative_offset ? world_t_body.z() : 0.0);
   geometry_msgs::msg::Point pos;
-  pos.z = height;
 
   for (const auto& block : layer) {
     for (size_t x = 0; x < block.voxels_per_side; ++x) {
@@ -139,9 +137,7 @@ void TraversabilityVisualizer::visualizeLayer(
           continue;  // Unobserved voxels.
         }
         pos.y = block.origin().y() + (y + 0.5f) * layer.voxel_size;
-        if (voxel.height) {
-          pos.z = *voxel.height;
-        }
+        pos.z = voxel.height + z_offset;
         msg.points.push_back(pos);
         msg.colors.push_back(visualizer::makeColorMsg(
             traversability_colormap_->getColor(voxel.traversability),
