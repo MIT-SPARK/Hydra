@@ -61,6 +61,15 @@ struct TraversabilityVoxel {
   // traversability and confidence.
   spark_dsg::TraversabilityState state = spark_dsg::TraversabilityState::UNKNOWN;
 
+  //! @brief Traversability probability in [0, 1] fused from projected semantic
+  //! traversability labels. Negative means no semantic observation yet.
+  float semantic_traversability = -1.0f;
+
+  //! @brief Confidence in semantic_traversability in [0, 1], based on how many times
+  //! the cell has been observed. 0 means unobserved. Independent of the value itself,
+  //! so a cell can be high-confidence and undecided (~0.5) when labels conflict.
+  float semantic_confidence = 0.0f;
+
   //! @brief Arbitrary debug value that can be set for viualization.
   // TODO(lschmid): Remove this at some point.
   mutable float debug_value = -1.0f;
