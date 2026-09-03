@@ -52,13 +52,23 @@ struct TraversabilityVoxel {
   //! @brief Confidence in the traversability value in [0, 1].
   float confidence = 0.0f;
 
-  //! @brief The height of the surface in meters in global coordinate, used for
-  //! debugging and visualization.
-  std::optional<float> height = 0.0f;
+  //! @brief The height of the surface in meters in global coordinates. The layer is
+  //! always 2.5D: every voxel carries a height, where 0.0 means no surface was
+  //! observed for this voxel.
+  float height = 0.0f;
 
   //! @brief Discrete traversability state for of the voxel, computed as a function of
   // traversability and confidence.
   spark_dsg::TraversabilityState state = spark_dsg::TraversabilityState::UNKNOWN;
+
+  //! @brief Traversability probability in [0, 1] fused from projected semantic
+  //! traversability labels. Negative means no semantic observation yet.
+  float semantic_traversability = -1.0f;
+
+  //! @brief Confidence in semantic_traversability in [0, 1], based on how many times
+  //! the cell has been observed. 0 means unobserved. Independent of the value itself,
+  //! so a cell can be high-confidence and undecided (~0.5) when labels conflict.
+  float semantic_confidence = 0.0f;
 
   //! @brief Arbitrary debug value that can be set for viualization.
   // TODO(lschmid): Remove this at some point.

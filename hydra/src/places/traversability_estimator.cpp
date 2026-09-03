@@ -61,6 +61,9 @@ BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) {
   return block_indices;
 }
 
+//! Minimum TSDF weight for a voxel to count as observed.
+constexpr float kMinTsdfWeight = 1e-6f;
+
 static const std::array<Index2D, 8> kNeighborOffsets = {{
     {0, -1},   // bottom
     {-1, 0},   // left
@@ -281,6 +284,14 @@ void HeightTraversabilityEstimator::computeTraversability(
   const BlockIndexSet updated_blocks_2d =
       get2DBlockIndices(msg.map().getTsdfLayer().allocatedBlockIndices());
 
+  // Surface heights for the same volume, so every voxel carries a height (2.5D).
+  const HeightMap height_map = extractHeightMap(*tsdf_layer_,
+                                                updated_blocks_2d,
+                                                msg.world_t_body.z(),
+                                                config.height_below,
+                                                config.height_above,
+                                                kMinTsdfWeight);
+
   const VoxelKey min_height =
       tsdf_layer_->getVoxelKey(Point(0, 0, msg.world_t_body.z() - config.height_below));
   const VoxelKey max_height =
@@ -315,7 +326,7 @@ void HeightTraversabilityEstimator::computeTraversability(
           for (int z = min_voxel_z; z <= max_voxel_z; ++z) {
             const auto& tsdf_voxel = tsdf_block->getVoxel(VoxelIndex(x, y, z));
             // Count number of observed and free voxels.
-            if (tsdf_voxel.weight < 1e-6f) {
+            if (tsdf_voxel.weight < kMinTsdfWeight) {
               continue;
             }
             traversability_voxel.confidence += 1.0f;
@@ -326,14 +337,22 @@ void HeightTraversabilityEstimator::computeTraversability(
         }
       }
     }
-
-    // Normalize the traversability values.
-    for (auto& voxel : traversability_block.voxels) {
-      if (voxel.confidence > 0.0f) {
-        voxel.traversability /= voxel.confidence;
-        voxel.confidence /= num_voxels;
+    // Normalize the traversability values and assign surface heights.
+    for (int x = 0; x < voxels_per_side; ++x) {
+      for (int y = 0; y < voxels_per_side; ++y) {
+        auto& voxel = traversability_block.voxel(x, y);
+        if (voxel.confidence > 0.0f) {
+          voxel.traversability /= voxel.confidence;
+          voxel.confidence /= num_voxels;
+        }
+        const BlockIndex global_2d =
+            traversability_block.globalFromLocalIndex(Index2D(x, y));
+        const auto it = height_map.find(Index2D(global_2d.x(), global_2d.y()));
+        if (it != height_map.end()) {
+          voxel.height = it->second;
+        }  // Otherwise the height stays at the 0.0f set by reset().
+        classifyTraversabilityVoxel(voxel);
       }
-      classifyTraversabilityVoxel(voxel);
     }
   }
 }
@@ -461,10 +480,7 @@ void GradientTraversabilityEstimator::computeTraversability(
             grad_it->second.gradient, config.gradient_threshold);
         trav_voxel.confidence = grad_it->second.confidence;
 
-        auto height_it = smooth_map.find(center_idx);
-        if (height_it != smooth_map.end()) {
-          trav_voxel.height = height_it->second;
-        }
+        trav_voxel.height = smooth_map.at(center_idx);
 
         classifyTraversabilityVoxel(trav_voxel);
       }

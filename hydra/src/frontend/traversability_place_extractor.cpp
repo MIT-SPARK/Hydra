@@ -88,7 +88,7 @@ void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
   // expensive though.
   Timer timer("traversability/postprocessing", msg.timestamp_ns);
   auto layer = estimator_->getTraversabilityLayer();
-  postprocessing_.apply(layer);
+  postprocessing_.apply(layer, msg);
 
   timer.reset("traversability/clustering");
   clustering_->updateGraph(layer, msg, graph, config.layer);

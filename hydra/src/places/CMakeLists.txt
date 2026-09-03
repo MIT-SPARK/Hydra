@@ -13,6 +13,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/region_growing_traversability_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/traversability_estimator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/traversability_postprocessing.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/traversability_projective_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/2d_places/ellipsoid_math.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/2d_places/index_remapping.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/2d_places/place_reallocation.cpp
