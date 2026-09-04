@@ -64,6 +64,7 @@ add_library(
   src/utils/scene_graph_logger.cpp
   src/utils/status_monitor.cpp
   src/utils/tf_lookup.cpp
+  src/utils/qos_config.cpp
   src/visualizer/feature_color_adaptors.cpp
   src/visualizer/voxel_drawing.cpp
 )
