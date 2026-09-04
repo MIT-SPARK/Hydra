@@ -53,9 +53,13 @@ void declare_config(InputModule::Config::InputPair& config) {
 void declare_config(InputModule::Config& config) {
   using namespace config;
   name("InputModule::Config");
+  base<VerbosityConfig>(config);
   field(config.inputs, "inputs");
   checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
+
+InputModule::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("input")) {}
 
 InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
     : config(config::checkValid(config)), queue_(queue) {
@@ -73,8 +77,9 @@ void InputModule::start() {
   for (auto& receiver : receivers_) {
     receiver->init();
   }
+
   data_thread_.reset(new std::thread(&InputModule::dataSpin, this));
-  LOG(INFO) << "[Hydra Input] started!";
+  MLOG(0) << "started!";
 }
 
 void InputModule::stop() { stopImpl(); }
@@ -83,15 +88,14 @@ void InputModule::stopImpl() {
   should_shutdown_ = true;
 
   if (data_thread_) {
-    VLOG(2) << "[Hydra Input] stopping input thread";
+    MLOG(1) << "stopping input thread";
     data_thread_->join();
     data_thread_.reset();
-    VLOG(2) << "[Hydra Input] stopped input thread";
+    MLOG(1) << "stopped input thread";
   }
 
   for (size_t i = 0; i < receivers_.size(); ++i) {
-    VLOG(2) << "[Hydra Input] remaining in data queue[" << i
-            << "]: " << receivers_[i]->numQueued();
+    MLOG(1) << "remaining in data queue[" << i << "]: " << receivers_[i]->numQueued();
   }
 }
 
@@ -106,22 +110,23 @@ void InputModule::dataSpin() {
       }
 
       const auto curr_time = packet->timestamp_ns;
-      VLOG(2) << "[Hydra Input] popped input @ " << curr_time << " [ns]";
+      MLOG(2) << "popped input @ " << curr_time << " [ns]";
 
       const auto odom_T_body = getBodyPose(*packet);
       if (!odom_T_body) {
-        LOG(WARNING) << "[Hydra Input] dropping input @ " << curr_time
+        LOG(WARNING) << "[input] dropping input @ " << curr_time
                      << " [ns] due to missing pose";
         continue;
       }
+
+      MLOG(3) << "output queue state: size=" << queue_->size()
+              << " (max=" << queue_->max_size << ") @ " << curr_time << " [ns]";
 
       InputPacket::Ptr input(new InputPacket());
       input->timestamp_ns = curr_time;
       input->sensor_input = packet;
       input->world_t_body = odom_T_body.target_p_source;
       input->world_R_body = odom_T_body.target_R_source;
-      VLOG(5) << "[Hydra Input] output queue state: size=" << queue_->size()
-              << " (max=" << queue_->max_size << ") @ " << curr_time << " [ns]";
       queue_->push(input);
     }
   }

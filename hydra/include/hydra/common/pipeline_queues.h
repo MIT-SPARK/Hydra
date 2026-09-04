@@ -43,7 +43,6 @@
 namespace hydra {
 
 struct BackendInput;
-struct FeatureView;
 
 class PipelineQueues {
  public:
@@ -57,8 +56,6 @@ class PipelineQueues {
   MessageQueue<std::shared_ptr<BackendInput>> backend_queue;
   //! Connection between backend and LCD module
   MessageQueue<lcd::RegistrationSolution> backend_lcd_queue;
-  // TODO(nathan) drop
-  MessageQueue<std::unique_ptr<FeatureView>> input_features_queue;
   //! Queue for receiving (timestamped) external loop closures
   MessageQueue<pose_graph_tools::PoseGraph> external_loop_closure_queue;
 

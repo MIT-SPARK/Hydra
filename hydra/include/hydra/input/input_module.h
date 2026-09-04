@@ -58,11 +58,13 @@ struct PoseStatus {
 class InputModule : public Module {
  public:
   using OutputQueue = MessageQueue<InputPacket::Ptr>;
-  struct Config {
+  struct Config : VerbosityConfig {
     struct InputPair {
       config::VirtualConfig<DataReceiver> receiver;
       config::VirtualConfig<Sensor> sensor;
     };
+
+    Config();
     std::map<std::string, InputPair> inputs;
   } const config;
 

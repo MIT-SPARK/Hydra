@@ -86,7 +86,7 @@ class HydraRosPipeline : public HydraPipeline {
   std::shared_ptr<GraphBuilder> frontend_;
   std::shared_ptr<BackendModule> backend_;
 
-  std::unique_ptr<StatusMonitor> status_monitor_;
+  std::unique_ptr<StatusMonitor> monitor_;
   std::unique_ptr<ExternalLoopClosureSubscriber> external_loop_closure_sub_;
 };
 

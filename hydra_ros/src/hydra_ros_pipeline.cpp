@@ -107,17 +107,16 @@ void HydraRosPipeline::init() {
   frontend_->addSink(std::make_shared<RosFrontendPublisher>(nh / "frontend"));
   external_loop_closure_sub_.reset(new ExternalLoopClosureSubscriber(nh));
 
-  status_monitor_ = std::make_unique<StatusMonitor>(config.status_monitor, nh);
+  using std::chrono::nanoseconds;
+  monitor_ = std::make_unique<StatusMonitor>(config.status_monitor, nh);
   backend_->addSink(BackendModule::Sink::fromCallback(
-      [this](uint64_t timestamp_ns, const auto&, const auto&) {
-        status_monitor_->recordModuleCallback("backend",
-                                              std::chrono::nanoseconds(timestamp_ns));
+      [this](uint64_t stamp, const auto&, const auto&) {
+        monitor_->recordModuleCallback("backend", nanoseconds(stamp));
       }));
 
   active_window_->addSink(ActiveWindowModule::Sink::fromCallback(
-      [this](uint64_t timestamp_ns, const auto&, const auto&) {
-        status_monitor_->recordModuleCallback("active_window",
-                                              std::chrono::nanoseconds(timestamp_ns));
+      [this](uint64_t stamp, const auto&, const auto&) {
+        monitor_->recordModuleCallback("active_window", nanoseconds(stamp));
       }));
 
   input_module_ =
@@ -126,7 +125,7 @@ void HydraRosPipeline::init() {
 
 void HydraRosPipeline::start() {
   HydraPipeline::start();
-  status_monitor_->start();
+  monitor_->start();
 }
 
 void HydraRosPipeline::stop() {

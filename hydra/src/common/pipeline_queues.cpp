@@ -36,8 +36,6 @@
 
 #include <glog/logging.h>
 
-#include "hydra/frontend/view_selector.h"
-
 namespace hydra {
 
 PipelineQueues::~PipelineQueues() {
@@ -58,7 +56,6 @@ void PipelineQueues::clear() {
   backend_queue.clear();
   backend_lcd_queue.clear();
   external_loop_closure_queue.clear();
-  input_features_queue.clear();
 }
 
 PipelineQueues::PipelineQueues() {}

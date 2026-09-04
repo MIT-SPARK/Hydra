@@ -278,7 +278,7 @@ void GraphBuilder::processNextInput(const ActiveWindowOutput& msg) {
                                             data.getSensorPose().inverse(),
                                             data.feature,
                                             &data.getSensor());
-  PipelineQueues::instance().input_features_queue.push(std::move(view));
+  // TODO(nathan) do something with view
 }
 
 bool GraphBuilder::spinOnce() {
@@ -325,8 +325,6 @@ void GraphBuilder::dispatchSpin(ActiveWindowOutput::Ptr msg) {
 }
 
 void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
-  auto& queues = PipelineQueues::instance();
-
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns << " [ns]";
   std::lock_guard<std::mutex> lock(mutex_);
   ScopedTimer timer("frontend/spin", msg->timestamp_ns);
@@ -361,7 +359,7 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
   }
 
   backend_input_->mesh_update = std::move(last_mesh_update_);
-  queues.backend_queue.push(backend_input_);
+  PipelineQueues::instance().backend_queue.push(backend_input_);
   if (lcd_input_queue_) {
     lcd_input_queue_->push(lcd_input_);
   }
