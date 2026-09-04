@@ -71,7 +71,6 @@ void declare_config(FrameConfig& frames) {
 void declare_config(PipelineConfig& config) {
   using namespace config;
   name("PipelineConfig");
-  field(config.enable_lcd, "enable_lcd");
   field(config.timing_disabled, "timing_disabled");
   field(config.disable_timer_output, "disable_timer_output");
   field(config.enable_pgmo_logging, "enable_pgmo_logging");

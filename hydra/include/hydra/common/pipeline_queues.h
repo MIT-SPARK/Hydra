@@ -43,33 +43,28 @@
 namespace hydra {
 
 struct BackendInput;
-struct LcdInput;
 struct FeatureView;
 
 class PipelineQueues {
  public:
-  using LcdQueue = MessageQueue<std::shared_ptr<LcdInput>>;
-
   ~PipelineQueues();
+
   static PipelineQueues& instance();
+
   void clear();
 
   //! Connection between frontend and backend
   MessageQueue<std::shared_ptr<BackendInput>> backend_queue;
   //! Connection between backend and LCD module
   MessageQueue<lcd::RegistrationSolution> backend_lcd_queue;
-  //! Queue for receiving image or pointcloud level descriptors
+  // TODO(nathan) drop
   MessageQueue<std::unique_ptr<FeatureView>> input_features_queue;
   //! Queue for receiving (timestamped) external loop closures
   MessageQueue<pose_graph_tools::PoseGraph> external_loop_closure_queue;
 
-  //! Optional input queue to LCD module
-  LcdQueue::Ptr lcd_queue;
-
  private:
   PipelineQueues();
 
-  // TODO(nathan) have some sort of config or pull from global config
   // TODO(nathan) fix thread safety (by probably just having a single static instance)
   inline static std::unique_ptr<PipelineQueues> s_instance_;
 };

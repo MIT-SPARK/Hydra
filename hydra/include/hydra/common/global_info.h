@@ -80,8 +80,6 @@ struct FrameConfig {
 void declare_config(FrameConfig& config);
 
 struct PipelineConfig {
-  //! If true, turn on internal loop closure detection
-  bool enable_lcd = false;
   //! If true, disable all performance timers
   bool timing_disabled = false;
   //! If true, don't show latest elapsed for timers

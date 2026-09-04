@@ -48,6 +48,15 @@
 using namespace spark_dsg;
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<LoopClosureModule,
+                                   LoopClosureModule,
+                                   LoopClosureModule::Config,
+                                   SharedModuleState::Ptr>("LoopClosureModule");
+
+}
 
 using hydra::timing::ScopedTimer;
 
@@ -63,7 +72,10 @@ void declare_config(LoopClosureModule::Config& config) {
 
 LoopClosureModule::LoopClosureModule(const Config& config,
                                      const SharedModuleState::Ptr& state)
-    : config(config), state_(state), lcd_graph_(new SceneGraph()) {
+    : config(config),
+      queue_(std::make_shared<MessageQueue<LcdInput::Ptr>>()),
+      state_(state),
+      lcd_graph_(new SceneGraph()) {
   lcd_detector_.reset(new lcd::LcdDetector(config.detector));
 }
 
@@ -97,15 +109,9 @@ void LoopClosureModule::save(const DataDirectory& output) {
 std::string LoopClosureModule::printInfo() const { return config::toString(config); }
 
 void LoopClosureModule::spin() {
-  auto queue = PipelineQueues::instance().lcd_queue;
-  if (!queue) {
-    LOG(ERROR) << "LCD queue required to run LCD";
-    return;
-  }
-
   bool should_shutdown = false;
   while (!should_shutdown) {
-    bool has_data = queue->poll();
+    bool has_data = queue_->poll();
     if (GlobalInfo::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
@@ -128,13 +134,7 @@ void LoopClosureModule::spin() {
 }
 
 bool LoopClosureModule::spinOnce(bool force_update) {
-  auto queue = PipelineQueues::instance().lcd_queue;
-  if (!queue) {
-    LOG(ERROR) << "LCD queue required to run LCD";
-    return false;
-  }
-
-  bool has_data = queue->poll();
+  bool has_data = queue_->poll();
   if (!has_data) {
     return false;
   }
@@ -144,6 +144,8 @@ bool LoopClosureModule::spinOnce(bool force_update) {
 }
 
 lcd::LcdDetector& LoopClosureModule::getDetector() const { return *lcd_detector_; }
+
+MessageQueue<LcdInput::Ptr>::Ptr LoopClosureModule::queue() const { return queue_; }
 
 void LoopClosureModule::spinOnceImpl(bool force_update) {
   const size_t timestamp_ns = processFrontendOutput();
@@ -189,8 +191,7 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 }
 
 size_t LoopClosureModule::processFrontendOutput() {
-  auto queue = PipelineQueues::instance().lcd_queue;
-  const auto& msg = queue->front();
+  const auto& msg = queue_->front();
   VLOG(5) << "[Hydra LCD] Received archived places: "
           << displayNodeSymbolContainer(msg->archived_places);
 
@@ -206,7 +207,7 @@ size_t LoopClosureModule::processFrontendOutput() {
 
   size_t timestamp_ns = msg->timestamp_ns;
   last_sequence_number_ = msg->sequence_number;
-  queue->pop();
+  queue_->pop();
   return timestamp_ns;
 }
 

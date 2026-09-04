@@ -38,10 +38,10 @@
 #include <hydra/backend/backend_module.h>
 #include <hydra/common/hydra_pipeline.h>
 #include <hydra/frontend/graph_builder.h>
+#include <hydra/loop_closure/loop_closure_module.h>
 
 #include <memory>
 
-#include "hydra_ros/input/feature_receiver.h"
 #include "hydra_ros/input/ros_input_module.h"
 #include "hydra_ros/utils/status_monitor.h"
 
@@ -51,7 +51,13 @@ class ExternalLoopClosureSubscriber;
 
 class HydraRosPipeline : public HydraPipeline {
  public:
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config();
+
+    //! @brief Show the config passed to Hydra (before resolving sensor configurations)
+    bool preprint_config = false;
+    //! @brief Configuration for sensor inputs
+    RosInputModule::Config input;
     //! @brief Configuration for active window / metric-semantic reconstruction
     config::VirtualConfig<ActiveWindowModule> active_window{
         ReconstructionModule::Config()};
@@ -59,18 +65,8 @@ class HydraRosPipeline : public HydraPipeline {
     config::VirtualConfig<GraphBuilder> frontend{GraphBuilder::Config()};
     //! @brief Configuration for backend module
     config::VirtualConfig<BackendModule> backend{BackendModule::Config()};
-    //! @brief Publish frontend scene graph in addition to backend
-    bool enable_frontend_output = true;
-    //! @brief Turn on zmq-based publishing
-    bool enable_zmq_interface = false;
-    //! @brief Configuration for sensor inputs
-    RosInputModule::Config input;
-    //! @brief Receiver for language features
-    config::VirtualConfig<FeatureReceiver> features;
-    //! @brief Verbosity setting for main pipeline class
-    int verbosity = 1;
-    //! @brief Show the config passed to Hydra (before resolving sensor configurations)
-    bool preprint_config = false;
+    //! @brief Optional config for loop closure module
+    config::VirtualConfig<LoopClosureModule> lcd;
     //! @brief Monitor to report whether or Hydra is running normally
     StatusMonitor::Config status_monitor;
   } const config;
@@ -86,14 +82,11 @@ class HydraRosPipeline : public HydraPipeline {
   void stop() override;
 
  protected:
-  virtual void initLCD();
-
- protected:
-  std::unique_ptr<StatusMonitor> status_monitor_;
   std::shared_ptr<ActiveWindowModule> active_window_;
   std::shared_ptr<GraphBuilder> frontend_;
   std::shared_ptr<BackendModule> backend_;
 
+  std::unique_ptr<StatusMonitor> status_monitor_;
   std::unique_ptr<ExternalLoopClosureSubscriber> external_loop_closure_sub_;
 };
 

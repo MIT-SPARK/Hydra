@@ -59,37 +59,34 @@ namespace hydra {
 void declare_config(HydraRosPipeline::Config& config) {
   using namespace config;
   name("HydraRosConfig");
+  base<VerbosityConfig>(config);
+  field(config.preprint_config, "preprint_config");
+  field(config.input, "input");
   field(config.active_window, "active_window");
   field(config.frontend, "frontend");
   field(config.backend, "backend");
-  field(config.enable_frontend_output, "enable_frontend_output");
-  field(config.enable_zmq_interface, "enable_zmq_interface");
-  field(config.input, "input");
-  config.features.setOptional();
-  field(config.features, "features");
-  field(config.verbosity, "verbosity");
-  field(config.preprint_config, "preprint_config");
+  config.lcd.setOptional();
+  field(config.lcd, "lcd");
   field(config.status_monitor, "status_monitor");
 }
+
+HydraRosPipeline::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("pipeline")) {}
 
 HydraRosPipeline::HydraRosPipeline(int robot_id, int config_verbosity)
     : HydraPipeline(config::fromContext<PipelineConfig>(), robot_id, config_verbosity),
       config(config::checkValid(config::fromContext<Config>())) {
   if (config.preprint_config) {
     LOG(INFO) << "Using configuration to start Hydra\n" << config::toString(config);
-  } else {
-    LOG_IF(INFO, config.verbosity >= 1)
-        << "Starting Hydra-ROS with input configuration\n"
-        << config::toString(config.input);
   }
+
+  MLOG(1) << "Starting Hydra-ROS with input configuration\n"
+          << config::toString(config.input);
 }
 
 HydraRosPipeline::~HydraRosPipeline() {}
 
 void HydraRosPipeline::init() {
-  const auto& pipeline_config = GlobalInfo::instance().getConfig();
-
-  auto nh = ianvs::NodeHandle::this_node("~");
   backend_ = config.backend.create(backend_dsg_, shared_state_);
   modules_["backend"] = CHECK_NOTNULL(backend_);
 
@@ -99,15 +96,18 @@ void HydraRosPipeline::init() {
   active_window_ = config.active_window.create(frontend_->queue());
   modules_["active_window"] = CHECK_NOTNULL(active_window_);
 
-  if (pipeline_config.enable_lcd) {
-    initLCD();
+  auto lcd = config.lcd.create(shared_state_);
+  if (lcd) {
+    frontend_->setLcdQueue(lcd->queue());
+    modules_["lcd"] = std::move(lcd);
   }
 
-  status_monitor_ = std::make_unique<StatusMonitor>(config.status_monitor, nh);
+  auto nh = ianvs::NodeHandle::this_node("~");
+  backend_->addSink(std::make_shared<RosBackendPublisher>(nh / "backend"));
+  frontend_->addSink(std::make_shared<RosFrontendPublisher>(nh / "frontend"));
   external_loop_closure_sub_.reset(new ExternalLoopClosureSubscriber(nh));
 
-  auto bnh = nh / "backend";
-  backend_->addSink(std::make_shared<RosBackendPublisher>(bnh));
+  status_monitor_ = std::make_unique<StatusMonitor>(config.status_monitor, nh);
   backend_->addSink(BackendModule::Sink::fromCallback(
       [this](uint64_t timestamp_ns, const auto&, const auto&) {
         status_monitor_->recordModuleCallback("backend",
@@ -120,22 +120,8 @@ void HydraRosPipeline::init() {
                                               std::chrono::nanoseconds(timestamp_ns));
       }));
 
-  // TODO(nathan) make optional config
-  if (config.enable_zmq_interface) {
-    const auto zmq_config = config::fromContext<ZmqSink::Config>("backend/zmq_sink");
-    backend_->addSink(std::make_shared<ZmqSink>(zmq_config));
-  }
-
-  if (config.enable_frontend_output) {
-    CHECK(frontend_) << "Frontend module required!";
-    frontend_->addSink(std::make_shared<RosFrontendPublisher>(nh / "frontend"));
-  }
-
   input_module_ =
       std::make_shared<RosInputModule>(config.input, active_window_->queue());
-  if (config.features) {
-    modules_["features"] = config.features.create();  // has to come after input module
-  }
 }
 
 void HydraRosPipeline::start() {
@@ -144,30 +130,13 @@ void HydraRosPipeline::start() {
 }
 
 void HydraRosPipeline::stop() {
-  // TODO(nathan) log remaining queue sizes here or in stop
   // enforce stop order to make sure every data packet is processed
   input_module_->stop();
-  // TODO(nathan) push extracting active window objects to module stop
   active_window_->stop();
   frontend_->stop();
   backend_->stop();
 
   HydraPipeline::stop();
-}
-
-void HydraRosPipeline::initLCD() {
-  // TODO(nathan) push to pipeline config?
-  auto lcd_config = config::fromContext<LoopClosureConfig>();
-  lcd_config.detector.num_semantic_classes =
-      GlobalInfo::instance().labelspace().total_labels;
-  LOG_IF(INFO, config.verbosity >= 2)
-      << "Number of classes for LCD: " << lcd_config.detector.num_semantic_classes;
-
-  config::checkValid(lcd_config);
-
-  auto lcd = std::make_shared<LoopClosureModule>(lcd_config, shared_state_);
-  modules_["lcd"] = lcd;
-  // TODO(nathan) rework sensor-level LCD request
 }
 
 }  // namespace hydra

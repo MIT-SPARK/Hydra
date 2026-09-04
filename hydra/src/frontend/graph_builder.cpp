@@ -301,6 +301,10 @@ void GraphBuilder::addSink(const Sink::Ptr& sink) {
   }
 }
 
+void GraphBuilder::setLcdQueue(const MessageQueue<LcdInput::Ptr>::Ptr& queue) {
+  lcd_input_queue_ = queue;
+}
+
 void GraphBuilder::addInputCallback(InputCallback callback) {
   input_callbacks_.push_back([callback](ActiveWindowOutput::Ptr msg) {
     if (!msg) {
@@ -330,7 +334,7 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
   backend_input_.reset(new BackendInput());
   backend_input_->timestamp_ns = msg->timestamp_ns;
   backend_input_->sequence_number = sequence_number_;
-  if (queues.lcd_queue) {
+  if (lcd_input_queue_) {
     lcd_input_.reset(new LcdInput());
     lcd_input_->timestamp_ns = msg->timestamp_ns;
     lcd_input_->sequence_number = sequence_number_;
@@ -348,7 +352,7 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     state_->backend_graph->graph->mergeGraph(*dsg_->graph);
   }  // end critical section
 
-  if (queues.lcd_queue) {
+  if (lcd_input_queue_) {
     // n.b., critical section in this scope!
     std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_lcd_graph", msg->timestamp_ns);
@@ -358,8 +362,8 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
 
   backend_input_->mesh_update = std::move(last_mesh_update_);
   queues.backend_queue.push(backend_input_);
-  if (queues.lcd_queue) {
-    queues.lcd_queue->push(lcd_input_);
+  if (lcd_input_queue_) {
+    lcd_input_queue_->push(lcd_input_);
   }
 
   // mutex not required because nothing is modifying the graph

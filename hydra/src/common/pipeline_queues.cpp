@@ -36,7 +36,6 @@
 
 #include <glog/logging.h>
 
-#include "hydra/common/global_info.h"
 #include "hydra/frontend/view_selector.h"
 
 namespace hydra {
@@ -44,12 +43,7 @@ namespace hydra {
 PipelineQueues::~PipelineQueues() {
   VLOG(2) << "backend_queue: " << backend_queue.size();
   VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
-
-  if (lcd_queue) {
-    VLOG(2) << "lcd_queue: " << lcd_queue->size();
-  } else {
-    VLOG(2) << "lcd_queue: n/a";
-  }
+  VLOG(2) << "external_loop_closure_queue: " << external_loop_closure_queue.size();
 }
 
 PipelineQueues& PipelineQueues::instance() {
@@ -63,17 +57,10 @@ PipelineQueues& PipelineQueues::instance() {
 void PipelineQueues::clear() {
   backend_queue.clear();
   backend_lcd_queue.clear();
+  external_loop_closure_queue.clear();
   input_features_queue.clear();
-  if (lcd_queue) {
-    lcd_queue->clear();
-  }
 }
 
-PipelineQueues::PipelineQueues() {
-  const auto& info = hydra::GlobalInfo::instance();
-  if (info.getConfig().enable_lcd) {
-    lcd_queue.reset(new LcdQueue());
-  }
-}
+PipelineQueues::PipelineQueues() {}
 
 }  // namespace hydra

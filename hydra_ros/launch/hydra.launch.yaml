@@ -43,7 +43,7 @@ launch:
         --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/mesh_segmenter_sinks.yaml@frontend/objects
         --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/gvd_places_sinks.yaml@frontend/freespace_places
         --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/active_window_sinks.yaml@active_window
-        --config-utilities-yaml {enable_lcd: $(var enable_lcd)}
+        --config-utilities-yaml {lcd: {type: $(if $(var enable_lcd) LoopClosureModule '""')}}
         --config-utilities-file $(var lcd_config_path)
         --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
         --config-utilities-yaml {print_missing: $(var print_missing), glog_level: $(var glog_level), glog_verbosity: $(var glog_verbosity)}

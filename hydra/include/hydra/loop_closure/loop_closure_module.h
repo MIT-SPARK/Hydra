@@ -37,9 +37,11 @@
 #include <queue>
 #include <thread>
 
+#include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
+#include "hydra/loop_closure/lcd_input.h"
 
 namespace hydra {
 
@@ -73,6 +75,8 @@ class LoopClosureModule : public Module {
 
   lcd::LcdDetector& getDetector() const;
 
+  MessageQueue<LcdInput::Ptr>::Ptr queue() const;
+
  protected:
   void spinOnceImpl(bool force_update);
 
@@ -83,6 +87,8 @@ class LoopClosureModule : public Module {
   std::optional<spark_dsg::NodeId> getQueryAgentId(size_t timestamp_ns);
 
  protected:
+  MessageQueue<LcdInput::Ptr>::Ptr queue_;
+
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   uint64_t last_sequence_number_ = 0;
@@ -102,7 +108,5 @@ class LoopClosureModule : public Module {
 };
 
 void declare_config(LoopClosureModule::Config& config);
-
-using LoopClosureConfig = LoopClosureModule::Config;
 
 }  // namespace hydra

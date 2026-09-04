@@ -65,6 +65,8 @@ class LcdDetector {
   using SearchResultMap = std::map<size_t, LayerSearchResults>;
 
   struct Config {
+    Config();
+
     TeaserParams teaser_config;
     bool enable_agent_registration = true;
     DescriptorMatchConfig agent_search_config;
@@ -76,7 +78,7 @@ class LcdDetector {
     SubgraphConfig object_extraction{5.0};
     SubgraphConfig places_extraction{5.0};
 
-    size_t num_semantic_classes = 20;
+    size_t num_semantic_classes;
     HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
     bool use_gnn_descriptors = false;
     GnnLcdConfig gnn_lcd;
