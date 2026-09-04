@@ -42,119 +42,10 @@
 #include <semantic_inference_msgs/msg/feature_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+#include "hydra_ros/input/image_subscribers.h"
 #include "hydra_ros/input/ros_data_receiver.h"
 
 namespace hydra {
-
-template <typename MsgT>
-struct FilterSub : public message_filters::SimpleFilter<MsgT> {
-  FilterSub(ianvs::NodeHandle nh, const std::string& topic, uint32_t queue_size)
-      : subscriber(nh.create_subscription<MsgT>(
-            topic, queue_size, [this](const typename MsgT::ConstSharedPtr& msg) {
-              this->signalMessage(msg);
-            })) {}
-
-  typename rclcpp::Subscription<MsgT>::SharedPtr subscriber;
-};
-
-struct ColorSubscriber {
- public:
-  using MsgType = sensor_msgs::msg::Image;
-  using Filter = message_filters::SimpleFilter<MsgType>;
-
-  ColorSubscriber();
-  explicit ColorSubscriber(ianvs::NodeHandle nh, uint32_t queue_size = 1);
-  virtual ~ColorSubscriber();
-
-  Filter& getFilter() const;
-  void fillInput(const sensor_msgs::msg::Image& img, ImageInputPacket& packet) const;
-
- private:
-  std::shared_ptr<FilterSub<sensor_msgs::msg::Image>> impl_;
-};
-
-struct DepthSubscriber {
- public:
-  using MsgType = sensor_msgs::msg::Image;
-  using Filter = message_filters::SimpleFilter<MsgType>;
-
-  DepthSubscriber();
-  explicit DepthSubscriber(ianvs::NodeHandle nh, uint32_t queue_size = 1);
-  virtual ~DepthSubscriber();
-
-  Filter& getFilter() const;
-  void fillInput(const sensor_msgs::msg::Image& img, ImageInputPacket& packet) const;
-
- private:
-  std::shared_ptr<FilterSub<sensor_msgs::msg::Image>> impl_;
-};
-
-struct LabelSubscriber {
- public:
-  using MsgType = sensor_msgs::msg::Image;
-  using Filter = message_filters::SimpleFilter<MsgType>;
-
-  LabelSubscriber();
-  explicit LabelSubscriber(ianvs::NodeHandle nh, uint32_t queue_size = 1);
-  virtual ~LabelSubscriber();
-
-  Filter& getFilter() const;
-  void fillInput(const sensor_msgs::msg::Image& img, ImageInputPacket& packet) const;
-
- private:
-  std::shared_ptr<FilterSub<sensor_msgs::msg::Image>> impl_;
-};
-
-struct InstanceSubscriber {
- public:
-  using MsgType = sensor_msgs::msg::Image;
-  using Filter = message_filters::SimpleFilter<MsgType>;
-
-  InstanceSubscriber();
-  explicit InstanceSubscriber(ianvs::NodeHandle nh, uint32_t queue_size = 1);
-  virtual ~InstanceSubscriber();
-
-  Filter& getFilter() const;
-  void fillInput(const sensor_msgs::msg::Image& img, ImageInputPacket& packet) const;
-
- private:
-  std::shared_ptr<FilterSub<sensor_msgs::msg::Image>> impl_;
-};
-
-struct ColormappedLabelSubscriber {
- public:
-  using MsgType = sensor_msgs::msg::Image;
-  using Filter = message_filters::SimpleFilter<MsgType>;
-
-  ColormappedLabelSubscriber();
-  explicit ColormappedLabelSubscriber(ianvs::NodeHandle nh, uint32_t queue_size = 1);
-  virtual ~ColormappedLabelSubscriber();
-
-  Filter& getFilter() const;
-  void setColormap(const SemanticColorMap* colormap, int32_t default_label);
-  void fillInput(const sensor_msgs::msg::Image& img, ImageInputPacket& packet) const;
-
- private:
-  int32_t default_label_;
-  const SemanticColorMap* colormap_;
-  std::shared_ptr<FilterSub<sensor_msgs::msg::Image>> impl_;
-};
-
-struct FeatureSubscriber {
- public:
-  using MsgType = semantic_inference_msgs::msg::FeatureImage;
-  using Filter = message_filters::SimpleFilter<MsgType>;
-
-  FeatureSubscriber();
-  explicit FeatureSubscriber(ianvs::NodeHandle nh, uint32_t queue_size = 1);
-  virtual ~FeatureSubscriber();
-
-  Filter& getFilter() const;
-  void fillInput(const MsgType& img, ImageInputPacket& packet) const;
-
- private:
-  std::shared_ptr<FilterSub<semantic_inference_msgs::msg::FeatureImage>> impl_;
-};
 
 template <typename SemanticT>
 class ImageReceiverImpl : public RosDataReceiver {
@@ -168,6 +59,7 @@ class ImageReceiverImpl : public RosDataReceiver {
 
   ImageReceiverImpl(const RosDataReceiver::Config& config,
                     const std::string& sensor_name);
+
   virtual ~ImageReceiverImpl() = default;
 
  protected:
@@ -213,30 +105,6 @@ void ImageReceiverImpl<SemanticT>::callback(
   semantic_sub_.fillInput(*labels, *packet);
   queue_.push(packet);
 }
-
-class RGBDImageReceiver : public RosDataReceiver {
- public:
-  struct Config : RosDataReceiver::Config {};
-  using Policy =
-      message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image,
-                                                      sensor_msgs::msg::Image>;
-  using Synchronizer = message_filters::Synchronizer<Policy>;
-
-  RGBDImageReceiver(const Config& config, const std::string& sensor_name);
-  virtual ~RGBDImageReceiver() = default;
-
- protected:
-  bool initImpl() override;
-
-  void callback(const sensor_msgs::msg::Image::ConstSharedPtr& color,
-                const sensor_msgs::msg::Image::ConstSharedPtr& depth);
-
-  ColorSubscriber color_sub_;
-  DepthSubscriber depth_sub_;
-  std::unique_ptr<Synchronizer> sync_;
-};
-
-void declare_config(RGBDImageReceiver::Config& config);
 
 class ClosedSetImageReceiver : public ImageReceiverImpl<LabelSubscriber> {
  public:

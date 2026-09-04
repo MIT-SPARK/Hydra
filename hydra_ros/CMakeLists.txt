@@ -45,6 +45,7 @@ add_library(
   src/frontend/traversability_visualizer.cpp
   src/input/feature_receiver.cpp
   src/input/image_receiver.cpp
+  src/input/image_subscribers.cpp
   src/input/pointcloud_adaptor.cpp
   src/input/pointcloud_receiver.cpp
   src/input/ros_data_receiver.cpp
