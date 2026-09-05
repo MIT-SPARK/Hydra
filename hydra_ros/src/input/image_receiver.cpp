@@ -50,8 +50,9 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+using semantic_inference_msgs::msg::FeatureImage;
+using semantic_inference_msgs::msg::FeatureVectorStamped;
 using sensor_msgs::msg::Image;
-using FeatureImage = semantic_inference_msgs::msg::FeatureImage;
 
 namespace hydra {
 namespace {
@@ -98,113 +99,114 @@ cv::Mat parseDepth(const Image& img) {
   }
 }
 
+cv::Mat parseImage(const Image& msg) {
+  try {
+    return cv_bridge::toCvCopy(msg)->image;
+  } catch (const cv_bridge::Exception& e) {
+    LOG(ERROR) << "Failed to convert image: " << e.what();
+    return cv::Mat();
+  }
+}
+
 }  // namespace
 
-template <typename MsgT, typename Derived>
-struct SemanticAdapter {
-  using MsgType = MsgT;
-  using Callback = const std::function<void(const typename MsgType::ConstPtr&)>;
-
-  void fill(const MsgT& msg, ImageInputPacket& packet) {
-    static_cast<Derived>(this)->fill(msg, packet);
-  }
-
-  rclcpp::Subscription<MsgType>::SharedPtr sub;
-
- protected:
-  SemanticAdapter(ianvs::NodeHandle nh,
-                  const std::string& topic,
-                  const rclcpp::QoS& qos,
-                  const Callback& callback)
-      : sub(nh.create_subscription<MsgType>(topic, qos, callback)) {}
+struct ImageReceiverBase {
+  virtual ~ImageReceiverBase() = default;
 };
 
-struct ClosedSetAdapter : public SemanticAdapter<Image, ClosedSetAdapter> {
-  using Base = SemanticAdapter<Image, ClosedSetAdapter>;
-  using MsgType = Base::MsgType;
+template <typename AdapterT, bool exact>
+struct ImageReceiverImpl;
 
+struct NullAdapter {
+  using MsgType = message_filters::NullType;
+
+  template <bool exact>
+  NullAdapter(ianvs::NodeHandle,
+              const std::string&,
+              const rclcpp::QoS&,
+              ImageReceiverImpl<NullAdapter, exact>&) {}
+};
+
+struct ClosedSetAdapter {
+  using MsgType = Image;
+
+  template <bool exact>
   ClosedSetAdapter(ianvs::NodeHandle nh,
                    const std::string& topic,
                    const rclcpp::QoS& qos,
-                   const Base::Callback& callback)
-      : Base(nh, topic, qos, callback) {}
+                   ImageReceiverImpl<ClosedSetAdapter, exact>& receiver)
+      : sub(nh.create_subscription<Image>(
+            topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
+              receiver.sync.template add<2>(msg);
+            })) {}
 
-  void fill(const Image& msg, ImageInputPacket& packet) const;
+  static void fill(const Image& msg, ImageInputPacket& packet) {
+    packet.labels = parseImage(msg);
+  }
+
+  rclcpp::Subscription<Image>::SharedPtr sub;
 };
 
-struct InstanceAdapter : public SemanticAdapter<Image, InstanceAdapter> {
-  using Base = SemanticAdapter<Image, InstanceAdapter>;
-  using MsgType = Base::MsgType;
+struct InstanceAdapter {
+  using MsgType = Image;
 
+  template <bool exact>
   InstanceAdapter(ianvs::NodeHandle nh,
                   const std::string& topic,
                   const rclcpp::QoS& qos,
-                  const Base::Callback& callback)
-      : Base(nh, topic, qos, callback) {}
+                  ImageReceiverImpl<InstanceAdapter, exact>& receiver)
+      : sub(nh.create_subscription<Image>(
+            topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
+              receiver.sync.template add<2>(msg);
+            })) {}
 
-  void fill(const Image& img, ImageInputPacket& packet) const;
+  static void fill(const Image& msg, ImageInputPacket& packet) {
+    const auto mat = parseImage(msg);
+    if (mat.type() != CV_32SC1) {
+      LOG(ERROR) << "Invalid encoding for instance+label image";
+      return;
+    }
+
+    packet.labels = cv::Mat(mat.size(), CV_32SC1);
+    packet.instances = cv::Mat(mat.size(), CV_16SC1);
+    for (int r = 0; r < mat.rows; ++r) {
+      for (int c = 0; c < mat.cols; ++c) {
+        const auto original = mat.at<int32_t>(r, c);
+        packet.labels.at<int32_t>(r, c) = original & 0xFFFF;
+        packet.instances.at<int16_t>(r, c) = original >> 16;
+      }
+    }
+  }
+
+  rclcpp::Subscription<Image>::SharedPtr sub;
 };
 
-struct OpenSetAdapter : public SemanticAdapter<FeatureImage, OpenSetAdapter> {
-  using Base = SemanticAdapter<FeatureImage, OpenSetAdapter>;
-  using MsgType = Base::MsgType;
+struct OpenSetAdapter {
+  using MsgType = FeatureImage;
 
+  template <bool exact>
   OpenSetAdapter(ianvs::NodeHandle nh,
                  const std::string& topic,
                  const rclcpp::QoS& qos,
-                 const Base::Callback& callback)
-      : Base(nh, topic, qos, callback) {}
+                 ImageReceiverImpl<OpenSetAdapter, exact>& receiver)
+      : sub(nh.create_subscription<FeatureImage>(
+            topic, qos, [&receiver](const FeatureImage::ConstSharedPtr& msg) {
+              receiver.sync.template add<2>(msg);
+            })) {}
 
-  void fill(const FeatureImage& img, ImageInputPacket& packet) const;
-};
+  static void fill(const FeatureImage& msg, ImageInputPacket& packet) {
+    packet.instances = parseImage(msg.image);
 
-void ClosedSetAdapter::fill(const Image& msg, ImageInputPacket& packet) const {
-  try {
-    packet.labels = cv_bridge::toCvCopy(msg)->image;
-  } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert label image: " << e.what();
-  }
-}
-
-void InstanceAdapter::fill(const Image& img, ImageInputPacket& packet) const {
-  cv::Mat mat;
-  try {
-    mat = cv_bridge::toCvCopy(img)->image;
-  } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert label image: " << e.what();
-  }
-
-  if (mat.type() != CV_32SC1) {
-    LOG(ERROR) << "Invalid encoding for instance+label image";
-    return;
-  }
-
-  packet.labels = cv::Mat(mat.size(), CV_32SC1);
-  packet.instances = cv::Mat(mat.size(), CV_16SC1);
-  for (int r = 0; r < mat.rows; ++r) {
-    for (int c = 0; c < mat.cols; ++c) {
-      const auto original = mat.at<int32_t>(r, c);
-      packet.labels.at<int32_t>(r, c) = original & 0xFFFF;
-      packet.instances.at<int16_t>(r, c) = original >> 16;
+    CHECK_EQ(msg.mask_ids.size(), msg.features.size());
+    for (size_t i = 0; i < msg.mask_ids.size(); ++i) {
+      const auto& vec = msg.features[i].data;
+      packet.label_features.emplace(
+          msg.mask_ids[i], Eigen::Map<const FeatureVector>(vec.data(), vec.size()));
     }
   }
-}
 
-void OpenSetAdapter::fill(const FeatureImage& msg, ImageInputPacket& packet) const {
-  try {
-    packet.instances = cv_bridge::toCvCopy(msg.image)->image;
-  } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert depth image: " << e.what();
-  }
-
-  CHECK_EQ(msg.mask_ids.size(), msg.features.size());
-  for (size_t i = 0; i < msg.mask_ids.size(); ++i) {
-    const auto& vec = msg.features[i].data;
-    packet.label_features.emplace(
-        msg.mask_ids[i],
-        Eigen::Map<const hydra::FeatureVector>(vec.data(), vec.size()));
-  }
-}
+  rclcpp::Subscription<FeatureImage>::SharedPtr sub;
+};
 
 using message_filters::Synchronizer;
 using message_filters::sync_policies::ApproximateTime;
@@ -223,96 +225,123 @@ struct policy_type<MsgT, false> {
   using value = ApproximateTime<Image, Image, MsgT>;
 };
 
-struct ImageReceiverBase {
-  virtual ~ImageReceiverBase() = default;
+struct PacketBuilderBase {
+  using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
+  using Queue = MessageQueue<SensorInputPacket::Ptr>;
+
+  ImagePacketPtr make_packet(const Image::ConstSharedPtr& color,
+                             const Image::ConstSharedPtr& depth) const {
+    const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
+    auto packet = std::make_shared<ImageInputPacket>(timestamp_ns, sensor_name);
+    packet->color = parseColor(*color);
+    packet->depth = parseDepth(*depth);
+    return packet;
+  }
+
+  const std::string sensor_name;
+  Queue& queue;
+};
+
+template <typename AdapterT>
+struct PacketBuilder : PacketBuilderBase {
+  using MsgT = typename AdapterT::MsgType;
+  void callback(const Image::ConstSharedPtr& color,
+                const Image::ConstSharedPtr& depth,
+                const typename MsgT::ConstSharedPtr& semantics) {
+    auto packet = make_packet(color, depth);
+    AdapterT::fill(*semantics, *packet);
+    queue.push(packet);
+  }
+};
+
+template <>
+struct PacketBuilder<NullAdapter> : PacketBuilderBase {
+  void callback(const Image::ConstSharedPtr& color,
+                const Image::ConstSharedPtr& depth) {
+    auto packet = make_packet(color, depth);
+    queue.push(packet);
+  }
 };
 
 template <typename AdapterT, bool exact>
 struct ImageReceiverImpl : public ImageReceiverBase {
+  using Queue = PacketBuilderBase::Queue;
   using ImgPtr = Image::ConstSharedPtr;
   using MsgT = typename AdapterT::MsgType;
-  using MsgPtr = typename AdapterT::MsgType::ConstSharedPtr;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
                     const std::string& name,
-                    const ImageReceiver::Config& config);
-
-  void callback(const Image::ConstSharedPtr& color,
-                const Image::ConstSharedPtr& depth,
-                const MsgPtr& labels);
+                    const rclcpp::QoS& qos,
+                    size_t queue_size,
+                    Queue& queue);
 
   const std::string name;
-  const bool use_exact;
-  MessageQueue<SensorInputPacket::Ptr> queue;
+  Queue& queue;
   Synchronizer<typename policy_type<MsgT, exact>::value> sync;
 
   rclcpp::Subscription<Image>::SharedPtr color;
   rclcpp::Subscription<Image>::SharedPtr depth;
   AdapterT semantics;
-  rclcpp::Subscription<Image>::SharedPtr feature;
+  rclcpp::Subscription<FeatureVectorStamped>::SharedPtr feature;
+  rclcpp::Subscription<Image>::SharedPtr traversability;
 };
 
 template <typename AdapterT, bool exact>
-ImageReceiverImpl<AdapterT, exact>::ImageReceiverImpl(
-    ianvs::NodeHandle nh, const std::string& name, const ImageReceiver::Config& config)
+ImageReceiverImpl<AdapterT, exact>::ImageReceiverImpl(ianvs::NodeHandle nh,
+                                                      const std::string& name,
+                                                      const rclcpp::QoS& qos,
+                                                      size_t queue_size,
+                                                      Queue& queue)
     : name(name),
-      use_exact(config.use_exact),
-      sync(config.queue_size),
+      queue(queue),
+      sync(queue_size),
       color(nh.create_subscription<Image>(
           "rgb/image_raw",
-          config.qos,
+          qos,
           [this](const ImgPtr& msg) { sync.template add<0>(msg); })),
       depth(nh.create_subscription<Image>(
           "depth_registered/image_rect",
-          config.qos,
+          qos,
           [this](const ImgPtr& msg) { sync.template add<1>(msg); })),
-      semantics(nh, "semantic/image_raw", config.qos, [this](const MsgPtr& msg) {
-        sync.template add<2>(msg);
-      }) {
-  sync.registerCallback(&ImageReceiverImpl<AdapterT, exact>::callback, this);
-}
-
-template <typename AdapterT, bool exact>
-void ImageReceiverImpl<AdapterT, exact>::callback(
-    const Image::ConstSharedPtr& _color,
-    const Image::ConstSharedPtr& _depth,
-    const typename MsgT::ConstSharedPtr& _semantics) {
-  const auto timestamp_ns = rclcpp::Time(_color->header.stamp).nanoseconds();
-
-  auto packet = std::make_shared<ImageInputPacket>(timestamp_ns, name);
-  packet->color = parseColor(*_color);
-  packet->depth = parseDepth(*_depth);
-  semantics.fill(*_semantics, *packet);
-  queue.push(packet);
-}
+      semantics(nh, "semantic/image_raw", qos, *this) {}
 
 template <typename AdapterT>
+using ExactRecv = ImageReceiverImpl<AdapterT, true>;
+
+template <typename AdapterT>
+using ApproxRecv = ImageReceiverImpl<AdapterT, false>;
+
+template <typename T>
 std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
                                                 ianvs::NodeHandle nh,
-                                                const std::string& name) {
+                                                const std::string& name,
+                                                PacketBuilderBase::Queue& queue) {
+  const auto qos = config.qos;
+  const auto queue_size = config.queue_size;
   if (config.use_exact) {
-    return std::make_unique<ImageReceiverImpl<AdapterT, true>>(nh, name, config);
+    return std::make_unique<ExactRecv<T>>(nh, name, qos, queue_size, queue);
   } else {
-    return std::make_unique<ImageReceiverImpl<AdapterT, false>>(nh, name, config);
+    return std::make_unique<ApproxRecv<T>>(nh, name, qos, queue_size, queue);
   }
 }
 
 struct ImageReceiver::Impl {
   explicit Impl(const ImageReceiver::Config& config,
                 ianvs::NodeHandle nh,
-                const std::string& name) {
+                const std::string& name,
+                PacketBuilderBase::Queue& queue) {
     switch (config.semantics_type) {
       case ImageReceiver::Config::SemanticsType::NONE:
-        recv = makeReceiver<ClosedSetAdapter>(config, nh, name);
+        recv = makeReceiver<NullAdapter>(config, nh, name, queue);
         break;
       case ImageReceiver::Config::SemanticsType::CLOSED_SET:
-        recv = makeReceiver<ClosedSetAdapter>(config, nh, name);
+        recv = makeReceiver<ClosedSetAdapter>(config, nh, name, queue);
         break;
       case ImageReceiver::Config::SemanticsType::INSTANCE:
-        recv = makeReceiver<InstanceAdapter>(config, nh, name);
+        recv = makeReceiver<InstanceAdapter>(config, nh, name, queue);
         break;
       case ImageReceiver::Config::SemanticsType::OPEN_SET:
-        recv = makeReceiver<OpenSetAdapter>(config, nh, name);
+        recv = makeReceiver<OpenSetAdapter>(config, nh, name, queue);
         break;
     }
   }
@@ -345,7 +374,7 @@ ImageReceiver::~ImageReceiver() = default;
 
 bool ImageReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);
-  impl_.reset(new Impl(config, nh, sensor_name));
+  impl_.reset(new Impl(config, nh, sensor_name, queue_));
   return true;
 }
 
