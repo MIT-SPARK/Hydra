@@ -290,71 +290,63 @@ struct FeatureAdapter<false> {
 
 template <>
 struct FeatureAdapter<true> {
-  using Msg = FeatureVectorStamped;
+  using MsgType = FeatureVectorStamped;
 
   template <typename RecvT>
   FeatureAdapter(ianvs::NodeHandle nh,
                  const std::string& topic,
                  const rclcpp::QoS& qos,
                  RecvT& receiver)
-      : sub(nh.create_subscription<Msg>(
-            topic, qos, [&receiver](const Msg::ConstSharedPtr& msg) {
+      : sub(nh.create_subscription<MsgType>(
+            topic, qos, [&receiver](const MsgType::ConstSharedPtr& msg) {
               receiver.sync.template add<3>(msg);
             })) {}
 
-  static void fill(const Msg& msg, ImageInputPacket& packet) {
+  static void fill(const MsgType& msg, ImageInputPacket& packet) {
     const auto& vec = msg.feature.data;
     packet.input_feature = Eigen::Map<const FeatureVector>(vec.data(), vec.size());
   }
 
-  rclcpp::Subscription<Msg>::SharedPtr sub;
+  rclcpp::Subscription<MsgType>::SharedPtr sub;
 };
 
 }  // namespace
 
-template <bool _with_feature, bool exact>
-struct ReceiverType;
-
-template <bool _with_feature>
-struct ReceiverType<_with_feature, true> {
-  template <typename... Args>
-  using policy_from_tuple = exact_policy_from_tuple<Args...>::value;
-  constexpr static bool with_feature = _with_feature;
-};
-
-template <bool _with_feature>
-struct ReceiverType<_with_feature, false> {
-  template <typename... Args>
-  using policy_from_tuple = approx_policy_from_tuple<Args...>::value;
-  constexpr static bool with_feature = _with_feature;
-};
-
 template <typename T, typename MsgT, bool should_add>
-struct add_msg_type;
+struct add_type;
 
 template <template <typename...> typename List, typename MsgT, typename... OtherT>
-struct add_msg_type<List<OtherT...>, MsgT, true> {
+struct add_type<List<OtherT...>, MsgT, true> {
   using value = List<OtherT..., MsgT>;
 };
 
 template <template <typename...> typename List, typename MsgT, typename... OtherT>
-struct add_msg_type<List<OtherT...>, MsgT, false> {
+struct add_type<List<OtherT...>, MsgT, false> {
   using value = List<OtherT...>;
 };
 
 template <typename T, typename MsgT, bool should_add>
-using add_msg_type_v = add_msg_type<T, MsgT, should_add>::value;
+using add_type_v = add_type<T, MsgT, should_add>::value;
 
-template <typename T, typename ReceiverType>
-struct policy_type {
-  using vec = FeatureVectorStamped;
-  using base = std::tuple<Image, Image, typename T::MsgType>;
-  using types = add_msg_type_v<base, vec, ReceiverType::with_feature>;
-  using value = ReceiverType::template policy_from_tuple<types>;
+template <bool exact>
+struct policy_type;
+
+template <>
+struct policy_type<true> {
+  template <typename... Args>
+  using policy_from_tuple = exact_policy_from_tuple<Args...>::value;
 };
 
-template <typename T, typename ReceiverType>
-using policy_type_v = policy_type<T, ReceiverType>::value;
+template <>
+struct policy_type<false> {
+  template <typename... Args>
+  using policy_from_tuple = approx_policy_from_tuple<Args...>::value;
+};
+
+template <bool _with_feature, bool exact>
+struct ReceiverType : policy_type<exact> {
+  static constexpr bool with_feature = _with_feature;
+};
 
 struct PacketBuilderBase {
   using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
@@ -376,32 +368,47 @@ struct PacketBuilderBase {
   Queue& queue;
 };
 
-template <typename AdapterT>
-struct PacketBuilder : PacketBuilderBase {
-  using MsgT = typename AdapterT::MsgType;
+template <typename... AdapterT>
+void fillPacket(ImageInputPacket& packet,
+                const typename AdapterT::MsgType::ConstSharedPtr&... msg);
 
+template <>
+void fillPacket(ImageInputPacket&) {}
+
+template <typename AdapterT, typename... OtherT>
+void fillPacket(ImageInputPacket& packet,
+                const typename AdapterT::MsgType::ConstSharedPtr& msg,
+                const typename OtherT::MsgType::ConstSharedPtr&... others) {
+  AdapterT::fill(*msg, packet);
+  fillPacket<OtherT...>(packet, others...);
+}
+
+template <typename T>
+struct PacketBuilder;
+
+template <template <typename...> typename List, typename... AdapterT>
+struct PacketBuilder<List<AdapterT...>> : PacketBuilderBase {
   PacketBuilder(const std::string& sensor_name, Queue& queue)
       : PacketBuilderBase(sensor_name, queue) {}
 
   void callback(const Image::ConstSharedPtr& color,
                 const Image::ConstSharedPtr& depth,
-                const typename MsgT::ConstSharedPtr& semantics) {
+                const typename AdapterT::MsgType::ConstSharedPtr&... others) {
     auto packet = make_packet(color, depth);
-    AdapterT::fill(*semantics, *packet);
+    fillPacket<AdapterT...>(*packet, others...);
     queue.push(packet);
   }
 };
 
-template <>
-struct PacketBuilder<NullAdapter> : PacketBuilderBase {
-  PacketBuilder(const std::string& sensor_name, Queue& queue)
-      : PacketBuilderBase(sensor_name, queue) {}
+template <typename T, typename R>
+struct ReceiverInfo {
+  using vec = FeatureVectorStamped;
+  using adapters = add_type_v<std::tuple<T>, FeatureAdapter<true>, R::with_feature>;
+  using types =
+      add_type_v<std::tuple<Image, Image, typename T::MsgType>, vec, R::with_feature>;
 
-  void callback(const Image::ConstSharedPtr& color,
-                const Image::ConstSharedPtr& depth) {
-    auto packet = make_packet(color, depth);
-    queue.push(packet);
-  }
+  using policy = R::template policy_from_tuple<types>;
+  using builder = PacketBuilder<adapters>;
 };
 
 struct ImageReceiverBase {
@@ -413,9 +420,8 @@ struct ImageReceiverImpl : public ImageReceiverBase {
   using Queue = PacketBuilderBase::Queue;
   using ImgPtr = Image::ConstSharedPtr;
 
-  using Type = TypeT;
-  using MsgT = typename AdapterT::MsgType;
-  using Sync = Synchronizer<policy_type_v<AdapterT, Type>>;
+  using Info = ReceiverInfo<AdapterT, TypeT>;
+  using Sync = Synchronizer<typename Info::policy>;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
                     const std::string& name,
@@ -424,12 +430,12 @@ struct ImageReceiverImpl : public ImageReceiverBase {
                     Queue& queue);
 
   Sync sync;
-  PacketBuilder<AdapterT> builder;
+  Info::builder builder;
 
   rclcpp::Subscription<Image>::SharedPtr color;
   rclcpp::Subscription<Image>::SharedPtr depth;
   AdapterT semantics;
-  FeatureAdapter<Type::with_feature> feature;
+  FeatureAdapter<TypeT::with_feature> feature;
   rclcpp::Subscription<Image>::SharedPtr traversability;
 };
 
@@ -451,7 +457,7 @@ ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
           [this](const ImgPtr& msg) { sync.template add<1>(msg); })),
       semantics(nh, "semantic/image_raw", qos, *this),
       feature(nh, "semantic/feature", qos, *this) {
-  // sync.registerCallback(&PacketBuilder<AdapterT>::callback, &builder);
+  sync.registerCallback(&Info::builder::callback, &builder);
 }
 
 template <typename AdapterT, bool with_feature>
