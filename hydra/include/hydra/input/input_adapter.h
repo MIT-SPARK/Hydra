@@ -34,55 +34,14 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include "hydra/common/message_queue.h"
-#include "hydra/input/input_adapter.h"
-#include "hydra/input/input_filter.h"
 #include "hydra/input/sensor_input_packet.h"
-#include "hydra/utils/logging.h"
 
 namespace hydra {
 
-class DataReceiver {
+class InputAdapter {
  public:
-  using DataQueue = MessageQueue<SensorInputPacket::Ptr>;
-
-  struct Config : VerbosityConfig {
-    Config();
-
-    //! Maximum queue size (0 means unlimited)
-    size_t max_packets = 0;
-    //! Enforced time separation between packets
-    double input_separation_s = 0.0;
-    //! Filters to discard invalid inputs
-    std::vector<config::VirtualConfig<InputFilter, true>> filters;
-    //! Adapters to pre-process input packets
-    std::vector<config::VirtualConfig<InputAdapter, true>> adapters;
-  } const config;
-
-  DataReceiver(const Config& config, const std::string& sensor_name);
-  virtual ~DataReceiver() = default;
-
-  bool init();
-
-  SensorInputPacket::Ptr poll();
-
-  void clear();
-
-  size_t numQueued() const;
-
-  const std::string sensor_name;
-
- protected:
-  SensorInputPacket::Ptr pollOnce();
-
-  virtual bool initImpl() = 0;
-
-  DataQueue queue_;
-  SensorInputPacket::Ptr last_received_;
-  std::vector<std::unique_ptr<InputFilter>> filters_;
-  std::vector<std::unique_ptr<InputAdapter>> adapters_;
+  virtual ~InputAdapter() = default;
+  virtual void update(SensorInputPacket& packet) const = 0;
 };
-
-void declare_config(DataReceiver::Config& config);
 
 }  // namespace hydra

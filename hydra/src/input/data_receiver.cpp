@@ -42,6 +42,17 @@
 
 namespace hydra {
 
+void declare_config(DataReceiver::Config& config) {
+  using namespace config;
+  name("DataReceiver::Config");
+  base<VerbosityConfig>(config);
+  field(config.sensor, "sensor");
+  field(config.max_packets, "max_packets");
+  field(config.input_separation_s, "input_separation_s");
+  field(config.filters, "filters");
+  field(config.adapters, "adapters");
+}
+
 DataReceiver::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
 
@@ -51,6 +62,10 @@ DataReceiver::DataReceiver(const Config& config, const std::string& _sensor_name
       queue_(config.max_packets) {
   for (const auto& filter : config.filters) {
     filters_.push_back(filter.create());
+  }
+
+  for (const auto& adapter : config.adapters) {
+    adapters_.push_back(adapter.create());
   }
 }
 
@@ -86,12 +101,14 @@ SensorInputPacket::Ptr DataReceiver::pollOnce() {
   }
 
   for (const auto& filter : filters_) {
-    if (!filter) {
-      continue;
-    }
-
-    if (!filter->valid(*packet, last_received_.get())) {
+    if (filter && !filter->valid(*packet, last_received_.get())) {
       return nullptr;
+    }
+  }
+
+  for (const auto& adapter : adapters_) {
+    if (adapter) {
+      adapter->update(*packet);
     }
   }
 
@@ -103,14 +120,5 @@ SensorInputPacket::Ptr DataReceiver::pollOnce() {
 void DataReceiver::clear() { queue_.clear(); }
 
 size_t DataReceiver::numQueued() const { return queue_.size(); }
-
-void declare_config(DataReceiver::Config& config) {
-  using namespace config;
-  name("DataReceiver::Config");
-  base<VerbosityConfig>(config);
-  field(config.max_packets, "max_packets");
-  field(config.input_separation_s, "input_separation_s");
-  field(config.filters, "filters");
-}
 
 }  // namespace hydra
