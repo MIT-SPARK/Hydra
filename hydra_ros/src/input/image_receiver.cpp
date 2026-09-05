@@ -229,6 +229,9 @@ struct PacketBuilderBase {
   using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
   using Queue = MessageQueue<SensorInputPacket::Ptr>;
 
+  PacketBuilderBase(const std::string& sensor_name, Queue& queue)
+      : sensor_name(sensor_name), queue(queue) {}
+
   ImagePacketPtr make_packet(const Image::ConstSharedPtr& color,
                              const Image::ConstSharedPtr& depth) const {
     const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
@@ -245,6 +248,10 @@ struct PacketBuilderBase {
 template <typename AdapterT>
 struct PacketBuilder : PacketBuilderBase {
   using MsgT = typename AdapterT::MsgType;
+
+  PacketBuilder(const std::string& sensor_name, Queue& queue)
+      : PacketBuilderBase(sensor_name, queue) {}
+
   void callback(const Image::ConstSharedPtr& color,
                 const Image::ConstSharedPtr& depth,
                 const typename MsgT::ConstSharedPtr& semantics) {
@@ -256,6 +263,9 @@ struct PacketBuilder : PacketBuilderBase {
 
 template <>
 struct PacketBuilder<NullAdapter> : PacketBuilderBase {
+  PacketBuilder(const std::string& sensor_name, Queue& queue)
+      : PacketBuilderBase(sensor_name, queue) {}
+
   void callback(const Image::ConstSharedPtr& color,
                 const Image::ConstSharedPtr& depth) {
     auto packet = make_packet(color, depth);
@@ -268,6 +278,7 @@ struct ImageReceiverImpl : public ImageReceiverBase {
   using Queue = PacketBuilderBase::Queue;
   using ImgPtr = Image::ConstSharedPtr;
   using MsgT = typename AdapterT::MsgType;
+  using Sync = Synchronizer<typename policy_type<MsgT, exact>::value>;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
                     const std::string& name,
@@ -275,9 +286,8 @@ struct ImageReceiverImpl : public ImageReceiverBase {
                     size_t queue_size,
                     Queue& queue);
 
-  const std::string name;
-  Queue& queue;
-  Synchronizer<typename policy_type<MsgT, exact>::value> sync;
+  Sync sync;
+  PacketBuilder<AdapterT> builder;
 
   rclcpp::Subscription<Image>::SharedPtr color;
   rclcpp::Subscription<Image>::SharedPtr depth;
@@ -292,9 +302,8 @@ ImageReceiverImpl<AdapterT, exact>::ImageReceiverImpl(ianvs::NodeHandle nh,
                                                       const rclcpp::QoS& qos,
                                                       size_t queue_size,
                                                       Queue& queue)
-    : name(name),
-      queue(queue),
-      sync(queue_size),
+    : sync(queue_size),
+      builder(name, queue),
       color(nh.create_subscription<Image>(
           "rgb/image_raw",
           qos,
@@ -303,7 +312,9 @@ ImageReceiverImpl<AdapterT, exact>::ImageReceiverImpl(ianvs::NodeHandle nh,
           "depth_registered/image_rect",
           qos,
           [this](const ImgPtr& msg) { sync.template add<1>(msg); })),
-      semantics(nh, "semantic/image_raw", qos, *this) {}
+      semantics(nh, "semantic/image_raw", qos, *this) {
+  sync.registerCallback(&PacketBuilder<AdapterT>::callback, &builder);
+}
 
 template <typename AdapterT>
 using ExactRecv = ImageReceiverImpl<AdapterT, true>;
