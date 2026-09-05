@@ -42,7 +42,6 @@ class RosDataReceiver : public DataReceiver {
  public:
   struct Config : DataReceiver::Config {
     std::string ns;
-    size_t queue_size = 10;
   } const config;
 
   RosDataReceiver(const Config& config, const std::string& name);

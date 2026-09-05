@@ -47,7 +47,6 @@ void declare_config(RosDataReceiver::Config& config) {
   name("RosDataReceiver::Config");
   base<DataReceiver::Config>(config);
   field(config.ns, "ns");
-  field(config.queue_size, "queue_size");
 }
 
 RosDataReceiver::RosDataReceiver(const Config& config, const std::string& sensor_name)

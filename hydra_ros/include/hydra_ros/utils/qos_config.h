@@ -47,8 +47,12 @@ struct QoSConfig {
   //! Liveliness
   rclcpp::LivelinessPolicy liveliness = rclcpp::LivelinessPolicy::SystemDefault;
 
-  // Intentional implicit cast
+  QoSConfig() = default;
   QoSConfig(const rclcpp::QoS& qos);
+  QoSConfig(size_t depth,
+            rclcpp::ReliabilityPolicy reliability,
+            rclcpp::DurabilityPolicy durability,
+            rclcpp::LivelinessPolicy liveliness);
 
   operator rclcpp::QoS() const;
 };

@@ -28,6 +28,7 @@ void declare_config(PointcloudReceiver::Config& config) {
   field(config.in_world_frame, "in_world_frame");
   field(config.instance_ids, "instance_ids");
   field(config.discard_transparent_color, "discard_transparent_color");
+  field(config.qos, "qos");
 }
 
 PointcloudReceiver::PointcloudReceiver(const Config& config,
@@ -37,7 +38,7 @@ PointcloudReceiver::PointcloudReceiver(const Config& config,
 bool PointcloudReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);
   sub_ = nh.create_subscription<PointCloud2>(
-      "pointcloud", config.queue_size, &PointcloudReceiver::callback, this);
+      "pointcloud", config.qos, &PointcloudReceiver::callback, this);
   return true;
 }
 

@@ -56,6 +56,15 @@ QoSConfig::QoSConfig(const rclcpp::QoS& qos)
       durability(qos.durability()),
       liveliness(qos.liveliness()) {}
 
+QoSConfig::QoSConfig(size_t depth,
+                     rclcpp::ReliabilityPolicy reliability,
+                     rclcpp::DurabilityPolicy durability,
+                     rclcpp::LivelinessPolicy liveliness)
+    : depth(depth),
+      reliability(reliability),
+      durability(durability),
+      liveliness(liveliness) {}
+
 QoSConfig::operator rclcpp::QoS() const {
   rclcpp::QoS qos(rclcpp::KeepAll{});
   if (depth > 0) {

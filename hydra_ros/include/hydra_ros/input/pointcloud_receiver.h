@@ -38,6 +38,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include "hydra_ros/input/ros_data_receiver.h"
+#include "hydra_ros/utils/qos_config.h"
 
 namespace hydra {
 
@@ -50,6 +51,8 @@ class PointcloudReceiver : public RosDataReceiver {
     bool instance_ids = false;
     //! Whether or not to mask colors with 0 alpha values
     bool discard_transparent_color = false;
+    //! Subscription QoS settings (defaults to best effort with depth 5)
+    QoSConfig qos = rclcpp::SensorDataQoS();
   } const config;
 
   PointcloudReceiver(const Config& config, const std::string& sensor_name);
