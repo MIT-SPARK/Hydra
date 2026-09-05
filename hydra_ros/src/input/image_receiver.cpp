@@ -299,7 +299,7 @@ struct FeatureAdapter<true> {
                  RecvT& receiver)
       : sub(nh.create_subscription<MsgType>(
             topic, qos, [&receiver](const MsgType::ConstSharedPtr& msg) {
-              receiver.sync.template add<3>(msg);
+              receiver.sync.template add<RecvT::Info::feature_offset>(msg);
             })) {}
 
   static void fill(const MsgType& msg, ImageInputPacket& packet) {
@@ -400,12 +400,24 @@ struct PacketBuilder<List<AdapterT...>> : PacketBuilderBase {
   }
 };
 
+template <typename... Args>
+struct type_list {};
+
 template <typename T, typename R>
 struct ReceiverInfo {
+  static constexpr bool is_null = std::is_same_v<T, NullAdapter>;
+  static constexpr size_t feature_offset = is_null ? 2 : 3;
+
   using vec = FeatureVectorStamped;
-  using adapters = add_type_v<std::tuple<T>, FeatureAdapter<true>, R::with_feature>;
-  using types =
-      add_type_v<std::tuple<Image, Image, typename T::MsgType>, vec, R::with_feature>;
+  using msg = typename T::MsgType;
+
+  using adapters = add_type_v<add_type_v<type_list<>, T, !is_null>,
+                              FeatureAdapter<true>,
+                              R::with_feature>;
+
+  using types = add_type_v<add_type_v<type_list<Image, Image>, msg, !is_null>,
+                           FeatureVectorStamped,
+                           R::with_feature>;
 
   using policy = R::template policy_from_tuple<types>;
   using builder = PacketBuilder<adapters>;
@@ -495,7 +507,7 @@ struct ImageReceiver::Impl {
                 PacketBuilderBase::Queue& queue) {
     switch (config.semantics_type) {
       case ImageReceiver::Config::SemanticsType::NONE:
-        // recv = makeReceiver<NullAdapter>(config, nh, name, queue);
+        recv = makeReceiver<NullAdapter>(config, nh, name, queue);
         break;
       case ImageReceiver::Config::SemanticsType::CLOSED_SET:
         recv = makeReceiver<ClosedSetAdapter>(config, nh, name, queue);
