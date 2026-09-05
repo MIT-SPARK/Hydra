@@ -47,6 +47,7 @@ namespace hydra {
 void declare_config(ActiveWindowModule::Config& config) {
   using namespace config;
   name("ActiveWindowModule::Config");
+  base<VerbosityConfig>(config);
   field(config.max_input_queue_size, "max_input_queue_size");
   field(config.volumetric_map, "volumetric_map");
   config.map_window.setOptional();
@@ -56,7 +57,8 @@ void declare_config(ActiveWindowModule::Config& config) {
 }
 
 ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
-    : max_input_queue_size(0),
+    : VerbosityConfig(VerbosityConfig::default_verbosity("active_window")),
+      max_input_queue_size(0),
       volumetric_map({0.1, 16, 0.3, with_semantics, with_tracking}) {}
 
 ActiveWindowModule::ActiveWindowModule(const Config& config,
@@ -70,8 +72,6 @@ ActiveWindowModule::ActiveWindowModule(const Config& config,
                                     : GlobalInfo::instance().createVolumetricWindow()) {
   const auto mesh_config = GlobalInfo::instance().getConfig().mesh;
   if (config.validate_mesh_fields) {
-    // double-check that the frontend and backend will actually receive labels and
-    // first-seen stamps
     if (config.volumetric_map.with_semantics && !mesh_config.with_labels) {
       LOG(FATAL) << "Volumetric map contains semantics, but mesh does not have labels "
                     "enabled!";
@@ -86,7 +86,7 @@ ActiveWindowModule::ActiveWindowModule(const Config& config,
 
 void ActiveWindowModule::start() {
   spin_thread_.reset(new std::thread(&ActiveWindowModule::spin, this));
-  LOG(INFO) << "[Active Window] started!";
+  MLOG(0) << "started!";
 }
 
 void ActiveWindowModule::stop() { stopImpl(); }
@@ -95,17 +95,17 @@ void ActiveWindowModule::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
-    VLOG(2) << "[Active Window] stopping!";
+    MLOG(1) << "stopping!";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Active Window] stopped!";
+    MLOG(1) << "stopped!";
   }
 
-  VLOG(2) << "[Active Window] input queue: " << input_queue_->size();
+  MLOG(1) << "input queue: " << input_queue_->size();
   if (output_queue_) {
-    VLOG(2) << "[Active Window] output queue: " << output_queue_->size();
+    MLOG(1) << "output queue: " << output_queue_->size();
   } else {
-    VLOG(2) << "[Active Window] output queue: n/a";
+    MLOG(1) << "output queue: n/a";
   }
 }
 
@@ -117,7 +117,7 @@ void ActiveWindowModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
     bool has_data = input_queue_->poll();
-    if (hydra::GlobalInfo::instance().force_shutdown() || !has_data) {
+    if (GlobalInfo::instance().force_shutdown() || !has_data) {
       should_shutdown = should_shutdown_;
     }
 
