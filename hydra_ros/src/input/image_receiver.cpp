@@ -61,6 +61,77 @@ using message_filters::sync_policies::ExactTime;
 namespace hydra {
 namespace {
 
+#define MAKE_VARIADIC(Policy, Underlying)                                           \
+  template <typename... MsgT>                                                       \
+  struct Policy;                                                                    \
+                                                                                    \
+  template <typename A, typename B>                                                 \
+  struct Policy<A, B> {                                                             \
+    using value = Underlying<A, B>;                                                 \
+  };                                                                                \
+                                                                                    \
+  template <typename A, typename B, typename C>                                     \
+  struct Policy<A, B, C> {                                                          \
+    using value = Underlying<A, B, C>;                                              \
+  };                                                                                \
+                                                                                    \
+  template <typename A, typename B, typename C, typename D>                         \
+  struct Policy<A, B, C, D> {                                                       \
+    using value = Underlying<A, B, C, D>;                                           \
+  };                                                                                \
+                                                                                    \
+  template <typename A, typename B, typename C, typename D, typename E>             \
+  struct Policy<A, B, C, D, E> {                                                    \
+    using value = Underlying<A, B, C, D, E>;                                        \
+  };                                                                                \
+                                                                                    \
+  template <typename A, typename B, typename C, typename D, typename E, typename F> \
+  struct Policy<A, B, C, D, E, F> {                                                 \
+    using value = Underlying<A, B, C, D, E, F>;                                     \
+  };                                                                                \
+                                                                                    \
+  template <typename A,                                                             \
+            typename B,                                                             \
+            typename C,                                                             \
+            typename D,                                                             \
+            typename E,                                                             \
+            typename F,                                                             \
+            typename G>                                                             \
+  struct Policy<A, B, C, D, E, F, G> {                                              \
+    using value = Underlying<A, B, C, D, E, F, G>;                                  \
+  };                                                                                \
+                                                                                    \
+  template <typename A,                                                             \
+            typename B,                                                             \
+            typename C,                                                             \
+            typename D,                                                             \
+            typename E,                                                             \
+            typename F,                                                             \
+            typename G,                                                             \
+            typename H>                                                             \
+  struct Policy<A, B, C, D, E, F, G, H> {                                           \
+    using value = Underlying<A, B, C, D, E, F, G, H>;                               \
+  };                                                                                \
+                                                                                    \
+  template <typename A,                                                             \
+            typename B,                                                             \
+            typename C,                                                             \
+            typename D,                                                             \
+            typename E,                                                             \
+            typename F,                                                             \
+            typename G,                                                             \
+            typename H,                                                             \
+            typename I>                                                             \
+  struct Policy<A, B, C, D, E, F, G, H, I> {                                        \
+    using value = Underlying<A, B, C, D, E, F, G, H, I>;                            \
+  };                                                                                \
+                                                                                    \
+  template <typename... T>                                                          \
+  using Policy##_v = Policy<T...>::value;
+
+MAKE_VARIADIC(approx_policy, ApproximateTime)
+MAKE_VARIADIC(exact_policy, ExactTime)
+
 static const auto registration =
     config::RegistrationWithConfig<DataReceiver,
                                    ImageReceiver,
@@ -239,33 +310,37 @@ struct ReceiverType {
   constexpr static bool exact = _exact;
 };
 
-template <typename T, bool with_feature>
-struct base_policy_type;
+template <typename Policy, typename MsgT, bool should_add>
+struct add_msg_type;
 
-template <typename T>
-struct base_policy_type<T, true> {
-  using Vec = FeatureVectorStamped;
-  using approx = ApproximateTime<Image, Image, typename T::MsgType, Vec>;
-  using exact = ExactTime<Image, Image, typename T::MsgType, Vec>;
+template <template <typename...> typename Policy, typename MsgT, typename... OtherT>
+struct add_msg_type<Policy<OtherT...>, MsgT, true> {
+  using value = Policy<OtherT..., MsgT>;
 };
 
-template <typename T>
-struct base_policy_type<T, false> {
-  using approx = ApproximateTime<Image, Image, typename T::MsgType>;
-  using exact = ExactTime<Image, Image, typename T::MsgType>;
+template <template <typename...> typename Policy, typename MsgT, typename... OtherT>
+struct add_msg_type<Policy<OtherT...>, MsgT, false> {
+  using value = Policy<OtherT...>;
 };
+
+template <typename Policy, typename MsgT, bool should_add>
+using add_msg_type_v = add_msg_type<Policy, MsgT, should_add>::value;
 
 template <typename T, typename ReceiverType, bool exact>
 struct policy_type;
 
 template <typename T, typename ReceiverType>
-struct policy_type<T, ReceiverType, true> {
-  using value = base_policy_type<T, ReceiverType::with_feature>::exact;
+struct policy_type<T, ReceiverType, false> {
+  using value = add_msg_type_v<approx_policy_v<Image, Image, typename T::MsgType>,
+                               FeatureVectorStamped,
+                               ReceiverType::with_feature>;
 };
 
 template <typename T, typename ReceiverType>
-struct policy_type<T, ReceiverType, false> {
-  using value = base_policy_type<T, ReceiverType::with_feature>::approx;
+struct policy_type<T, ReceiverType, true> {
+  using value = add_msg_type_v<exact_policy_v<Image, Image, typename T::MsgType>,
+                               FeatureVectorStamped,
+                               ReceiverType::with_feature>;
 };
 
 template <typename T, typename ReceiverType, bool exact>
@@ -396,7 +471,7 @@ struct ImageReceiver::Impl {
                 PacketBuilderBase::Queue& queue) {
     switch (config.semantics_type) {
       case ImageReceiver::Config::SemanticsType::NONE:
-        recv = makeReceiver<NullAdapter>(config, nh, name, queue);
+        // recv = makeReceiver<NullAdapter>(config, nh, name, queue);
         break;
       case ImageReceiver::Config::SemanticsType::CLOSED_SET:
         recv = makeReceiver<ClosedSetAdapter>(config, nh, name, queue);
