@@ -54,6 +54,10 @@ using semantic_inference_msgs::msg::FeatureImage;
 using semantic_inference_msgs::msg::FeatureVectorStamped;
 using sensor_msgs::msg::Image;
 
+using message_filters::Synchronizer;
+using message_filters::sync_policies::ApproximateTime;
+using message_filters::sync_policies::ExactTime;
+
 namespace hydra {
 namespace {
 
@@ -108,33 +112,21 @@ cv::Mat parseImage(const Image& msg) {
   }
 }
 
-}  // namespace
-
-struct ImageReceiverBase {
-  virtual ~ImageReceiverBase() = default;
-};
-
-template <typename AdapterT, bool exact>
-struct ImageReceiverImpl;
-
 struct NullAdapter {
   using MsgType = message_filters::NullType;
 
-  template <bool exact>
-  NullAdapter(ianvs::NodeHandle,
-              const std::string&,
-              const rclcpp::QoS&,
-              ImageReceiverImpl<NullAdapter, exact>&) {}
+  template <typename RecvT>
+  NullAdapter(ianvs::NodeHandle, const std::string&, const rclcpp::QoS&, RecvT&) {}
 };
 
 struct ClosedSetAdapter {
   using MsgType = Image;
 
-  template <bool exact>
+  template <typename RecvT>
   ClosedSetAdapter(ianvs::NodeHandle nh,
                    const std::string& topic,
                    const rclcpp::QoS& qos,
-                   ImageReceiverImpl<ClosedSetAdapter, exact>& receiver)
+                   RecvT& receiver)
       : sub(nh.create_subscription<Image>(
             topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
               receiver.sync.template add<2>(msg);
@@ -150,11 +142,11 @@ struct ClosedSetAdapter {
 struct InstanceAdapter {
   using MsgType = Image;
 
-  template <bool exact>
+  template <typename RecvT>
   InstanceAdapter(ianvs::NodeHandle nh,
                   const std::string& topic,
                   const rclcpp::QoS& qos,
-                  ImageReceiverImpl<InstanceAdapter, exact>& receiver)
+                  RecvT& receiver)
       : sub(nh.create_subscription<Image>(
             topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
               receiver.sync.template add<2>(msg);
@@ -184,11 +176,11 @@ struct InstanceAdapter {
 struct OpenSetAdapter {
   using MsgType = FeatureImage;
 
-  template <bool exact>
+  template <typename RecvT>
   OpenSetAdapter(ianvs::NodeHandle nh,
                  const std::string& topic,
                  const rclcpp::QoS& qos,
-                 ImageReceiverImpl<OpenSetAdapter, exact>& receiver)
+                 RecvT& receiver)
       : sub(nh.create_subscription<FeatureImage>(
             topic, qos, [&receiver](const FeatureImage::ConstSharedPtr& msg) {
               receiver.sync.template add<2>(msg);
@@ -208,22 +200,76 @@ struct OpenSetAdapter {
   rclcpp::Subscription<FeatureImage>::SharedPtr sub;
 };
 
-using message_filters::Synchronizer;
-using message_filters::sync_policies::ApproximateTime;
-using message_filters::sync_policies::ExactTime;
+template <bool enabled>
+struct FeatureAdapter;
 
-template <typename MsgT, bool exact>
+template <>
+struct FeatureAdapter<false> {
+  template <typename RecvT>
+  FeatureAdapter(ianvs::NodeHandle, const std::string&, const rclcpp::QoS&, RecvT&) {}
+};
+
+template <>
+struct FeatureAdapter<true> {
+  using Msg = FeatureVectorStamped;
+
+  template <typename RecvT>
+  FeatureAdapter(ianvs::NodeHandle nh,
+                 const std::string& topic,
+                 const rclcpp::QoS& qos,
+                 RecvT& receiver)
+      : sub(nh.create_subscription<Msg>(
+            topic, qos, [&receiver](const Msg::ConstSharedPtr& msg) {
+              receiver.sync.template add<3>(msg);
+            })) {}
+
+  static void fill(const Msg& msg, ImageInputPacket& packet) {
+    const auto& vec = msg.feature.data;
+    packet.input_feature = Eigen::Map<const FeatureVector>(vec.data(), vec.size());
+  }
+
+  rclcpp::Subscription<Msg>::SharedPtr sub;
+};
+
+}  // namespace
+
+template <bool _with_feature, bool _exact>
+struct ReceiverType {
+  constexpr static bool with_feature = _with_feature;
+  constexpr static bool exact = _exact;
+};
+
+template <typename T, bool with_feature>
+struct base_policy_type;
+
+template <typename T>
+struct base_policy_type<T, true> {
+  using Vec = FeatureVectorStamped;
+  using approx = ApproximateTime<Image, Image, typename T::MsgType, Vec>;
+  using exact = ExactTime<Image, Image, typename T::MsgType, Vec>;
+};
+
+template <typename T>
+struct base_policy_type<T, false> {
+  using approx = ApproximateTime<Image, Image, typename T::MsgType>;
+  using exact = ExactTime<Image, Image, typename T::MsgType>;
+};
+
+template <typename T, typename ReceiverType, bool exact>
 struct policy_type;
 
-template <typename MsgT>
-struct policy_type<MsgT, true> {
-  using value = ExactTime<Image, Image, MsgT>;
+template <typename T, typename ReceiverType>
+struct policy_type<T, ReceiverType, true> {
+  using value = base_policy_type<T, ReceiverType::with_feature>::exact;
 };
 
-template <typename MsgT>
-struct policy_type<MsgT, false> {
-  using value = ApproximateTime<Image, Image, MsgT>;
+template <typename T, typename ReceiverType>
+struct policy_type<T, ReceiverType, false> {
+  using value = base_policy_type<T, ReceiverType::with_feature>::approx;
 };
+
+template <typename T, typename ReceiverType, bool exact>
+using policy_type_v = policy_type<T, ReceiverType, exact>::value;
 
 struct PacketBuilderBase {
   using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
@@ -273,12 +319,18 @@ struct PacketBuilder<NullAdapter> : PacketBuilderBase {
   }
 };
 
-template <typename AdapterT, bool exact>
+struct ImageReceiverBase {
+  virtual ~ImageReceiverBase() = default;
+};
+
+template <typename AdapterT, typename TypeT>
 struct ImageReceiverImpl : public ImageReceiverBase {
   using Queue = PacketBuilderBase::Queue;
   using ImgPtr = Image::ConstSharedPtr;
+
+  using Type = TypeT;
   using MsgT = typename AdapterT::MsgType;
-  using Sync = Synchronizer<typename policy_type<MsgT, exact>::value>;
+  using Sync = Synchronizer<policy_type_v<AdapterT, Type, Type::exact>>;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
                     const std::string& name,
@@ -292,12 +344,12 @@ struct ImageReceiverImpl : public ImageReceiverBase {
   rclcpp::Subscription<Image>::SharedPtr color;
   rclcpp::Subscription<Image>::SharedPtr depth;
   AdapterT semantics;
-  rclcpp::Subscription<FeatureVectorStamped>::SharedPtr feature;
+  FeatureAdapter<Type::with_feature> feature;
   rclcpp::Subscription<Image>::SharedPtr traversability;
 };
 
-template <typename AdapterT, bool exact>
-ImageReceiverImpl<AdapterT, exact>::ImageReceiverImpl(ianvs::NodeHandle nh,
+template <typename AdapterT, typename TypeT>
+ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
                                                       const std::string& name,
                                                       const rclcpp::QoS& qos,
                                                       size_t queue_size,
@@ -312,15 +364,16 @@ ImageReceiverImpl<AdapterT, exact>::ImageReceiverImpl(ianvs::NodeHandle nh,
           "depth_registered/image_rect",
           qos,
           [this](const ImgPtr& msg) { sync.template add<1>(msg); })),
-      semantics(nh, "semantic/image_raw", qos, *this) {
+      semantics(nh, "semantic/image_raw", qos, *this),
+      feature(nh, "semantic/feature", qos, *this) {
   sync.registerCallback(&PacketBuilder<AdapterT>::callback, &builder);
 }
 
 template <typename AdapterT>
-using ExactRecv = ImageReceiverImpl<AdapterT, true>;
+using ExactRecv = ImageReceiverImpl<AdapterT, ReceiverType<false, true>>;
 
 template <typename AdapterT>
-using ApproxRecv = ImageReceiverImpl<AdapterT, false>;
+using ApproxRecv = ImageReceiverImpl<AdapterT, ReceiverType<false, false>>;
 
 template <typename T>
 std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
