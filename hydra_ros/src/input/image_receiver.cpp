@@ -127,7 +127,15 @@ namespace {
   };                                                                                \
                                                                                     \
   template <typename... T>                                                          \
-  using Policy##_v = Policy<T...>::value;
+  using Policy##_v = Policy<T...>::value;                                           \
+                                                                                    \
+  template <typename Tuple>                                                         \
+  struct Policy##_from_tuple;                                                       \
+                                                                                    \
+  template <template <typename...> typename List, typename... OtherT>               \
+  struct Policy##_from_tuple<List<OtherT...>> {                                     \
+    using value = Policy##_v<OtherT...>;                                            \
+  };
 
 MAKE_VARIADIC(approx_policy, ApproximateTime)
 MAKE_VARIADIC(exact_policy, ExactTime)
@@ -304,47 +312,49 @@ struct FeatureAdapter<true> {
 
 }  // namespace
 
-template <bool _with_feature, bool _exact>
-struct ReceiverType {
+template <bool _with_feature, bool exact>
+struct ReceiverType;
+
+template <bool _with_feature>
+struct ReceiverType<_with_feature, true> {
+  template <typename... Args>
+  using policy_from_tuple = exact_policy_from_tuple<Args...>::value;
   constexpr static bool with_feature = _with_feature;
-  constexpr static bool exact = _exact;
 };
 
-template <typename Policy, typename MsgT, bool should_add>
+template <bool _with_feature>
+struct ReceiverType<_with_feature, false> {
+  template <typename... Args>
+  using policy_from_tuple = approx_policy_from_tuple<Args...>::value;
+  constexpr static bool with_feature = _with_feature;
+};
+
+template <typename T, typename MsgT, bool should_add>
 struct add_msg_type;
 
-template <template <typename...> typename Policy, typename MsgT, typename... OtherT>
-struct add_msg_type<Policy<OtherT...>, MsgT, true> {
-  using value = Policy<OtherT..., MsgT>;
+template <template <typename...> typename List, typename MsgT, typename... OtherT>
+struct add_msg_type<List<OtherT...>, MsgT, true> {
+  using value = List<OtherT..., MsgT>;
 };
 
-template <template <typename...> typename Policy, typename MsgT, typename... OtherT>
-struct add_msg_type<Policy<OtherT...>, MsgT, false> {
-  using value = Policy<OtherT...>;
+template <template <typename...> typename List, typename MsgT, typename... OtherT>
+struct add_msg_type<List<OtherT...>, MsgT, false> {
+  using value = List<OtherT...>;
 };
 
-template <typename Policy, typename MsgT, bool should_add>
-using add_msg_type_v = add_msg_type<Policy, MsgT, should_add>::value;
-
-template <typename T, typename ReceiverType, bool exact>
-struct policy_type;
+template <typename T, typename MsgT, bool should_add>
+using add_msg_type_v = add_msg_type<T, MsgT, should_add>::value;
 
 template <typename T, typename ReceiverType>
-struct policy_type<T, ReceiverType, false> {
-  using value = add_msg_type_v<approx_policy_v<Image, Image, typename T::MsgType>,
-                               FeatureVectorStamped,
-                               ReceiverType::with_feature>;
+struct policy_type {
+  using vec = FeatureVectorStamped;
+  using base = std::tuple<Image, Image, typename T::MsgType>;
+  using types = add_msg_type_v<base, vec, ReceiverType::with_feature>;
+  using value = ReceiverType::template policy_from_tuple<types>;
 };
 
 template <typename T, typename ReceiverType>
-struct policy_type<T, ReceiverType, true> {
-  using value = add_msg_type_v<exact_policy_v<Image, Image, typename T::MsgType>,
-                               FeatureVectorStamped,
-                               ReceiverType::with_feature>;
-};
-
-template <typename T, typename ReceiverType, bool exact>
-using policy_type_v = policy_type<T, ReceiverType, exact>::value;
+using policy_type_v = policy_type<T, ReceiverType>::value;
 
 struct PacketBuilderBase {
   using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
@@ -405,7 +415,7 @@ struct ImageReceiverImpl : public ImageReceiverBase {
 
   using Type = TypeT;
   using MsgT = typename AdapterT::MsgType;
-  using Sync = Synchronizer<policy_type_v<AdapterT, Type, Type::exact>>;
+  using Sync = Synchronizer<policy_type_v<AdapterT, Type>>;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
                     const std::string& name,
@@ -441,14 +451,14 @@ ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
           [this](const ImgPtr& msg) { sync.template add<1>(msg); })),
       semantics(nh, "semantic/image_raw", qos, *this),
       feature(nh, "semantic/feature", qos, *this) {
-  sync.registerCallback(&PacketBuilder<AdapterT>::callback, &builder);
+  // sync.registerCallback(&PacketBuilder<AdapterT>::callback, &builder);
 }
 
-template <typename AdapterT>
-using ExactRecv = ImageReceiverImpl<AdapterT, ReceiverType<false, true>>;
+template <typename AdapterT, bool with_feature>
+using ExactRecv = ImageReceiverImpl<AdapterT, ReceiverType<with_feature, true>>;
 
-template <typename AdapterT>
-using ApproxRecv = ImageReceiverImpl<AdapterT, ReceiverType<false, false>>;
+template <typename AdapterT, bool with_feature>
+using ApproxRecv = ImageReceiverImpl<AdapterT, ReceiverType<with_feature, false>>;
 
 template <typename T>
 std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
@@ -458,9 +468,17 @@ std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& con
   const auto qos = config.qos;
   const auto queue_size = config.queue_size;
   if (config.use_exact) {
-    return std::make_unique<ExactRecv<T>>(nh, name, qos, queue_size, queue);
+    if (config.with_feature) {
+      return std::make_unique<ExactRecv<T, true>>(nh, name, qos, queue_size, queue);
+    } else {
+      return std::make_unique<ExactRecv<T, false>>(nh, name, qos, queue_size, queue);
+    }
   } else {
-    return std::make_unique<ApproxRecv<T>>(nh, name, qos, queue_size, queue);
+    if (config.with_feature) {
+      return std::make_unique<ApproxRecv<T, true>>(nh, name, qos, queue_size, queue);
+    } else {
+      return std::make_unique<ApproxRecv<T, false>>(nh, name, qos, queue_size, queue);
+    }
   }
 }
 

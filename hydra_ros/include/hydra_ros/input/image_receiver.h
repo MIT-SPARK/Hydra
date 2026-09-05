@@ -48,6 +48,8 @@ class ImageReceiver : public RosDataReceiver {
       INSTANCE,    // 2D closed-set instance segmentation
       OPEN_SET,    // 2D open-set (and open-vocab) segmentation
     } semantics_type = SemanticsType::NONE;
+    //! Whether or not to enable image-level features
+    bool with_feature = false;
     //! Whether or not to use exact synchronization (versus approximate)
     bool use_exact = false;
     //! Queue depth for synchronization
