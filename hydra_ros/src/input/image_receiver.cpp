@@ -544,6 +544,11 @@ ImageReceiver::ImageReceiver(const Config& config,
 
 ImageReceiver::~ImageReceiver() = default;
 
+void ImageReceiver::stop() {
+  impl_.reset();  // we want cancel subscriptions before stopping the receiver thread
+  DataReceiver::stop();
+}
+
 bool ImageReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);
   impl_.reset(new Impl(config, nh, queue_));

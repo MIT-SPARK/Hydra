@@ -61,6 +61,8 @@ class PointcloudReceiver : public RosDataReceiver {
 
   virtual ~PointcloudReceiver() = default;
 
+  void stop() override;
+
  protected:
   bool initImpl() override;
 

@@ -72,7 +72,7 @@ class DataReceiver {
 
   bool start();
 
-  void stop();
+  virtual void stop();
 
   void clear();
 
@@ -111,6 +111,9 @@ class DataReceiver {
 
   mutable std::mutex mutex_;
   std::deque<int64_t> received_window_;
+
+ private:
+  void stopImpl();
 };
 
 void declare_config(DataReceiver::Config& config);

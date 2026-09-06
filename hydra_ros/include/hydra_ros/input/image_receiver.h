@@ -64,6 +64,8 @@ class ImageReceiver : public RosDataReceiver {
 
   ~ImageReceiver();
 
+  void stop() override;
+
  protected:
   bool initImpl() override;
 

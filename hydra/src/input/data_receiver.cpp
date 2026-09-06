@@ -75,7 +75,7 @@ DataReceiver::DataReceiver(const Config& config,
   }
 }
 
-DataReceiver::~DataReceiver() { stop(); }
+DataReceiver::~DataReceiver() { stopImpl(); }
 
 bool DataReceiver::start() {
   const auto success = initImpl();
@@ -83,16 +83,7 @@ bool DataReceiver::start() {
   return success;
 }
 
-void DataReceiver::stop() {
-  should_shutdown_ = true;
-  if (thread_) {
-    MLOG(1) << "stopping receiver '" << sensor_name << "'";
-    thread_->join();
-    thread_.reset();
-    MLOG(1) << "stopped receiver '" << sensor_name << "'";
-    MLOG(1) << "remaining in receiver '" << sensor_name << "' queue: " << queue_.size();
-  }
-}
+void DataReceiver::stop() { stopImpl(); }
 
 void DataReceiver::clear() { queue_.clear(); }
 
@@ -217,6 +208,17 @@ std::string DataReceiver::RateStats::str() const {
   ss << " (min: " << min << ", max: " << max << ", median: " << median << ") [hz] over "
      << num_measurements << " measurements";
   return ss.str();
+}
+
+void DataReceiver::stopImpl() {
+  should_shutdown_ = true;
+  if (thread_) {
+    MLOG(1) << "stopping receiver '" << sensor_name << "'";
+    thread_->join();
+    thread_.reset();
+    MLOG(1) << "stopped receiver '" << sensor_name << "'";
+    MLOG(1) << "remaining in receiver '" << sensor_name << "' queue: " << queue_.size();
+  }
 }
 
 }  // namespace hydra

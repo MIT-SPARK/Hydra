@@ -38,6 +38,11 @@ PointcloudReceiver::PointcloudReceiver(const Config& config,
                                        const OutputQueue::Ptr& output)
     : RosDataReceiver(config, sensor, output), config(config) {}
 
+void PointcloudReceiver::stop() {
+  sub_.reset();  // we want cancel subscriptions before stopping the receiver thread
+  DataReceiver::stop();
+}
+
 bool PointcloudReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);
   sub_ = nh.create_subscription<PointCloud2>(
