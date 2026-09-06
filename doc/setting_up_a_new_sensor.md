@@ -72,7 +72,7 @@ Next, we add remappings to connect the input topics for Hydra to the camera:
 ```
 
 > **Note** <br>
-> We know the topics that Hydra expects for inputs based on the input name (`camera`) and receiver type (`ClosedSetImageReceiver`) that's specified in the input configuration (which we'll look at in more detail later).
+> We know the topics that Hydra expects for inputs based on the input name (`camera`) and receiver type (`ImageReceiver`) that's specified in the input configuration (which we'll look at in more detail later).
 
 We then add Hydra:
 ```yaml
@@ -130,7 +130,8 @@ input:
   inputs:
     camera:
       receiver:
-        type: ClosedSetImageReceiver
+        type: ImageReceiver
+        semantics_type: closed_set
         queue_size: 30
       sensor:
         type: camera_info

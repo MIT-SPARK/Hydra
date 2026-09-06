@@ -6,8 +6,10 @@ input:
   inputs:
     left_cam:
       receiver:
-        type: ColormappedLabelImageReceiver
-        colormap_path: $<var colormap_path>
+        type: ImageReceiver
+        semantics_type: closed_set
+        adapters:
+          - {type: ColormappedLabelsAdapter, colormap_path: $<var colormap_path>}
       sensor:
         type: camera_info
         min_range: 0.1

@@ -47,7 +47,7 @@ class ImageReceiver : public RosDataReceiver {
       CLOSED_SET,  // 2D closed-set semantic segmentation
       INSTANCE,    // 2D closed-set instance segmentation
       OPEN_SET,    // 2D open-set (and open-vocab) segmentation
-    } semantics_type = SemanticsType::NONE;
+    } semantics_type = SemanticsType::CLOSED_SET;
     //! Whether or not to enable image-level features
     bool with_feature = false;
     //! Whether or not to enable traversability image

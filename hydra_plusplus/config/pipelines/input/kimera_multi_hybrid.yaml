@@ -5,7 +5,7 @@ input:
   clear_queue_on_fail: true
   inputs:
     rgbd:
-      receiver: {type: InstanceImageReceiver, input_separation_s: 0.1}
+      receiver: {type: ImageReceiver, semantics_type: instance, input_separation_s: 0.1}
       sensor:
         type: camera_info
         min_range: 0.1

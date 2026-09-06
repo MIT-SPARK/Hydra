@@ -40,6 +40,15 @@
 #include <glog/logging.h>
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<InputAdapter,
+                                   ColormappedLabelsAdapter,
+                                   ColormappedLabelsAdapter::Config>(
+        "ColormappedLabelsAdapter");
+
+}
 
 void declare_config(ColormappedLabelsAdapter::Config& config) {
   using namespace config;
