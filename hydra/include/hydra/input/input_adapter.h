@@ -34,14 +34,14 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include "hydra/input/sensor_input_packet.h"
+#include "hydra/input/input_data.h"
 
 namespace hydra {
 
 class InputAdapter {
  public:
   virtual ~InputAdapter() = default;
-  virtual void update(SensorInputPacket& packet) const = 0;
+  virtual void update(InputData& data) const = 0;
 };
 
 }  // namespace hydra

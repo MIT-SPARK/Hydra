@@ -34,59 +34,28 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include "hydra/common/message_queue.h"
+#include "hydra/common/semantic_color_map.h"
 #include "hydra/input/input_adapter.h"
-#include "hydra/input/input_filter.h"
-#include "hydra/input/sensor.h"
-#include "hydra/input/sensor_input_packet.h"
-#include "hydra/utils/logging.h"
 
 namespace hydra {
 
-class DataReceiver {
+class ColormappedLabelsAdapter : public InputAdapter {
  public:
-  using DataQueue = MessageQueue<SensorInputPacket::Ptr>;
-
-  struct Config : VerbosityConfig {
-    Config();
-
-    //! Maximum queue size (0 means unlimited)
-    size_t max_packets = 0;
-    //! Enforced time separation between packets
-    double input_separation_s = 0.0;
-    //! Filters to discard invalid inputs
-    std::vector<config::VirtualConfig<InputFilter, true>> filters;
-    //! Adapters to pre-process input packets
-    std::vector<config::VirtualConfig<InputAdapter, true>> adapters;
+  struct Config {
+    //! Path to colormap CSV to use to remap colors to labels
+    std::filesystem::path colormap_path;
+    //! Label value to use when value is unknown
+    int32_t default_label = -1;
   } const config;
 
-  DataReceiver(const Config& config, const Sensor::ConstPtr& sensor);
-  virtual ~DataReceiver() = default;
+  explicit ColormappedLabelsAdapter(const Config& config);
+  virtual ~ColormappedLabelsAdapter() = default;
+  void update(InputData& packet) const override;
 
-  bool init();
-
-  SensorInputPacket::Ptr poll();
-
-  void clear();
-
-  size_t numQueued() const;
-
-  void update(InputData& data) const;
-
-  const Sensor::ConstPtr sensor;
-  const std::string sensor_name;
-
- protected:
-  SensorInputPacket::Ptr pollOnce();
-
-  virtual bool initImpl() = 0;
-
-  DataQueue queue_;
-  SensorInputPacket::Ptr last_received_;
-  std::vector<std::unique_ptr<InputFilter>> filters_;
-  std::vector<std::unique_ptr<InputAdapter>> adapters_;
+ private:
+  std::unique_ptr<SemanticColorMap> colormap_;
 };
 
-void declare_config(DataReceiver::Config& config);
+void declare_config(ColormappedLabelsAdapter::Config& config);
 
 }  // namespace hydra

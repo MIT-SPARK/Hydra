@@ -123,6 +123,7 @@ void InputModule::dataSpin() {
       data->world_T_body = Eigen::Translation<double, 3>(odom_T_body.target_p_source) *
                            odom_T_body.target_R_source;
       packet->fillInputData(*data);
+      receiver->update(*data);
       queue_->push(data);
     }
   }

@@ -32,95 +32,37 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/input/data_receiver.h"
+#include "hydra/input/colormapped_labels_adapter.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
-#include <chrono>
-
 namespace hydra {
 
-void declare_config(DataReceiver::Config& config) {
+void declare_config(ColormappedLabelsAdapter::Config& config) {
   using namespace config;
-  name("DataReceiver::Config");
-  base<VerbosityConfig>(config);
-  field(config.max_packets, "max_packets");
-  field(config.input_separation_s, "input_separation_s");
-  field(config.filters, "filters");
-  field(config.adapters, "adapters");
+  name("ColormappedLabelsAdapter::Config");
+  field<Path::Absolute>(config.colormap_path, "colormap_path");
+  field(config.default_label, "default_label");
+  check<Path::Exists>(config.colormap_path, "colormap_path");
 }
 
-DataReceiver::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
-
-DataReceiver::DataReceiver(const Config& config, const Sensor::ConstPtr& sensor)
+ColormappedLabelsAdapter::ColormappedLabelsAdapter(const Config& config)
     : config(config::checkValid(config)),
-      sensor(sensor),
-      sensor_name(sensor->name),
-      queue_(config.max_packets) {
-  for (const auto& filter : config.filters) {
-    filters_.push_back(filter.create());
-  }
-
-  for (const auto& adapter : config.adapters) {
-    adapters_.push_back(adapter.create());
-  }
+      colormap_(SemanticColorMap::fromCsv(config.colormap_path)) {
+  CHECK(colormap_) << "Colormap required!";
 }
 
-bool DataReceiver::init() { return initImpl(); }
-
-SensorInputPacket::Ptr DataReceiver::poll() {
-  while (!queue_.empty()) {
-    const auto packet = pollOnce();
-    if (packet) {
-      return packet;
-    }
+void ColormappedLabelsAdapter::update(InputData& data) const {
+  const auto& colors = data.color_image;
+  if (colors.empty() || colors.channels() != 3) {
+    LOG(ERROR) << "Failed to decode color image to semantics!";
+    return;
   }
 
-  return nullptr;
-}
-
-SensorInputPacket::Ptr DataReceiver::pollOnce() {
-  if (queue_.empty()) {
-    return nullptr;
-  }
-
-  const auto packet = queue_.pop();
-  const auto timestamp = packet->timestamp_ns;
-  const std::chrono::nanoseconds curr_time_ns(timestamp);
-  if (last_received_) {
-    std::chrono::nanoseconds last_time_ns(last_received_->timestamp_ns);
-    std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
-    if (separation_s.count() < config.input_separation_s) {
-      MLOG(3) << "Dropping input @ " << timestamp << " [ns] with separation of "
-              << separation_s.count() << " [s]";
-      return nullptr;
-    }
-  }
-
-  for (const auto& filter : filters_) {
-    if (filter && !filter->valid(*packet, last_received_.get())) {
-      return nullptr;
-    }
-  }
-
-  MLOG(2) << "Got input @ " << timestamp << " [ns]";
-  last_received_ = packet;
-  return last_received_;
-}
-
-void DataReceiver::clear() { queue_.clear(); }
-
-size_t DataReceiver::numQueued() const { return queue_.size(); }
-
-void DataReceiver::update(InputData& data) const {
-  for (const auto& adapter : adapters_) {
-    if (adapter) {
-      adapter->update(data);
-    }
-  }
+  data.label_image = colormap_->colorsToLabels(colors, config.default_label);
 }
 
 }  // namespace hydra
