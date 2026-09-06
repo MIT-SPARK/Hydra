@@ -1,9 +1,42 @@
+/* -----------------------------------------------------------------------------
+ * Copyright 2022 Massachusetts Institute of Technology.
+ * All Rights Reserved
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Research was sponsored by the United States Air Force Research Laboratory and
+ * the United States Air Force Artificial Intelligence Accelerator and was
+ * accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views
+ * and conclusions contained in this document are those of the authors and should
+ * not be interpreted as representing the official policies, either expressed or
+ * implied, of the United States Air Force or the U.S. Government. The U.S.
+ * Government is authorized to reproduce and distribute reprints for Government
+ * purposes notwithstanding any copyright notation herein.
+ * -------------------------------------------------------------------------- */
 #pragma once
 
 #include <Eigen/Geometry>
 #include <limits>
 #include <opencv2/core/mat.hpp>
-#include <utility>
 
 #include "hydra/common/common_types.h"
 #include "hydra/input/sensor.h"
@@ -28,8 +61,26 @@ struct InputData {
   using MaskType = uint8_t;
   inline static constexpr auto MaskMatType = CV_8UC1;
 
-  explicit InputData(Sensor::ConstPtr sensor) : sensor_(std::move(sensor)) {}
+  explicit InputData(Sensor::ConstPtr sensor);
+
   virtual ~InputData() = default;
+
+  //! Get the sensor that captured this data.
+  const Sensor& getSensor() const;
+
+  //! Get the pose of the sensor in world frame when this data was captured.
+  Eigen::Isometry3d getSensorPose() const;
+
+  //! Check if range value is in allowable sensor and data range
+  bool inRange(float range_m) const;
+
+  /**
+   * @brief Normalize and fill all fields
+   * @param vertices_in_world_frame Convert the vertex image to be in world frame.
+   * @param normalize_labels Force label normalization.
+   * @return Whether or not conversions succeeded.
+   */
+  bool finalize(bool vertices_in_world_frame = false, bool normalize_labels = true);
 
   //! Time stamp this input data was captured.
   TimeStamp timestamp_ns;
@@ -59,19 +110,6 @@ struct InputData {
   FeatureVector feature;
   //! Features associated with each label
   FeatureMap<int> label_features;
-
-  //! Get the sensor that captured this data.
-  const Sensor& getSensor() const { return *sensor_; }
-
-  //! Get the pose of the sensor in world frame when this data was captured.
-  Eigen::Isometry3d getSensorPose() const {
-    return world_T_body * sensor_->body_T_sensor();
-  }
-
-  bool inRange(float range_m) const {
-    return range_m >= sensor_->min_range() && range_m <= sensor_->max_range() &&
-           range_m <= max_range;
-  }
 
  private:
   Sensor::ConstPtr sensor_;

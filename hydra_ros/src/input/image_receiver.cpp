@@ -144,7 +144,7 @@ static const auto registration =
     config::RegistrationWithConfig<DataReceiver,
                                    ImageReceiver,
                                    ImageReceiver::Config,
-                                   std::string>("ImageReceiver");
+                                   Sensor::ConstPtr>("ImageReceiver");
 
 cv::Mat parseColor(const Image& msg) {
   using namespace sensor_msgs::image_encodings;
@@ -352,19 +352,17 @@ struct PacketBuilderBase {
   using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
   using Queue = MessageQueue<SensorInputPacket::Ptr>;
 
-  PacketBuilderBase(const std::string& sensor_name, Queue& queue)
-      : sensor_name(sensor_name), queue(queue) {}
+  explicit PacketBuilderBase(Queue& queue) : queue(queue) {}
 
   ImagePacketPtr make_packet(const Image::ConstSharedPtr& color,
                              const Image::ConstSharedPtr& depth) const {
     const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
-    auto packet = std::make_shared<ImageInputPacket>(timestamp_ns, sensor_name);
+    auto packet = std::make_shared<ImageInputPacket>(timestamp_ns);
     packet->color = parseColor(*color);
     packet->depth = parseDepth(*depth);
     return packet;
   }
 
-  const std::string sensor_name;
   Queue& queue;
 };
 
@@ -388,8 +386,7 @@ struct PacketBuilder;
 
 template <template <typename...> typename List, typename... AdapterT>
 struct PacketBuilder<List<AdapterT...>> : PacketBuilderBase {
-  PacketBuilder(const std::string& sensor_name, Queue& queue)
-      : PacketBuilderBase(sensor_name, queue) {}
+  PacketBuilder(Queue& queue) : PacketBuilderBase(queue) {}
 
   void callback(const Image::ConstSharedPtr& color,
                 const Image::ConstSharedPtr& depth,
@@ -436,7 +433,6 @@ struct ImageReceiverImpl : public ImageReceiverBase {
   using Sync = Synchronizer<typename Info::policy>;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
-                    const std::string& name,
                     const rclcpp::QoS& qos,
                     size_t queue_size,
                     Queue& queue);
@@ -453,12 +449,11 @@ struct ImageReceiverImpl : public ImageReceiverBase {
 
 template <typename AdapterT, typename TypeT>
 ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
-                                                      const std::string& name,
                                                       const rclcpp::QoS& qos,
                                                       size_t queue_size,
                                                       Queue& queue)
     : sync(queue_size),
-      builder(name, queue),
+      builder(queue),
       color(nh.create_subscription<Image>(
           "rgb/image_raw",
           qos,
@@ -481,21 +476,20 @@ using ApproxRecv = ImageReceiverImpl<AdapterT, ReceiverType<with_feature, false>
 template <typename T>
 std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
                                                 ianvs::NodeHandle nh,
-                                                const std::string& name,
                                                 PacketBuilderBase::Queue& queue) {
   const auto qos = config.qos;
   const auto queue_size = config.queue_size;
   if (config.use_exact) {
     if (config.with_feature) {
-      return std::make_unique<ExactRecv<T, true>>(nh, name, qos, queue_size, queue);
+      return std::make_unique<ExactRecv<T, true>>(nh, qos, queue_size, queue);
     } else {
-      return std::make_unique<ExactRecv<T, false>>(nh, name, qos, queue_size, queue);
+      return std::make_unique<ExactRecv<T, false>>(nh, qos, queue_size, queue);
     }
   } else {
     if (config.with_feature) {
-      return std::make_unique<ApproxRecv<T, true>>(nh, name, qos, queue_size, queue);
+      return std::make_unique<ApproxRecv<T, true>>(nh, qos, queue_size, queue);
     } else {
-      return std::make_unique<ApproxRecv<T, false>>(nh, name, qos, queue_size, queue);
+      return std::make_unique<ApproxRecv<T, false>>(nh, qos, queue_size, queue);
     }
   }
 }
@@ -503,20 +497,19 @@ std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& con
 struct ImageReceiver::Impl {
   explicit Impl(const ImageReceiver::Config& config,
                 ianvs::NodeHandle nh,
-                const std::string& name,
                 PacketBuilderBase::Queue& queue) {
     switch (config.semantics_type) {
       case ImageReceiver::Config::SemanticsType::NONE:
-        recv = makeReceiver<NullAdapter>(config, nh, name, queue);
+        recv = makeReceiver<NullAdapter>(config, nh, queue);
         break;
       case ImageReceiver::Config::SemanticsType::CLOSED_SET:
-        recv = makeReceiver<ClosedSetAdapter>(config, nh, name, queue);
+        recv = makeReceiver<ClosedSetAdapter>(config, nh, queue);
         break;
       case ImageReceiver::Config::SemanticsType::INSTANCE:
-        recv = makeReceiver<InstanceAdapter>(config, nh, name, queue);
+        recv = makeReceiver<InstanceAdapter>(config, nh, queue);
         break;
       case ImageReceiver::Config::SemanticsType::OPEN_SET:
-        recv = makeReceiver<OpenSetAdapter>(config, nh, name, queue);
+        recv = makeReceiver<OpenSetAdapter>(config, nh, queue);
         break;
     }
   }
@@ -538,8 +531,8 @@ void declare_config(ImageReceiver::Config& config) {
   field(config.qos, "qos");
 }
 
-ImageReceiver::ImageReceiver(const Config& config, const std::string& sensor_name)
-    : RosDataReceiver(config, sensor_name), config(config) {
+ImageReceiver::ImageReceiver(const Config& config, const Sensor::ConstPtr& sensor)
+    : RosDataReceiver(config, sensor), config(config) {
   if (config.queue_size <= 2 && !config.use_exact) {
     LOG(WARNING) << "ApproximateTime policy requires queue sizes larger than 2";
   }
@@ -549,7 +542,7 @@ ImageReceiver::~ImageReceiver() = default;
 
 bool ImageReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);
-  impl_.reset(new Impl(config, nh, sensor_name, queue_));
+  impl_.reset(new Impl(config, nh, queue_));
   return true;
 }
 

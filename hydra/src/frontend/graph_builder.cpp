@@ -425,10 +425,9 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     // TODO(nathan) add this back when we fix the khronos active window
     // const auto pose = input.world_T_body();
     // const auto block_size = input.map().blockSize();
-    const spatial_hash::IndexSet archived_blocks(input.archived_mesh_indices.begin(),
-                                                 input.archived_mesh_indices.end());
+    const spatial_hash::IndexSet archived(input.archived.begin(), input.archived.end());
     mesh_compression_->archiveBlocks([&](const auto& index, const auto& /* info */) {
-      return archived_blocks.count(index);
+      return archived.count(index);
     });
   }  // end timing scope
 

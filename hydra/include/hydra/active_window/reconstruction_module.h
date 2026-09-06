@@ -35,8 +35,6 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
-#include <Eigen/Geometry>
-
 #include "hydra/active_window/active_window_module.h"
 #include "hydra/input/sensor_map.h"
 #include "hydra/reconstruction/mesh_integrator.h"
@@ -64,7 +62,7 @@ class ReconstructionModule : public ActiveWindowModule {
  protected:
   bool shouldUpdate(uint64_t timestamp_ns) const;
 
-  ActiveWindowOutput::Ptr spinOnce(const InputPacket& input) override;
+  ActiveWindowOutput::Ptr spinOnce(const InputData::Ptr& input) override;
 
  protected:
   std::optional<uint64_t> last_update_ns_;

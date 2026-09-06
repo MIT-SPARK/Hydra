@@ -154,7 +154,7 @@ FrontierExtractor::FrontierExtractor(const Config& config)
 
 void FrontierExtractor::call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) {
   const auto timestamp = msg.timestamp_ns;
-  updateRecentBlocks(msg.world_t_body, msg.map().blockSize());
+  updateRecentBlocks(msg.world_T_body().translation(), msg.map().blockSize());
 
   std::lock_guard<std::mutex> graph_lock(dsg.mutex);
   timing::ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
@@ -373,8 +373,9 @@ void FrontierExtractor::detectFrontiers(const ActiveWindowOutput& input,
   SpatialCloud::Ptr cloud(new SpatialCloud());
   SpatialCloud::Ptr archived_cloud(new SpatialCloud());
 
-  double min_frontier_z = input.world_t_body.z() + config.minimum_relative_z;
-  double max_frontier_z = input.world_t_body.z() + config.maximum_relative_z;
+  const auto curr_z = input.world_T_body().translation().z();
+  double min_frontier_z = curr_z + config.minimum_relative_z;
+  double max_frontier_z = curr_z + config.maximum_relative_z;
 
   place_finder_.reset();
   if (!active_nodes.empty()) {

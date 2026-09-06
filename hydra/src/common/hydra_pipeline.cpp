@@ -67,7 +67,8 @@ HydraPipeline::HydraPipeline(const Config& config,
   shared_state_.reset(new SharedModuleState());
   shared_state_->lcd_graph = info.createSharedDsg();
   shared_state_->backend_graph = info.createSharedDsg();
-  MLOG(0) << "[Hydra] Initialized pipeline with:\n" << info;
+  MLOG(0) << "[Hydra] Initialized pipeline with:\n"
+          << config::toString(info.getConfig());
 }
 
 void HydraPipeline::init() {}
@@ -161,16 +162,10 @@ void HydraPipeline::save(const DataDirectory& logs) const {
     return;
   }
 
+  const auto log_dir = logs.path();
+
   auto& info = GlobalInfo::instance();
   auto node = config::toYaml(info.getConfig());
-  for (const auto& name : info.getAvailableSensors()) {
-    const auto sensor = info.getSensor(name);
-    if (sensor) {
-      node["sensors"][name] = info.getSensor(name)->dump();
-    }
-  }
-
-  std::filesystem::path log_dir = logs.path();
   std::ofstream fout(log_dir / "hydra_config.yaml");
   fout << node;
 
@@ -185,7 +180,7 @@ void HydraPipeline::save(const DataDirectory& logs) const {
 
   // save timing information to avoid destructor weirdness with singletons
   LOG(INFO) << "[Hydra] saving timing information to " << log_dir;
-  const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+  const auto& timer = ElapsedTimeRecorder::instance();
   timer.logTimers(logs.path("timing"));
   timer.logStats(log_dir / "timing_stats.csv");
   LOG(INFO) << "[Hydra] saved timing information";

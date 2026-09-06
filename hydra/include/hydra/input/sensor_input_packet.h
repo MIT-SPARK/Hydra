@@ -40,17 +40,14 @@ namespace hydra {
 struct SensorInputPacket {
   using Ptr = std::shared_ptr<SensorInputPacket>;
 
-  explicit SensorInputPacket(uint64_t stamp, const std::string& sensor_name)
-      : timestamp_ns(stamp), sensor_name(sensor_name) {}
+  explicit SensorInputPacket(uint64_t stamp);
 
-  virtual ~SensorInputPacket() = default;
+  virtual ~SensorInputPacket();
 
   bool fillInputData(InputData& msg) const;
 
   //! Timestamp sensor input is acquired
   const uint64_t timestamp_ns;
-  //! Sensor that acquired the input
-  const std::string sensor_name;
   //! Frame ID for sensor
   std::string sensor_frame;
   //! Learned feature for the input data (e.g., CLIP for camera)
@@ -61,7 +58,7 @@ struct SensorInputPacket {
 };
 
 struct ImageInputPacket : public SensorInputPacket {
-  explicit ImageInputPacket(uint64_t stamp, const std::string& sensor_name);
+  explicit ImageInputPacket(uint64_t stamp);
 
   //! Color for each pixel
   cv::Mat color;
@@ -81,7 +78,7 @@ struct ImageInputPacket : public SensorInputPacket {
 };
 
 struct CloudInputPacket : public SensorInputPacket {
-  explicit CloudInputPacket(uint64_t stamp, const std::string& sensor_name);
+  explicit CloudInputPacket(uint64_t stamp);
 
   //! Whether or not the pointcloud is in the world frame
   bool in_world_frame = false;

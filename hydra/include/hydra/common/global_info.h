@@ -37,14 +37,12 @@
 #include <spark_dsg/mesh.h>
 
 #include <atomic>
-#include <map>
 #include <memory>
 #include <vector>
 
 #include "hydra/common/labelspace.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
-#include "hydra/input/sensor.h"
 
 // TODO(nathan) bad....
 #include "hydra/active_window/volumetric_window.h"
@@ -136,12 +134,6 @@ class GlobalInfo {
 
   SharedDsgInfo::Ptr createSharedDsg() const;
 
-  bool setSensor(const Sensor::Ptr& sensor, bool allow_override = true);
-
-  Sensor::ConstPtr getSensor(const std::string& name) const;
-
-  std::vector<std::string> getAvailableSensors() const;
-
   std::unique_ptr<VolumetricWindow> createVolumetricWindow() const;
 
   spark_dsg::Mesh::Ptr createMesh() const;
@@ -160,9 +152,6 @@ class GlobalInfo {
   LabelRemapper label_remapper_;
 
   std::unique_ptr<Labelspace> labelspace_;
-  std::map<std::string, std::shared_ptr<const Sensor>> sensors_;
 };
-
-std::ostream& operator<<(std::ostream& out, const GlobalInfo& config);
 
 }  // namespace hydra

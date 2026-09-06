@@ -41,7 +41,7 @@
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/input/data_receiver.h"
-#include "hydra/input/input_packet.h"
+#include "hydra/input/input_data.h"
 
 namespace hydra {
 
@@ -57,14 +57,14 @@ struct PoseStatus {
 
 class InputModule : public Module {
  public:
-  using OutputQueue = MessageQueue<InputPacket::Ptr>;
+  using OutputQueue = MessageQueue<InputData::Ptr>;
   struct Config : VerbosityConfig {
-    struct InputPair {
-      config::VirtualConfig<DataReceiver> receiver;
-      config::VirtualConfig<Sensor> sensor;
-    };
-
     Config();
+
+    struct InputPair {
+      config::VirtualConfig<Sensor> sensor;
+      config::VirtualConfig<DataReceiver> receiver;
+    };
     std::map<std::string, InputPair> inputs;
   } const config;
 

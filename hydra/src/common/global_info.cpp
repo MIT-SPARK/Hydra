@@ -169,48 +169,6 @@ SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   return graph_info;
 }
 
-bool GlobalInfo::setSensor(const Sensor::Ptr& sensor, bool allow_override) {
-  if (!sensor) {
-    LOG(ERROR) << "Sensor is invalid!";
-    return false;
-  }
-
-  auto iter = sensors_.find(sensor->name);
-  if (iter == sensors_.end()) {
-    sensors_[sensor->name] = sensor;
-    return true;
-  }
-
-  if (!allow_override) {
-    LOG(ERROR) << "Sensor '" << sensor->name << "' already exists!";
-    return false;
-  }
-
-  VLOG(1) << "Overriding sensor '" << sensor->name << "'!";
-  iter->second = sensor;
-  return true;
-}
-
-Sensor::ConstPtr GlobalInfo::getSensor(const std::string& name) const {
-  auto iter = sensors_.find(name);
-  if (iter == sensors_.end()) {
-    LOG(ERROR) << "Sensor '" << name << "' does not exist!";
-    return nullptr;
-  }
-
-  return iter->second;
-}
-
-std::vector<std::string> GlobalInfo::getAvailableSensors() const {
-  std::vector<std::string> names;
-  names.reserve(sensors_.size());
-  for (const auto& [name, sensor] : sensors_) {
-    names.push_back(name);
-  }
-
-  return names;
-}
-
 std::unique_ptr<VolumetricWindow> GlobalInfo::createVolumetricWindow() const {
   return config_.map_window.create();
 }
@@ -225,16 +183,6 @@ spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {
   out << config::toString(config.getConfig());
-  const auto sensor_names = config.getAvailableSensors();
-  for (const auto& name : sensor_names) {
-    auto sensor = config.getSensor(name);
-    if (!sensor) {
-      continue;
-    }
-
-    out << "sensor '" << name << "'" << sensor->dump();
-  }
-
   return out;
 }
 

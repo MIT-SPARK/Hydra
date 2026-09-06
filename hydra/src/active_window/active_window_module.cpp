@@ -126,7 +126,7 @@ void ActiveWindowModule::spin() {
     }
 
     const auto msg = input_queue_->pop();
-    auto output = spinOnce(*msg);
+    auto output = spinOnce(msg);
     if (!output) {
       continue;
     }
@@ -138,12 +138,12 @@ void ActiveWindowModule::spin() {
   }
 }
 
-bool ActiveWindowModule::step(const InputPacket::Ptr& msg) {
+bool ActiveWindowModule::step(const InputData::Ptr& msg) {
   if (!msg) {
     return false;
   }
 
-  auto output = spinOnce(*msg);
+  auto output = spinOnce(msg);
   if (!output) {
     return false;
   }

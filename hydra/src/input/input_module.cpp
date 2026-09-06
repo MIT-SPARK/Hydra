@@ -39,15 +39,13 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
-#include "hydra/common/global_info.h"
-
 namespace hydra {
 
 void declare_config(InputModule::Config::InputPair& config) {
   using namespace config;
-  name("InputModule::InputPair::Config");
-  field(config.receiver, "receiver");
+  name("InputModule::Config::InputPair");
   field(config.sensor, "sensor");
+  field(config.receiver, "receiver");
 }
 
 void declare_config(InputModule::Config& config) {
@@ -63,11 +61,9 @@ InputModule::Config::Config()
 
 InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
     : config(config::checkValid(config)), queue_(queue) {
-  // Setup the receivers and instatiate their sensors globally.
-  auto& info = GlobalInfo::instance();
-  for (const auto& [name, input_pair] : config.inputs) {
-    receivers_.emplace_back(input_pair.receiver.create(name));
-    CHECK(info.setSensor(input_pair.sensor.create(name), false));
+  for (const auto& [name, pair] : config.inputs) {
+    Sensor::ConstPtr sensor = pair.sensor.create();
+    receivers_.emplace_back(pair.receiver.create(sensor));
   }
 }
 
@@ -122,12 +118,12 @@ void InputModule::dataSpin() {
       MLOG(3) << "output queue state: size=" << queue_->size()
               << " (max=" << queue_->max_size << ") @ " << curr_time << " [ns]";
 
-      InputPacket::Ptr input(new InputPacket());
-      input->timestamp_ns = curr_time;
-      input->sensor_input = packet;
-      input->world_t_body = odom_T_body.target_p_source;
-      input->world_R_body = odom_T_body.target_R_source;
-      queue_->push(input);
+      auto data = std::make_shared<InputData>(receiver->sensor);
+      data->timestamp_ns = curr_time;
+      data->world_T_body = Eigen::Translation<double, 3>(odom_T_body.target_p_source) *
+                           odom_T_body.target_R_source;
+      packet->fillInputData(*data);
+      queue_->push(data);
     }
   }
 }

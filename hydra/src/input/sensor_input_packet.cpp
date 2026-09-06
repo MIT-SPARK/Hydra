@@ -53,14 +53,17 @@ inline bool sizesMatch(const cv::Mat& lhs, const cv::Mat& rhs) {
 
 }  // namespace
 
+SensorInputPacket::SensorInputPacket(uint64_t stamp) : timestamp_ns(stamp) {}
+
+SensorInputPacket::~SensorInputPacket() = default;
+
 bool SensorInputPacket::fillInputData(InputData& msg) const {
   msg.timestamp_ns = timestamp_ns;
   msg.feature = input_feature;
   return fillInputDataImpl(msg);
 }
 
-ImageInputPacket::ImageInputPacket(uint64_t stamp, const std::string& sensor_name)
-    : SensorInputPacket(stamp, sensor_name) {}
+ImageInputPacket::ImageInputPacket(uint64_t stamp) : SensorInputPacket(stamp) {}
 
 bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
   if (depth.empty()) {
@@ -105,8 +108,7 @@ bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
   return true;
 }
 
-CloudInputPacket::CloudInputPacket(uint64_t stamp, const std::string& sensor_name)
-    : SensorInputPacket(stamp, sensor_name) {}
+CloudInputPacket::CloudInputPacket(uint64_t stamp) : SensorInputPacket(stamp) {}
 
 bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   if (points.empty() || (labels.empty() && colors.empty())) {

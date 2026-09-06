@@ -15,7 +15,7 @@ static const auto registration_ =
     config::RegistrationWithConfig<DataReceiver,
                                    PointcloudReceiver,
                                    PointcloudReceiver::Config,
-                                   std::string>("PointcloudReceiver");
+                                   Sensor::ConstPtr>("PointcloudReceiver");
 
 }
 
@@ -32,8 +32,8 @@ void declare_config(PointcloudReceiver::Config& config) {
 }
 
 PointcloudReceiver::PointcloudReceiver(const Config& config,
-                                       const std::string& sensor_name)
-    : RosDataReceiver(config, sensor_name), config(config) {}
+                                       const Sensor::ConstPtr& sensor)
+    : RosDataReceiver(config, sensor), config(config) {}
 
 bool PointcloudReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);
@@ -46,7 +46,7 @@ void PointcloudReceiver::callback(const PointCloud2::ConstSharedPtr& msg) {
   const auto stamp = rclcpp::Time(msg->header.stamp).nanoseconds();
   MLOG(2) << "Got raw pointcloud input @ " << stamp << " [ns]";
 
-  auto packet = std::make_shared<CloudInputPacket>(stamp, sensor_name);
+  auto packet = std::make_shared<CloudInputPacket>(stamp);
   fillPointcloudPacket(
       *msg, *packet, config.instance_ids, config.discard_transparent_color);
   packet->in_world_frame = config.in_world_frame;

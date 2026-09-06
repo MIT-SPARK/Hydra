@@ -94,7 +94,7 @@ void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
   clustering_->updateGraph(layer, msg, graph, config.layer);
 
   timer.reset("traversability/sinks");
-  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_t_body, layer);
+  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_T_body().translation(), layer);
 }
 
 }  // namespace hydra::places

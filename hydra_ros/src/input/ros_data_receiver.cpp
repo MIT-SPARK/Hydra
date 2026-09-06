@@ -49,8 +49,8 @@ void declare_config(RosDataReceiver::Config& config) {
   field(config.ns, "ns");
 }
 
-RosDataReceiver::RosDataReceiver(const Config& config, const std::string& sensor_name)
-    : DataReceiver(config, sensor_name),
+RosDataReceiver::RosDataReceiver(const Config& config, const Sensor::ConstPtr& sensor)
+    : DataReceiver(config, sensor),
       config(config),
       ns_(getNamespace(config.ns, sensor_name)) {}
 

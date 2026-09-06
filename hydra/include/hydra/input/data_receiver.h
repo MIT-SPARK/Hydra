@@ -37,6 +37,7 @@
 #include "hydra/common/message_queue.h"
 #include "hydra/input/input_adapter.h"
 #include "hydra/input/input_filter.h"
+#include "hydra/input/sensor.h"
 #include "hydra/input/sensor_input_packet.h"
 #include "hydra/utils/logging.h"
 
@@ -59,7 +60,7 @@ class DataReceiver {
     std::vector<config::VirtualConfig<InputAdapter, true>> adapters;
   } const config;
 
-  DataReceiver(const Config& config, const std::string& sensor_name);
+  DataReceiver(const Config& config, const Sensor::ConstPtr& sensor);
   virtual ~DataReceiver() = default;
 
   bool init();
@@ -70,6 +71,7 @@ class DataReceiver {
 
   size_t numQueued() const;
 
+  const Sensor::ConstPtr sensor;
   const std::string sensor_name;
 
  protected:

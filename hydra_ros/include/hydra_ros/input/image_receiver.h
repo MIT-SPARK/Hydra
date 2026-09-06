@@ -58,7 +58,7 @@ class ImageReceiver : public RosDataReceiver {
     QoSConfig qos = rclcpp::SensorDataQoS();
   } const config;
 
-  ImageReceiver(const Config& config, const std::string& sensor_name);
+  ImageReceiver(const Config& config, const Sensor::ConstPtr& sensor);
 
   ~ImageReceiver();
 

@@ -46,7 +46,6 @@ void declare_config(DataReceiver::Config& config) {
   using namespace config;
   name("DataReceiver::Config");
   base<VerbosityConfig>(config);
-  field(config.sensor, "sensor");
   field(config.max_packets, "max_packets");
   field(config.input_separation_s, "input_separation_s");
   field(config.filters, "filters");
@@ -56,9 +55,10 @@ void declare_config(DataReceiver::Config& config) {
 DataReceiver::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
 
-DataReceiver::DataReceiver(const Config& config, const std::string& _sensor_name)
+DataReceiver::DataReceiver(const Config& config, const Sensor::ConstPtr& sensor)
     : config(config::checkValid(config)),
-      sensor_name(_sensor_name),
+      sensor(sensor),
+      sensor_name(sensor->name),
       queue_(config.max_packets) {
   for (const auto& filter : config.filters) {
     filters_.push_back(filter.create());
