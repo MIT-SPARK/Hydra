@@ -46,6 +46,7 @@ namespace hydra {
 
 struct InputData {
   using Ptr = std::shared_ptr<InputData>;
+  using ConstPtr = std::shared_ptr<const InputData>;
 
   // Types of the stored image data.
   using ColorType = cv::Vec3b;
@@ -86,6 +87,7 @@ struct InputData {
   TimeStamp timestamp_ns;
   //! Pose of the robot body in the world frame.
   Eigen::Isometry3d world_T_body;
+
   //! Color image as RGB.
   cv::Mat color_image;
   //! Color mask (primarily for backprojected LiDAR)
@@ -100,16 +102,19 @@ struct InputData {
   cv::Mat instance_image;
   //! 3D points of the range image in sensor or world frame.
   cv::Mat vertex_map;
+  //! Image of pixel-wise traversability estimates
+  cv::Mat traversability_image;
+  //! Feature associated with current input data
+  FeatureVector feature;
+  //! Features associated with each label
+  FeatureMap<int> label_features;
+
   //! Whether or not the vertex map is in the world frame (or sensor frame).
   bool points_in_world_frame = false;
   //! Min range observed in the range image.
   float min_range = 0.0f;
   //! Max range observed in the range image.
   float max_range = std::numeric_limits<float>::infinity();
-  //! Feature associated with current input data
-  FeatureVector feature;
-  //! Features associated with each label
-  FeatureMap<int> label_features;
 
  private:
   Sensor::ConstPtr sensor_;

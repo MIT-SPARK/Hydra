@@ -54,7 +54,7 @@ struct ActiveWindowOutput {
   //! Timestamp of update
   uint64_t timestamp_ns;
   //! Sensor data from last update
-  std::shared_ptr<InputData> sensor_data;
+  InputData::ConstPtr sensor_data;
   //! New nodes to add to the scene graph
   GraphUpdate graph_update;
   //! Archived blocks on this pass
