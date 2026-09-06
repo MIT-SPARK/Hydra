@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <deque>
+
 #include "hydra/common/message_queue.h"
 #include "hydra/input/input_adapter.h"
 #include "hydra/input/input_filter.h"
@@ -46,6 +48,7 @@ namespace hydra {
 class DataReceiver {
  public:
   using DataQueue = MessageQueue<SensorInputPacket::Ptr>;
+  using OutputQueue = MessageQueue<InputData::Ptr>;
 
   struct Config : VerbosityConfig {
     Config();
@@ -58,31 +61,48 @@ class DataReceiver {
     std::vector<config::VirtualConfig<InputFilter, true>> filters;
     //! Adapters to pre-process input packets
     std::vector<config::VirtualConfig<InputAdapter, true>> adapters;
+    //! Number of timestamps to keep for monitoring rate
+    size_t received_window_size = 100;
   } const config;
 
-  DataReceiver(const Config& config, const Sensor::ConstPtr& sensor);
-  virtual ~DataReceiver() = default;
+  DataReceiver(const Config& config,
+               const Sensor::ConstPtr& sensor,
+               const OutputQueue::Ptr& output);
+  virtual ~DataReceiver();
 
-  bool init();
+  bool start();
 
-  SensorInputPacket::Ptr poll();
+  void stop();
 
   void clear();
 
-  size_t numQueued() const;
-
-  void update(InputData& data) const;
+  struct RateStats {
+    size_t num_measurements = 0;
+    double mean = 0.0;
+    double min = 0.0;
+    double max = 0.0;
+    double median = 0.0;
+    double variance = 0.0;
+  };
+  RateStats getStats() const;
 
   const Sensor::ConstPtr sensor;
   const std::string sensor_name;
 
  protected:
-  SensorInputPacket::Ptr pollOnce();
+  void spin();
+
+  void pushPacket(SensorInputPacket::Ptr packet);
 
   virtual bool initImpl() = 0;
 
   DataQueue queue_;
+  OutputQueue::Ptr output_queue_;
+  std::atomic<bool> should_shutdown_{false};
+  std::unique_ptr<std::thread> thread_;
+
   SensorInputPacket::Ptr last_received_;
+  std::deque<int64_t> received_window_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
   std::vector<std::unique_ptr<InputAdapter>> adapters_;
 };

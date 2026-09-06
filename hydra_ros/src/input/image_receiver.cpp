@@ -144,7 +144,8 @@ static const auto registration =
     config::RegistrationWithConfig<DataReceiver,
                                    ImageReceiver,
                                    ImageReceiver::Config,
-                                   Sensor::ConstPtr>("ImageReceiver");
+                                   Sensor::ConstPtr,
+                                   DataReceiver::OutputQueue::Ptr>("ImageReceiver");
 
 cv::Mat parseColor(const Image& msg) {
   using namespace sensor_msgs::image_encodings;
@@ -520,6 +521,7 @@ struct ImageReceiver::Impl {
 void declare_config(ImageReceiver::Config& config) {
   using namespace config;
   name("ImageReceiver::Config");
+  base<RosDataReceiver::Config>(config);
   enum_field(config.semantics_type,
              "semantics_type",
              {{ImageReceiver::Config::SemanticsType::NONE, "none"},
@@ -531,8 +533,10 @@ void declare_config(ImageReceiver::Config& config) {
   field(config.qos, "qos");
 }
 
-ImageReceiver::ImageReceiver(const Config& config, const Sensor::ConstPtr& sensor)
-    : RosDataReceiver(config, sensor), config(config) {
+ImageReceiver::ImageReceiver(const Config& config,
+                             const Sensor::ConstPtr& sensor,
+                             const OutputQueue::Ptr& output)
+    : RosDataReceiver(config, sensor, output), config(config) {
   if (config.queue_size <= 2 && !config.use_exact) {
     LOG(WARNING) << "ApproximateTime policy requires queue sizes larger than 2";
   }

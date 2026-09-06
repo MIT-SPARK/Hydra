@@ -51,14 +51,14 @@ class RosInputModule : public InputModule {
     InputModule::Config remapSensors() const;
   } const config;
 
-  RosInputModule(const Config& config, const OutputQueue::Ptr& output_queue);
+  RosInputModule(const Config& config, const DataQueue::Ptr& output_queue);
 
   virtual ~RosInputModule();
 
   std::string printInfo() const override;
 
  protected:
-  PoseStatus getBodyPose(const SensorInputPacket& packet) override;
+  PoseStatus getBodyPose(const InputData& packet) override;
 
  protected:
   TFLookup lookup_;

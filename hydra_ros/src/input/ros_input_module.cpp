@@ -50,7 +50,7 @@ static const auto registration =
     config::RegistrationWithConfig<InputModule,
                                    RosInputModule,
                                    RosInputModule::Config,
-                                   InputModule::OutputQueue::Ptr>("RosInput");
+                                   InputModule::DataQueue::Ptr>("RosInput");
 
 inline bool isNumber(const std::string& name) {
   return std::find_if(name.begin(), name.end(), [](char c) {
@@ -87,7 +87,7 @@ InputModule::Config RosInputModule::Config::remapSensors() const {
   return to_return;
 }
 
-RosInputModule::RosInputModule(const Config& config, const OutputQueue::Ptr& queue)
+RosInputModule::RosInputModule(const Config& config, const DataQueue::Ptr& queue)
     : InputModule(config.remapSensors(), queue),
       config(config),
       lookup_(config.tf_lookup),
@@ -97,7 +97,7 @@ RosInputModule::~RosInputModule() = default;
 
 std::string RosInputModule::printInfo() const { return config::toString(config); }
 
-PoseStatus RosInputModule::getBodyPose(const SensorInputPacket& packet) {
+PoseStatus RosInputModule::getBodyPose(const InputData& packet) {
   const auto pose_status = lookup_.getBodyPose(packet.timestamp_ns);
   if (pose_status && !have_first_pose_) {
     have_first_pose_ = true;
@@ -108,6 +108,9 @@ PoseStatus RosInputModule::getBodyPose(const SensorInputPacket& packet) {
     for (auto& receiver : receivers_) {
       receiver->clear();
     }
+
+    // clear any forwarded packets from receivers
+    input_queue_->clear();
   }
 
   return pose_status;

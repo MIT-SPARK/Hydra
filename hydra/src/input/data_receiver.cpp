@@ -40,6 +40,8 @@
 
 #include <chrono>
 
+#include "hydra/common/global_info.h"
+
 namespace hydra {
 
 void declare_config(DataReceiver::Config& config) {
@@ -50,16 +52,20 @@ void declare_config(DataReceiver::Config& config) {
   field(config.input_separation_s, "input_separation_s");
   field(config.filters, "filters");
   field(config.adapters, "adapters");
+  field(config.received_window_size, "received_window_size");
 }
 
 DataReceiver::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
 
-DataReceiver::DataReceiver(const Config& config, const Sensor::ConstPtr& sensor)
+DataReceiver::DataReceiver(const Config& config,
+                           const Sensor::ConstPtr& sensor,
+                           const OutputQueue::Ptr& output)
     : config(config::checkValid(config)),
       sensor(sensor),
       sensor_name(sensor->name),
-      queue_(config.max_packets) {
+      queue_(config.max_packets),
+      output_queue_(output) {
   for (const auto& filter : config.filters) {
     filters_.push_back(filter.create());
   }
@@ -69,26 +75,51 @@ DataReceiver::DataReceiver(const Config& config, const Sensor::ConstPtr& sensor)
   }
 }
 
-bool DataReceiver::init() { return initImpl(); }
+DataReceiver::~DataReceiver() { stop(); }
 
-SensorInputPacket::Ptr DataReceiver::poll() {
-  while (!queue_.empty()) {
-    const auto packet = pollOnce();
-    if (packet) {
-      return packet;
-    }
-  }
-
-  return nullptr;
+bool DataReceiver::start() {
+  const auto success = initImpl();
+  thread_ = std::make_unique<std::thread>(&DataReceiver::spin, this);
+  return success;
 }
 
-SensorInputPacket::Ptr DataReceiver::pollOnce() {
-  if (queue_.empty()) {
-    return nullptr;
+void DataReceiver::stop() {
+  should_shutdown_ = true;
+  if (thread_) {
+    MLOG(1) << "stopping receiver '" << sensor_name << "'";
+    thread_->join();
+    thread_.reset();
+    MLOG(1) << "stopped receiver '" << sensor_name << "'";
+    MLOG(1) << "remaining in receiver '" << sensor_name << "' queue: " << queue_.size();
+  }
+}
+
+void DataReceiver::clear() { queue_.clear(); }
+
+void DataReceiver::spin() {
+  bool should_shutdown = false;
+  while (!should_shutdown) {
+    const auto has_data = queue_.poll();
+    if (GlobalInfo::instance().force_shutdown() || !has_data) {
+      should_shutdown = should_shutdown_;
+    }
+
+    if (!has_data) {
+      continue;
+    }
+
+    const auto packet = queue_.pop();
+    pushPacket(packet);
+  }
+}
+
+void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
+  const auto timestamp = packet->timestamp_ns;
+  received_window_.push_back(timestamp);
+  if (received_window_.size() > config.received_window_size) {
+    received_window_.pop_front();
   }
 
-  const auto packet = queue_.pop();
-  const auto timestamp = packet->timestamp_ns;
   const std::chrono::nanoseconds curr_time_ns(timestamp);
   if (last_received_) {
     std::chrono::nanoseconds last_time_ns(last_received_->timestamp_ns);
@@ -96,31 +127,69 @@ SensorInputPacket::Ptr DataReceiver::pollOnce() {
     if (separation_s.count() < config.input_separation_s) {
       MLOG(3) << "Dropping input @ " << timestamp << " [ns] with separation of "
               << separation_s.count() << " [s]";
-      return nullptr;
+      return;
     }
   }
 
   for (const auto& filter : filters_) {
     if (filter && !filter->valid(*packet, last_received_.get())) {
-      return nullptr;
+      return;
     }
   }
 
   MLOG(2) << "Got input @ " << timestamp << " [ns]";
   last_received_ = packet;
-  return last_received_;
-}
 
-void DataReceiver::clear() { queue_.clear(); }
-
-size_t DataReceiver::numQueued() const { return queue_.size(); }
-
-void DataReceiver::update(InputData& data) const {
+  auto data = std::make_shared<InputData>(sensor);
+  data->timestamp_ns = timestamp;
+  packet->fillInputData(*data);
   for (const auto& adapter : adapters_) {
     if (adapter) {
-      adapter->update(data);
+      adapter->update(*data);
     }
   }
+
+  output_queue_->push(data);
+}
+
+auto DataReceiver::getStats() const -> RateStats {
+  if (received_window_.size() <= 1) {
+    return {};
+  }
+
+  RateStats stats;
+  stats.num_measurements = received_window_.size() - 1;
+  stats.min = std::numeric_limits<double>::max();
+
+  std::vector<double> values(stats.num_measurements, 0.0);
+  for (size_t i = 1; i < received_window_.size(); ++i) {
+    const auto diff_ns = std::abs(received_window_[i] - received_window_[i - 1]);
+    const double diff_s = 1.0e-9 * diff_ns;
+    values[i - 1] = diff_s;
+
+    stats.min = std::min(stats.min, diff_s);
+    stats.max = std::max(stats.max, diff_s);
+    stats.mean += diff_s;
+  }
+
+  std::sort(values.begin(), values.end());
+  const auto mid = values.size() / 2;
+  if (values.size() % 2 == 0) {
+    // this is safe because values.size() >= 1 and 2 is the first value
+    // where this will trigger
+    stats.median = (values[mid] + values[mid + 1]) / 2.0;
+  } else {
+    stats.median = values[mid];
+  }
+
+  stats.mean /= stats.num_measurements;
+  for (const auto& value : values) {
+    const auto diff = value - stats.mean;
+    stats.variance += diff * diff;
+  }
+
+  stats.variance /= stats.num_measurements;
+  return stats;
 }
 
 }  // namespace hydra

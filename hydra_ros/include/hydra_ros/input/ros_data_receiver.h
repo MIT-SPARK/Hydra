@@ -44,7 +44,9 @@ class RosDataReceiver : public DataReceiver {
     std::string ns;
   } const config;
 
-  RosDataReceiver(const Config& config, const Sensor::ConstPtr& sensor);
+  RosDataReceiver(const Config& config,
+                  const Sensor::ConstPtr& sensor,
+                  const OutputQueue::Ptr& output);
   virtual ~RosDataReceiver() = default;
 
  protected:

@@ -15,7 +15,9 @@ static const auto registration_ =
     config::RegistrationWithConfig<DataReceiver,
                                    PointcloudReceiver,
                                    PointcloudReceiver::Config,
-                                   Sensor::ConstPtr>("PointcloudReceiver");
+                                   Sensor::ConstPtr,
+                                   DataReceiver::OutputQueue::Ptr>(
+        "PointcloudReceiver");
 
 }
 
@@ -32,8 +34,9 @@ void declare_config(PointcloudReceiver::Config& config) {
 }
 
 PointcloudReceiver::PointcloudReceiver(const Config& config,
-                                       const Sensor::ConstPtr& sensor)
-    : RosDataReceiver(config, sensor), config(config) {}
+                                       const Sensor::ConstPtr& sensor,
+                                       const OutputQueue::Ptr& output)
+    : RosDataReceiver(config, sensor, output), config(config) {}
 
 bool PointcloudReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);

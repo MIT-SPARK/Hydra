@@ -57,7 +57,7 @@ struct PoseStatus {
 
 class InputModule : public Module {
  public:
-  using OutputQueue = MessageQueue<InputData::Ptr>;
+  using DataQueue = MessageQueue<InputData::Ptr>;
   struct Config : VerbosityConfig {
     Config();
 
@@ -66,9 +66,10 @@ class InputModule : public Module {
       config::VirtualConfig<DataReceiver> receiver;
     };
     std::map<std::string, InputPair> inputs;
+    size_t spin_period_us = 100;
   } const config;
 
-  InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
+  InputModule(const Config& config, const DataQueue::Ptr& output_queue);
 
   virtual ~InputModule();
 
@@ -83,10 +84,11 @@ class InputModule : public Module {
 
   void stopImpl();
 
-  virtual PoseStatus getBodyPose(const SensorInputPacket& packet) = 0;
+  virtual PoseStatus getBodyPose(const InputData& data) = 0;
 
  protected:
-  OutputQueue::Ptr queue_;
+  DataQueue::Ptr input_queue_;
+  DataQueue::Ptr output_queue_;
   std::atomic<bool> should_shutdown_{false};
 
   std::vector<std::unique_ptr<DataReceiver>> receivers_;

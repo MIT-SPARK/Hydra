@@ -59,11 +59,17 @@ void declare_config(InputModule::Config& config) {
 InputModule::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("input")) {}
 
-InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
-    : config(config::checkValid(config)), queue_(queue) {
+InputModule::InputModule(const Config& config, const DataQueue::Ptr& output_queue)
+    : config(config::checkValid(config)),
+      input_queue_(new DataQueue()),
+      output_queue_(output_queue) {
   for (const auto& [name, pair] : config.inputs) {
-    Sensor::ConstPtr sensor = pair.sensor.create();
-    receivers_.emplace_back(pair.receiver.create(sensor));
+    Sensor::ConstPtr sensor = pair.sensor.create(name);
+    if (!sensor) {
+      throw std::runtime_error("Could not create valid sensor for '" + name + "'");
+    }
+
+    receivers_.emplace_back(pair.receiver.create(sensor, input_queue_));
   }
 }
 
@@ -71,7 +77,7 @@ InputModule::~InputModule() { stopImpl(); }
 
 void InputModule::start() {
   for (auto& receiver : receivers_) {
-    receiver->init();
+    receiver->start();
   }
 
   data_thread_.reset(new std::thread(&InputModule::dataSpin, this));
@@ -83,15 +89,15 @@ void InputModule::stop() { stopImpl(); }
 void InputModule::stopImpl() {
   should_shutdown_ = true;
 
+  for (auto& receiver : receivers_) {
+    receiver->stop();
+  }
+
   if (data_thread_) {
     MLOG(1) << "stopping input thread";
     data_thread_->join();
     data_thread_.reset();
     MLOG(1) << "stopped input thread";
-  }
-
-  for (size_t i = 0; i < receivers_.size(); ++i) {
-    MLOG(1) << "remaining in data queue[" << i << "]: " << receivers_[i]->numQueued();
   }
 }
 
@@ -99,33 +105,33 @@ std::string InputModule::printInfo() const { return config::toString(config); }
 
 void InputModule::dataSpin() {
   while (!should_shutdown_) {
-    for (const auto& receiver : receivers_) {
-      const auto packet = receiver->poll();
-      if (!packet) {
-        continue;
-      }
-
-      const auto curr_time = packet->timestamp_ns;
-      MLOG(2) << "popped input @ " << curr_time << " [ns]";
-
-      const auto odom_T_body = getBodyPose(*packet);
-      if (!odom_T_body) {
-        LOG(WARNING) << "[input] dropping input @ " << curr_time
-                     << " [ns] due to missing pose";
-        continue;
-      }
-
-      MLOG(3) << "output queue state: size=" << queue_->size()
-              << " (max=" << queue_->max_size << ") @ " << curr_time << " [ns]";
-
-      auto data = std::make_shared<InputData>(receiver->sensor);
-      data->timestamp_ns = curr_time;
-      data->world_T_body = Eigen::Translation<double, 3>(odom_T_body.target_p_source) *
-                           odom_T_body.target_R_source;
-      packet->fillInputData(*data);
-      receiver->update(*data);
-      queue_->push(data);
+    auto has_data = input_queue_->poll();
+    if (!has_data) {
+      continue;
     }
+
+    const auto data = input_queue_->pop();
+    if (!data) {
+      continue;
+    }
+
+    const auto curr_time = data->timestamp_ns;
+    MLOG(3) << "popped input @ " << curr_time << " [ns]";
+
+    const auto odom_T_body = getBodyPose(*data);
+    if (!odom_T_body) {
+      LOG(WARNING) << "[input] dropping input @ " << curr_time
+                   << " [ns] due to missing pose";
+      continue;
+    }
+
+    data->world_T_body = Eigen::Translation<double, 3>(odom_T_body.target_p_source) *
+                         odom_T_body.target_R_source;
+
+    MLOG(3) << "output queue state: size=" << output_queue_->size()
+            << " (max=" << output_queue_->max_size << ") @ " << curr_time << " [ns]";
+
+    output_queue_->push(data);
   }
 }
 

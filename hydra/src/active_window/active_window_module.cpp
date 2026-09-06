@@ -99,13 +99,13 @@ void ActiveWindowModule::stopImpl() {
     spin_thread_->join();
     spin_thread_.reset();
     MLOG(1) << "stopped!";
-  }
 
-  MLOG(1) << "input queue: " << input_queue_->size();
-  if (output_queue_) {
-    MLOG(1) << "output queue: " << output_queue_->size();
-  } else {
-    MLOG(1) << "output queue: n/a";
+    MLOG(1) << "input queue: " << input_queue_->size();
+    if (output_queue_) {
+      MLOG(1) << "output queue: " << output_queue_->size();
+    } else {
+      MLOG(1) << "output queue: n/a";
+    }
   }
 }
 

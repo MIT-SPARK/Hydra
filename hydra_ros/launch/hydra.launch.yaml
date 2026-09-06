@@ -49,6 +49,7 @@ launch:
         --config-utilities-yaml {print_missing: $(var print_missing), glog_level: $(var glog_level), glog_verbosity: $(var glog_verbosity)}
         --config-utilities-yaml {robot_id: $(var robot_id), odom_frame: $(var odom_frame), robot_frame: $(var robot_frame), map_frame: $(var map_frame)}
         --config-utilities-yaml {enable_zmq: $(var enable_zmq), backend: {zmq_sink: {url: $(var zmq_url), send_mesh: $(var zmq_send_mesh)}}}
+        --config-utilities-yaml {printing: {width: 86}}
         --config-utilities-yaml $(var extra_yaml)
   # hydra visualizer
   - arg: {name: graph_to_visualize, default: backend}

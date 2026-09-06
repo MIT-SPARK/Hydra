@@ -55,7 +55,10 @@ class PointcloudReceiver : public RosDataReceiver {
     QoSConfig qos = rclcpp::SensorDataQoS();
   } const config;
 
-  PointcloudReceiver(const Config& config, const Sensor::ConstPtr& sensor);
+  PointcloudReceiver(const Config& config,
+                     const Sensor::ConstPtr& sensor,
+                     const OutputQueue::Ptr& output);
+
   virtual ~PointcloudReceiver() = default;
 
  protected:
