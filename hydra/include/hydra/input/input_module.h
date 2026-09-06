@@ -66,7 +66,7 @@ class InputModule : public Module {
       config::VirtualConfig<DataReceiver> receiver;
     };
     std::map<std::string, InputPair> inputs;
-    size_t spin_period_us = 100;
+    size_t summary_period_ms = 500;
   } const config;
 
   InputModule(const Config& config, const DataQueue::Ptr& output_queue);
@@ -84,6 +84,8 @@ class InputModule : public Module {
 
   void stopImpl();
 
+  void summarize() const;
+
   virtual PoseStatus getBodyPose(const InputData& data) = 0;
 
  protected:
@@ -91,6 +93,7 @@ class InputModule : public Module {
   DataQueue::Ptr output_queue_;
   std::atomic<bool> should_shutdown_{false};
 
+  mutable std::chrono::time_point<std::chrono::high_resolution_clock> last_summary_;
   std::vector<std::unique_ptr<DataReceiver>> receivers_;
   std::unique_ptr<std::thread> data_thread_;
 };

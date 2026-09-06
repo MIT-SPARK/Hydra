@@ -113,12 +113,17 @@ void DataReceiver::spin() {
   }
 }
 
-void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
-  const auto timestamp = packet->timestamp_ns;
+void DataReceiver::recordTimestamp(uint64_t timestamp) {
+  std::lock_guard<std::mutex> lock(mutex_);
   received_window_.push_back(timestamp);
   if (received_window_.size() > config.received_window_size) {
     received_window_.pop_front();
   }
+}
+
+void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
+  const auto timestamp = packet->timestamp_ns;
+  recordTimestamp(timestamp);
 
   const std::chrono::nanoseconds curr_time_ns(timestamp);
   if (last_received_) {
@@ -153,26 +158,32 @@ void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
 }
 
 auto DataReceiver::getStats() const -> RateStats {
-  if (received_window_.size() <= 1) {
-    return {};
-  }
+  std::vector<double> values;
+  {  // critical section
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (received_window_.size() <= 1) {
+      return {};
+    }
+
+    values.resize(received_window_.size() - 1);
+    for (size_t i = 1; i < received_window_.size(); ++i) {
+      const auto diff_ns = std::abs(received_window_[i] - received_window_[i - 1]);
+      const double rate_hz = 1.0 / (1.0e-9 * diff_ns);
+      values[i - 1] = rate_hz;
+    }
+  }  // end critical section
+
+  std::sort(values.begin(), values.end());
 
   RateStats stats;
   stats.num_measurements = received_window_.size() - 1;
   stats.min = std::numeric_limits<double>::max();
-
-  std::vector<double> values(stats.num_measurements, 0.0);
-  for (size_t i = 1; i < received_window_.size(); ++i) {
-    const auto diff_ns = std::abs(received_window_[i] - received_window_[i - 1]);
-    const double diff_s = 1.0e-9 * diff_ns;
-    values[i - 1] = diff_s;
-
-    stats.min = std::min(stats.min, diff_s);
-    stats.max = std::max(stats.max, diff_s);
-    stats.mean += diff_s;
+  for (const auto& value : values) {
+    stats.min = std::min(stats.min, value);
+    stats.max = std::max(stats.max, value);
+    stats.mean += value;
   }
 
-  std::sort(values.begin(), values.end());
   const auto mid = values.size() / 2;
   if (values.size() % 2 == 0) {
     // this is safe because values.size() >= 1 and 2 is the first value
@@ -190,6 +201,22 @@ auto DataReceiver::getStats() const -> RateStats {
 
   stats.variance /= stats.num_measurements;
   return stats;
+}
+
+std::string DataReceiver::RateStats::str() const {
+  if (!num_measurements) {
+    return "n/a";
+  }
+
+  std::stringstream ss;
+  ss << std::setprecision(3) << "mean: " << mean;
+  if (num_measurements > 1) {
+    ss << std::setprecision(3) << " ± " << variance;
+  }
+
+  ss << " (min: " << min << ", max: " << max << ", median: " << median << ") [hz] over "
+     << num_measurements << " measurements";
+  return ss.str();
 }
 
 }  // namespace hydra

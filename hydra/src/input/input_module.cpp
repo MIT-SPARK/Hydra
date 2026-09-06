@@ -53,14 +53,15 @@ void declare_config(InputModule::Config& config) {
   name("InputModule::Config");
   base<VerbosityConfig>(config);
   field(config.inputs, "inputs");
+  field(config.summary_period_ms, "summary_period_ms");
   checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
 
 InputModule::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("input")) {}
 
-InputModule::InputModule(const Config& config, const DataQueue::Ptr& output_queue)
-    : config(config::checkValid(config)),
+InputModule::InputModule(const Config& _config, const DataQueue::Ptr& output_queue)
+    : config(config::checkValid(_config)),
       input_queue_(new DataQueue()),
       output_queue_(output_queue) {
   for (const auto& [name, pair] : config.inputs) {
@@ -103,8 +104,36 @@ void InputModule::stopImpl() {
 
 std::string InputModule::printInfo() const { return config::toString(config); }
 
+void InputModule::summarize() const {
+  using namespace std::chrono;
+  if (config.verbosity < 2 || config.summary_period_ms == 0) {
+    return;
+  }
+
+  const auto curr_time = high_resolution_clock::now();
+  const size_t diff_ms = duration_cast<milliseconds>(curr_time - last_summary_).count();
+  if (diff_ms < config.summary_period_ms) {
+    return;
+  }
+
+  last_summary_ = curr_time;
+  std::stringstream ss;
+  ss << "status:\n";
+  for (const auto& recv : receivers_) {
+    ss << "  - [" << recv->sensor_name << "] " << recv->getStats().str() << "\n";
+  }
+
+  ss << "  - [output] size: " << output_queue_->size()
+     << " (max: " << output_queue_->max_size << ")";
+  MLOG(2) << ss.str();
+}
+
 void InputModule::dataSpin() {
+  last_summary_ = std::chrono::high_resolution_clock::now();
+
   while (!should_shutdown_) {
+    summarize();
+
     auto has_data = input_queue_->poll();
     if (!has_data) {
       continue;
@@ -127,10 +156,6 @@ void InputModule::dataSpin() {
 
     data->world_T_body = Eigen::Translation<double, 3>(odom_T_body.target_p_source) *
                          odom_T_body.target_R_source;
-
-    MLOG(3) << "output queue state: size=" << output_queue_->size()
-            << " (max=" << output_queue_->max_size << ") @ " << curr_time << " [ns]";
-
     output_queue_->push(data);
   }
 }

@@ -62,7 +62,7 @@ class DataReceiver {
     //! Adapters to pre-process input packets
     std::vector<config::VirtualConfig<InputAdapter, true>> adapters;
     //! Number of timestamps to keep for monitoring rate
-    size_t received_window_size = 100;
+    size_t received_window_size = 21;
   } const config;
 
   DataReceiver(const Config& config,
@@ -83,6 +83,8 @@ class DataReceiver {
     double max = 0.0;
     double median = 0.0;
     double variance = 0.0;
+
+    std::string str() const;
   };
   RateStats getStats() const;
 
@@ -94,6 +96,8 @@ class DataReceiver {
 
   void pushPacket(SensorInputPacket::Ptr packet);
 
+  void recordTimestamp(uint64_t timestamp);
+
   virtual bool initImpl() = 0;
 
   DataQueue queue_;
@@ -102,9 +106,11 @@ class DataReceiver {
   std::unique_ptr<std::thread> thread_;
 
   SensorInputPacket::Ptr last_received_;
-  std::deque<int64_t> received_window_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
   std::vector<std::unique_ptr<InputAdapter>> adapters_;
+
+  mutable std::mutex mutex_;
+  std::deque<int64_t> received_window_;
 };
 
 void declare_config(DataReceiver::Config& config);

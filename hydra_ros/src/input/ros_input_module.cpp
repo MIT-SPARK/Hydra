@@ -69,7 +69,9 @@ void declare_config(RosInputModule::Config& config) {
 }
 
 InputModule::Config RosInputModule::Config::remapSensors() const {
-  InputModule::Config to_return;
+  InputModule::Config to_return = *this;
+  to_return.inputs.clear();  // technically not needed, but...
+
   for (const auto& [name, input_pair] : inputs) {
     auto sensor_name = name;
     if (isNumber(sensor_name)) {
