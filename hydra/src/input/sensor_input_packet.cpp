@@ -71,21 +71,23 @@ bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
     return false;
   }
 
-  if (color.empty() && labels.empty()) {
-    LOG(ERROR) << "Missing required images: color or label image must be set.";
-    return false;
-  }
-
+  msg.depth_image = depth;
   msg.color_image = color;
+  msg.label_image = labels;
+  msg.instance_image = instances;
+  msg.traversability_image = traversability;
+  // TODO(nathan) think about better copy
+  msg.label_features = label_features;
+
   if (color_is_bgr && !msg.color_image.empty()) {
     cv::cvtColor(msg.color_image, msg.color_image, cv::COLOR_BGR2RGB);
   }
 
-  msg.depth_image = depth;
-  msg.label_image = labels;
-  msg.instance_image = instances;
-  // TODO(nathan) think about better copy
-  msg.label_features = label_features;
+  if (!msg.color_image.empty() && !sizesMatch(msg.depth_image, msg.color_image)) {
+    LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
+               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    return false;
+  }
 
   if (!msg.label_image.empty() && !sizesMatch(msg.depth_image, msg.label_image)) {
     LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
@@ -94,13 +96,14 @@ bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
   }
 
   if (!msg.instance_image.empty() && !sizesMatch(msg.depth_image, msg.instance_image)) {
-    LOG(ERROR) << "Instance dimensions " << showImageDim(msg.label_image)
-               << " do not match depth dimensions " << showImageDim(msg.instance_image);
+    LOG(ERROR) << "Instance dimensions " << showImageDim(msg.instance_image)
+               << " do not match depth dimensions " << showImageDim(msg.depth_image);
     return false;
   }
 
-  if (!msg.color_image.empty() && !sizesMatch(msg.depth_image, msg.color_image)) {
-    LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
+  if (!msg.traversability_image.empty() &&
+      !sizesMatch(msg.depth_image, msg.traversability_image)) {
+    LOG(ERROR) << "Traversability dimensions " << showImageDim(msg.traversability_image)
                << " do not match depth dimensions " << showImageDim(msg.depth_image);
     return false;
   }
@@ -122,32 +125,36 @@ bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   msg.color_mask = color_mask;
   msg.label_image = labels;
   msg.instance_image = instances;
-
-  if (!msg.label_image.empty() && !sizesMatch(msg.vertex_map, msg.label_image)) {
-    LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
-               << " do not match pointcloud dimensions "
-               << showImageDim(msg.vertex_map);
-    return false;
-  }
-
-  if (!msg.instance_image.empty() && !sizesMatch(msg.vertex_map, msg.instance_image)) {
-    LOG(ERROR) << "Instance dimensions " << showImageDim(msg.instance_image)
-               << " do not match pointcloud dimensions "
-               << showImageDim(msg.vertex_map);
-    return false;
-  }
+  msg.traversability_image = traversability;
 
   if (!msg.color_image.empty() && !sizesMatch(msg.vertex_map, msg.color_image)) {
     LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
-               << " do not match pointcloud dimensions "
-               << showImageDim(msg.vertex_map);
+               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
     return false;
   }
 
   if (!msg.color_mask.empty() && !sizesMatch(msg.vertex_map, msg.color_mask)) {
     LOG(ERROR) << "Color mask dimensions " << showImageDim(msg.color_mask)
-               << " do not match pointcloud dimensions "
-               << showImageDim(msg.vertex_map);
+               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
+    return false;
+  }
+
+  if (!msg.label_image.empty() && !sizesMatch(msg.vertex_map, msg.label_image)) {
+    LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
+               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
+    return false;
+  }
+
+  if (!msg.instance_image.empty() && !sizesMatch(msg.vertex_map, msg.instance_image)) {
+    LOG(ERROR) << "Instance dimensions " << showImageDim(msg.instance_image)
+               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
+    return false;
+  }
+
+  if (!msg.traversability_image.empty() &&
+      !sizesMatch(msg.vertex_map, msg.traversability_image)) {
+    LOG(ERROR) << "Traversability dimensions " << showImageDim(msg.traversability_image)
+               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
     return false;
   }
 

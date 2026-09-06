@@ -60,14 +60,16 @@ struct SensorInputPacket {
 struct ImageInputPacket : public SensorInputPacket {
   explicit ImageInputPacket(uint64_t stamp);
 
-  //! Color for each pixel
-  cv::Mat color;
   //! Depth for each pixel
   cv::Mat depth;
+  //! Color for each pixel
+  cv::Mat color;
   //! Labels for each pixel
   cv::Mat labels;
   //! Instance IDs for each pixel
   cv::Mat instances;
+  //! Traversability estimates for each pixel
+  cv::Mat traversability;
   //! Features associated with each label
   FeatureMap<int> label_features;
   //! Whether or not the input color image is bgr order
@@ -92,6 +94,8 @@ struct CloudInputPacket : public SensorInputPacket {
   cv::Mat labels;
   //! Instance IDs for each point
   cv::Mat instances;
+  //! Traversability estimates for each point
+  cv::Mat traversability;
 
  protected:
   bool fillInputDataImpl(InputData& msg) const override;

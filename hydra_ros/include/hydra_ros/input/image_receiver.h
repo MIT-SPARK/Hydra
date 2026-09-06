@@ -50,6 +50,8 @@ class ImageReceiver : public RosDataReceiver {
     } semantics_type = SemanticsType::NONE;
     //! Whether or not to enable image-level features
     bool with_feature = false;
+    //! Whether or not to enable traversability image
+    bool with_traversability = false;
     //! Whether or not to use exact synchronization (versus approximate)
     bool use_exact = false;
     //! Queue depth for synchronization
