@@ -56,9 +56,9 @@ ColormappedLabelsAdapter::ColormappedLabelsAdapter(const Config& config)
 }
 
 void ColormappedLabelsAdapter::update(InputData& data) const {
-  const auto& colors = data.color_image;
+  const auto colors = data.label_image;
   if (colors.empty() || colors.channels() != 3) {
-    LOG(ERROR) << "Failed to decode color image to semantics!";
+    LOG(ERROR) << "Failed to decode label_image from colors to semantics!";
     return;
   }
 
