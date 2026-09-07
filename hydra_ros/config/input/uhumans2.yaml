@@ -3,7 +3,6 @@ input:
   type: RosInput
   tf_verbosity: 1
   clear_queue_on_fail: true
-  verbosity: 1
   inputs:
     left_cam:
       receiver: {type: ImageReceiver, semantics_type: closed_set, verbosity: 1, use_exact: true, queue_size: 5}

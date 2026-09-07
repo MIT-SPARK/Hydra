@@ -48,10 +48,10 @@ struct SensorInputPacket {
 
   //! Timestamp sensor input is acquired
   const uint64_t timestamp_ns;
-  //! Frame ID for sensor
-  std::string sensor_frame;
   //! Learned feature for the input data (e.g., CLIP for camera)
   FeatureVector input_feature;
+
+  // TODO(nathan) think about sharing more fields with derived inputs
 
  protected:
   virtual bool fillInputDataImpl(InputData& msg) const = 0;
