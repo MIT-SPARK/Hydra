@@ -58,9 +58,9 @@ class DeformationGraphBuilder : public GraphBuilderFunctor {
   DeformationGraphBuilder(const Config& config);
   virtual ~DeformationGraphBuilder();
 
-  virtual void call(const ActiveWindowOutput& msg,
-                    SharedDsgInfo& dsg,
-                    FrontendOutput& output) = 0;
+  void call(const ActiveWindowOutput& msg,
+            SharedDsgInfo& dsg,
+            FrontendOutput& output) override;
 
  protected:
   kimera_pgmo::Graph graph_;

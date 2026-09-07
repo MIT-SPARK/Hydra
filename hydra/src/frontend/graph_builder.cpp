@@ -85,14 +85,15 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.object_config, "objects");
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
+
+  config.deformation_graph_builder.setOptional();
+  field(config.deformation_graph_builder, "deformation_graph_builder");
   config.freespace_places.setOptional();
   field(config.freespace_places, "freespace_places");
   config.traversability_places.setOptional();
   field(config.traversability_places, "traversability_places");
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
-  config.deformation_graph_builder.setOptional();
-  field(config.deformation_graph_builder, "deformation_graph_builder");
 
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
@@ -123,8 +124,9 @@ GraphBuilder::GraphBuilder(const Config& config,
       tracker_(config.pose_graph_tracker.create()),
       surface_places_(config.surface_places.create(
           GlobalInfo::instance().labelspace().surface_places_labels)),
-      traversability_places_(config.traversability_places.create()),
+      deformation_graph_builder_(config.deformation_graph_builder.create()),
       freespace_places_(config.freespace_places.create()),
+      traversability_places_(config.traversability_places.create()),
       frontier_places_(config.frontier_places.create()),
       view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
@@ -139,14 +141,31 @@ GraphBuilder::GraphBuilder(const Config& config,
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   addInputCallback(
-      std::bind(&GraphBuilder::updateDeformationGraph, this, std::placeholders::_1));
-  addInputCallback(
       std::bind(&GraphBuilder::updatePoseGraph, this, std::placeholders::_1));
-  addInputCallback(std::bind(&GraphBuilder::updatePlaces, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updateFrontiers, this, std::placeholders::_1));
-  addInputCallback(std::bind(
-      &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
+
+  callbacks_.push_back([this](auto msg) {
+    if (msg && deformation_graph_builder_) {
+      deformation_graph_builder_->call(*msg, *dsg_, *curr_output_);
+    }
+  });
+
+  callbacks_.push_back([this](auto msg) {
+    if (msg && freespace_places_) {
+      freespace_places_->call(*msg, *dsg_, *curr_output_);
+    }
+  });
+
+  callbacks_.push_back([this](auto msg) {
+    if (msg && traversability_places_) {
+      traversability_places_->call(*msg, *dsg_, *curr_output_);
+    }
+  });
+
+  callbacks_.push_back([this](auto msg) {
+    if (msg && frontier_places_) {
+      frontier_places_->call(*msg, *dsg_, *curr_output_);
+    }
+  });
 
   addPostMeshCallback(
       std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
@@ -299,7 +318,7 @@ void GraphBuilder::setLcdQueue(const OutputQueue::Ptr& queue) {
 }
 
 void GraphBuilder::addInputCallback(InputCallback callback) {
-  input_callbacks_.push_back([callback](ActiveWindowOutput::Ptr msg) {
+  callbacks_.push_back([callback](ActiveWindowOutput::Ptr msg) {
     if (!msg) {
       return;
     }
@@ -380,7 +399,7 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 
   {  // start timing scope
     ScopedTimer timer("frontend/launch_callbacks", msg->timestamp_ns, true, 1, false);
-    launchCallbacks(input_callbacks_, msg);
+    launchCallbacks(callbacks_, msg);
   }
 
   {  // start timing scope
@@ -421,13 +440,7 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     MLOG(2) << "Updating mesh with " << mesh.numBlocks() << " blocks";
     const BlockMeshIter wrapper(mesh);
     last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
-  }  // end timing scope
-
-  {  // start timing scope
-    // TODO(nathan) we should probably have a mutex before modifying the mesh, but
-    // nothing else uses it at the moment
-    ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
+    // TODO(nathan) update mesh offsets with new delta
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
@@ -450,38 +463,6 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
     std::unique_lock<std::mutex> lock(dsg_->mutex);
     segmenter_->updateGraph(stamp, mesh_offsets_, clusters, *dsg_->graph);
   }  // end dsg critical section
-}
-
-void GraphBuilder::updateDeformationGraph(const ActiveWindowOutput& input) {
-  if (!deformation_graph_builder_) {
-    return;
-  }
-
-  deformation_graph_builder_->call(input, *dsg_, *curr_output_);
-}
-
-void GraphBuilder::updateFrontiers(const ActiveWindowOutput& input) {
-  if (!frontier_places_) {
-    return;
-  }
-
-  frontier_places_->call(input, *dsg_, *curr_output_);
-}
-
-void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
-  if (!freespace_places_) {
-    return;
-  }
-
-  freespace_places_->call(input, *dsg_, *curr_output_);
-}
-
-void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
-  if (!traversability_places_) {
-    return;
-  }
-
-  traversability_places_->call(input, *dsg_, *curr_output_);
 }
 
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {

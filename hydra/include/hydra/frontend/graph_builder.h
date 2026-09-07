@@ -89,10 +89,11 @@ class GraphBuilder : public Module {
 
     MeshSegmenter::Config object_config;
     config::VirtualConfig<SurfacePlaceExtractor> surface_places;
+
+    config::VirtualConfig<GraphBuilderFunctor> deformation_graph_builder;
     config::VirtualConfig<GraphBuilderFunctor> freespace_places;
     config::VirtualConfig<GraphBuilderFunctor> traversability_places;
     config::VirtualConfig<GraphBuilderFunctor> frontier_places;
-    config::VirtualConfig<GraphBuilderFunctor> deformation_graph_builder;
 
     config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
     //! Keyframes for feature assignment
@@ -139,17 +140,9 @@ class GraphBuilder : public Module {
  protected:
   void updateMesh(const ActiveWindowOutput& msg);
 
-  void updateFrontiers(const ActiveWindowOutput& msg);
-
-  void updatePlaces(const ActiveWindowOutput& msg);
-
-  void updateTraversabilityPlaces(const ActiveWindowOutput& msg);
-
   void updateObjects(const ActiveWindowOutput& msg);
 
   void updatePlaces2d(const ActiveWindowOutput& msg);
-
-  void updateDeformationGraph(const ActiveWindowOutput& msg);
 
   void updatePoseGraph(const ActiveWindowOutput& msg);
 
@@ -178,10 +171,12 @@ class GraphBuilder : public Module {
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
-  std::unique_ptr<GraphBuilderFunctor> traversability_places_;
-  std::unique_ptr<GraphBuilderFunctor> freespace_places_;
-  std::unique_ptr<GraphBuilderFunctor> frontier_places_;
+
   std::unique_ptr<GraphBuilderFunctor> deformation_graph_builder_;
+  std::unique_ptr<GraphBuilderFunctor> freespace_places_;
+  std::unique_ptr<GraphBuilderFunctor> traversability_places_;
+  std::unique_ptr<GraphBuilderFunctor> frontier_places_;
+
   ViewDatabase view_database_;
 
   spark_dsg::SceneGraphLogger frontend_graph_logger_;
@@ -196,7 +191,7 @@ class GraphBuilder : public Module {
  private:
   void stopImpl();
 
-  std::vector<std::function<void(ActiveWindowOutput::Ptr)>> input_callbacks_;
+  std::vector<std::function<void(ActiveWindowOutput::Ptr)>> callbacks_;
   std::vector<std::function<void(const ActiveWindowOutput&)>> post_mesh_callbacks_;
 };
 
