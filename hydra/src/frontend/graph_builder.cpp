@@ -138,6 +138,7 @@ GraphBuilder::GraphBuilder(const Config& config,
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
+  dsg_->graph->setMesh(global_info.createMesh());
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   addInputCallback(
@@ -440,7 +441,11 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     MLOG(2) << "Updating mesh with " << mesh.numBlocks() << " blocks";
     const BlockMeshIter wrapper(mesh);
     last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
-    // TODO(nathan) update mesh offsets with new delta
+  }  // end timing scope
+
+  {  // start timing scope
+    ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
+    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
