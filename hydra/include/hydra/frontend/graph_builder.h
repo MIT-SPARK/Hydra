@@ -82,7 +82,7 @@ class GraphBuilder : public Module {
     //! Whether or not to use mesh clustering for object extraction
     bool enable_mesh_objects = true;
     //! Compression resolution for mesh
-    double mesh_resolution = 0.1;
+    double mesh_resolution = 0.005;
 
     GraphUpdater::Config graph_updater;
     GraphConnector::Config graph_connector;

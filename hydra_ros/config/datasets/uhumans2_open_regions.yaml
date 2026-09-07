@@ -11,7 +11,7 @@ active_window:
   volumetric_map: {voxels_per_side: 16, voxel_size: 0.1, truncation_distance: 0.3}
   tsdf: {semantic_integrator: {type: SingleLabelIntegrator}}
 frontend:
-  pgmo: {d_graph_resolution: 2.5, mesh_resolution: 0.005}
+  mesh_resolution: 0.005
   objects: {min_cluster_size: 40, cluster_tolerance: 0.25}
   traversability_places:
     type: traversability
