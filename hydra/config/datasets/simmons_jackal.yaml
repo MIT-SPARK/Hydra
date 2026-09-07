@@ -11,10 +11,8 @@ active_window:
     semantic_integrator:
       type: MLESemanticIntegrator
 frontend:
-  pgmo:
-    time_horizon: 100.0
-    d_graph_resolution: 2.5
-    mesh_resolution: 0.005
+  mesh_resolution: 0.005
+  pgmo: {horizon_s: 100.0, resolution: 2.5}
   objects:
     min_cluster_size: 25
     cluster_tolerance: 0.18

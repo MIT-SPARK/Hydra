@@ -112,7 +112,9 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
 
 GvdPlaceExtractor::~GvdPlaceExtractor() {}
 
-void GvdPlaceExtractor::call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) {
+void GvdPlaceExtractor::call(const ActiveWindowOutput& msg,
+                             SharedDsgInfo& dsg,
+                             FrontendOutput&) {
   detect(msg);
 
   std::lock_guard<std::mutex> graph_lock(dsg.mutex);

@@ -152,7 +152,9 @@ FrontierExtractor::FrontierExtractor(const Config& config)
       next_node_id_(config.prefix, 0),
       map_window_(GlobalInfo::instance().createVolumetricWindow()) {}
 
-void FrontierExtractor::call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) {
+void FrontierExtractor::call(const ActiveWindowOutput& msg,
+                             SharedDsgInfo& dsg,
+                             FrontendOutput&) {
   const auto timestamp = msg.timestamp_ns;
   updateRecentBlocks(msg.world_T_body().translation(), msg.map().blockSize());
 

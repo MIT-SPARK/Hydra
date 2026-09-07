@@ -33,27 +33,40 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/mesh.h>
+#include <kimera_pgmo/utils/graph.h>
 
 #include <memory>
 
-#include "hydra/common/robot_prefix_config.h"
-#include "hydra/odometry/pose_graph_tracker.h"
+#include "hydra/frontend/graph_builder_functor.h"
+#include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
-class MeshDelta;
-}
+class MeshCompression;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 
-struct BackendInput {
-  using Ptr = std::shared_ptr<BackendInput>;
-  RobotPrefixConfig prefix;
-  uint64_t timestamp_ns;
-  uint64_t sequence_number;
-  pose_graph_tools::PoseGraph deformation_graph;
-  PoseGraphPacket agent_updates;
-  std::shared_ptr<kimera_pgmo::MeshDelta> mesh_update;
+class DeformationGraphBuilder : public GraphBuilderFunctor {
+ public:
+  struct Config : public VerbosityConfig {
+    Config();
+
+    double resolution = 1.5;
+    double horizon_s = 10.0;
+  } const config;
+
+  DeformationGraphBuilder(const Config& config);
+  virtual ~DeformationGraphBuilder();
+
+  void call(const ActiveWindowOutput& msg,
+            SharedDsgInfo& dsg,
+            FrontendOutput& output) override;
+
+ protected:
+  kimera_pgmo::Graph graph_;
+  std::unique_ptr<kimera_pgmo::MeshCompression> compression_;
 };
+
+void declare_config(DeformationGraphBuilder::Config& config);
 
 }  // namespace hydra

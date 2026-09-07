@@ -33,19 +33,40 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/scene_graph_types.h>
-
 #include <memory>
-#include <unordered_set>
-#include <vector>
+
+#include "hydra/common/robot_prefix_config.h"
+#include "hydra/odometry/pose_graph_tracker.h"
+
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 
-struct LcdInput {
-  using Ptr = std::shared_ptr<LcdInput>;
+struct FrontendOutput {
+  using Ptr = std::shared_ptr<FrontendOutput>;
+  using ConstPtr = std::shared_ptr<const FrontendOutput>;
+
+  FrontendOutput(uint64_t timestamp_ns, uint64_t sequence_number)
+      : timestamp_ns(timestamp_ns), sequence_number(sequence_number) {}
+
+  //! Timestamp of measurement used for update
   uint64_t timestamp_ns;
+  //! Sequence number of update
   uint64_t sequence_number;
+  //! Robot ID for update
+  RobotPrefixConfig prefix;
+  //! Updates to the mesh control points
+  pose_graph_tools::PoseGraph::Ptr deformation_graph;
+  //! Updates to the pose graph
+  PoseGraphPacket agent_updates;
+  //! Updates to the mesh
+  std::shared_ptr<kimera_pgmo::MeshDelta> mesh_update;
+
+  //! Archived place nodes (for LCD)
   std::unordered_set<spark_dsg::NodeId> archived_places;
+  //! New agent poses (for LCD)
   std::vector<spark_dsg::NodeId> new_agent_nodes;
 };
 

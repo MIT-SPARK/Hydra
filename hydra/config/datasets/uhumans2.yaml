@@ -12,10 +12,8 @@ active_window:
     semantic_integrator:
       type: SingleLabelIntegrator
 frontend:
-  pgmo:
-    time_horizon: 15.0
-    d_graph_resolution: 2.5
-    mesh_resolution: 0.005
+  mesh_resolution: 0.005
+  pgmo: {horizon_s: 15.0, resolution: 2.5}
   objects:
     min_cluster_size: 40
     cluster_tolerance: 0.25

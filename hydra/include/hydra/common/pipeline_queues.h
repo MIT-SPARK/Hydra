@@ -42,7 +42,7 @@
 
 namespace hydra {
 
-struct BackendInput;
+struct FrontendOutput;
 
 class PipelineQueues {
  public:
@@ -53,7 +53,7 @@ class PipelineQueues {
   void clear();
 
   //! Connection between frontend and backend
-  MessageQueue<std::shared_ptr<BackendInput>> backend_queue;
+  MessageQueue<std::shared_ptr<const FrontendOutput>> backend_queue;
   //! Connection between backend and LCD module
   MessageQueue<lcd::RegistrationSolution> backend_lcd_queue;
   //! Queue for receiving (timestamped) external loop closures

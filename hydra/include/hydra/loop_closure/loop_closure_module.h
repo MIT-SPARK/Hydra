@@ -41,15 +41,23 @@
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
-#include "hydra/loop_closure/lcd_input.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
+struct FrontendOutput;
+
 class LoopClosureModule : public Module {
  public:
+  using NodeVec = std::vector<spark_dsg::NodeId>;
   using NodeIdSet = std::unordered_set<spark_dsg::NodeId>;
+  using InputQueue = MessageQueue<std::shared_ptr<const FrontendOutput>>;
+  using NodeIdQueue =
+      std::priority_queue<spark_dsg::NodeId, NodeVec, std::greater<spark_dsg::NodeId>>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config();
+
     lcd::LcdDetector::Config detector;
     bool visualize_dsg_lcd = false;
     std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
@@ -75,7 +83,7 @@ class LoopClosureModule : public Module {
 
   lcd::LcdDetector& getDetector() const;
 
-  MessageQueue<LcdInput::Ptr>::Ptr queue() const;
+  InputQueue::Ptr queue() const;
 
  protected:
   void spinOnceImpl(bool force_update);
@@ -87,17 +95,14 @@ class LoopClosureModule : public Module {
   std::optional<spark_dsg::NodeId> getQueryAgentId(size_t timestamp_ns);
 
  protected:
-  MessageQueue<LcdInput::Ptr>::Ptr queue_;
+  InputQueue::Ptr queue_;
 
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   uint64_t last_sequence_number_ = 0;
 
   SharedModuleState::Ptr state_;
-  std::priority_queue<spark_dsg::NodeId,
-                      std::vector<spark_dsg::NodeId>,
-                      std::greater<spark_dsg::NodeId>>
-      agent_queue_;
+  NodeIdQueue agent_queue_;
   std::list<spark_dsg::NodeId> potential_lcd_root_nodes_;
 
   std::unique_ptr<lcd::LcdDetector> lcd_detector_;

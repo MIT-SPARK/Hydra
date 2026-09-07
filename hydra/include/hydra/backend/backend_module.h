@@ -43,7 +43,6 @@
 #include <mutex>
 #include <thread>
 
-#include "hydra/backend/backend_input.h"
 #include "hydra/backend/dsg_updater.h"
 #include "hydra/backend/external_loop_closure_receiver.h"
 #include "hydra/backend/optimization_hook.h"
@@ -51,6 +50,7 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
+#include "hydra/frontend/frontend_output.h"
 
 namespace hydra {
 
@@ -75,6 +75,9 @@ struct BackendModuleStatus {
   std::optional<double> last_opt_s = 0.0;
   std::optional<double> last_mesh_update_s = 0.0;
 };
+
+// TODO(nathan) drop this shim typedef when khronos is updated
+using BackendInput = FrontendOutput;
 
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
@@ -134,11 +137,11 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                       const gtsam::Pose3& src_T_dest,
                       double variance);
 
-  void updateFactorGraph(const BackendInput& input);
+  void updateFactorGraph(const FrontendOutput& input);
 
   bool updateFromLcdQueue();
 
-  void copyMeshDelta(const BackendInput& input);
+  void copyMeshDelta(const FrontendOutput& input);
 
   bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
 

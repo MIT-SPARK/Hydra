@@ -38,9 +38,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/compression/block_compression.h>
 #include <kimera_pgmo/compression/delta_compression.h>
-#include <kimera_pgmo/utils/common_functions.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
@@ -48,8 +46,9 @@
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
+#include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/mesh_segmenter.h"
-#include "hydra/utils/pgmo_mesh_interface.h"
+#include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
@@ -75,56 +74,59 @@ void declare_config(GraphBuilder::Config& config) {
   name("GraphBuilder::Config");
   base<VerbosityConfig>(config);
 
-  {
-    NameSpace ns("pgmo");
-    field(config.pgmo.mesh_resolution, "mesh_resolution");
-    field(config.pgmo.d_graph_resolution, "d_graph_resolution");
-    field(config.pgmo.time_horizon, "time_horizon");
-  }
-
-  field(config.graph_connector, "graph_connector");
-  field(config.graph_updater, "graph_updater");
-  config.pose_graph_tracker.setOptional();
-  field(config.pose_graph_tracker, "pose_graph_tracker");
-
+  field(config.no_packet_collation, "no_packet_collation");
+  field(config.clear_object_meshes, "clear_object_meshes");
   field(config.enable_mesh_objects, "enable_mesh_objects");
+  field(config.mesh_resolution, "mesh_resolution");
+
+  field(config.graph_updater, "graph_updater");
+  field(config.graph_connector, "graph_connector");
+
   field(config.object_config, "objects");
-  // surface (i.e., 2D) places
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
 
-  // traversability places
-  config.traversability_places.setOptional();
-  field(config.traversability_places, "traversability_places");
-  // freespace (i.e., 3D) places
+  config.deformation_graph_builder.setOptional();
+  field(config.deformation_graph_builder, "deformation_graph_builder");
   config.freespace_places.setOptional();
   field(config.freespace_places, "freespace_places");
-  // frontier (i.e. 3D, boundary to unknown space) places
+  config.traversability_places.setOptional();
+  field(config.traversability_places, "traversability_places");
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
 
+  config.pose_graph_tracker.setOptional();
+  field(config.pose_graph_tracker, "pose_graph_tracker");
   field(config.view_database, "view_database");
   field(config.sinks, "sinks");
-  field(config.no_packet_collation, "no_packet_collation");
-  field(config.clear_object_meshes, "clear_object_meshes");
+
+  check(config.mesh_resolution, GT, 0.0, "mesh_resolution");
 }
+
+GraphBuilder::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")),
+      graph_updater({{DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}),
+      deformation_graph_builder(DeformationGraphBuilder::Config()),
+      pose_graph_tracker(PoseGraphFromOdom::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
                            const SharedDsgInfo::Ptr& dsg,
                            const SharedModuleState::Ptr& state)
     : config(config::checkValid(config)),
-      sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       queue_(std::make_shared<InputQueue>()),
+      sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       dsg_(dsg),
       state_(state),
+      mesh_compression_(new kimera_pgmo::DeltaCompression(config.mesh_resolution)),
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
       tracker_(config.pose_graph_tracker.create()),
       surface_places_(config.surface_places.create(
           GlobalInfo::instance().labelspace().surface_places_labels)),
-      traversability_places_(config.traversability_places.create()),
+      deformation_graph_builder_(config.deformation_graph_builder.create()),
       freespace_places_(config.freespace_places.create()),
+      traversability_places_(config.traversability_places.create()),
       frontier_places_(config.frontier_places.create()),
       view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
@@ -138,21 +140,33 @@ GraphBuilder::GraphBuilder(const Config& config,
   CHECK(dsg_->graph != nullptr);
   dsg_->graph->setMesh(global_info.createMesh());
 
-  mesh_compression_.reset(
-      new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
-  deformation_compression_.reset(
-      new kimera_pgmo::BlockCompression(config.pgmo.d_graph_resolution));
-
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   addInputCallback(
-      std::bind(&GraphBuilder::updateDeformationGraph, this, std::placeholders::_1));
-  addInputCallback(
       std::bind(&GraphBuilder::updatePoseGraph, this, std::placeholders::_1));
-  addInputCallback(std::bind(&GraphBuilder::updatePlaces, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updateFrontiers, this, std::placeholders::_1));
-  addInputCallback(std::bind(
-      &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
+
+  callbacks_.push_back([this](auto msg) {
+    if (msg && deformation_graph_builder_) {
+      deformation_graph_builder_->call(*msg, *dsg_, *curr_output_);
+    }
+  });
+
+  callbacks_.push_back([this](auto msg) {
+    if (msg && freespace_places_) {
+      freespace_places_->call(*msg, *dsg_, *curr_output_);
+    }
+  });
+
+  callbacks_.push_back([this](auto msg) {
+    if (msg && traversability_places_) {
+      traversability_places_->call(*msg, *dsg_, *curr_output_);
+    }
+  });
+
+  callbacks_.push_back([this](auto msg) {
+    if (msg && frontier_places_) {
+      frontier_places_->call(*msg, *dsg_, *curr_output_);
+    }
+  });
 
   addPostMeshCallback(
       std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
@@ -167,7 +181,7 @@ GraphBuilder::~GraphBuilder() {
 
 void GraphBuilder::start() {
   spin_thread_.reset(new std::thread(&GraphBuilder::spin, this));
-  LOG(INFO) << "[Hydra Frontend] started!";
+  MLOG(0) << "started!";
 }
 
 void GraphBuilder::stop() { stopImpl(); }
@@ -176,13 +190,12 @@ void GraphBuilder::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
-    VLOG(2) << "[Hydra Frontend] stopping frontend!";
+    MLOG(1) << "stopping frontend!";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra Frontend] stopped!";
+    MLOG(1) << "stopped!";
+    MLOG(1) << queue_->size() << " messages left";
   }
-
-  VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
 void GraphBuilder::save(const DataDirectory& output) {
@@ -301,12 +314,12 @@ void GraphBuilder::addSink(const Sink::Ptr& sink) {
   }
 }
 
-void GraphBuilder::setLcdQueue(const MessageQueue<LcdInput::Ptr>::Ptr& queue) {
+void GraphBuilder::setLcdQueue(const OutputQueue::Ptr& queue) {
   lcd_input_queue_ = queue;
 }
 
 void GraphBuilder::addInputCallback(InputCallback callback) {
-  input_callbacks_.push_back([callback](ActiveWindowOutput::Ptr msg) {
+  callbacks_.push_back([callback](ActiveWindowOutput::Ptr msg) {
     if (!msg) {
       return;
     }
@@ -325,24 +338,16 @@ void GraphBuilder::dispatchSpin(ActiveWindowOutput::Ptr msg) {
 }
 
 void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
-  VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns << " [ns]";
+  MLOG(2) << "Popped input packet @ " << msg->timestamp_ns << " [ns]";
   std::lock_guard<std::mutex> lock(mutex_);
   ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
-  backend_input_.reset(new BackendInput());
-  backend_input_->timestamp_ns = msg->timestamp_ns;
-  backend_input_->sequence_number = sequence_number_;
-  if (lcd_input_queue_) {
-    lcd_input_.reset(new LcdInput());
-    lcd_input_->timestamp_ns = msg->timestamp_ns;
-    lcd_input_->sequence_number = sequence_number_;
-  }
-
+  curr_output_ = std::make_shared<FrontendOutput>(msg->timestamp_ns, sequence_number_);
   updateImpl(msg);
+  curr_output_->mesh_update = std::move(last_mesh_update_);
 
   // TODO(nathan) ideally make the copy lighter-weight
   // we need to copy over the latest updates to the backend and to LCD
-  // no fancy threading: we just mark the update time and copy all changes in one go
   {  // start critical section
     std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_graph", msg->timestamp_ns);
@@ -350,26 +355,24 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     state_->backend_graph->graph->mergeGraph(*dsg_->graph);
   }  // end critical section
 
-  if (lcd_input_queue_) {
-    // n.b., critical section in this scope!
+  if (lcd_input_queue_) {  // LCD graph critical section
     std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_lcd_graph", msg->timestamp_ns);
     state_->lcd_graph->sequence_number = sequence_number_;
     state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
-  backend_input_->mesh_update = std::move(last_mesh_update_);
-  PipelineQueues::instance().backend_queue.push(backend_input_);
+  PipelineQueues::instance().backend_queue.push(curr_output_);
   if (lcd_input_queue_) {
-    lcd_input_queue_->push(lcd_input_);
+    lcd_input_queue_->push(curr_output_);
   }
 
   // mutex not required because nothing is modifying the graph
   frontend_graph_logger_.logGraph(*dsg_->graph);
 
-  if (dsg_->graph && backend_input_) {
+  if (dsg_->graph && curr_output_) {
     ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
-    Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *backend_input_);
+    Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *curr_output_);
   }
 
   ++sequence_number_;
@@ -397,7 +400,7 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 
   {  // start timing scope
     ScopedTimer timer("frontend/launch_callbacks", msg->timestamp_ns, true, 1, false);
-    launchCallbacks(input_callbacks_, msg);
+    launchCallbacks(callbacks_, msg);
   }
 
   {  // start timing scope
@@ -435,14 +438,12 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
 
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh.numBlocks() << " blocks";
+    MLOG(2) << "Updating mesh with " << mesh.numBlocks() << " blocks";
     const BlockMeshIter wrapper(mesh);
     last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
   }  // end timing scope
 
   {  // start timing scope
-    // TODO(nathan) we should probably have a mutex before modifying the mesh, but
-    // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
     last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
   }  // end timing scope
@@ -469,59 +470,6 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
   }  // end dsg critical section
 }
 
-void GraphBuilder::updateDeformationGraph(const ActiveWindowOutput& input) {
-  ScopedTimer timer("frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
-  double time_s =
-      std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
-  auto interface = PgmoMeshLayerInterface(input.map().getMeshLayer());
-
-  pcl::PointCloud<pcl::PointXYZRGBA> new_vertices;
-  std::vector<size_t> new_indices;
-  std::vector<pcl::Vertices> new_triangles;
-  kimera_pgmo::HashedIndexMapping new_remapping;
-  deformation_compression_->pruneStoredMesh(time_s - config.pgmo.time_horizon);
-  deformation_compression_->compressAndIntegrate(
-      interface, new_vertices, new_triangles, new_indices, new_remapping, time_s);
-
-  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
-      new pcl::PointCloud<pcl::PointXYZRGBA>());
-  deformation_compression_->getVertices(vertices);
-
-  // Add nodes and edges to graph
-  const auto new_edges =
-      deformation_graph_.addPointsAndSurfaces(new_indices, new_triangles);
-  if (backend_input_) {
-    backend_input_->deformation_graph = *CHECK_NOTNULL(kimera_pgmo::makePoseGraph(
-        prefix.id, time_s, new_edges, new_indices, *vertices));
-  }
-}
-
-void GraphBuilder::updateFrontiers(const ActiveWindowOutput& input) {
-  if (!frontier_places_) {
-    return;
-  }
-
-  frontier_places_->call(input, *dsg_);
-}
-
-void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
-  if (!freespace_places_) {
-    return;
-  }
-
-  freespace_places_->call(input, *dsg_);
-}
-
-void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
-  if (!traversability_places_) {
-    return;
-  }
-
-  traversability_places_->call(input, *dsg_);
-}
-
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   if (!surface_places_) {
     return;
@@ -542,23 +490,19 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
   ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
 
   PoseGraphPacket packet;
   while (!pose_graph_updates_.empty()) {
     packet.updateFrom(pose_graph_updates_.pop());
   }
 
-  if (backend_input_) {
-    backend_input_->agent_updates = packet;
-  }
+  curr_output_->agent_updates = packet;
 
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   // TODO(nathan) thinking about locking more
   std::lock_guard<std::mutex> lock(dsg_->mutex);
   const auto new_node_ids = packet.addToGraph(*dsg_->graph, prefix.id);
-  if (lcd_input_) {
-    lcd_input_->new_agent_nodes = new_node_ids;
-  }
+  curr_output_->new_agent_nodes = new_node_ids;
 }
 
 }  // namespace hydra

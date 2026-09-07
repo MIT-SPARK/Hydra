@@ -42,7 +42,7 @@
 
 #include "hydra/common/global_info.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/loop_closure/lcd_input.h"  // IWYU pragma: keep
+#include "hydra/frontend/frontend_output.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;
@@ -63,6 +63,7 @@ using hydra::timing::ScopedTimer;
 void declare_config(LoopClosureModule::Config& config) {
   using namespace config;
   name("LoopClosureConfig");
+  base<VerbosityConfig>(config);
   field(config.detector, "lcd");
   field(config.visualize_dsg_lcd, "visualize_dsg_lcd");
   field(config.lcd_visualizer_ns, "lcd_visualizer_ns");
@@ -70,10 +71,13 @@ void declare_config(LoopClosureModule::Config& config) {
   field(config.descriptor_creation_horizon_m, "descriptor_creation_horizon_m");
 }
 
+LoopClosureModule::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("lcd")) {}
+
 LoopClosureModule::LoopClosureModule(const Config& config,
                                      const SharedModuleState::Ptr& state)
     : config(config),
-      queue_(std::make_shared<MessageQueue<LcdInput::Ptr>>()),
+      queue_(std::make_shared<InputQueue>()),
       state_(state),
       lcd_graph_(new SceneGraph()) {
   lcd_detector_.reset(new lcd::LcdDetector(config.detector));
@@ -83,20 +87,18 @@ LoopClosureModule::~LoopClosureModule() { stopImpl(); }
 
 void LoopClosureModule::start() {
   spin_thread_.reset(new std::thread(&LoopClosureModule::spin, this));
-  LOG(INFO) << "[Hydra LCD] LCD started!";
+  MLOG(0) << "LCD started!";
 }
 
 void LoopClosureModule::stop() { stopImpl(); }
 
 void LoopClosureModule::stopImpl() {
-  VLOG(2) << "[Hydra LCD] stopping lcd!";
-
   should_shutdown_ = true;
   if (spin_thread_) {
-    VLOG(2) << "[Hydra LCD] joining thread";
+    MLOG(1) << "joining thread";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra LCD] joined thread";
+    MLOG(1) << "joined thread";
   }
 }
 
@@ -145,7 +147,7 @@ bool LoopClosureModule::spinOnce(bool force_update) {
 
 lcd::LcdDetector& LoopClosureModule::getDetector() const { return *lcd_detector_; }
 
-MessageQueue<LcdInput::Ptr>::Ptr LoopClosureModule::queue() const { return queue_; }
+auto LoopClosureModule::queue() const -> InputQueue::Ptr { return queue_; }
 
 void LoopClosureModule::spinOnceImpl(bool force_update) {
   const size_t timestamp_ns = processFrontendOutput();
@@ -168,7 +170,7 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
     const auto to_cache = getPlacesToCache(attrs.position);
 
     if (!to_cache.empty()) {
-      VLOG(5) << "[Hydra LCD] Constructing descriptors for "
+      MLOG(3) << "Constructing descriptors for "
               << displayNodeSymbolContainer(to_cache);
       lcd_detector_->updateDescriptorCache(*lcd_graph_, to_cache, timestamp_ns);
     }
@@ -191,16 +193,15 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 }
 
 size_t LoopClosureModule::processFrontendOutput() {
-  const auto& msg = queue_->front();
-  VLOG(5) << "[Hydra LCD] Received archived places: "
+  const FrontendOutput::ConstPtr& msg = queue_->front();
+  MLOG(3) << "Received archived places: "
           << displayNodeSymbolContainer(msg->archived_places);
 
   potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
                                    msg->archived_places.begin(),
                                    msg->archived_places.end());
 
-  VLOG(5) << "[Hydra LCD] Adding nodes: "
-          << displayNodeSymbolContainer(msg->new_agent_nodes);
+  MLOG(3) << "Adding nodes: " << displayNodeSymbolContainer(msg->new_agent_nodes);
   for (const auto& node : msg->new_agent_nodes) {
     agent_queue_.push(node);
   }
@@ -218,8 +219,7 @@ auto LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos)
   while (iter != potential_lcd_root_nodes_.end()) {
     auto node_opt = lcd_graph_->findNode(*iter);
     if (!node_opt) {
-      VLOG(5) << "[Hydra LCD] Deleted place " << NodeSymbol(*iter).str()
-              << " found in LCD queue";
+      MLOG(3) << "Deleted place " << NodeSymbol(*iter).str() << " found in LCD queue";
       iter = potential_lcd_root_nodes_.erase(iter);
       continue;
     }

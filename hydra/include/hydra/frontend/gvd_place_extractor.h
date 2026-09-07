@@ -76,7 +76,9 @@ class GvdPlaceExtractor : public GraphBuilderFunctor {
 
   virtual ~GvdPlaceExtractor();
 
-  void call(const ActiveWindowOutput& msg, SharedDsgInfo& graph) override;
+  void call(const ActiveWindowOutput& msg,
+            SharedDsgInfo& graph,
+            FrontendOutput& output) override;
 
   void detect(const ActiveWindowOutput& msg);
 
