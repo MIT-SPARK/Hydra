@@ -41,7 +41,7 @@
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/input/data_receiver.h"
-#include "hydra/input/input_packet.h"
+#include "hydra/input/input_data.h"
 
 namespace hydra {
 
@@ -57,16 +57,19 @@ struct PoseStatus {
 
 class InputModule : public Module {
  public:
-  using OutputQueue = MessageQueue<InputPacket::Ptr>;
-  struct Config {
+  using DataQueue = MessageQueue<InputData::Ptr>;
+  struct Config : VerbosityConfig {
+    Config();
+
     struct InputPair {
-      config::VirtualConfig<DataReceiver> receiver;
       config::VirtualConfig<Sensor> sensor;
+      config::VirtualConfig<DataReceiver> receiver;
     };
     std::map<std::string, InputPair> inputs;
+    size_t summary_period_ms = 500;
   } const config;
 
-  InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
+  InputModule(const Config& config, const DataQueue::Ptr& output_queue);
 
   virtual ~InputModule();
 
@@ -81,12 +84,16 @@ class InputModule : public Module {
 
   void stopImpl();
 
-  virtual PoseStatus getBodyPose(const SensorInputPacket& packet) = 0;
+  void summarize() const;
+
+  virtual PoseStatus getBodyPose(const InputData& data) = 0;
 
  protected:
-  OutputQueue::Ptr queue_;
+  DataQueue::Ptr input_queue_;
+  DataQueue::Ptr output_queue_;
   std::atomic<bool> should_shutdown_{false};
 
+  mutable std::chrono::time_point<std::chrono::high_resolution_clock> last_summary_;
   std::vector<std::unique_ptr<DataReceiver>> receivers_;
   std::unique_ptr<std::thread> data_thread_;
 };

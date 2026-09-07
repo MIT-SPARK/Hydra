@@ -33,29 +33,30 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Geometry>
-
-#include "hydra/input/sensor_input_packet.h"
+#include <rclcpp/qos.hpp>
 
 namespace hydra {
 
-struct InputData;
+struct QoSConfig {
+  //! Message queue depth; 0 defaults to KEEP_ALL history setting
+  size_t depth = 1;
+  //! Reliability setting
+  rclcpp::ReliabilityPolicy reliability = rclcpp::ReliabilityPolicy::SystemDefault;
+  //! Durability setting
+  rclcpp::DurabilityPolicy durability = rclcpp::DurabilityPolicy::SystemDefault;
+  //! Liveliness
+  rclcpp::LivelinessPolicy liveliness = rclcpp::LivelinessPolicy::SystemDefault;
 
-struct InputPacket {
-  using Ptr = std::shared_ptr<InputPacket>;
+  QoSConfig() = default;
+  QoSConfig(const rclcpp::QoS& qos);
+  QoSConfig(size_t depth,
+            rclcpp::ReliabilityPolicy reliability,
+            rclcpp::DurabilityPolicy durability,
+            rclcpp::LivelinessPolicy liveliness);
 
-  uint64_t timestamp_ns;
-
-  SensorInputPacket::Ptr sensor_input;
-  Eigen::Vector3d world_t_body;
-  Eigen::Quaterniond world_R_body;
-
-  virtual ~InputPacket() = default;
-  virtual bool fillInputData(InputData& data) const;
-
-  Eigen::Isometry3d world_T_body() const {
-    return Eigen::Translation<double, 3>(world_t_body) * world_R_body;
-  }
+  operator rclcpp::QoS() const;
 };
+
+void declare_config(QoSConfig& config);
 
 }  // namespace hydra

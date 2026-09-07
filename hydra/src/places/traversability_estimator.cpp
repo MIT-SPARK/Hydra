@@ -251,7 +251,7 @@ void HeightTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg) {
   }
 
   // Erase archived blocks.
-  tsdf_layer_->removeBlocks(msg.archived_mesh_indices);
+  tsdf_layer_->removeBlocks(msg.archived);
   const BlockIndexSet blocks_2d =
       get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
   for (const auto& block_index : traversability_layer_->allocatedBlockIndices()) {
@@ -281,10 +281,11 @@ void HeightTraversabilityEstimator::computeTraversability(
   const BlockIndexSet updated_blocks_2d =
       get2DBlockIndices(msg.map().getTsdfLayer().allocatedBlockIndices());
 
+  const auto curr_z = msg.world_T_body().translation().z();
   const VoxelKey min_height =
-      tsdf_layer_->getVoxelKey(Point(0, 0, msg.world_t_body.z() - config.height_below));
+      tsdf_layer_->getVoxelKey(Point(0, 0, curr_z - config.height_below));
   const VoxelKey max_height =
-      tsdf_layer_->getVoxelKey(Point(0, 0, msg.world_t_body.z() + config.height_above));
+      tsdf_layer_->getVoxelKey(Point(0, 0, curr_z + config.height_above));
   const int voxels_per_side = tsdf_layer_->voxels_per_side;
   const float voxel_size = tsdf_layer_->voxel_size;
   const int num_voxels =
@@ -389,7 +390,7 @@ void GradientTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg) 
   }
 
   // Erase archived blocks.
-  tsdf_layer_->removeBlocks(msg.archived_mesh_indices);
+  tsdf_layer_->removeBlocks(msg.archived);
   const BlockIndexSet blocks_2d =
       get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
   for (const auto& block_index : traversability_layer_->allocatedBlockIndices()) {
@@ -417,7 +418,7 @@ void GradientTraversabilityEstimator::computeTraversability(
     const ActiveWindowOutput& msg) {
   const auto updated_blocks_2d =
       get2DBlockIndices(msg.map().getTsdfLayer().allocatedBlockIndices());
-  const float robot_z = msg.world_t_body.z();
+  const float robot_z = msg.world_T_body().translation().z();
   const int voxels_per_side = tsdf_layer_->voxels_per_side;
 
   // PASS 1: Extract heights from ALL currently allocated TSDF blocks (not just

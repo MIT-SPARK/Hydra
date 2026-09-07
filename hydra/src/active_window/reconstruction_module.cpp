@@ -42,10 +42,7 @@
 #include <chrono>
 #include <iomanip>
 
-#include "hydra/input/input_conversion.h"
 #include "hydra/places/robot_footprint_integrator.h"
-#include "hydra/reconstruction/mesh_integrator.h"
-#include "hydra/reconstruction/projective_integrator.h"
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -119,44 +116,41 @@ bool ReconstructionModule::shouldUpdate(uint64_t timestamp_ns) const {
   return diff_s >= config.full_update_separation_s;
 }
 
-ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
-  if (!msg.sensor_input) {
-    LOG(ERROR) << "[Hydra Reconstruction] received invalid sensor data in input!";
+ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& data) {
+  if (!data) {
+    LOG(ERROR) << "[active_window] received invalid input!";
     return nullptr;
   }
 
-  const auto timestamp_ns = msg.timestamp_ns;
-  const auto world_T_body = msg.world_T_body();
+  const auto stamp = data->timestamp_ns;
   const auto fmt = getDefaultFormat();
-  VLOG(5) << "[Hydra Reconstruction] Got input @ " << timestamp_ns
-          << " [ns] with pose: p=" << world_T_body.translation().format(fmt)
-          << ", q=" << printRotation(world_T_body.rotation());
+  MLOG(3) << "Got input @ " << stamp
+          << " [ns] with pose: p=" << data->world_T_body.translation().format(fmt)
+          << ", q=" << printRotation(data->world_T_body.rotation());
 
-  const auto do_full_update = shouldUpdate(timestamp_ns);
-
-  VLOG(2) << "[Hydra Reconstruction] starting " << (do_full_update ? "full" : "partial")
-          << " update for message @ " << timestamp_ns << " (" << input_queue_->size()
+  const auto do_full_update = shouldUpdate(stamp);
+  MLOG(2) << "starting " << (do_full_update ? "full" : "partial")
+          << " update for message @ " << stamp << " (" << input_queue_->size()
           << " message(s) left)";
 
-  ScopedTimer timer("reconstruction/spin", timestamp_ns);
+  ScopedTimer timer("reconstruction/spin", stamp);
   // force semantic normalization if volumetric map has semantic layer
-  InputData::Ptr data = conversions::parseInputPacket(msg, false, map_.hasSemantics());
-  if (!data) {
+  if (!data->finalize(false, map_.hasSemantics())) {
     return nullptr;
   }
 
   const auto tsdf_integrator = tsdf_integrators_.get(data->getSensor().name);
   if (!tsdf_integrator) {
-    VLOG(1) << "Unknown sensor '" << data->getSensor().name << "'";
+    MLOG(1) << "Unknown sensor '" << data->getSensor().name << "'";
     return nullptr;
   }
 
   {  // timing scope
-    ScopedTimer timer("reconstruction/tsdf", timestamp_ns);
+    ScopedTimer timer("reconstruction/tsdf", stamp);
     const auto integration_mask = getDefaultIntegrationMask(*data);
     tsdf_integrator->updateMap(*data, map_, true, integration_mask);
     if (footprint_integrator_) {
-      footprint_integrator_->markFreespace(world_T_body.cast<float>(), map_);
+      footprint_integrator_->markFreespace(data->world_T_body.cast<float>(), map_);
     }
   }  // timing scope
 
@@ -165,21 +159,20 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
     return nullptr;
   }
 
-  last_update_ns_ = timestamp_ns;
+  last_update_ns_ = stamp;
   {  // timing scope
-    ScopedTimer timer("reconstruction/mesh", timestamp_ns);
+    ScopedTimer timer("reconstruction/mesh", stamp);
     mesh_integrator_->generateMesh(map_, true, true);
   }  // timing scope
 
-  auto output = ActiveWindowOutput::fromInput(msg);
+  auto output = std::make_shared<ActiveWindowOutput>();
+  output->timestamp_ns = data->timestamp_ns;
   output->sensor_data = data;
 
-  // this comes before clearing the update flag as we don't archive updated blocks
   if (map_window_) {
-    output->archived_mesh_indices =
-        map_window_->archiveBlocks(timestamp_ns, world_T_body, map_);
-    VLOG(2) << "[Hydra Reconstruction] archived "
-            << output->archived_mesh_indices.size() << " @ " << timestamp_ns << " [ns]";
+    // this comes before clearing the update flag as we don't archive updated blocks
+    output->archived = map_window_->archiveBlocks(stamp, data->world_T_body, map_);
+    MLOG(2) << "archived " << output->archived.size() << " @ " << stamp << " [ns]";
   }
 
   output->setMap(map_.cloneUpdated());

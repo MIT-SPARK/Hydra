@@ -32,18 +32,46 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gtest/gtest.h>
-#include <hydra/input/input_packet.h>
+#include "hydra/input/colormapped_labels_adapter.h"
 
-TEST(InputPacket, TestIsometryConstruction) {
-  hydra::InputPacket packet;
-  packet.world_R_body = Eigen::Quaterniond(0.0, 1.0, 0.0, 0.0);
-  packet.world_t_body = Eigen::Vector3d(1, 2, 3);
+#include <config_utilities/config.h>
+#include <config_utilities/types/path.h>
+#include <config_utilities/validation.h>
+#include <glog/logging.h>
 
-  Eigen::Matrix4d expected = Eigen::Matrix4d::Identity();
-  expected.block<3, 3>(0, 0) = packet.world_R_body.toRotationMatrix();
-  expected.block<3, 1>(0, 3) = packet.world_t_body;
+namespace hydra {
+namespace {
 
-  const auto result = packet.world_T_body();
-  EXPECT_TRUE(expected.isApprox(result.matrix(), 1.0e-6));
+static const auto registration =
+    config::RegistrationWithConfig<InputAdapter,
+                                   ColormappedLabelsAdapter,
+                                   ColormappedLabelsAdapter::Config>(
+        "ColormappedLabelsAdapter");
+
 }
+
+void declare_config(ColormappedLabelsAdapter::Config& config) {
+  using namespace config;
+  name("ColormappedLabelsAdapter::Config");
+  field<Path::Absolute>(config.colormap_path, "colormap_path");
+  field(config.default_label, "default_label");
+  check<Path::Exists>(config.colormap_path, "colormap_path");
+}
+
+ColormappedLabelsAdapter::ColormappedLabelsAdapter(const Config& config)
+    : config(config::checkValid(config)),
+      colormap_(SemanticColorMap::fromCsv(config.colormap_path)) {
+  CHECK(colormap_) << "Colormap required!";
+}
+
+void ColormappedLabelsAdapter::update(InputData& data) const {
+  const auto colors = data.label_image;
+  if (colors.empty() || colors.channels() != 3) {
+    LOG(ERROR) << "Failed to decode label_image from colors to semantics!";
+    return;
+  }
+
+  data.label_image = colormap_->colorsToLabels(colors, config.default_label);
+}
+
+}  // namespace hydra

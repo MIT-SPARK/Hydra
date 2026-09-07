@@ -34,8 +34,12 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <deque>
+
 #include "hydra/common/message_queue.h"
+#include "hydra/input/input_adapter.h"
 #include "hydra/input/input_filter.h"
+#include "hydra/input/sensor.h"
 #include "hydra/input/sensor_input_packet.h"
 #include "hydra/utils/logging.h"
 
@@ -44,6 +48,7 @@ namespace hydra {
 class DataReceiver {
  public:
   using DataQueue = MessageQueue<SensorInputPacket::Ptr>;
+  using OutputQueue = MessageQueue<InputData::Ptr>;
 
   struct Config : VerbosityConfig {
     Config();
@@ -54,29 +59,61 @@ class DataReceiver {
     double input_separation_s = 0.0;
     //! Filters to discard invalid inputs
     std::vector<config::VirtualConfig<InputFilter, true>> filters;
+    //! Adapters to pre-process input packets
+    std::vector<config::VirtualConfig<InputAdapter, true>> adapters;
+    //! Number of timestamps to keep for monitoring rate
+    size_t received_window_size = 21;
   } const config;
 
-  DataReceiver(const Config& config, const std::string& sensor_name);
-  virtual ~DataReceiver() = default;
+  DataReceiver(const Config& config,
+               const Sensor::ConstPtr& sensor,
+               const OutputQueue::Ptr& output);
+  virtual ~DataReceiver();
 
-  bool init();
+  bool start();
 
-  SensorInputPacket::Ptr poll();
+  virtual void stop();
 
   void clear();
 
-  size_t numQueued() const;
+  struct RateStats {
+    size_t num_measurements = 0;
+    double mean = 0.0;
+    double min = 0.0;
+    double max = 0.0;
+    double median = 0.0;
+    double variance = 0.0;
 
+    std::string str() const;
+  };
+  RateStats getStats() const;
+
+  const Sensor::ConstPtr sensor;
   const std::string sensor_name;
 
  protected:
-  SensorInputPacket::Ptr pollOnce();
+  void spin();
+
+  void pushPacket(SensorInputPacket::Ptr packet);
+
+  void recordTimestamp(uint64_t timestamp);
 
   virtual bool initImpl() = 0;
 
   DataQueue queue_;
+  OutputQueue::Ptr output_queue_;
+  std::atomic<bool> should_shutdown_{false};
+  std::unique_ptr<std::thread> thread_;
+
   SensorInputPacket::Ptr last_received_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
+  std::vector<std::unique_ptr<InputAdapter>> adapters_;
+
+  mutable std::mutex mutex_;
+  std::deque<int64_t> received_window_;
+
+ private:
+  void stopImpl();
 };
 
 void declare_config(DataReceiver::Config& config);

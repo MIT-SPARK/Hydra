@@ -1,11 +1,11 @@
 target_sources(
   ${PROJECT_NAME}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/camera.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/colormapped_labels_adapter.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/data_receiver.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/image_input_filters.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/input_conversion.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/input_data.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/input_module.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/input_packet.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/lidar.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_extrinsics.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_input_packet.cpp

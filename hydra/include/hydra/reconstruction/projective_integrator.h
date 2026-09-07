@@ -48,7 +48,7 @@
 #pragma once
 #include <memory>
 
-#include "hydra/input/input_packet.h"
+#include "hydra/input/input_data.h"
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/semantic_integrator.h"
 #include "hydra/reconstruction/volumetric_map.h"

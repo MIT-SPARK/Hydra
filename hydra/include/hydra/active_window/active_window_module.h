@@ -42,19 +42,20 @@
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
-#include "hydra/input/input_packet.h"
+#include "hydra/input/input_data.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 class ActiveWindowModule : public Module {
  public:
   using Ptr = std::shared_ptr<ActiveWindowModule>;
-  using InputQueue = MessageQueue<InputPacket::Ptr>;
+  using InputQueue = MessageQueue<InputData::Ptr>;
   using OutputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
   using Sink = OutputSink<uint64_t, const VolumetricMap&, const ActiveWindowOutput&>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
     size_t max_input_queue_size = 0;
     VolumetricMap::Config volumetric_map;
     config::VirtualConfig<VolumetricWindow> map_window;
@@ -78,7 +79,7 @@ class ActiveWindowModule : public Module {
 
   void spin();
 
-  bool step(const InputPacket::Ptr& input);
+  bool step(const InputData::Ptr& input);
 
   void addSink(const Sink::Ptr& sink);
 
@@ -89,7 +90,7 @@ class ActiveWindowModule : public Module {
  protected:
   cv::Mat getDefaultIntegrationMask(const InputData& data) const;
 
-  virtual ActiveWindowOutput::Ptr spinOnce(const InputPacket& input) = 0;
+  virtual ActiveWindowOutput::Ptr spinOnce(const InputData::Ptr& input) = 0;
 
   void stopImpl();
 

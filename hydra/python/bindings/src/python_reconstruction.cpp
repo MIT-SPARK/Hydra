@@ -36,6 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/parsing/context.h>
+#include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <pybind11/eigen.h>
@@ -75,13 +76,14 @@ class PythonReconstruction {
 
   virtual ~PythonReconstruction();
 
-  bool step(const std::shared_ptr<InputPacket>& input);
+  bool step(const std::shared_ptr<SensorInputPacket>& packet,
+            const Eigen::Isometry3d& world_T_body);
 
   void save(const std::filesystem::path& output);
 
   void stop();
 
-  const std::string sensor_name;
+  const Sensor::ConstPtr sensor;
 
  protected:
   SensorInputPacket::Ptr last_input_;
@@ -99,12 +101,10 @@ void declare_config(PythonReconstruction::Config& config) {
 
 PythonReconstruction::PythonReconstruction(const Config& config,
                                            const Sensor::Ptr& sensor)
-    : config(config::checkValid(config)), sensor_name(sensor ? sensor->name : "") {
+    : config(config::checkValid(config)), sensor(sensor) {
   if (!sensor) {
     throw std::runtime_error("invalid sensor!");
   }
-
-  GlobalInfo::instance().setSensor(sensor);
 
   for (const auto& filter : config.filters) {
     filters_.push_back(filter.create());
@@ -115,7 +115,7 @@ PythonReconstruction::PythonReconstruction(const Config& config,
     throw std::runtime_error("could not create reconstruction module");
   }
 
-  MLOG(2) << "\n" << GlobalInfo::instance();
+  MLOG(2) << "\n" << config::toString(GlobalInfo::instance().getConfig());
   MLOG(1) << "\n" << module_->printInfo();
 }
 
@@ -123,20 +123,26 @@ void PythonReconstruction::stop() {}
 
 PythonReconstruction::~PythonReconstruction() { stop(); }
 
-bool PythonReconstruction::step(const std::shared_ptr<InputPacket>& input) {
+bool PythonReconstruction::step(const std::shared_ptr<SensorInputPacket>& packet,
+                                const Eigen::Isometry3d& odom_T_body) {
   for (const auto& filter : filters_) {
     if (!filter) {
       continue;
     }
 
-    if (!filter->valid(*input->sensor_input, last_input_.get())) {
+    if (!filter->valid(*packet, last_input_.get())) {
       LOG(ERROR) << "Skipping input!";
       return false;
     }
   }
 
-  last_input_ = input->sensor_input;
-  return module_->step(input);
+  last_input_ = packet;
+
+  auto data = std::make_shared<InputData>(sensor);
+  data->timestamp_ns = packet->timestamp_ns;
+  data->world_T_body = odom_T_body;
+  packet->fillInputData(*data);
+  return module_->step(data);
 }
 
 void PythonReconstruction::save(const std::filesystem::path& output) {
@@ -171,22 +177,20 @@ void addBindings(pybind11::module_& m) {
           "step",
           [](PythonReconstruction& pipeline,
              size_t timestamp_ns,
-             const Eigen::Vector4d& world_R_body,
-             const Eigen::Vector3d& world_t_body,
+             const Eigen::Vector4d& odom_R_body,
+             const Eigen::Vector3d& odom_t_body,
              const py::buffer& rgb,
              const py::buffer& depth) {
-            auto input = std::make_shared<InputPacket>();
-            input->timestamp_ns = timestamp_ns;
-            input->world_t_body = world_t_body;
-            input->world_R_body = Eigen::Quaterniond(
-                world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-            input->sensor_input = std::make_unique<PythonImageInput>(
-                timestamp_ns, pipeline.sensor_name, rgb, depth);
-            return pipeline.step(input);
+            auto packet = std::make_shared<PythonImageInput>(timestamp_ns, rgb, depth);
+            const Eigen::Quaterniond q(
+                odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
+            const Eigen::Isometry3d odom_T_body =
+                Eigen::Translation<double, 3>(odom_t_body) * q;
+            return pipeline.step(packet, odom_T_body);
           },
           "timestamp_ns"_a,
-          "world_R_body"_a,
-          "world_t_body"_a,
+          "odom_R_body"_a,
+          "odom_t_body"_a,
           "rgb"_a,
           "depth"_a);
 }

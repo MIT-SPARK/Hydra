@@ -39,31 +39,38 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
-#include "hydra/common/global_info.h"
-
 namespace hydra {
 
 void declare_config(InputModule::Config::InputPair& config) {
   using namespace config;
-  name("InputModule::InputPair::Config");
-  field(config.receiver, "receiver");
+  name("InputModule::Config::InputPair");
   field(config.sensor, "sensor");
+  field(config.receiver, "receiver");
 }
 
 void declare_config(InputModule::Config& config) {
   using namespace config;
   name("InputModule::Config");
+  base<VerbosityConfig>(config);
   field(config.inputs, "inputs");
+  field(config.summary_period_ms, "summary_period_ms");
   checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
 
-InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
-    : config(config::checkValid(config)), queue_(queue) {
-  // Setup the receivers and instatiate their sensors globally.
-  auto& info = GlobalInfo::instance();
-  for (const auto& [name, input_pair] : config.inputs) {
-    receivers_.emplace_back(input_pair.receiver.create(name));
-    CHECK(info.setSensor(input_pair.sensor.create(name), false));
+InputModule::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("input")) {}
+
+InputModule::InputModule(const Config& _config, const DataQueue::Ptr& output_queue)
+    : config(config::checkValid(_config)),
+      input_queue_(new DataQueue()),
+      output_queue_(output_queue) {
+  for (const auto& [name, pair] : config.inputs) {
+    Sensor::ConstPtr sensor = pair.sensor.create(name);
+    if (!sensor) {
+      throw std::runtime_error("Could not create valid sensor for '" + name + "'");
+    }
+
+    receivers_.emplace_back(pair.receiver.create(sensor, input_queue_));
   }
 }
 
@@ -71,10 +78,11 @@ InputModule::~InputModule() { stopImpl(); }
 
 void InputModule::start() {
   for (auto& receiver : receivers_) {
-    receiver->init();
+    receiver->start();
   }
+
   data_thread_.reset(new std::thread(&InputModule::dataSpin, this));
-  LOG(INFO) << "[Hydra Input] started!";
+  MLOG(0) << "started!";
 }
 
 void InputModule::stop() { stopImpl(); }
@@ -82,48 +90,73 @@ void InputModule::stop() { stopImpl(); }
 void InputModule::stopImpl() {
   should_shutdown_ = true;
 
-  if (data_thread_) {
-    VLOG(2) << "[Hydra Input] stopping input thread";
-    data_thread_->join();
-    data_thread_.reset();
-    VLOG(2) << "[Hydra Input] stopped input thread";
+  for (auto& receiver : receivers_) {
+    receiver->stop();
   }
 
-  for (size_t i = 0; i < receivers_.size(); ++i) {
-    VLOG(2) << "[Hydra Input] remaining in data queue[" << i
-            << "]: " << receivers_[i]->numQueued();
+  if (data_thread_) {
+    MLOG(1) << "stopping input thread";
+    data_thread_->join();
+    data_thread_.reset();
+    MLOG(1) << "stopped input thread";
   }
 }
 
 std::string InputModule::printInfo() const { return config::toString(config); }
 
+void InputModule::summarize() const {
+  using namespace std::chrono;
+  if (config.verbosity < 2 || config.summary_period_ms == 0) {
+    return;
+  }
+
+  const auto curr_time = high_resolution_clock::now();
+  const size_t diff_ms = duration_cast<milliseconds>(curr_time - last_summary_).count();
+  if (diff_ms < config.summary_period_ms) {
+    return;
+  }
+
+  last_summary_ = curr_time;
+  std::stringstream ss;
+  ss << "status:\n";
+  for (const auto& recv : receivers_) {
+    ss << "  - [" << recv->sensor_name << "] " << recv->getStats().str() << "\n";
+  }
+
+  ss << "  - [output] size: " << output_queue_->size()
+     << " (max: " << output_queue_->max_size << ")";
+  MLOG(2) << ss.str();
+}
+
 void InputModule::dataSpin() {
+  last_summary_ = std::chrono::high_resolution_clock::now();
+
   while (!should_shutdown_) {
-    for (const auto& receiver : receivers_) {
-      const auto packet = receiver->poll();
-      if (!packet) {
-        continue;
-      }
+    summarize();
 
-      const auto curr_time = packet->timestamp_ns;
-      VLOG(2) << "[Hydra Input] popped input @ " << curr_time << " [ns]";
-
-      const auto odom_T_body = getBodyPose(*packet);
-      if (!odom_T_body) {
-        LOG(WARNING) << "[Hydra Input] dropping input @ " << curr_time
-                     << " [ns] due to missing pose";
-        continue;
-      }
-
-      InputPacket::Ptr input(new InputPacket());
-      input->timestamp_ns = curr_time;
-      input->sensor_input = packet;
-      input->world_t_body = odom_T_body.target_p_source;
-      input->world_R_body = odom_T_body.target_R_source;
-      VLOG(5) << "[Hydra Input] output queue state: size=" << queue_->size()
-              << " (max=" << queue_->max_size << ") @ " << curr_time << " [ns]";
-      queue_->push(input);
+    auto has_data = input_queue_->poll();
+    if (!has_data) {
+      continue;
     }
+
+    const auto data = input_queue_->pop();
+    if (!data) {
+      continue;
+    }
+
+    const auto curr_time = data->timestamp_ns;
+    MLOG(3) << "popped input @ " << curr_time << " [ns]";
+
+    const auto odom_T_body = getBodyPose(*data);
+    if (!odom_T_body) {
+      LOG(WARNING) << "[input] dropping input @ " << curr_time
+                   << " [ns] due to missing pose";
+      continue;
+    }
+
+    data->world_T_body = Eigen::Translation<double, 3>(odom_T_body.target_p_source) *
+                         odom_T_body.target_R_source;
+    output_queue_->push(data);
   }
 }
 

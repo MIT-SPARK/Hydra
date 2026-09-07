@@ -3,7 +3,8 @@ input:
   type: RosInput
   inputs:
     - receiver:
-        type: ClosedSetImageReceiver
+        type: ImageReceiver
+        semantics_type: closed_set
         queue_size: 30
       sensor:
         type: camera_info

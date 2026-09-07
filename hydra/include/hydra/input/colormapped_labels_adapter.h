@@ -33,46 +33,29 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-#include <hydra/common/module.h>
-#include <ianvs/node_handle.h>
 
-#include "hydra_ros/utils/tf_lookup.h"
+#include "hydra/common/semantic_color_map.h"
+#include "hydra/input/input_adapter.h"
 
 namespace hydra {
 
-struct FeatureSubscriber;
-
-class FeatureReceiver : public Module {
+class ColormappedLabelsAdapter : public InputAdapter {
  public:
   struct Config {
-    //! Node handle namespace (defaults to matching data receivers)
-    std::string ns = "~/input";
-    //! Individual subscriber queue size
-    size_t queue_size = 10;
-    //! Lookup settings for poses
-    TFLookup::Config tf_lookup;
-    //! Sensors to not subscribe to
-    std::vector<std::string> sensors_to_exclude;
-    //! Verbosity for receiver
-    size_t verbosity = 0;
+    //! Path to colormap CSV to use to remap colors to labels
+    std::filesystem::path colormap_path;
+    //! Label value to use when value is unknown
+    int32_t default_label = -1;
   } const config;
 
-  explicit FeatureReceiver(const Config& config);
-  virtual ~FeatureReceiver();
-  void start() override;
-  void stop() override;
-  std::string printInfo() const override;
+  explicit ColormappedLabelsAdapter(const Config& config);
+  virtual ~ColormappedLabelsAdapter() = default;
+  void update(InputData& packet) const override;
 
  private:
-  TFLookup lookup_;
-  std::vector<std::unique_ptr<FeatureSubscriber>> subs_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<FeatureReceiver, FeatureReceiver, Config>(
-          "FeatureReceiver");
+  std::unique_ptr<SemanticColorMap> colormap_;
 };
 
-void declare_config(FeatureReceiver::Config& config);
+void declare_config(ColormappedLabelsAdapter::Config& config);
 
 }  // namespace hydra

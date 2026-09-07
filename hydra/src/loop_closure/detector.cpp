@@ -45,6 +45,7 @@
 
 #include <fstream>
 
+#include "hydra/common/global_info.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace teaser {
@@ -184,16 +185,24 @@ void declare_config(LcdDetector::Config& config) {
   field(config.enable_agent_registration, "enable_agent_registration");
   field(config.object_extraction, "object_extraction");
   field(config.places_extraction, "places_extraction");
+  field(config.num_semantic_classes, "num_semantic_classes");
   field(config.place_histogram_config, "place_histogram_config");
   field(config.agent_search_config, "agent");
   field(config.variances, "variances");
   // TODO(nathan) pin agent registration to agent min
-
   field(config.use_gnn_descriptors, "use_gnn_descriptors");
   if (config.use_gnn_descriptors) {
     field(config.gnn_lcd, "gnn_lcd");
   }
+
+  check(config.num_semantic_classes,
+        GE,
+        GlobalInfo::instance().labelspace().total_labels,
+        "num_semantic_classes");
 }
+
+LcdDetector::Config::Config()
+    : num_semantic_classes(GlobalInfo::instance().labelspace().total_labels) {}
 
 LcdDetector::LcdDetector(const LcdDetector::Config& config) : config(config) {
   makeDefaultDescriptorFactories();

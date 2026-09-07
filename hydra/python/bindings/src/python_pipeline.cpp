@@ -87,11 +87,12 @@ class PythonPipeline : public HydraPipeline {
 
   void reset();
 
-  bool step(const InputPacket::Ptr& input);
+  bool step(const std::shared_ptr<SensorInputPacket>& packet,
+            const Eigen::Isometry3d& world_T_body);
 
   SceneGraph::Ptr getSceneGraph() const;
 
-  const std::string sensor_name;
+  const Sensor::ConstPtr sensor;
   const std::string zmq_url;
 
  protected:
@@ -124,14 +125,13 @@ PythonPipeline::PythonPipeline(const Config& _config,
                                std::string zmq_url)
     : HydraPipeline(_config, robot_id, config_verbosity),
       config(_config),
-      sensor_name(sensor ? sensor->name : ""),
+      sensor(sensor),
       zmq_url(zmq_url),
       step_mode_only_(step_mode_only) {
   if (!sensor) {
     throw std::runtime_error("Invalid sensor!");
   }
 
-  GlobalInfo::instance().setSensor(sensor);
   VLOG(config_verbosity) << "Using sensor '" << sensor->name << "':\n"
                          << sensor->dump();
   initModules();
@@ -211,7 +211,13 @@ void PythonPipeline::reset() {
   }
 }
 
-bool PythonPipeline::step(const InputPacket::Ptr& input) {
+bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
+                          const Eigen::Isometry3d& odom_T_body) {
+  auto input = std::make_shared<InputData>(sensor);
+  input->timestamp_ns = packet->timestamp_ns;
+  input->world_T_body = odom_T_body;
+  packet->fillInputData(*input);
+
   if (!active_window_->step(input)) {
     return false;
   }
@@ -306,25 +312,24 @@ void addBindings(pybind11::module_& m) {
           "step",
           [](PythonPipeline& pipeline,
              size_t timestamp_ns,
-             const Eigen::Vector3d& world_t_body,
-             const Eigen::Vector4d& world_R_body,
+             const Eigen::Vector3d& odom_t_body,
+             const Eigen::Vector4d& odom_R_body,
              const py::buffer& depth,
              const py::buffer& labels,
              const py::buffer& rgb,
              const FeatureVector& feature) {
-            auto input = std::make_shared<InputPacket>();
-            input->timestamp_ns = timestamp_ns;
-            input->world_t_body = world_t_body;
-            input->world_R_body = Eigen::Quaterniond(
-                world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-            input->sensor_input = std::make_unique<PythonImageInput>(
-                timestamp_ns, pipeline.sensor_name, rgb, depth, labels);
-            input->sensor_input->input_feature = feature;
-            return pipeline.step(input);
+            auto packet =
+                std::make_shared<PythonImageInput>(timestamp_ns, rgb, depth, labels);
+            packet->input_feature = feature;
+            const Eigen::Quaterniond q(
+                odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
+            const Eigen::Isometry3d odom_T_body =
+                Eigen::Translation<double, 3>(odom_t_body) * q;
+            return pipeline.step(packet, odom_T_body);
           },
           "timestamp_ns"_a,
-          "world_t_body"_a,
-          "world_R_body"_a,
+          "odom_t_body"_a,
+          "odom_R_body"_a,
           "depth"_a,
           "labels"_a,
           "rgb"_a,
@@ -333,25 +338,24 @@ void addBindings(pybind11::module_& m) {
           "step",
           [](PythonPipeline& pipeline,
              size_t timestamp_ns,
-             const Eigen::Vector3d& world_t_body,
-             const Eigen::Vector4d& world_R_body,
+             const Eigen::Vector3d& odom_t_body,
+             const Eigen::Vector4d& odom_R_body,
              const PythonCloudInput::PointVec& points,
              const PythonCloudInput::LabelVec& labels,
              const PythonCloudInput::ColorVec& colors,
              const FeatureVector& feature) {
-            auto input = std::make_shared<InputPacket>();
-            input->timestamp_ns = timestamp_ns;
-            input->world_t_body = world_t_body;
-            input->world_R_body = Eigen::Quaterniond(
-                world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-            input->sensor_input = std::make_unique<PythonCloudInput>(
-                timestamp_ns, pipeline.sensor_name, points, labels, colors);
-            input->sensor_input->input_feature = feature;
-            return pipeline.step(input);
+            auto packet = std::make_shared<PythonCloudInput>(
+                timestamp_ns, points, labels, colors);
+            packet->input_feature = feature;
+            const Eigen::Quaterniond q(
+                odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
+            const Eigen::Isometry3d odom_T_body =
+                Eigen::Translation<double, 3>(odom_t_body) * q;
+            return pipeline.step(packet, odom_T_body);
           },
           "timestamp_ns"_a,
-          "world_t_body"_a,
-          "world_R_body"_a,
+          "odom_t_body"_a,
+          "odom_R_body"_a,
           "points"_a,
           "labels"_a,
           "colors"_a,

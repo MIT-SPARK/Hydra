@@ -35,321 +35,575 @@
 #include "hydra_ros/input/image_receiver.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/types/path.h>
+#include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <ianvs/node_handle.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/sync_policies/exact_time.h>
 
 #include <cv_bridge/cv_bridge.hpp>
-
-namespace hydra {
+#include <rclcpp/time.hpp>
+#include <semantic_inference_msgs/msg/feature_image.hpp>
+#include <semantic_inference_msgs/msg/feature_vector_stamped.hpp>
+#include <sensor_msgs/image_encodings.hpp>
+#include <sensor_msgs/msg/image.hpp>
 
 using semantic_inference_msgs::msg::FeatureImage;
+using semantic_inference_msgs::msg::FeatureVectorStamped;
 using sensor_msgs::msg::Image;
 
-ColorSubscriber::ColorSubscriber() = default;
+using message_filters::Synchronizer;
+using message_filters::sync_policies::ApproximateTime;
+using message_filters::sync_policies::ExactTime;
 
-ColorSubscriber::ColorSubscriber(ianvs::NodeHandle nh, uint32_t queue_size)
-    : impl_(std::make_shared<FilterSub<Image>>(nh, "rgb/image_raw", queue_size)) {}
+namespace hydra {
+namespace {
 
-ColorSubscriber::~ColorSubscriber() = default;
+#define MAKE_VARIADIC(Policy, Underlying)                                           \
+  template <typename... MsgT>                                                       \
+  struct Policy;                                                                    \
+                                                                                    \
+  template <typename A, typename B>                                                 \
+  struct Policy<A, B> {                                                             \
+    using value = Underlying<A, B>;                                                 \
+  };                                                                                \
+                                                                                    \
+  template <typename A, typename B, typename C>                                     \
+  struct Policy<A, B, C> {                                                          \
+    using value = Underlying<A, B, C>;                                              \
+  };                                                                                \
+                                                                                    \
+  template <typename A, typename B, typename C, typename D>                         \
+  struct Policy<A, B, C, D> {                                                       \
+    using value = Underlying<A, B, C, D>;                                           \
+  };                                                                                \
+                                                                                    \
+  template <typename A, typename B, typename C, typename D, typename E>             \
+  struct Policy<A, B, C, D, E> {                                                    \
+    using value = Underlying<A, B, C, D, E>;                                        \
+  };                                                                                \
+                                                                                    \
+  template <typename A, typename B, typename C, typename D, typename E, typename F> \
+  struct Policy<A, B, C, D, E, F> {                                                 \
+    using value = Underlying<A, B, C, D, E, F>;                                     \
+  };                                                                                \
+                                                                                    \
+  template <typename A,                                                             \
+            typename B,                                                             \
+            typename C,                                                             \
+            typename D,                                                             \
+            typename E,                                                             \
+            typename F,                                                             \
+            typename G>                                                             \
+  struct Policy<A, B, C, D, E, F, G> {                                              \
+    using value = Underlying<A, B, C, D, E, F, G>;                                  \
+  };                                                                                \
+                                                                                    \
+  template <typename A,                                                             \
+            typename B,                                                             \
+            typename C,                                                             \
+            typename D,                                                             \
+            typename E,                                                             \
+            typename F,                                                             \
+            typename G,                                                             \
+            typename H>                                                             \
+  struct Policy<A, B, C, D, E, F, G, H> {                                           \
+    using value = Underlying<A, B, C, D, E, F, G, H>;                               \
+  };                                                                                \
+                                                                                    \
+  template <typename A,                                                             \
+            typename B,                                                             \
+            typename C,                                                             \
+            typename D,                                                             \
+            typename E,                                                             \
+            typename F,                                                             \
+            typename G,                                                             \
+            typename H,                                                             \
+            typename I>                                                             \
+  struct Policy<A, B, C, D, E, F, G, H, I> {                                        \
+    using value = Underlying<A, B, C, D, E, F, G, H, I>;                            \
+  };                                                                                \
+                                                                                    \
+  template <typename... T>                                                          \
+  using Policy##_v = Policy<T...>::value;                                           \
+                                                                                    \
+  template <typename Tuple>                                                         \
+  struct Policy##_from_tuple;                                                       \
+                                                                                    \
+  template <template <typename...> typename List, typename... OtherT>               \
+  struct Policy##_from_tuple<List<OtherT...>> {                                     \
+    using value = Policy##_v<OtherT...>;                                            \
+  };
 
-ColorSubscriber::Filter& ColorSubscriber::getFilter() const {
-  return *CHECK_NOTNULL(impl_);
-}
+MAKE_VARIADIC(approx_policy, ApproximateTime)
+MAKE_VARIADIC(exact_policy, ExactTime)
 
-void ColorSubscriber::fillInput(const Image& img, ImageInputPacket& packet) const {
-  // Allow also mono images to be converted to grayscale.
-  if (sensor_msgs::image_encodings::isColor(img.encoding) ||
-      sensor_msgs::image_encodings::isBayer(img.encoding)) {
+static const auto registration =
+    config::RegistrationWithConfig<DataReceiver,
+                                   ImageReceiver,
+                                   ImageReceiver::Config,
+                                   Sensor::ConstPtr,
+                                   DataReceiver::OutputQueue::Ptr>("ImageReceiver");
+
+cv::Mat parseColor(const Image& msg) {
+  using namespace sensor_msgs::image_encodings;
+  if (isColor(msg.encoding) || isBayer(msg.encoding)) {
     try {
-      packet.color =
-          cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::RGB8)->image;
-      return;
+      return cv_bridge::toCvCopy(msg, RGB8)->image;
     } catch (const cv_bridge::Exception& e) {
       LOG(ERROR) << "Failed to convert color image: " << e.what();
-      return;
+      return cv::Mat();
     }
-  } else if (sensor_msgs::image_encodings::isMono(img.encoding)) {
+  }
+
+  if (isMono(msg.encoding)) {
     try {
-      cv::Mat mono =
-          cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8)->image;
-      cv::cvtColor(mono, packet.color, cv::COLOR_GRAY2RGB);
-      return;
+      cv::Mat color;
+      auto mono = cv_bridge::toCvCopy(msg, MONO8);
+      cv::cvtColor(mono->image, color, cv::COLOR_GRAY2RGB);
+      return color;
     } catch (const cv_bridge::Exception& e) {
       LOG(ERROR) << "Failed to convert mono image as color input: " << e.what();
+      return cv::Mat();
+    }
+  }
+
+  LOG(ERROR) << "Failed to convert color image: unsupported encoding: " << msg.encoding;
+  return cv::Mat();
+}
+
+cv::Mat parseDepth(const Image& img) {
+  try {
+    return cv_bridge::toCvCopy(img)->image;
+  } catch (const cv_bridge::Exception& e) {
+    LOG(ERROR) << "Failed to convert depth image: " << e.what();
+    return cv::Mat();
+  }
+}
+
+cv::Mat parseImage(const Image& msg) {
+  try {
+    return cv_bridge::toCvCopy(msg)->image;
+  } catch (const cv_bridge::Exception& e) {
+    LOG(ERROR) << "Failed to convert image: " << e.what();
+    return cv::Mat();
+  }
+}
+
+struct NullAdapter {
+  using MsgType = message_filters::NullType;
+
+  template <typename RecvT>
+  NullAdapter(ianvs::NodeHandle, const std::string&, const rclcpp::QoS&, RecvT&) {}
+};
+
+struct ClosedSetAdapter {
+  using MsgType = Image;
+
+  template <typename RecvT>
+  ClosedSetAdapter(ianvs::NodeHandle nh,
+                   const std::string& topic,
+                   const rclcpp::QoS& qos,
+                   RecvT& receiver)
+      : sub(nh.create_subscription<Image>(
+            topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
+              receiver.sync.template add<2>(msg);
+            })) {}
+
+  static void fill(const Image& msg, ImageInputPacket& packet) {
+    packet.labels = parseImage(msg);
+  }
+
+  rclcpp::Subscription<Image>::SharedPtr sub;
+};
+
+struct InstanceAdapter {
+  using MsgType = Image;
+
+  template <typename RecvT>
+  InstanceAdapter(ianvs::NodeHandle nh,
+                  const std::string& topic,
+                  const rclcpp::QoS& qos,
+                  RecvT& receiver)
+      : sub(nh.create_subscription<Image>(
+            topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
+              receiver.sync.template add<2>(msg);
+            })) {}
+
+  static void fill(const Image& msg, ImageInputPacket& packet) {
+    const auto mat = parseImage(msg);
+    if (mat.type() != CV_32SC1) {
+      LOG(ERROR) << "Invalid encoding for instance+label image";
       return;
     }
-  }
-  LOG(ERROR) << "Failed to convert color image: unsupported encoding: " << img.encoding;
-}
 
-DepthSubscriber::DepthSubscriber() = default;
-
-DepthSubscriber::DepthSubscriber(ianvs::NodeHandle nh, uint32_t queue_size)
-    : impl_(std::make_shared<FilterSub<Image>>(
-          nh, "depth_registered/image_rect", queue_size)) {}
-
-DepthSubscriber::~DepthSubscriber() = default;
-
-DepthSubscriber::Filter& DepthSubscriber::getFilter() const {
-  return *CHECK_NOTNULL(impl_);
-}
-
-void DepthSubscriber::fillInput(const Image& img, ImageInputPacket& packet) const {
-  try {
-    packet.depth = cv_bridge::toCvCopy(img)->image;
-  } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert depth image: " << e.what();
-  }
-}
-
-LabelSubscriber::LabelSubscriber() = default;
-
-LabelSubscriber::LabelSubscriber(ianvs::NodeHandle nh, uint32_t queue_size)
-    : impl_(std::make_shared<FilterSub<Image>>(nh, "semantic/image_raw", queue_size)) {}
-
-LabelSubscriber::~LabelSubscriber() = default;
-
-LabelSubscriber::Filter& LabelSubscriber::getFilter() const {
-  return *CHECK_NOTNULL(impl_);
-}
-
-void LabelSubscriber::fillInput(const Image& img, ImageInputPacket& packet) const {
-  try {
-    packet.labels = cv_bridge::toCvCopy(img)->image;
-  } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert label image: " << e.what();
-  }
-}
-
-InstanceSubscriber::InstanceSubscriber() = default;
-
-InstanceSubscriber::InstanceSubscriber(ianvs::NodeHandle nh, uint32_t queue_size)
-    : impl_(std::make_shared<FilterSub<Image>>(nh, "semantic/image_raw", queue_size)) {}
-
-InstanceSubscriber::~InstanceSubscriber() = default;
-
-InstanceSubscriber::Filter& InstanceSubscriber::getFilter() const {
-  return *CHECK_NOTNULL(impl_);
-}
-
-void InstanceSubscriber::fillInput(const Image& img, ImageInputPacket& packet) const {
-  cv::Mat mat;
-  try {
-    mat = cv_bridge::toCvCopy(img)->image;
-  } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert label image: " << e.what();
-  }
-
-  if (mat.type() != CV_32SC1) {
-    LOG(ERROR) << "Invalid encoding for instance+label image";
-    return;
-  }
-
-  packet.labels = cv::Mat(mat.size(), CV_32SC1);
-  packet.instances = cv::Mat(mat.size(), CV_16SC1);
-  for (int r = 0; r < mat.rows; ++r) {
-    for (int c = 0; c < mat.cols; ++c) {
-      const auto original = mat.at<int32_t>(r, c);
-      packet.labels.at<int32_t>(r, c) = original & 0xFFFF;
-      packet.instances.at<int16_t>(r, c) = original >> 16;
+    packet.labels = cv::Mat(mat.size(), CV_32SC1);
+    packet.instances = cv::Mat(mat.size(), CV_16SC1);
+    for (int r = 0; r < mat.rows; ++r) {
+      for (int c = 0; c < mat.cols; ++c) {
+        const auto original = mat.at<int32_t>(r, c);
+        packet.labels.at<int32_t>(r, c) = original & 0xFFFF;
+        packet.instances.at<int16_t>(r, c) = original >> 16;
+      }
     }
   }
-}
 
-ColormappedLabelSubscriber::ColormappedLabelSubscriber()
-    : default_label_(-1), colormap_(nullptr) {}
+  rclcpp::Subscription<Image>::SharedPtr sub;
+};
 
-ColormappedLabelSubscriber::ColormappedLabelSubscriber(ianvs::NodeHandle nh,
-                                                       uint32_t queue_size)
-    : default_label_(-1),
-      colormap_(nullptr),
-      impl_(std::make_shared<FilterSub<Image>>(nh, "semantic/image_raw", queue_size)) {}
+struct OpenSetAdapter {
+  using MsgType = FeatureImage;
 
-ColormappedLabelSubscriber::~ColormappedLabelSubscriber() = default;
+  template <typename RecvT>
+  OpenSetAdapter(ianvs::NodeHandle nh,
+                 const std::string& topic,
+                 const rclcpp::QoS& qos,
+                 RecvT& receiver)
+      : sub(nh.create_subscription<FeatureImage>(
+            topic, qos, [&receiver](const FeatureImage::ConstSharedPtr& msg) {
+              receiver.sync.template add<2>(msg);
+            })) {}
 
-ColormappedLabelSubscriber::Filter& ColormappedLabelSubscriber::getFilter() const {
-  return *CHECK_NOTNULL(impl_);
-}
+  static void fill(const FeatureImage& msg, ImageInputPacket& packet) {
+    packet.instances = parseImage(msg.image);
 
-void ColormappedLabelSubscriber::setColormap(const SemanticColorMap* colormap,
-                                             int32_t default_label) {
-  colormap_ = colormap;
-  default_label_ = default_label;
-}
-
-void ColormappedLabelSubscriber::fillInput(const Image& img,
-                                           ImageInputPacket& packet) const {
-  if (!colormap_) {
-    LOG(ERROR) << "Colormap not set for subscriber!";
-    return;
-  }
-
-  cv::Mat colors;
-  try {
-    colors = cv_bridge::toCvCopy(img)->image;
-  } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert label image: " << e.what();
-    return;
-  }
-
-  if (colors.empty() || colors.channels() != 3) {
-    LOG(ERROR) << "Failed to decode color image to semantics!";
-    return;
-  }
-
-  packet.labels = cv::Mat(colors.size(), CV_32SC1);
-  for (int r = 0; r < colors.rows; ++r) {
-    for (int c = 0; c < colors.cols; ++c) {
-      const auto& pixel = colors.at<cv::Vec3b>(r, c);
-      const spark_dsg::Color color(pixel[0], pixel[1], pixel[2]);
-      packet.labels.at<int32_t>(r, c) =
-          colormap_->getLabelFromColor(color).value_or(default_label_);
+    CHECK_EQ(msg.mask_ids.size(), msg.features.size());
+    for (size_t i = 0; i < msg.mask_ids.size(); ++i) {
+      const auto& vec = msg.features[i].data;
+      packet.label_features.emplace(
+          msg.mask_ids[i], Eigen::Map<const FeatureVector>(vec.data(), vec.size()));
     }
   }
-}
 
-FeatureSubscriber::FeatureSubscriber() = default;
+  rclcpp::Subscription<FeatureImage>::SharedPtr sub;
+};
 
-FeatureSubscriber::FeatureSubscriber(ianvs::NodeHandle nh, uint32_t queue_size)
-    : impl_(std::make_shared<FilterSub<FeatureImage>>(
-          nh, "semantic/image_raw", queue_size)) {}
+template <bool enabled>
+struct FeatureAdapter;
 
-FeatureSubscriber::~FeatureSubscriber() = default;
+template <>
+struct FeatureAdapter<false> {
+  template <typename RecvT>
+  FeatureAdapter(ianvs::NodeHandle, const std::string&, const rclcpp::QoS&, RecvT&) {}
+};
 
-FeatureSubscriber::Filter& FeatureSubscriber::getFilter() const {
-  return *CHECK_NOTNULL(impl_);
-}
+template <>
+struct FeatureAdapter<true> {
+  using MsgType = FeatureVectorStamped;
 
-void FeatureSubscriber::fillInput(const MsgType& msg, ImageInputPacket& packet) const {
-  try {
-    packet.instances = cv_bridge::toCvCopy(msg.image)->image;
-  } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert depth image: " << e.what();
+  template <typename RecvT>
+  FeatureAdapter(ianvs::NodeHandle nh,
+                 const std::string& topic,
+                 const rclcpp::QoS& qos,
+                 RecvT& receiver)
+      : sub(nh.create_subscription<MsgType>(
+            topic, qos, [&receiver](const MsgType::ConstSharedPtr& msg) {
+              receiver.sync.template add<RecvT::Info::feature_offset>(msg);
+            })) {}
+
+  static void fill(const MsgType& msg, ImageInputPacket& packet) {
+    const auto& vec = msg.feature.data;
+    packet.input_feature = Eigen::Map<const FeatureVector>(vec.data(), vec.size());
   }
 
-  CHECK_EQ(msg.mask_ids.size(), msg.features.size());
-  for (size_t i = 0; i < msg.mask_ids.size(); ++i) {
-    const auto& vec = msg.features[i].data;
-    packet.label_features.emplace(
-        msg.mask_ids[i],
-        Eigen::Map<const hydra::FeatureVector>(vec.data(), vec.size()));
+  rclcpp::Subscription<MsgType>::SharedPtr sub;
+};
+
+template <bool enabled>
+struct TraversabilityAdapter;
+
+template <>
+struct TraversabilityAdapter<false> {
+  template <typename RecvT>
+  TraversabilityAdapter(ianvs::NodeHandle,
+                        const std::string&,
+                        const rclcpp::QoS&,
+                        RecvT&) {}
+};
+
+template <>
+struct TraversabilityAdapter<true> {
+  using MsgType = Image;
+
+  template <typename RecvT>
+  TraversabilityAdapter(ianvs::NodeHandle nh,
+                        const std::string& topic,
+                        const rclcpp::QoS& qos,
+                        RecvT& receiver)
+      : sub(nh.create_subscription<Image>(
+            topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
+              receiver.sync.template add<RecvT::Info::traversability_offset>(msg);
+            })) {}
+
+  static void fill(const Image& msg, ImageInputPacket& packet) {
+    packet.traversability = parseImage(msg);
+  }
+
+  rclcpp::Subscription<Image>::SharedPtr sub;
+};
+
+}  // namespace
+
+template <typename T, typename MsgT, bool should_add>
+struct add_type;
+
+template <template <typename...> typename List, typename MsgT, typename... OtherT>
+struct add_type<List<OtherT...>, MsgT, true> {
+  using value = List<OtherT..., MsgT>;
+};
+
+template <template <typename...> typename List, typename MsgT, typename... OtherT>
+struct add_type<List<OtherT...>, MsgT, false> {
+  using value = List<OtherT...>;
+};
+
+template <typename T, typename MsgT, bool should_add>
+using add_type_v = add_type<T, MsgT, should_add>::value;
+
+template <bool exact>
+struct policy_type;
+
+template <>
+struct policy_type<true> {
+  template <typename... Args>
+  using policy_from_tuple = exact_policy_from_tuple<Args...>::value;
+};
+
+template <>
+struct policy_type<false> {
+  template <typename... Args>
+  using policy_from_tuple = approx_policy_from_tuple<Args...>::value;
+};
+
+template <bool _with_feature, bool _with_traversability, bool exact>
+struct ReceiverType : policy_type<exact> {
+  static constexpr bool with_feature = _with_feature;
+  static constexpr bool with_traversability = _with_traversability;
+};
+
+struct PacketBuilderBase {
+  using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
+  using Queue = MessageQueue<SensorInputPacket::Ptr>;
+
+  explicit PacketBuilderBase(Queue& queue) : queue(queue) {}
+
+  ImagePacketPtr make_packet(const Image::ConstSharedPtr& color,
+                             const Image::ConstSharedPtr& depth) const {
+    const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
+    auto packet = std::make_shared<ImageInputPacket>(timestamp_ns);
+    packet->color = parseColor(*color);
+    packet->depth = parseDepth(*depth);
+    return packet;
+  }
+
+  Queue& queue;
+};
+
+template <typename... AdapterT>
+void fillPacket(ImageInputPacket& packet,
+                const typename AdapterT::MsgType::ConstSharedPtr&... msg);
+
+template <>
+void fillPacket(ImageInputPacket&) {}
+
+template <typename AdapterT, typename... OtherT>
+void fillPacket(ImageInputPacket& packet,
+                const typename AdapterT::MsgType::ConstSharedPtr& msg,
+                const typename OtherT::MsgType::ConstSharedPtr&... others) {
+  AdapterT::fill(*msg, packet);
+  fillPacket<OtherT...>(packet, others...);
+}
+
+template <typename T>
+struct PacketBuilder;
+
+template <template <typename...> typename List, typename... AdapterT>
+struct PacketBuilder<List<AdapterT...>> : PacketBuilderBase {
+  PacketBuilder(Queue& queue) : PacketBuilderBase(queue) {}
+
+  void callback(const Image::ConstSharedPtr& color,
+                const Image::ConstSharedPtr& depth,
+                const typename AdapterT::MsgType::ConstSharedPtr&... others) {
+    auto packet = make_packet(color, depth);
+    fillPacket<AdapterT...>(*packet, others...);
+    queue.push(packet);
+  }
+};
+
+template <typename... Args>
+struct type_list {};
+
+template <typename T, typename R>
+struct ReceiverInfo {
+  static constexpr bool is_null = std::is_same_v<T, NullAdapter>;
+  static constexpr size_t traversability_offset = is_null ? 2 : 3;
+  static constexpr size_t feature_offset =
+      R::with_traversability ? traversability_offset + 1 : traversability_offset;
+
+  using vec = FeatureVectorStamped;
+  using msg = typename T::MsgType;
+
+  using adapters = add_type_v<add_type_v<add_type_v<type_list<>, T, !is_null>,
+                                         TraversabilityAdapter<true>,
+                                         R::with_traversability>,
+                              FeatureAdapter<true>,
+                              R::with_feature>;
+
+  using types =
+      add_type_v<add_type_v<add_type_v<type_list<Image, Image>, msg, !is_null>,
+                            Image,
+                            R::with_traversability>,
+                 FeatureVectorStamped,
+                 R::with_feature>;
+
+  using policy = R::template policy_from_tuple<types>;
+  using builder = PacketBuilder<adapters>;
+};
+
+struct ImageReceiverBase {
+  virtual ~ImageReceiverBase() = default;
+};
+
+template <typename AdapterT, typename TypeT>
+struct ImageReceiverImpl : public ImageReceiverBase {
+  using Queue = PacketBuilderBase::Queue;
+  using ImgPtr = Image::ConstSharedPtr;
+
+  using Info = ReceiverInfo<AdapterT, TypeT>;
+  using Sync = Synchronizer<typename Info::policy>;
+
+  ImageReceiverImpl(ianvs::NodeHandle nh,
+                    const rclcpp::QoS& qos,
+                    size_t queue_size,
+                    Queue& queue);
+
+  Sync sync;
+  Info::builder builder;
+
+  rclcpp::Subscription<Image>::SharedPtr color;
+  rclcpp::Subscription<Image>::SharedPtr depth;
+  AdapterT semantics;
+  FeatureAdapter<TypeT::with_feature> feature;
+  TraversabilityAdapter<TypeT::with_traversability> traversability;
+};
+
+template <typename AdapterT, typename TypeT>
+ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
+                                                      const rclcpp::QoS& qos,
+                                                      size_t queue_size,
+                                                      Queue& queue)
+    : sync(queue_size),
+      builder(queue),
+      color(nh.create_subscription<Image>(
+          "rgb/image_raw",
+          qos,
+          [this](const ImgPtr& msg) { sync.template add<0>(msg); })),
+      depth(nh.create_subscription<Image>(
+          "depth_registered/image_rect",
+          qos,
+          [this](const ImgPtr& msg) { sync.template add<1>(msg); })),
+      semantics(nh, "semantic/image_raw", qos, *this),
+      feature(nh, "semantic/feature", qos, *this),
+      traversability(nh, "traversability/image_raw", qos, *this) {
+  sync.registerCallback(&Info::builder::callback, &builder);
+}
+
+template <typename T, bool feature, bool traversability>
+using ExactRecv = ImageReceiverImpl<T, ReceiverType<feature, traversability, true>>;
+
+template <typename T, bool feature, bool traversability>
+using ApproxRecv = ImageReceiverImpl<T, ReceiverType<feature, traversability, false>>;
+
+template <typename T, template <typename, bool, bool> typename RecvT>
+std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
+                                                ianvs::NodeHandle nh,
+                                                PacketBuilderBase::Queue& queue) {
+  const auto qos = config.qos;
+  const auto queue_size = config.queue_size;
+  if (config.with_feature && config.with_traversability) {
+    return std::make_unique<RecvT<T, true, true>>(nh, qos, queue_size, queue);
+  } else if (config.with_feature) {
+    return std::make_unique<RecvT<T, true, false>>(nh, qos, queue_size, queue);
+  } else if (config.with_traversability) {
+    return std::make_unique<RecvT<T, false, true>>(nh, qos, queue_size, queue);
+  } else {
+    return std::make_unique<RecvT<T, false, false>>(nh, qos, queue_size, queue);
   }
 }
 
-RGBDImageReceiver::RGBDImageReceiver(const Config& config,
-                                     const std::string& sensor_name)
-    : RosDataReceiver(config, sensor_name) {}
+template <typename T>
+std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
+                                                ianvs::NodeHandle nh,
+                                                PacketBuilderBase::Queue& queue) {
+  if (config.use_exact) {
+    return makeReceiver<T, ExactRecv>(config, nh, queue);
+  } else {
+    return makeReceiver<T, ApproxRecv>(config, nh, queue);
+  }
+}
 
-bool RGBDImageReceiver::initImpl() {
-  color_sub_ = ColorSubscriber(ianvs::NodeHandle::this_node(ns_));
-  depth_sub_ = DepthSubscriber(ianvs::NodeHandle::this_node(ns_));
-  sync_.reset(new Synchronizer(
-      Policy(config.queue_size), color_sub_.getFilter(), depth_sub_.getFilter()));
-  sync_->registerCallback(&RGBDImageReceiver::callback, this);
+struct ImageReceiver::Impl {
+  explicit Impl(const ImageReceiver::Config& config,
+                ianvs::NodeHandle nh,
+                PacketBuilderBase::Queue& queue) {
+    switch (config.semantics_type) {
+      case ImageReceiver::Config::SemanticsType::NONE:
+        recv = makeReceiver<NullAdapter>(config, nh, queue);
+        break;
+      case ImageReceiver::Config::SemanticsType::CLOSED_SET:
+        recv = makeReceiver<ClosedSetAdapter>(config, nh, queue);
+        break;
+      case ImageReceiver::Config::SemanticsType::INSTANCE:
+        recv = makeReceiver<InstanceAdapter>(config, nh, queue);
+        break;
+      case ImageReceiver::Config::SemanticsType::OPEN_SET:
+        recv = makeReceiver<OpenSetAdapter>(config, nh, queue);
+        break;
+    }
+  }
+
+  std::unique_ptr<ImageReceiverBase> recv;
+};
+
+void declare_config(ImageReceiver::Config& config) {
+  using namespace config;
+  name("ImageReceiver::Config");
+  base<RosDataReceiver::Config>(config);
+  enum_field(config.semantics_type,
+             "semantics_type",
+             {{ImageReceiver::Config::SemanticsType::NONE, "none"},
+              {ImageReceiver::Config::SemanticsType::CLOSED_SET, "closed_set"},
+              {ImageReceiver::Config::SemanticsType::INSTANCE, "instance"},
+              {ImageReceiver::Config::SemanticsType::OPEN_SET, "open_set"}});
+  field(config.with_feature, "with_feature");
+  field(config.with_traversability, "with_traversability");
+  field(config.use_exact, "use_exact");
+  field(config.queue_size, "queue_size");
+  field(config.qos, "qos");
+}
+
+ImageReceiver::ImageReceiver(const Config& config,
+                             const Sensor::ConstPtr& sensor,
+                             const OutputQueue::Ptr& output)
+    : RosDataReceiver(config, sensor, output), config(config) {
+  if (config.queue_size <= 2 && !config.use_exact) {
+    LOG(WARNING) << "ApproximateTime policy requires queue sizes larger than 2";
+  }
+}
+
+ImageReceiver::~ImageReceiver() = default;
+
+void ImageReceiver::stop() {
+  impl_.reset();  // we want cancel subscriptions before stopping the receiver thread
+  DataReceiver::stop();
+}
+
+bool ImageReceiver::initImpl() {
+  auto nh = ianvs::NodeHandle::this_node(ns_);
+  impl_.reset(new Impl(config, nh, queue_));
   return true;
 }
 
-void RGBDImageReceiver::callback(const sensor_msgs::msg::Image::ConstSharedPtr& color,
-                                 const sensor_msgs::msg::Image::ConstSharedPtr& depth) {
-  const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
-  auto packet = std::make_shared<ImageInputPacket>(timestamp_ns, sensor_name);
-  color_sub_.fillInput(*color, *packet);
-  depth_sub_.fillInput(*depth, *packet);
-  queue_.push(packet);
-}
-
-void declare_config(RGBDImageReceiver::Config& config) {
-  using namespace config;
-  name("RGBDImageReceiver::Config");
-  base<RosDataReceiver::Config>(config);
-}
-
-ClosedSetImageReceiver::ClosedSetImageReceiver(const Config& config,
-                                               const std::string& sensor_name)
-    : ImageReceiverImpl<LabelSubscriber>(config, sensor_name) {}
-
-void declare_config(ClosedSetImageReceiver::Config& config) {
-  using namespace config;
-  name("ClosedSetImageReceiver::Config");
-  base<RosDataReceiver::Config>(config);
-}
-
-InstanceImageReceiver::InstanceImageReceiver(const Config& config,
-                                             const std::string& sensor_name)
-    : ImageReceiverImpl<InstanceSubscriber>(config, sensor_name) {}
-
-void declare_config(InstanceImageReceiver::Config& config) {
-  using namespace config;
-  name("InstanceImageReceiver::Config");
-  base<RosDataReceiver::Config>(config);
-}
-
-OpenSetImageReceiver::OpenSetImageReceiver(const Config& config,
-                                           const std::string& sensor_name)
-    : ImageReceiverImpl<FeatureSubscriber>(config, sensor_name) {}
-
-void declare_config(OpenSetImageReceiver::Config& config) {
-  using namespace config;
-  name("OpenSetImageReceiver::Config");
-  base<hydra::RosDataReceiver::Config>(config);
-}
-
-ColormappedLabelImageReceiver::ColormappedLabelImageReceiver(const Config& config,
-                                                             const std::string& name)
-    : ImageReceiverImpl<ColormappedLabelSubscriber>(config, name),
-      config(config::checkValid(config)),
-      colormap_(SemanticColorMap::fromCsv(config.colormap_path)) {
-  CHECK(colormap_) << "Colormap required!";
-}
-
-bool ColormappedLabelImageReceiver::initImpl() {
-  using Base = ImageReceiverImpl<ColormappedLabelSubscriber>;
-  const auto ret = Base::initImpl();
-  semantic_sub_.setColormap(colormap_.get(), config.default_label);
-  return ret;
-}
-
-void declare_config(ColormappedLabelImageReceiver::Config& config) {
-  using namespace config;
-  name("ColormappedLabelImageReceiver::Config");
-  base<hydra::RosDataReceiver::Config>(config);
-  field<Path::Absolute>(config.colormap_path, "colormap_path");
-  field(config.default_label, "default_label");
-  check<Path::Exists>(config.colormap_path, "colormap_path");
-}
-
-namespace {
-
-static const auto no_semantic_registration =
-    config::RegistrationWithConfig<DataReceiver,
-                                   RGBDImageReceiver,
-                                   RGBDImageReceiver::Config,
-                                   std::string>("RGBDImageReceiver");
-
-static const auto closed_registration =
-    config::RegistrationWithConfig<DataReceiver,
-                                   ClosedSetImageReceiver,
-                                   ClosedSetImageReceiver::Config,
-                                   std::string>("ClosedSetImageReceiver");
-
-static const auto instance_registration =
-    config::RegistrationWithConfig<DataReceiver,
-                                   InstanceImageReceiver,
-                                   InstanceImageReceiver::Config,
-                                   std::string>("InstanceImageReceiver");
-
-static const auto open_registration =
-    config::RegistrationWithConfig<hydra::DataReceiver,
-                                   OpenSetImageReceiver,
-                                   OpenSetImageReceiver::Config,
-                                   std::string>("OpenSetImageReceiver");
-
-static const auto color_registration =
-    config::RegistrationWithConfig<hydra::DataReceiver,
-                                   ColormappedLabelImageReceiver,
-                                   ColormappedLabelImageReceiver::Config,
-                                   std::string>("ColormappedLabelImageReceiver");
-
-}  // namespace
 }  // namespace hydra

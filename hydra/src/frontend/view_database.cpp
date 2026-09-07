@@ -6,7 +6,7 @@
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
 
-#include "hydra/common/pipeline_queues.h"
+#include "hydra/common/message_queue.h"
 
 using namespace spark_dsg;
 
@@ -36,7 +36,7 @@ ViewDatabase::~ViewDatabase() {}
 
 void ViewDatabase::updateAssignments(const SceneGraph& graph,
                                      const ArchivalCheck& should_archive) const {
-  auto& queue = PipelineQueues::instance().input_features_queue;
+  MessageQueue<FeatureView::Ptr> queue;
   size_t new_views = 0;
   while (!queue.empty()) {
     ++new_views;

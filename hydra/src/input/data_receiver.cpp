@@ -40,69 +40,9 @@
 
 #include <chrono>
 
+#include "hydra/common/global_info.h"
+
 namespace hydra {
-
-DataReceiver::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
-
-DataReceiver::DataReceiver(const Config& config, const std::string& _sensor_name)
-    : config(config::checkValid(config)),
-      sensor_name(_sensor_name),
-      queue_(config.max_packets) {
-  for (const auto& filter : config.filters) {
-    filters_.push_back(filter.create());
-  }
-}
-
-bool DataReceiver::init() { return initImpl(); }
-
-SensorInputPacket::Ptr DataReceiver::poll() {
-  while (!queue_.empty()) {
-    const auto packet = pollOnce();
-    if (packet) {
-      return packet;
-    }
-  }
-
-  return nullptr;
-}
-
-SensorInputPacket::Ptr DataReceiver::pollOnce() {
-  if (queue_.empty()) {
-    return nullptr;
-  }
-
-  const auto packet = queue_.pop();
-  const auto timestamp = packet->timestamp_ns;
-  const std::chrono::nanoseconds curr_time_ns(timestamp);
-  if (last_received_) {
-    std::chrono::nanoseconds last_time_ns(last_received_->timestamp_ns);
-    std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
-    if (separation_s.count() < config.input_separation_s) {
-      MLOG(3) << "Dropping input @ " << timestamp << " [ns] with separation of "
-              << separation_s.count() << " [s]";
-      return nullptr;
-    }
-  }
-
-  for (const auto& filter : filters_) {
-    if (!filter) {
-      continue;
-    }
-
-    if (!filter->valid(*packet, last_received_.get())) {
-      return nullptr;
-    }
-  }
-
-  MLOG(2) << "Got input @ " << timestamp << " [ns]";
-  last_received_ = packet;
-  return last_received_;
-}
-
-void DataReceiver::clear() { queue_.clear(); }
-
-size_t DataReceiver::numQueued() const { return queue_.size(); }
 
 void declare_config(DataReceiver::Config& config) {
   using namespace config;
@@ -111,6 +51,174 @@ void declare_config(DataReceiver::Config& config) {
   field(config.max_packets, "max_packets");
   field(config.input_separation_s, "input_separation_s");
   field(config.filters, "filters");
+  field(config.adapters, "adapters");
+  field(config.received_window_size, "received_window_size");
+}
+
+DataReceiver::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
+
+DataReceiver::DataReceiver(const Config& config,
+                           const Sensor::ConstPtr& sensor,
+                           const OutputQueue::Ptr& output)
+    : config(config::checkValid(config)),
+      sensor(sensor),
+      sensor_name(sensor->name),
+      queue_(config.max_packets),
+      output_queue_(output) {
+  for (const auto& filter : config.filters) {
+    filters_.push_back(filter.create());
+  }
+
+  for (const auto& adapter : config.adapters) {
+    adapters_.push_back(adapter.create());
+  }
+}
+
+DataReceiver::~DataReceiver() { stopImpl(); }
+
+bool DataReceiver::start() {
+  const auto success = initImpl();
+  thread_ = std::make_unique<std::thread>(&DataReceiver::spin, this);
+  return success;
+}
+
+void DataReceiver::stop() { stopImpl(); }
+
+void DataReceiver::clear() { queue_.clear(); }
+
+void DataReceiver::spin() {
+  bool should_shutdown = false;
+  while (!should_shutdown) {
+    const auto has_data = queue_.poll();
+    if (GlobalInfo::instance().force_shutdown() || !has_data) {
+      should_shutdown = should_shutdown_;
+    }
+
+    if (!has_data) {
+      continue;
+    }
+
+    const auto packet = queue_.pop();
+    pushPacket(packet);
+  }
+}
+
+void DataReceiver::recordTimestamp(uint64_t timestamp) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  received_window_.push_back(timestamp);
+  if (received_window_.size() > config.received_window_size) {
+    received_window_.pop_front();
+  }
+}
+
+void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
+  const auto timestamp = packet->timestamp_ns;
+  recordTimestamp(timestamp);
+
+  const std::chrono::nanoseconds curr_time_ns(timestamp);
+  if (last_received_) {
+    std::chrono::nanoseconds last_time_ns(last_received_->timestamp_ns);
+    std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
+    if (separation_s.count() < config.input_separation_s) {
+      MLOG(3) << "Dropping input @ " << timestamp << " [ns] with separation of "
+              << separation_s.count() << " [s]";
+      return;
+    }
+  }
+
+  for (const auto& filter : filters_) {
+    if (filter && !filter->valid(*packet, last_received_.get())) {
+      return;
+    }
+  }
+
+  MLOG(2) << "Got input @ " << timestamp << " [ns]";
+  last_received_ = packet;
+
+  auto data = std::make_shared<InputData>(sensor);
+  data->timestamp_ns = timestamp;
+  packet->fillInputData(*data);
+  for (const auto& adapter : adapters_) {
+    if (adapter) {
+      adapter->update(*data);
+    }
+  }
+
+  output_queue_->push(data);
+}
+
+auto DataReceiver::getStats() const -> RateStats {
+  std::vector<double> values;
+  {  // critical section
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (received_window_.size() <= 1) {
+      return {};
+    }
+
+    values.resize(received_window_.size() - 1);
+    for (size_t i = 1; i < received_window_.size(); ++i) {
+      const auto diff_ns = std::abs(received_window_[i] - received_window_[i - 1]);
+      const double rate_hz = 1.0 / (1.0e-9 * diff_ns);
+      values[i - 1] = rate_hz;
+    }
+  }  // end critical section
+
+  std::sort(values.begin(), values.end());
+
+  RateStats stats;
+  stats.num_measurements = received_window_.size() - 1;
+  stats.min = std::numeric_limits<double>::max();
+  for (const auto& value : values) {
+    stats.min = std::min(stats.min, value);
+    stats.max = std::max(stats.max, value);
+    stats.mean += value;
+  }
+
+  const auto mid = values.size() / 2;
+  if (values.size() % 2 == 0) {
+    // this is safe because values.size() >= 1 and 2 is the first value
+    // where this will trigger
+    stats.median = (values[mid] + values[mid + 1]) / 2.0;
+  } else {
+    stats.median = values[mid];
+  }
+
+  stats.mean /= stats.num_measurements;
+  for (const auto& value : values) {
+    const auto diff = value - stats.mean;
+    stats.variance += diff * diff;
+  }
+
+  stats.variance /= stats.num_measurements;
+  return stats;
+}
+
+std::string DataReceiver::RateStats::str() const {
+  if (!num_measurements) {
+    return "n/a";
+  }
+
+  std::stringstream ss;
+  ss << std::setprecision(3) << "mean: " << mean;
+  if (num_measurements > 1) {
+    ss << std::setprecision(3) << " ± " << variance;
+  }
+
+  ss << " (min: " << min << ", max: " << max << ", median: " << median << ") [hz] over "
+     << num_measurements << " measurements";
+  return ss.str();
+}
+
+void DataReceiver::stopImpl() {
+  should_shutdown_ = true;
+  if (thread_) {
+    MLOG(1) << "stopping receiver '" << sensor_name << "'";
+    thread_->join();
+    thread_.reset();
+    MLOG(1) << "stopped receiver '" << sensor_name << "'";
+    MLOG(1) << "remaining in receiver '" << sensor_name << "' queue: " << queue_.size();
+  }
 }
 
 }  // namespace hydra

@@ -15,7 +15,9 @@ static const auto registration_ =
     config::RegistrationWithConfig<DataReceiver,
                                    PointcloudReceiver,
                                    PointcloudReceiver::Config,
-                                   std::string>("PointcloudReceiver");
+                                   Sensor::ConstPtr,
+                                   DataReceiver::OutputQueue::Ptr>(
+        "PointcloudReceiver");
 
 }
 
@@ -28,16 +30,23 @@ void declare_config(PointcloudReceiver::Config& config) {
   field(config.in_world_frame, "in_world_frame");
   field(config.instance_ids, "instance_ids");
   field(config.discard_transparent_color, "discard_transparent_color");
+  field(config.qos, "qos");
 }
 
 PointcloudReceiver::PointcloudReceiver(const Config& config,
-                                       const std::string& sensor_name)
-    : RosDataReceiver(config, sensor_name), config(config) {}
+                                       const Sensor::ConstPtr& sensor,
+                                       const OutputQueue::Ptr& output)
+    : RosDataReceiver(config, sensor, output), config(config) {}
+
+void PointcloudReceiver::stop() {
+  sub_.reset();  // we want cancel subscriptions before stopping the receiver thread
+  DataReceiver::stop();
+}
 
 bool PointcloudReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);
   sub_ = nh.create_subscription<PointCloud2>(
-      "pointcloud", config.queue_size, &PointcloudReceiver::callback, this);
+      "pointcloud", config.qos, &PointcloudReceiver::callback, this);
   return true;
 }
 
@@ -45,7 +54,7 @@ void PointcloudReceiver::callback(const PointCloud2::ConstSharedPtr& msg) {
   const auto stamp = rclcpp::Time(msg->header.stamp).nanoseconds();
   MLOG(2) << "Got raw pointcloud input @ " << stamp << " [ns]";
 
-  auto packet = std::make_shared<CloudInputPacket>(stamp, sensor_name);
+  auto packet = std::make_shared<CloudInputPacket>(stamp);
   fillPointcloudPacket(
       *msg, *packet, config.instance_ids, config.discard_transparent_color);
   packet->in_world_frame = config.in_world_frame;

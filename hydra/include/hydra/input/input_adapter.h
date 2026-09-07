@@ -32,20 +32,16 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/input/input_packet.h"
+#pragma once
 
 #include "hydra/input/input_data.h"
 
 namespace hydra {
 
-bool InputPacket::fillInputData(InputData& data) const {
-  if (!sensor_input) {
-    return false;
-  }
-
-  data.timestamp_ns = timestamp_ns;
-  data.world_T_body = world_T_body();
-  return sensor_input->fillInputData(data);
-}
+class InputAdapter {
+ public:
+  virtual ~InputAdapter() = default;
+  virtual void update(InputData& data) const = 0;
+};
 
 }  // namespace hydra

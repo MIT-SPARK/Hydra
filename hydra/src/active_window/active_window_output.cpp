@@ -45,14 +45,10 @@ const VolumetricMap& ActiveWindowOutput::map() const {
 
 void ActiveWindowOutput::updateFrom(ActiveWindowOutput&& msg, bool clone_map) {
   timestamp_ns = msg.timestamp_ns;
-  world_t_body = msg.world_t_body;
-  world_R_body = msg.world_R_body;
   sensor_data = msg.sensor_data;
   // TODO(nathan) this leads to incorrect behavior if we add in one update but then
   // archive in another
-  archived_mesh_indices.insert(archived_mesh_indices.end(),
-                               msg.archived_mesh_indices.begin(),
-                               msg.archived_mesh_indices.end());
+  archived.insert(archived.end(), msg.archived.begin(), msg.archived.end());
 
   // append graph updates to current message
   for (auto&& [layer_id, layer_update] : msg.graph_update) {
@@ -90,14 +86,6 @@ void ActiveWindowOutput::setMap(const VolumetricMap& map) {
 
 void ActiveWindowOutput::setMap(const std::shared_ptr<VolumetricMap>& map) {
   map_ = map;
-}
-
-ActiveWindowOutput::Ptr ActiveWindowOutput::fromInput(const InputPacket& msg) {
-  auto new_msg = std::make_shared<ActiveWindowOutput>();
-  new_msg->timestamp_ns = msg.timestamp_ns;
-  new_msg->world_t_body = msg.world_t_body;
-  new_msg->world_R_body = msg.world_R_body;
-  return new_msg;
 }
 
 }  // namespace hydra

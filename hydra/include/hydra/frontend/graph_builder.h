@@ -121,6 +121,8 @@ class GraphBuilder : public Module {
 
   void addSink(const Sink::Ptr& sink);
 
+  void setLcdQueue(const MessageQueue<LcdInput::Ptr>::Ptr& queue);
+
  protected:
   void addInputCallback(InputCallback callback);
 
@@ -185,6 +187,7 @@ class GraphBuilder : public Module {
 
   spark_dsg::SceneGraphLogger frontend_graph_logger_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
+  MessageQueue<LcdInput::Ptr>::Ptr lcd_input_queue_;
 
   Sink::List sinks_;
 

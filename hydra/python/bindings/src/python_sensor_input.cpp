@@ -41,12 +41,11 @@
 namespace hydra::python {
 
 PythonImageInput::PythonImageInput(uint64_t timestamp_ns,
-                                   const std::string& sensor_name,
                                    const PythonImage& _color,
                                    const PythonImage& _depth,
                                    const PythonImage& _labels,
                                    const PythonImage& _instances)
-    : ImageInputPacket(timestamp_ns, sensor_name) {
+    : ImageInputPacket(timestamp_ns) {
   depth = getDepthImage(_depth);
   color = getColorImage(_color);
   labels = getLabelImage(_labels);
@@ -54,11 +53,10 @@ PythonImageInput::PythonImageInput(uint64_t timestamp_ns,
 }
 
 PythonCloudInput::PythonCloudInput(uint64_t timestamp_ns,
-                                   const std::string& sensor_name,
                                    const PointVec& pos_vec,
                                    const LabelVec& label_vec,
                                    const ColorVec& color_vec)
-    : CloudInputPacket(timestamp_ns, sensor_name) {
+    : CloudInputPacket(timestamp_ns) {
   if (pos_vec.cols() == 0) {
     LOG(ERROR) << "received input without any points";
     return;

@@ -70,7 +70,7 @@ input:
       receiver: {type: RECEIVER_TYPE}
       sensor: SENSOR_CONFIGURATION
 ```
-where `RECEIVER_TYPE` is typically `ClosedSetImageReceiver` or `PointcloudReceiver`.
+where `RECEIVER_TYPE` is typically `ImageReceiver` or `PointcloudReceiver`.
 You should fill out `SENSOR_CONFIGURATION` to match the corresponding sensor type (either `Camera` or `Lidar`, see Hydra for details).
 Camera sensors support populating intrinsics from `sensor_msgs::msg::CameraInfo` messages (`type: camera_info`) and extrinsics can be populated from `tf` (`extrinsics: {type: ros}`).
 If configured this way, the extrinsics will look up the transform `body_T_sensor` where sensor is the frame ID associated with the camera info message and body is the frame ID associated with the robot body.

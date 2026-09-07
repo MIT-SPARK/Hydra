@@ -40,7 +40,7 @@
 #include <memory>
 
 #include "hydra/common/graph_update.h"
-#include "hydra/input/input_packet.h"
+#include "hydra/input/input_data.h"
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
@@ -53,16 +53,12 @@ struct ActiveWindowOutput {
 
   //! Timestamp of update
   uint64_t timestamp_ns;
-  //! Translation component of body pose
-  Eigen::Vector3d world_t_body;
-  //! Rotation component of body pose
-  Eigen::Quaterniond world_R_body;
   //! Sensor data from last update
-  std::shared_ptr<InputData> sensor_data;
+  InputData::ConstPtr sensor_data;
   //! New nodes to add to the scene graph
   GraphUpdate graph_update;
-  //! Archived mesh blocks on this pass
-  spatial_hash::BlockIndices archived_mesh_indices;
+  //! Archived blocks on this pass
+  spatial_hash::BlockIndices archived;
 
   /**
    * @brief Get the current volumetric map
@@ -87,17 +83,12 @@ struct ActiveWindowOutput {
    */
   virtual void updateFrom(ActiveWindowOutput&& msg, bool clone_map);
 
-  /**
-   * @brief Construct an output packet from the input to the active window
-   */
-  static Ptr fromInput(const InputPacket& input);
-
   /*
    * @brief Get the body pose from when this packet was created
    */
   template <typename T = double>
   Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
-    return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
+    return sensor_data->world_T_body.cast<T>();
   }
 
  protected:

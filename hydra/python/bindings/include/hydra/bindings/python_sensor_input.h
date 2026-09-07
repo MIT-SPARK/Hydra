@@ -44,7 +44,6 @@ namespace hydra::python {
 
 struct PythonImageInput : public ImageInputPacket {
   PythonImageInput(uint64_t timestamp_ns,
-                   const std::string& name,
                    const PythonImage& color,
                    const PythonImage& depth,
                    const PythonImage& labels = PythonImage(),
@@ -57,7 +56,6 @@ struct PythonCloudInput : public CloudInputPacket {
   using ColorVec = Eigen::Matrix<uint8_t, 3, Eigen::Dynamic>;
 
   PythonCloudInput(uint64_t timestamp_ns,
-                   const std::string& name,
                    const PointVec& points,
                    const LabelVec& labels,
                    const ColorVec& colors);

@@ -37,21 +37,25 @@
 #include <config_utilities/config.h>
 
 namespace hydra {
+namespace {
 
 inline std::string getNamespace(const std::string& ns, const std::string& name) {
   return ns.empty() ? "~/input/" + name : ns;
 }
+
+}  // namespace
 
 void declare_config(RosDataReceiver::Config& config) {
   using namespace config;
   name("RosDataReceiver::Config");
   base<DataReceiver::Config>(config);
   field(config.ns, "ns");
-  field(config.queue_size, "queue_size");
 }
 
-RosDataReceiver::RosDataReceiver(const Config& config, const std::string& sensor_name)
-    : DataReceiver(config, sensor_name),
+RosDataReceiver::RosDataReceiver(const Config& config,
+                                 const Sensor::ConstPtr& sensor,
+                                 const OutputQueue::Ptr& output)
+    : DataReceiver(config, sensor, output),
       config(config),
       ns_(getNamespace(config.ns, sensor_name)) {}
 

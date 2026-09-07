@@ -26,7 +26,6 @@ add_executable(
   frontend/test_graph_connector.cpp
   frontend/test_mesh_segmenter.cpp
   input/test_camera.cpp
-  input/test_input_packet.cpp
   input/test_lidar.cpp
   input/test_sensor.cpp
   loop_closure/test_descriptor_matching.cpp

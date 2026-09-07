@@ -96,7 +96,7 @@ void RegionGrowingTraversabilityClustering::updateGraph(
   max_region_size_ = std::round(config.max_radius / layer.voxel_size);
 
   // Initialize regions and voxels for this pass.
-  auto all_voxels = initializeVoxels(layer, msg.world_t_body);
+  auto all_voxels = initializeVoxels(layer, msg.world_T_body().translation());
   if (all_voxels.empty()) {
     return;
   }

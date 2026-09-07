@@ -32,69 +32,70 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/traversability_place_extractor.h"
+#include "hydra_ros/utils/qos_config.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/validation.h>
+#include <config_utilities/types/enum.h>
 
-#include "hydra/utils/timing_utilities.h"
-
-using Timer = hydra::timing::ScopedTimer;
-
-namespace hydra::places {
+namespace hydra {
 namespace {
 
-static const auto registration =
-    config::RegistrationWithConfig<GraphBuilderFunctor,
-                                   TraversabilityPlaceExtractor,
-                                   TraversabilityPlaceExtractor::Config>(
-        "traversability");
+size_t depth_from_policy(const rclcpp::QoS& qos) {
+  if (qos.history() == rclcpp::HistoryPolicy::KeepAll) {
+    return 0;
+  }
+
+  return qos.depth();
+}
 
 }  // namespace
 
-void declare_config(TraversabilityPlaceExtractor::Config& config) {
+QoSConfig::QoSConfig(const rclcpp::QoS& qos)
+    : depth(depth_from_policy(qos)),
+      reliability(qos.reliability()),
+      durability(qos.durability()),
+      liveliness(qos.liveliness()) {}
+
+QoSConfig::QoSConfig(size_t depth,
+                     rclcpp::ReliabilityPolicy reliability,
+                     rclcpp::DurabilityPolicy durability,
+                     rclcpp::LivelinessPolicy liveliness)
+    : depth(depth),
+      reliability(reliability),
+      durability(durability),
+      liveliness(liveliness) {}
+
+QoSConfig::operator rclcpp::QoS() const {
+  rclcpp::QoS qos(rclcpp::KeepAll{});
+  if (depth > 0) {
+    qos = rclcpp::QoS(rclcpp::KeepLast(depth));
+  }
+
+  return qos.reliability(reliability).durability(durability).liveliness(liveliness);
+}
+
+void declare_config(QoSConfig& config) {
   using namespace config;
-  name("TraversabilityPlaceExtractor::Config");
-  field(config.layer, "layer");
-  field(config.estimator, "estimator");
-  field(config.postprocessing, "postprocessing");
-  field(config.clustering, "clustering");
-  field(config.sinks, "sinks");
+  name("QoSConfig");
+  field(config.depth, "depth");
+  enum_field(config.reliability,
+             "reliability",
+             {{rclcpp::ReliabilityPolicy::BestEffort, "BestEffort"},
+              {rclcpp::ReliabilityPolicy::Reliable, "Reliable"},
+              {rclcpp::ReliabilityPolicy::SystemDefault, "SystemDefault"},
+              {rclcpp::ReliabilityPolicy::BestAvailable, "BestAvailable"}});
+  enum_field(config.durability,
+             "durability",
+             {{rclcpp::DurabilityPolicy::Volatile, "Volatile"},
+              {rclcpp::DurabilityPolicy::TransientLocal, "TransientLocal"},
+              {rclcpp::DurabilityPolicy::SystemDefault, "SystemDefault"},
+              {rclcpp::DurabilityPolicy::BestAvailable, "BestAvailable"}});
+  enum_field(config.liveliness,
+             "liveliness",
+             {{rclcpp::LivelinessPolicy::Automatic, "Auotmatic"},
+              {rclcpp::LivelinessPolicy::ManualByTopic, "ManualByTopic"},
+              {rclcpp::LivelinessPolicy::SystemDefault, "SystemDefault"},
+              {rclcpp::LivelinessPolicy::BestAvailable, "BestAvailable"}});
 }
 
-TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
-    : config(config::checkValid(config)),
-      estimator_(config.estimator.create()),
-      postprocessing_(config.postprocessing),
-      clustering_(config.clustering.create()),
-      sinks_(Sink::instantiate(config.sinks)) {}
-
-void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
-                                        SharedDsgInfo& dsg) {
-  detect(msg);
-
-  std::lock_guard<std::mutex> graph_lock(dsg.mutex);
-  updateGraph(msg, *dsg.graph);
-}
-
-void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
-  Timer timer("traversability/estimate", msg.timestamp_ns);
-  estimator_->updateTraversability(msg);
-}
-
-void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
-                                               spark_dsg::SceneGraph& graph) {
-  // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
-  // expensive though.
-  Timer timer("traversability/postprocessing", msg.timestamp_ns);
-  auto layer = estimator_->getTraversabilityLayer();
-  postprocessing_.apply(layer);
-
-  timer.reset("traversability/clustering");
-  clustering_->updateGraph(layer, msg, graph, config.layer);
-
-  timer.reset("traversability/sinks");
-  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_T_body().translation(), layer);
-}
-
-}  // namespace hydra::places
+}  // namespace hydra
