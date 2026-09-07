@@ -97,8 +97,7 @@ class MeshCompression : public MeshCompressor {
   GlobalIndex compressionCell(const Eigen::Vector3f& pos) const;
   bool isObservedFreeSpace(const VolumetricMap& map, const Eigen::Vector3f& pos) const;
   UpdateState prepareUpdate(const VolumetricMap& map) const;
-  void integrateMeshBlock(const VolumetricMap& map,
-                          const MeshBlock& block,
+  void integrateMeshBlock(const MeshBlock& block,
                           uint64_t timestamp_ns,
                           UpdateState& state);
   void markReobservedFrozenVertices(UpdateState& state) const;

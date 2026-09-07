@@ -89,6 +89,21 @@ def configuration_args(files, snippets, variables, options):
         for value in values:
             args.extend([flag, value])
 
+    if options["method"] == "reference":
+        disabled = {"type": "Uninitialized Virtual Config"}
+        args.extend(
+            [
+                "-c",
+                yaml.safe_dump(
+                    {
+                        "map_window": disabled,
+                        "reconstruction": {"map_window": disabled},
+                        "mesh_compression": disabled,
+                        "comparison_compression": disabled,
+                    }
+                ),
+            ]
+        )
     args.extend(["-c", "{app_plugins: [], reconstruction: {sinks: []}}"])
     return args
 
@@ -145,6 +160,7 @@ def run_trial(loader, camera, run, writer, output, options):
     (output / "resolved_reconstruction.txt").write_text(pipeline.config)
     rows = []
     updates = 0
+    timestamps = []
     for frame, packet in enumerate(input_frames(loader, options)):
         if not pipeline.step(*packet):
             continue
@@ -158,16 +174,37 @@ def run_trial(loader, camera, run, writer, output, options):
             )
             writer.writerow(row)
             rows.append(row)
+        timestamps.append(packet[0])
         updates += 1
         if updates % 50 == 0:
             click.echo(f"Run {run + 1}: {updates} reconstruction updates", err=True)
-    if options["save_mesh"]:
+    np.save(
+        output / f"run_{run}_timestamps.npy", np.asarray(timestamps, dtype=np.uint64)
+    )
+    if options["save_mesh"] or options["method"] == "reference":
         pipeline.save(output / f"run_{run}")
-    if not rows:
+    if options["method"] == "reference":
+        save_reference_mesh(pipeline.mesh, output / f"run_{run}" / "mesh.sparkdsg")
+    if not updates or (not rows and options["method"] != "reference"):
         raise click.ClickException(
             "No mesh updates produced; check topics, poses, and configuration"
         )
     return rows
+
+
+def save_reference_mesh(mesh, path):
+    """Weld exactly identical marching-cubes vertices without spatial compression."""
+    points, inverse = np.unique(mesh.get_vertices()[:3].T, axis=0, return_inverse=True)
+    faces = inverse[mesh.get_faces().T]
+    ordered = np.sort(faces, axis=1)
+    valid = np.all(np.diff(ordered, axis=1) != 0, axis=1)
+    faces, ordered = faces[valid], ordered[valid]
+    _, unique = np.unique(ordered, axis=0, return_index=True)
+    vertices = np.zeros((6, len(points)))
+    vertices[:3] = points.T
+    mesh.set_vertices(vertices)
+    mesh.set_faces(faces[np.sort(unique)].T)
+    mesh.save(path)
 
 
 def timing_summary(values):
@@ -231,7 +268,9 @@ def summarize(rows):
 @click.option("--min-range", type=click.FloatRange(min=0), default=0.1)
 @click.option("--max-range", type=click.FloatRange(min=0, min_open=True), default=5.0)
 @click.option("--color-order", type=click.Choice(["rgb", "bgr"]), default="rgb")
-@click.option("--method", type=click.Choice(["both", "old", "new"]), default="both")
+@click.option(
+    "--method", type=click.Choice(["both", "old", "new", "reference"]), default="both"
+)
 @click.option(
     "--resolution", type=click.FloatRange(min=0, min_open=True), default=0.005
 )
@@ -284,7 +323,7 @@ def run(
         for repeat in range(options["repetitions"]):
             rows.extend(run_trial(loader, camera, repeat, writer, output, options))
             fout.flush()
-    summary = summarize(rows)
+    summary = summarize(rows) if rows else {"reference": "Unwindowed marching cubes"}
     (output / "summary.json").write_text(json.dumps(summary, indent=2))
     click.echo(json.dumps(summary, indent=2))
 

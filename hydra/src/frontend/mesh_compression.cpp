@@ -37,12 +37,13 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
+#include <kimera_pgmo/compression/redundancy_checker.h>
 #include <spatial_hash/grid.h>
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <set>
+#include <unordered_set>
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
@@ -146,6 +147,7 @@ MeshCompression::UpdateState MeshCompression::prepareUpdate(
                            std::vector<bool>(vertices_.size(), false),
                            std::vector<bool>(vertices_.size(), false),
                            {}};
+  state.mutable_cells.reserve(vertices_.size());
   // An empty mesh block is not a clearing instruction. Only observed free space
   // can remove mutable geometry; frozen vertices support immutable faces.
   for (size_t i = 0; i < vertices_.size(); ++i) {
@@ -155,16 +157,13 @@ MeshCompression::UpdateState MeshCompression::prepareUpdate(
     }
 
     state.deleted[i] = isObservedFreeSpace(map, entry.vertex.pos);
-    if (!state.deleted[i]) {
-      state.mutable_cells.emplace(compressionCell(entry.vertex.pos), i);
-    }
+    state.mutable_cells.emplace(compressionCell(entry.vertex.pos), i);
   }
 
   return state;
 }
 
-void MeshCompression::integrateMeshBlock(const VolumetricMap& map,
-                                         const MeshBlock& block,
+void MeshCompression::integrateMeshBlock(const MeshBlock& block,
                                          uint64_t timestamp_ns,
                                          UpdateState& state) {
   std::vector<size_t> remap(block.numVertices(), invalid_index);
@@ -172,7 +171,7 @@ void MeshCompression::integrateMeshBlock(const VolumetricMap& map,
     kimera_pgmo::traits::VertexTraits traits;
     traits.properties = spark_dsg::pgmoGetVertexProperties(block);
     const auto pos = spark_dsg::pgmoGetVertex(block, i, &traits);
-    if (!pos.allFinite() || isObservedFreeSpace(map, pos)) {
+    if (!pos.allFinite()) {
       continue;
     }
 
@@ -186,6 +185,9 @@ void MeshCompression::integrateMeshBlock(const VolumetricMap& map,
 
     remap[i] = iter->second;
     state.observed[iter->second] = true;
+    // Marching cubes observes an interpolated zero crossing. A nearby positive
+    // projective TSDF sample must not clear that currently observed surface.
+    state.deleted[iter->second] = false;
     updateVertexAttributes(vertices_[iter->second].vertex, pos, traits, timestamp_ns);
   }
 
@@ -214,30 +216,36 @@ void MeshCompression::markReobservedFrozenVertices(UpdateState& state) const {
 }
 
 void MeshCompression::removeClearedAndReplacedFaces(const UpdateState& state) {
-  std::set<Face> unique_faces;
-  std::vector<Face> retained_faces;
+  std::unordered_set<Face, kimera_pgmo::RedundancyChecker::FaceHash> new_faces;
+  new_faces.reserve(faces_.size() - state.previous_faces);
+  size_t retained = 0;
   for (size_t i = 0; i < faces_.size(); ++i) {
     const auto& face = faces_[i];
     // Refresh topology only when all endpoints were reobserved, preserving
     // triangles across partial updates, including those with frozen endpoints.
     const auto all_observed = std::all_of(
         face.begin(), face.end(), [&](auto index) { return state.observed[index]; });
-    if (i < state.previous_faces && all_observed) {
+    const auto replaced = i < state.previous_faces && all_observed;
+    const auto cleared =
+        state.deleted[face[0]] || state.deleted[face[1]] || state.deleted[face[2]];
+    if (replaced || cleared) {
       continue;
     }
 
-    if (state.deleted[face[0]] || state.deleted[face[1]] || state.deleted[face[2]]) {
-      continue;
+    // Retained faces are already unique. They have an unobserved endpoint, so
+    // cannot duplicate incoming faces, whose endpoints are all observed.
+    if (i >= state.previous_faces) {
+      auto key = face;
+      std::sort(key.begin(), key.end());
+      if (!new_faces.insert(key).second) {
+        continue;
+      }
     }
 
-    auto key = face;
-    std::sort(key.begin(), key.end());
-    if (unique_faces.insert(key).second) {
-      retained_faces.push_back(face);
-    }
+    faces_[retained++] = face;
   }
 
-  faces_ = std::move(retained_faces);
+  faces_.resize(retained);
 }
 
 std::vector<bool> MeshCompression::findArchivableVertices(
@@ -285,9 +293,14 @@ std::vector<size_t> MeshCompression::appendDeltaVertices(
 
       const auto& vertex = vertices_[i].vertex;
       remap[i] = delta.addVertex(vertex.pos, vertex.traits, archiving);
-      if (i < state.previous_vertices) {
-        delta.info.prev_to_curr->emplace(i, remap[i]);
-      }
+    }
+  }
+
+  // Previous indices are ordered, allowing linear-time insertion into the map.
+  auto& previous = *delta.info.prev_to_curr;
+  for (size_t i = 0; i < state.previous_vertices; ++i) {
+    if (!state.deleted[i]) {
+      previous.emplace_hint(previous.end(), i, remap[i]);
     }
   }
 
@@ -297,7 +310,7 @@ std::vector<size_t> MeshCompression::appendDeltaVertices(
 void MeshCompression::appendDeltaFaces(const std::vector<bool>& archivable,
                                        const std::vector<size_t>& remap,
                                        kimera_pgmo::MeshDelta& delta) {
-  std::vector<Face> active_faces;
+  size_t active_count = 0;
   const auto archived_count = delta.getNumArchivedVertices();
   for (const auto& face : faces_) {
     const auto mapped = Face{remap[face[0]], remap[face[1]], remap[face[2]]};
@@ -311,25 +324,25 @@ void MeshCompression::appendDeltaFaces(const std::vector<bool>& archivable,
         vertices_[i].frozen = true;
       }
     } else {
-      active_faces.push_back({mapped[0] - archived_count,
-                              mapped[1] - archived_count,
-                              mapped[2] - archived_count});
+      faces_[active_count++] = {mapped[0] - archived_count,
+                                mapped[1] - archived_count,
+                                mapped[2] - archived_count};
     }
   }
 
-  faces_ = std::move(active_faces);
+  faces_.resize(active_count);
 }
 
 void MeshCompression::retainActiveVertices(const UpdateState& state,
                                            const std::vector<bool>& archivable) {
-  std::vector<Entry> remaining;
+  size_t remaining = 0;
   for (size_t i = 0; i < vertices_.size(); ++i) {
     if (!state.deleted[i] && !archivable[i]) {
-      remaining.push_back(vertices_[i]);
+      vertices_[remaining++] = vertices_[i];
     }
   }
 
-  vertices_ = std::move(remaining);
+  vertices_.resize(remaining);
 }
 
 void MeshCompression::updateTracking(const kimera_pgmo::MeshDelta& delta) {
@@ -345,7 +358,7 @@ kimera_pgmo::MeshDelta::Ptr MeshCompression::update(const VolumetricMap& map,
                                                     const ArchivePredicate& archive) {
   auto state = prepareUpdate(map);
   for (const auto& block : map.getMeshLayer()) {
-    integrateMeshBlock(map, block, timestamp_ns, state);
+    integrateMeshBlock(block, timestamp_ns, state);
   }
 
   markReobservedFrozenVertices(state);

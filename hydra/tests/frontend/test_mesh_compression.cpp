@@ -156,6 +156,34 @@ TEST(MeshCompression, OnlyObservedFreeSpaceDeletesVerticesAndIncidentFaces) {
   EXPECT_EQ(mesh.numFaces(), 0u);
 }
 
+TEST(MeshCompression, CurrentZeroCrossingsOverrideNearbyPositiveSamples) {
+  auto map = makeMap();
+  const auto points = triangle(map).points;
+  MeshCompression compression(0.01);
+  spark_dsg::Mesh mesh;
+  kimera_pgmo::MeshOffsetInfo offsets;
+  compression.update(map, 1)->updateMesh(mesh, offsets);
+
+  // Projective TSDF values at voxel centers can exceed the clearance even when
+  // marching cubes interpolates a zero crossing within the same voxel.
+  for (const auto& pos : points) {
+    observe(map, pos, 0.3f);
+  }
+
+  auto delta = compression.update(map, 2);
+  ASSERT_EQ(delta->info.prev_to_curr->size(), 3u);
+  EXPECT_EQ(delta->getVertex(0).traits.first_seen_stamp, 1u);
+  delta->updateMesh(mesh, offsets);
+  EXPECT_EQ(mesh.numFaces(), 1u);
+  EXPECT_EQ(mesh.numVertices(), 3u);
+
+  // Without the current surface observation, the same TSDF clears the old mesh.
+  map.getMeshLayer().getBlock(BlockIndex(0, 0, 0)).clear();
+  compression.update(map, 3)->updateMesh(mesh, offsets);
+  EXPECT_EQ(mesh.numFaces(), 0u);
+  EXPECT_EQ(mesh.numVertices(), 0u);
+}
+
 TEST(MeshCompression, MissingBlocksAndNearSurfaceSamplesAreNotCleared) {
   auto map = makeMap();
   const auto points = triangle(map).points;

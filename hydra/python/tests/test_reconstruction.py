@@ -3,6 +3,7 @@
 import hydra_python as hydra
 import numpy as np
 import pytest
+import spark_dsg
 import yaml
 
 
@@ -16,6 +17,7 @@ def make_pipeline(method, comparison=None):
         },
         "mesh_compression": {"type": method, "resolution": 0.01},
     }
+    settings["comparison_compression"] = {"type": "Uninitialized Virtual Config"}
     if comparison:
         settings["comparison_compression"] = {"type": comparison, "resolution": 0.01}
     hydra.init_config_context(["-c", yaml.safe_dump(settings)])
@@ -48,7 +50,9 @@ def test_reconstruction_retains_archived_mesh(method, tmp_path):
     assert second.compression_ms >= 0.0
     assert pipeline.mesh.num_vertices() == second.mesh_vertices
     pipeline.save(tmp_path / method)
-    assert (tmp_path / method / "mesh.sparkdsg").exists()
+    saved = spark_dsg.Mesh.load(tmp_path / method / "mesh.sparkdsg")
+    assert saved.num_vertices() == pipeline.mesh.num_vertices()
+    assert saved.num_faces() == pipeline.mesh.num_faces()
 
 
 def test_paired_compression_uses_same_packets_and_alternates_order():
@@ -64,3 +68,36 @@ def test_paired_compression_uses_same_packets_and_alternates_order():
         assert old.execution_order == 1 - index % 2
         assert new.mesh_faces > 0
         assert old.mesh_faces > 0
+
+
+def test_unwindowed_marching_cubes_without_compression(tmp_path):
+    disabled = {"type": "Uninitialized Virtual Config"}
+    hydra.init_config_context(
+        [
+            "-c",
+            yaml.safe_dump(
+                {
+                    "default_num_threads": 1,
+                    "map_window": disabled,
+                    "mesh_compression": disabled,
+                    "comparison_compression": disabled,
+                    "reconstruction": {"mesh": {"integrator_threads": 1}},
+                }
+            ),
+        ]
+    )
+    pipeline = hydra.ReconstructionPipeline(hydra.make_camera(20, 20, 9.5, 9.5, 20, 20))
+    assert step(pipeline, 1_000_000_000, 0.0)
+    first = pipeline.mesh
+    assert first.num_faces() > 0
+    assert step(pipeline, 2_000_000_000, 10.0)
+    assert not pipeline.compression_stats
+    mesh = pipeline.mesh
+    assert mesh.num_faces() > first.num_faces()
+    points = mesh.get_vertices()[:3].T
+    assert points[:, 0].min() < 0
+    assert points[:, 0].max() > 10
+    pipeline.save(tmp_path / "reference")
+    saved = spark_dsg.Mesh.load(tmp_path / "reference" / "mesh.sparkdsg")
+    np.testing.assert_array_equal(saved.get_vertices(), mesh.get_vertices())
+    np.testing.assert_array_equal(saved.get_faces(), mesh.get_faces())

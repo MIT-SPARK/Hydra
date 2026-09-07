@@ -134,7 +134,7 @@ class PythonReconstruction {
 
     std::vector<config::VirtualConfig<InputFilter, true>> filters;
     ReconstructionModule::Config reconstruction;
-    config::VirtualConfig<MeshCompressor> mesh_compression{
+    config::VirtualConfig<MeshCompressor, true> mesh_compression{
         MeshCompression::Config{0.005}};
     // Benchmark-only second compressor, fed the exact same updates sequentially.
     config::VirtualConfig<MeshCompressor, true> comparison_compression;
@@ -151,7 +151,7 @@ class PythonReconstruction {
   std::vector<CompressionStats> compression_stats;
   double reconstruction_ms = 0.0;
 
-  Mesh::Ptr mesh() const { return stitchers_.front().mesh; }
+  Mesh::Ptr mesh() const;
 
   std::string configString() const {
     const auto global = config::toString(GlobalInfo::instance().getConfig());
@@ -198,8 +198,11 @@ PythonReconstruction::PythonReconstruction(const Config& config,
   const auto& window = config.reconstruction.map_window;
   map_window_ =
       window ? window.create() : GlobalInfo::instance().createVolumetricWindow();
-  stitchers_.emplace_back(config.mesh_compression.getType(),
-                          config.mesh_compression.create());
+  if (config.mesh_compression) {
+    stitchers_.emplace_back(config.mesh_compression.getType(),
+                            config.mesh_compression.create());
+  }
+
   if (config.comparison_compression) {
     stitchers_.emplace_back(config.comparison_compression.getType(),
                             config.comparison_compression.create());
@@ -261,6 +264,24 @@ void PythonReconstruction::updateMeshes(const ActiveWindowOutput& input) {
   ++update_count_;
 }
 
+Mesh::Ptr PythonReconstruction::mesh() const {
+  if (!stitchers_.empty()) {
+    return stitchers_.front().mesh;
+  }
+
+  // With compression disabled, export marching cubes directly from the map.
+  auto mesh = std::make_shared<Mesh>(false, false, false, false);
+  for (const auto& block : module_->map().getMeshLayer()) {
+    const auto offset = mesh->numVertices();
+    mesh->points.insert(mesh->points.end(), block.points.begin(), block.points.end());
+    for (const auto& face : block.faces) {
+      mesh->faces.push_back({face[0] + offset, face[1] + offset, face[2] + offset});
+    }
+  }
+
+  return mesh;
+}
+
 void PythonReconstruction::save(const std::filesystem::path& output) {
   if (output.empty()) {
     return;
@@ -268,10 +289,10 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
 
   DataDirectory logs(output);
   if (logs.valid()) {
-    module_->map().save(logs.path("map"));
-    mesh()->save(logs.path("mesh.sparkdsg"));
+    module_->map().save(logs.path() / "map");
+    mesh()->save(logs.path() / "mesh.sparkdsg");
     if (stitchers_.size() > 1) {
-      stitchers_[1].mesh->save(logs.path("comparison_mesh.sparkdsg"));
+      stitchers_[1].mesh->save(logs.path() / "comparison_mesh.sparkdsg");
     }
   }
 }
