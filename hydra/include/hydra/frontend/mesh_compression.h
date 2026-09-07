@@ -39,6 +39,7 @@
 #include <functional>
 #include <vector>
 
+#include "hydra/frontend/mesh_compressor.h"
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
@@ -50,7 +51,7 @@ namespace hydra {
  * each vertex through a window predicate, independently of TSDF block ownership.
  * Archived geometry is immutable, as required by MeshDelta.
  */
-class MeshCompression {
+class MeshCompression : public MeshCompressor {
  public:
   using Vertex = kimera_pgmo::traits::Vertex;
   using Face = kimera_pgmo::traits::Face;
@@ -73,6 +74,9 @@ class MeshCompression {
   kimera_pgmo::MeshDelta::Ptr update(const VolumetricMap& map,
                                      uint64_t timestamp_ns,
                                      const ArchivePredicate& archive = {});
+
+  kimera_pgmo::MeshDelta::Ptr update(const ActiveWindowOutput& input,
+                                     const VolumetricWindow* window) override;
 
  private:
   struct Entry {

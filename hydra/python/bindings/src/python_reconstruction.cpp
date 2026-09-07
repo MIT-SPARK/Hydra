@@ -43,50 +43,130 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
+#include <chrono>
+
 #include "hydra/active_window/reconstruction_module.h"
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/common/global_info.h"
+#include "hydra/frontend/mesh_compression.h"
 #include "hydra/input/input_filter.h"
 #include "hydra/utils/data_directory.h"
 #include "hydra/utils/logging.h"
+#include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra::python {
+
+using namespace spark_dsg;
+
+struct CompressionStats {
+  std::string method;
+  uint64_t timestamp_ns = 0;
+  double compression_ms = 0.0;
+  double mesh_update_ms = 0.0;
+  size_t active_vertices = 0;
+  size_t archived_vertices = 0;
+  size_t active_faces = 0;
+  size_t archived_faces = 0;
+  size_t mesh_vertices = 0;
+  size_t mesh_faces = 0;
+  size_t updated_blocks = 0;
+  size_t archived_blocks = 0;
+  size_t execution_order = 0;
+};
+
 namespace {
 
-ReconstructionModule::Config default_config() {
-  ReconstructionModule::Config config;
-  config.volumetric_map = VolumetricMap::Config{0.1, 16, 0.3, false, false};
-  return config;
+using Clock = std::chrono::steady_clock;
+
+double elapsedMilliseconds(const Clock::time_point& start,
+                           const Clock::time_point& end) {
+  return std::chrono::duration<double, std::milli>(end - start).count();
+}
+
+struct MeshStitcher {
+  MeshStitcher(const std::string& method, std::unique_ptr<MeshCompressor> compressor)
+      : method(method),
+        compressor(std::move(compressor)),
+        mesh(GlobalInfo::instance().createMesh()) {}
+
+  CompressionStats update(const ActiveWindowOutput& input,
+                          const VolumetricWindow* window);
+
+  const std::string method;
+  std::unique_ptr<MeshCompressor> compressor;
+  Mesh::Ptr mesh;
+  kimera_pgmo::MeshOffsetInfo offsets;
+};
+
+CompressionStats MeshStitcher::update(const ActiveWindowOutput& input,
+                                      const VolumetricWindow* window) {
+  const auto start = Clock::now();
+  const auto delta = compressor->update(input, window);
+  const auto compressed = Clock::now();
+  delta->updateMesh(*mesh, offsets);
+  const auto applied = Clock::now();
+
+  auto stats = CompressionStats{};
+  stats.method = method;
+  stats.timestamp_ns = input.timestamp_ns;
+  stats.compression_ms = elapsedMilliseconds(start, compressed);
+  stats.mesh_update_ms = elapsedMilliseconds(compressed, applied);
+  stats.active_vertices = delta->getNumActiveVertices();
+  stats.archived_vertices = delta->getNumArchivedVertices();
+  stats.active_faces = delta->getNumActiveFaces();
+  stats.archived_faces = delta->getNumArchivedFaces();
+  stats.mesh_vertices = mesh->numVertices();
+  stats.mesh_faces = mesh->numFaces();
+  stats.updated_blocks = input.map().getMeshLayer().numBlocks();
+  stats.archived_blocks = input.archived.size();
+  return stats;
 }
 
 }  // namespace
 
-using namespace spark_dsg;
-
 class PythonReconstruction {
  public:
   struct Config : VerbosityConfig {
-    Config() : VerbosityConfig("[python_reconstruction] ") {}
+    Config() : VerbosityConfig("[python_reconstruction] ") {
+      reconstruction.volumetric_map.with_semantics = false;
+    }
+
     std::vector<config::VirtualConfig<InputFilter, true>> filters;
-    ReconstructionModule::Config reconstruction = default_config();
+    ReconstructionModule::Config reconstruction;
+    config::VirtualConfig<MeshCompressor> mesh_compression{
+        MeshCompression::Config{0.005}};
+    // Benchmark-only second compressor, fed the exact same updates sequentially.
+    config::VirtualConfig<MeshCompressor, true> comparison_compression;
   } const config;
 
   PythonReconstruction(const Config& config, const Sensor::Ptr& sensor);
-
-  virtual ~PythonReconstruction();
 
   bool step(const std::shared_ptr<SensorInputPacket>& packet,
             const Eigen::Isometry3d& world_T_body);
 
   void save(const std::filesystem::path& output);
 
-  void stop();
-
   const Sensor::ConstPtr sensor;
+  std::vector<CompressionStats> compression_stats;
+  double reconstruction_ms = 0.0;
+
+  Mesh::Ptr mesh() const { return stitchers_.front().mesh; }
+
+  std::string configString() const {
+    const auto global = config::toString(GlobalInfo::instance().getConfig());
+    return global + "\n" + config::toString(config);
+  }
 
  protected:
+  bool reconstructAndStitch(const InputData::Ptr& data);
+  void updateMeshes(const ActiveWindowOutput& input);
+
   SensorInputPacket::Ptr last_input_;
+  ActiveWindowModule::OutputQueue::Ptr output_queue_;
+  std::unique_ptr<VolumetricWindow> map_window_;
+  std::vector<MeshStitcher> stitchers_;
+  size_t update_count_ = 0;
   std::vector<std::unique_ptr<InputFilter>> filters_;
   std::shared_ptr<ReconstructionModule> module_;
 };
@@ -97,6 +177,8 @@ void declare_config(PythonReconstruction::Config& config) {
   base<VerbosityConfig>(config);
   field(config.filters, "filters");
   field(config.reconstruction, "reconstruction");
+  field(config.mesh_compression, "mesh_compression");
+  field(config.comparison_compression, "comparison_compression");
 }
 
 PythonReconstruction::PythonReconstruction(const Config& config,
@@ -110,21 +192,27 @@ PythonReconstruction::PythonReconstruction(const Config& config,
     filters_.push_back(filter.create());
   }
 
-  module_ = std::make_shared<ReconstructionModule>(config.reconstruction, nullptr);
-  if (!module_) {
-    throw std::runtime_error("could not create reconstruction module");
+  output_queue_ = std::make_shared<ActiveWindowModule::OutputQueue>();
+  module_ =
+      std::make_shared<ReconstructionModule>(config.reconstruction, output_queue_);
+  const auto& window = config.reconstruction.map_window;
+  map_window_ =
+      window ? window.create() : GlobalInfo::instance().createVolumetricWindow();
+  stitchers_.emplace_back(config.mesh_compression.getType(),
+                          config.mesh_compression.create());
+  if (config.comparison_compression) {
+    stitchers_.emplace_back(config.comparison_compression.getType(),
+                            config.comparison_compression.create());
   }
 
   MLOG(2) << "\n" << config::toString(GlobalInfo::instance().getConfig());
   MLOG(1) << "\n" << module_->printInfo();
 }
 
-void PythonReconstruction::stop() {}
-
-PythonReconstruction::~PythonReconstruction() { stop(); }
-
 bool PythonReconstruction::step(const std::shared_ptr<SensorInputPacket>& packet,
                                 const Eigen::Isometry3d& odom_T_body) {
+  compression_stats.clear();
+  reconstruction_ms = 0.0;
   for (const auto& filter : filters_) {
     if (!filter) {
       continue;
@@ -142,7 +230,35 @@ bool PythonReconstruction::step(const std::shared_ptr<SensorInputPacket>& packet
   data->timestamp_ns = packet->timestamp_ns;
   data->world_T_body = odom_T_body;
   packet->fillInputData(*data);
-  return module_->step(data);
+  return reconstructAndStitch(data);
+}
+
+bool PythonReconstruction::reconstructAndStitch(const InputData::Ptr& data) {
+  const auto start = Clock::now();
+  const auto updated = module_->step(data);
+  reconstruction_ms = elapsedMilliseconds(start, Clock::now());
+  if (!updated) {
+    return false;
+  }
+
+  // Synchronous step() pushes exactly one packet; no module threads are started.
+  const auto output = output_queue_->pop();
+  updateMeshes(*output);
+  return true;
+}
+
+void PythonReconstruction::updateMeshes(const ActiveWindowOutput& input) {
+  compression_stats.resize(stitchers_.size());
+  // Alternate order to balance cache effects in paired measurements. Each
+  // compressor has independent persistent state and an independent full mesh.
+  for (size_t order = 0; order < stitchers_.size(); ++order) {
+    const auto index = (order + update_count_) % stitchers_.size();
+    auto stats = stitchers_[index].update(input, map_window_.get());
+    stats.execution_order = order;
+    compression_stats[index] = stats;
+  }
+
+  ++update_count_;
 }
 
 void PythonReconstruction::save(const std::filesystem::path& output) {
@@ -153,9 +269,11 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
   DataDirectory logs(output);
   if (logs.valid()) {
     module_->map().save(logs.path("map"));
+    mesh()->save(logs.path("mesh.sparkdsg"));
+    if (stitchers_.size() > 1) {
+      stitchers_[1].mesh->save(logs.path("comparison_mesh.sparkdsg"));
+    }
   }
-
-  stop();
 }
 
 namespace python_reconstruction {
@@ -163,7 +281,39 @@ namespace python_reconstruction {
 using namespace pybind11::literals;
 namespace py = pybind11;
 
+void addCompressionStatsBindings(py::module_& m) {
+  py::class_<CompressionStats>(m, "CompressionStats")
+      .def_readonly("method", &CompressionStats::method)
+      .def_readonly("timestamp_ns", &CompressionStats::timestamp_ns)
+      .def_readonly("compression_ms", &CompressionStats::compression_ms)
+      .def_readonly("mesh_update_ms", &CompressionStats::mesh_update_ms)
+      .def_readonly("active_vertices", &CompressionStats::active_vertices)
+      .def_readonly("archived_vertices", &CompressionStats::archived_vertices)
+      .def_readonly("active_faces", &CompressionStats::active_faces)
+      .def_readonly("archived_faces", &CompressionStats::archived_faces)
+      .def_readonly("mesh_vertices", &CompressionStats::mesh_vertices)
+      .def_readonly("mesh_faces", &CompressionStats::mesh_faces)
+      .def_readonly("updated_blocks", &CompressionStats::updated_blocks)
+      .def_readonly("archived_blocks", &CompressionStats::archived_blocks)
+      .def_readonly("execution_order", &CompressionStats::execution_order);
+}
+
+bool stepImage(PythonReconstruction& pipeline,
+               size_t timestamp_ns,
+               const Eigen::Vector4d& odom_R_body,
+               const Eigen::Vector3d& odom_t_body,
+               const py::buffer& rgb,
+               const py::buffer& depth) {
+  auto packet = std::make_shared<PythonImageInput>(timestamp_ns, rgb, depth);
+  const auto rotation = Eigen::Quaterniond(
+      odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
+  const auto translation = Eigen::Translation3d(odom_t_body);
+  const auto odom_T_body = Eigen::Isometry3d(translation * rotation);
+  return pipeline.step(packet, odom_T_body);
+}
+
 void addBindings(pybind11::module_& m) {
+  addCompressionStatsBindings(m);
   py::class_<PythonReconstruction>(m, "ReconstructionPipeline")
       .def(py::init([](const Sensor::Ptr& sensor, const std::string& ns) {
              const auto config = config::fromContext<PythonReconstruction::Config>(ns);
@@ -172,28 +322,22 @@ void addBindings(pybind11::module_& m) {
            "sensor"_a,
            "ns"_a = "")
       .def("save", &PythonReconstruction::save)
-      .def("stop", &PythonReconstruction::stop)
-      .def(
-          "step",
-          [](PythonReconstruction& pipeline,
-             size_t timestamp_ns,
-             const Eigen::Vector4d& odom_R_body,
-             const Eigen::Vector3d& odom_t_body,
-             const py::buffer& rgb,
-             const py::buffer& depth) {
-            auto packet = std::make_shared<PythonImageInput>(timestamp_ns, rgb, depth);
-            const Eigen::Quaterniond q(
-                odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
-            const Eigen::Isometry3d odom_T_body =
-                Eigen::Translation<double, 3>(odom_t_body) * q;
-            return pipeline.step(packet, odom_T_body);
-          },
-          "timestamp_ns"_a,
-          "odom_R_body"_a,
-          "odom_t_body"_a,
-          "rgb"_a,
-          "depth"_a);
+      .def_property_readonly("mesh", &PythonReconstruction::mesh)
+      .def_property_readonly("config", &PythonReconstruction::configString)
+      .def_property_readonly("compression_stats",
+                             [](const PythonReconstruction& pipeline) {
+                               return pipeline.compression_stats;
+                             })
+      .def_readonly("reconstruction_ms", &PythonReconstruction::reconstruction_ms)
+      .def("step",
+           &stepImage,
+           "timestamp_ns"_a,
+           "odom_R_body"_a,
+           "odom_t_body"_a,
+           "rgb"_a,
+           "depth"_a);
 }
 
 }  // namespace python_reconstruction
+
 }  // namespace hydra::python

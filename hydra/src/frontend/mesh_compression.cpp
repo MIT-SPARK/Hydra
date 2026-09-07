@@ -35,6 +35,7 @@
 #include "hydra/frontend/mesh_compression.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <spatial_hash/grid.h>
 
@@ -43,10 +44,17 @@
 #include <limits>
 #include <set>
 
+#include "hydra/active_window/active_window_output.h"
+#include "hydra/active_window/volumetric_window.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra {
 namespace {
+
+const auto registration =
+    config::RegistrationWithConfig<MeshCompressor,
+                                   MeshCompression,
+                                   MeshCompression::Config>("MeshCompression");
 
 constexpr auto invalid_index = std::numeric_limits<size_t>::max();
 
@@ -355,6 +363,21 @@ kimera_pgmo::MeshDelta::Ptr MeshCompression::update(const VolumetricMap& map,
   delta->timestamp_ns = timestamp_ns;
   updateTracking(*delta);
   return delta;
+}
+
+kimera_pgmo::MeshDelta::Ptr MeshCompression::update(const ActiveWindowOutput& input,
+                                                    const VolumetricWindow* window) {
+  if (!window) {
+    return update(input.map(), input.timestamp_ns);
+  }
+
+  const auto world_T_body = input.world_T_body();
+  return update(input.map(), input.timestamp_ns, [&](const Vertex& vertex) {
+    return !window->inBounds(input.timestamp_ns,
+                             world_T_body,
+                             vertex.traits.stamp,
+                             vertex.pos.cast<double>());
+  });
 }
 
 }  // namespace hydra

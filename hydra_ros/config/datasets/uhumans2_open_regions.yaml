@@ -15,7 +15,6 @@ active_window:
       point_size: 0.01
       mesh_coloring: {type: UniformMeshColoring, color: [255, 0, 0]}
 frontend:
-  mesh_resolution: 0.005
   keyframe_selector:
     verbosity: 2
     max_range_difference_m: 0.5
@@ -26,6 +25,7 @@ frontend:
     cluster_tolerance: 0.25
     sinks:
       - {type: ObjectVisualizer}
+  mesh_compression: {type: MeshCompression, resolution: 0.005}
   traversability_places:
     type: traversability
     layer: PLACES

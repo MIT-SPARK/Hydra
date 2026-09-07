@@ -1,6 +1,7 @@
 target_sources(
   ${PROJECT_NAME}
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deformation_graph_builder.cpp
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/delta_mesh_compression.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/deformation_graph_builder.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_builder.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_connector.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/gvd_place_extractor.cpp

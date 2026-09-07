@@ -76,7 +76,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.no_packet_collation, "no_packet_collation");
   field(config.clear_object_meshes, "clear_object_meshes");
   field(config.enable_mesh_objects, "enable_mesh_objects");
-  field(config.mesh_resolution, "mesh_resolution");
+  field(config.mesh_compression, "mesh_compression");
 
   field(config.graph_updater, "graph_updater");
   field(config.graph_connector, "graph_connector");
@@ -97,12 +97,11 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.frontier_places, "frontier_places");
 
   field(config.sinks, "sinks");
-
-  check(config.mesh_resolution, GT, 0.0, "mesh_resolution");
 }
 
 GraphBuilder::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")),
+      mesh_compression(MeshCompression::Config{0.005}),
       graph_updater({{DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}),
       keyframe_selector(KeyframeSelector::Config()),
       deformation_graph_builder(DeformationGraphBuilder::Config()) {}
@@ -115,7 +114,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       dsg_(dsg),
       state_(state),
-      mesh_compression_(new MeshCompression(config.mesh_resolution)),
+      mesh_compression_(config.mesh_compression.create()),
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
@@ -368,13 +367,7 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    last_mesh_update_ = mesh_compression_->update(
-        input.map(), input.timestamp_ns, [&](const MeshCompression::Vertex& vertex) {
-          return map_window_ && !map_window_->inBounds(input.timestamp_ns,
-                                                       input.world_T_body(),
-                                                       vertex.traits.stamp,
-                                                       vertex.pos.cast<double>());
-        });
+    last_mesh_update_ = mesh_compression_->update(input, map_window_.get());
   }
 
   {  // start timing scope

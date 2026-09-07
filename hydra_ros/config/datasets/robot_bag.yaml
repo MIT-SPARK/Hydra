@@ -18,7 +18,9 @@ active_window:
   object_extractor: {type: MeshObjectExtractor}
 frontend:
   enable_mesh_objects: false
-  mesh_resolution: 0.005
+  mesh_compression:
+    type: MeshCompression
+    resolution: 0.005
   graph_updater:
     layer_updates:
       OBJECTS: {prefix: O, matcher: {type: IoUNodeMatcher, min_same_iou: 0.2, min_cross_iou: 0.5}}
