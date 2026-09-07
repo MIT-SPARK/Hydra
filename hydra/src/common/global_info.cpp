@@ -143,7 +143,10 @@ const FrameConfig& GlobalInfo::getFrames() const { return config_.frames; }
 const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefix_; }
 
 const Labelspace& GlobalInfo::labelspace() const {
-  CHECK(labelspace_);
+  if (!labelspace_) {
+    labelspace_.reset(new Labelspace());
+  }
+
   return *labelspace_;
 }
 

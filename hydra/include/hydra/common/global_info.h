@@ -151,7 +151,7 @@ class GlobalInfo {
   RobotPrefixConfig robot_prefix_;
   LabelRemapper label_remapper_;
 
-  std::unique_ptr<Labelspace> labelspace_;
+  mutable std::unique_ptr<Labelspace> labelspace_;
 };
 
 }  // namespace hydra

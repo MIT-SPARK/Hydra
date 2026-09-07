@@ -525,11 +525,11 @@ std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& con
   if (config.with_feature && config.with_traversability) {
     return std::make_unique<RecvT<T, true, true>>(nh, qos, queue_size, queue);
   } else if (config.with_feature) {
-    return std::make_unique<RecvT<T, true, true>>(nh, qos, queue_size, queue);
+    return std::make_unique<RecvT<T, true, false>>(nh, qos, queue_size, queue);
   } else if (config.with_traversability) {
-    return std::make_unique<RecvT<T, true, true>>(nh, qos, queue_size, queue);
+    return std::make_unique<RecvT<T, false, true>>(nh, qos, queue_size, queue);
   } else {
-    return std::make_unique<RecvT<T, true, true>>(nh, qos, queue_size, queue);
+    return std::make_unique<RecvT<T, false, false>>(nh, qos, queue_size, queue);
   }
 }
 
@@ -577,6 +577,8 @@ void declare_config(ImageReceiver::Config& config) {
               {ImageReceiver::Config::SemanticsType::CLOSED_SET, "closed_set"},
               {ImageReceiver::Config::SemanticsType::INSTANCE, "instance"},
               {ImageReceiver::Config::SemanticsType::OPEN_SET, "open_set"}});
+  field(config.with_feature, "with_feature");
+  field(config.with_traversability, "with_traversability");
   field(config.use_exact, "use_exact");
   field(config.queue_size, "queue_size");
   field(config.qos, "qos");
