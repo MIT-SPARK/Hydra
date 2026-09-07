@@ -121,6 +121,43 @@ def compare_meshes(reference, candidate, reference_points, count, seed, threshol
     }
 
 
+def ground_surface(reference, height, band):
+    """Select approximately horizontal reference triangles near the floor height."""
+    horizontal = np.abs(reference.face_normals[:, 2]) >= 0.95
+    near_height = np.abs(reference.triangles_center[:, 2] - height) <= band
+    faces = reference.faces[horizontal & near_height]
+    if not len(faces):
+        raise click.ClickException(
+            "No ground triangles match the selected height and band"
+        )
+    return trimesh.Trimesh(reference.vertices, faces, process=False)
+
+
+def ground_completeness(candidate, points, thresholds, tile_size):
+    distances = surface_distances(candidate, points)
+    indices = np.floor(points[:, :2] / tile_size).astype(int)
+    tiles, inverse = np.unique(indices, axis=0, return_inverse=True)
+    result = {"samples": len(points), **distance_summary(distances)}
+    result["completeness"] = {
+        str(t): float(np.mean(distances <= t)) for t in thresholds
+    }
+    result["tiles"] = []
+    for index, tile in enumerate(tiles):
+        selected = distances[inverse == index]
+        result["tiles"].append(
+            {
+                "x_m": float(tile[0] * tile_size),
+                "y_m": float(tile[1] * tile_size),
+                "samples": len(selected),
+                "rmse_m": float(np.sqrt(np.mean(selected**2))),
+                "completeness": {
+                    str(t): float(np.mean(selected <= t)) for t in thresholds
+                },
+            }
+        )
+    return result
+
+
 @click.command(context_settings={"show_default": True})
 @click.argument(
     "reference_path",
@@ -143,10 +180,29 @@ def compare_meshes(reference, candidate, reference_points, count, seed, threshol
     default=(0.01, 0.02, 0.05, 0.1),
     type=click.FloatRange(min=0, min_open=True),
 )
-def run(reference_path, candidate, output, samples, seed, thresholds):
+@click.option(
+    "--ground-height", type=float, default=None, help="World-frame ground Z in meters."
+)
+@click.option("--ground-band", type=click.FloatRange(min=0, min_open=True), default=0.1)
+@click.option("--tile-size", type=click.FloatRange(min=0, min_open=True), default=1.0)
+def run(
+    reference_path,
+    candidate,
+    output,
+    samples,
+    seed,
+    thresholds,
+    ground_height,
+    ground_band,
+    tile_size,
+):
     """Evaluate candidate meshes in the same world frame as REFERENCE_PATH."""
     reference, geometry = load_mesh(reference_path)
     reference_points = sample_surface(reference, samples, seed)
+    ground_points = None
+    if ground_height is not None:
+        ground = ground_surface(reference, ground_height, ground_band)
+        ground_points = sample_surface(ground, samples, seed)
     result = {
         "reference": str(reference_path.resolve()),
         "reference_geometry": geometry,
@@ -155,6 +211,9 @@ def run(reference_path, candidate, output, samples, seed, thresholds):
         "distance": "area-weighted surface samples to closest triangle, meters",
         "trimesh_version": trimesh.__version__,
         "candidates": {},
+        "ground_height_m": ground_height,
+        "ground_band_m": ground_band,
+        "tile_size_m": tile_size,
     }
     for name, path in candidate:
         click.echo(f"Evaluating {name}", err=True)
@@ -169,6 +228,10 @@ def run(reference_path, candidate, output, samples, seed, thresholds):
             "geometry": geometry,
             **metrics,
         }
+        if ground_points is not None:
+            result["candidates"][name]["ground"] = ground_completeness(
+                mesh, ground_points, thresholds, tile_size
+            )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2))
     click.echo(json.dumps(result, indent=2))

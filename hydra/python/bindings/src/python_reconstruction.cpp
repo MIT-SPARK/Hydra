@@ -37,12 +37,14 @@
 #include <config_utilities/config.h>
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
+#include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
+#include <algorithm>
 #include <chrono>
 
 #include "hydra/active_window/reconstruction_module.h"
@@ -84,6 +86,19 @@ double elapsedMilliseconds(const Clock::time_point& start,
   return std::chrono::duration<double, std::milli>(end - start).count();
 }
 
+Mesh::Ptr combineMeshBlocks(const MeshLayer& layer) {
+  auto mesh = std::make_shared<Mesh>(false, false, false, false);
+  for (const auto& block : layer) {
+    const auto offset = mesh->numVertices();
+    mesh->points.insert(mesh->points.end(), block.points.begin(), block.points.end());
+    for (const auto& face : block.faces) {
+      mesh->faces.push_back({face[0] + offset, face[1] + offset, face[2] + offset});
+    }
+  }
+
+  return mesh;
+}
+
 struct MeshStitcher {
   MeshStitcher(const std::string& method, std::unique_ptr<MeshCompressor> compressor)
       : method(method),
@@ -91,7 +106,11 @@ struct MeshStitcher {
         mesh(GlobalInfo::instance().createMesh()) {}
 
   CompressionStats update(const ActiveWindowOutput& input,
-                          const VolumetricWindow* window);
+                          const VolumetricWindow* window,
+                          const std::filesystem::path& debug_output);
+
+  CompressionStats summarizeUpdate(const ActiveWindowOutput& input,
+                                   const kimera_pgmo::MeshDelta& delta) const;
 
   const std::string method;
   std::unique_ptr<MeshCompressor> compressor;
@@ -100,22 +119,45 @@ struct MeshStitcher {
 };
 
 CompressionStats MeshStitcher::update(const ActiveWindowOutput& input,
-                                      const VolumetricWindow* window) {
+                                      const VolumetricWindow* window,
+                                      const std::filesystem::path& debug_output) {
+  const auto voxel_compressor = dynamic_cast<MeshCompression*>(compressor.get());
+  if (voxel_compressor) {
+    voxel_compressor->enableDiagnostics(!debug_output.empty());
+  }
+
+  if (!debug_output.empty()) {
+    std::filesystem::create_directories(debug_output);
+    mesh->save(debug_output / "before.sparkdsg");
+  }
+
   const auto start = Clock::now();
   const auto delta = compressor->update(input, window);
   const auto compressed = Clock::now();
   delta->updateMesh(*mesh, offsets);
   const auto applied = Clock::now();
+  if (!debug_output.empty()) {
+    mesh->save(debug_output / "after.sparkdsg");
+    if (voxel_compressor) {
+      voxel_compressor->saveDiagnostics(debug_output);
+    }
+  }
 
+  auto stats = summarizeUpdate(input, *delta);
+  stats.compression_ms = elapsedMilliseconds(start, compressed);
+  stats.mesh_update_ms = elapsedMilliseconds(compressed, applied);
+  return stats;
+}
+
+CompressionStats MeshStitcher::summarizeUpdate(
+    const ActiveWindowOutput& input, const kimera_pgmo::MeshDelta& delta) const {
   auto stats = CompressionStats{};
   stats.method = method;
   stats.timestamp_ns = input.timestamp_ns;
-  stats.compression_ms = elapsedMilliseconds(start, compressed);
-  stats.mesh_update_ms = elapsedMilliseconds(compressed, applied);
-  stats.active_vertices = delta->getNumActiveVertices();
-  stats.archived_vertices = delta->getNumArchivedVertices();
-  stats.active_faces = delta->getNumActiveFaces();
-  stats.archived_faces = delta->getNumArchivedFaces();
+  stats.active_vertices = delta.getNumActiveVertices();
+  stats.archived_vertices = delta.getNumArchivedVertices();
+  stats.active_faces = delta.getNumActiveFaces();
+  stats.archived_faces = delta.getNumArchivedFaces();
   stats.mesh_vertices = mesh->numVertices();
   stats.mesh_faces = mesh->numFaces();
   stats.updated_blocks = input.map().getMeshLayer().numBlocks();
@@ -138,6 +180,8 @@ class PythonReconstruction {
         MeshCompression::Config{0.005}};
     // Benchmark-only second compressor, fed the exact same updates sequentially.
     config::VirtualConfig<MeshCompressor, true> comparison_compression;
+    std::filesystem::path mesh_debug_output;
+    std::vector<size_t> mesh_debug_frames;
   } const config;
 
   PythonReconstruction(const Config& config, const Sensor::Ptr& sensor);
@@ -161,6 +205,7 @@ class PythonReconstruction {
  protected:
   bool reconstructAndStitch(const InputData::Ptr& data);
   void updateMeshes(const ActiveWindowOutput& input);
+  std::filesystem::path saveDebugInput(const ActiveWindowOutput& input) const;
 
   SensorInputPacket::Ptr last_input_;
   ActiveWindowModule::OutputQueue::Ptr output_queue_;
@@ -179,6 +224,8 @@ void declare_config(PythonReconstruction::Config& config) {
   field(config.reconstruction, "reconstruction");
   field(config.mesh_compression, "mesh_compression");
   field(config.comparison_compression, "comparison_compression");
+  field<Path::Absolute>(config.mesh_debug_output, "mesh_debug_output");
+  field(config.mesh_debug_frames, "mesh_debug_frames");
 }
 
 PythonReconstruction::PythonReconstruction(const Config& config,
@@ -250,13 +297,32 @@ bool PythonReconstruction::reconstructAndStitch(const InputData::Ptr& data) {
   return true;
 }
 
+std::filesystem::path PythonReconstruction::saveDebugInput(
+    const ActiveWindowOutput& input) const {
+  const auto& frames = config.mesh_debug_frames;
+  const auto selected =
+      std::find(frames.begin(), frames.end(), update_count_) != frames.end();
+  if (config.mesh_debug_output.empty() || !selected) {
+    return {};
+  }
+
+  const auto output = config.mesh_debug_output / std::to_string(update_count_);
+  std::filesystem::create_directories(output);
+  combineMeshBlocks(input.map().getMeshLayer())->save(output / "incoming.sparkdsg");
+  input.map().save((output / "map").string());
+  return output;
+}
+
 void PythonReconstruction::updateMeshes(const ActiveWindowOutput& input) {
+  const auto debug_output = saveDebugInput(input);
   compression_stats.resize(stitchers_.size());
   // Alternate order to balance cache effects in paired measurements. Each
   // compressor has independent persistent state and an independent full mesh.
   for (size_t order = 0; order < stitchers_.size(); ++order) {
     const auto index = (order + update_count_) % stitchers_.size();
-    auto stats = stitchers_[index].update(input, map_window_.get());
+    const auto path =
+        debug_output.empty() ? debug_output : debug_output / stitchers_[index].method;
+    auto stats = stitchers_[index].update(input, map_window_.get(), path);
     stats.execution_order = order;
     compression_stats[index] = stats;
   }
@@ -269,17 +335,7 @@ Mesh::Ptr PythonReconstruction::mesh() const {
     return stitchers_.front().mesh;
   }
 
-  // With compression disabled, export marching cubes directly from the map.
-  auto mesh = std::make_shared<Mesh>(false, false, false, false);
-  for (const auto& block : module_->map().getMeshLayer()) {
-    const auto offset = mesh->numVertices();
-    mesh->points.insert(mesh->points.end(), block.points.begin(), block.points.end());
-    for (const auto& face : block.faces) {
-      mesh->faces.push_back({face[0] + offset, face[1] + offset, face[2] + offset});
-    }
-  }
-
-  return mesh;
+  return combineMeshBlocks(module_->map().getMeshLayer());
 }
 
 void PythonReconstruction::save(const std::filesystem::path& output) {

@@ -84,6 +84,9 @@ def configuration_args(files, snippets, variables, options):
         if options["method"] == "old":
             defaults["mesh_compression"]["type"] = "DeltaCompression"
 
+    if options["debug_frame"]:
+        defaults["mesh_debug_frames"] = list(options["debug_frame"])
+        defaults["mesh_debug_output"] = str(options["debug_output"])
     args = ["-c", yaml.safe_dump(defaults)]
     for flag, values in (("-f", files), ("-c", snippets), ("-v", variables)):
         for value in values:
@@ -282,6 +285,12 @@ def summarize(rows):
 @click.option("--warmup-steps", type=click.IntRange(min=0), default=10)
 @click.option("--repetitions", type=click.IntRange(min=1), default=1)
 @click.option("--save-mesh", is_flag=True)
+@click.option(
+    "--debug-frame",
+    multiple=True,
+    type=click.IntRange(min=0),
+    help="Save before/input/after meshes and removal traces for this update index.",
+)
 @click.option("--config-utilities-files", "-f", multiple=True)
 @click.option("--config-utilities-yaml", "-c", multiple=True)
 @click.option("--config-utilities-var", "-v", multiple=True)
@@ -295,6 +304,12 @@ def run(
 ):
     """Compare compressors using identical updates reconstructed from BAG_PATH."""
     output.mkdir(parents=True, exist_ok=False)
+    options["debug_output"] = output / "debug"
+    if options["debug_frame"]:
+        click.echo(
+            "Diagnostic replay: do not use these timings for performance comparisons.",
+            err=True,
+        )
     args = configuration_args(
         config_utilities_files, config_utilities_yaml, config_utilities_var, options
     )

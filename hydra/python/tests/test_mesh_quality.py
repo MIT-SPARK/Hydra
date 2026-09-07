@@ -64,3 +64,15 @@ def test_exact_vertex_welding_preserves_surface(tmp_path):
     assert len(surface.faces) == 1
     assert stats["duplicate_faces"] == 1
     assert surface.area == pytest.approx(0.5)
+
+
+def test_ground_tiles_measure_missing_area():
+    reference = square()
+    ground = quality.ground_surface(reference, 0.0, 0.1)
+    candidate = square()
+    candidate.update_faces([True, False])
+    points = quality.sample_surface(ground, 10000, 1)
+    metrics = quality.ground_completeness(candidate, points, [1e-8], 0.5)
+    assert metrics["completeness"]["1e-08"] == pytest.approx(0.5, abs=0.02)
+    assert len(metrics["tiles"]) == 4
+    assert sum(tile["samples"] for tile in metrics["tiles"]) == 10000

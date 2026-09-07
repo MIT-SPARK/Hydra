@@ -36,7 +36,10 @@
 
 #include <kimera_pgmo/mesh_delta.h>
 
+#include <array>
+#include <filesystem>
 #include <functional>
+#include <string>
 #include <vector>
 
 #include "hydra/frontend/mesh_compressor.h"
@@ -46,6 +49,9 @@ namespace hydra {
 
 /** Spatially compress a mesh, retaining geometry until the TSDF observes free space.
  *
+ * Input mesh blocks must supply face_cells provenance from MeshIntegrator. Active
+ * triangles are replaced by source cell; clearing requires eight observed free
+ * TSDF corners. Shared vertices survive while retained faces need them.
  * Input maps may contain only updated blocks. Missing blocks and zero-weight voxels
  * are unknown, not evidence that a surface disappeared. Archival is specified at
  * each vertex through a window predicate, independently of TSDF block ownership.
@@ -60,9 +66,12 @@ class MeshCompression : public MeshCompressor {
   struct Config {
     double resolution = 0.01;
     float min_weight = 1.0e-6f;
-    // Minimum positive TSDF distance for clearing. Zero selects a conservative
-    // tolerance based on the TSDF voxel size and the compression cell diagonal.
+    // All eight source-cell corners must exceed this distance to clear a cell.
+    // Zero uses the compression resolution as a positive-distance margin.
     double min_clearance_m = 0.0;
+    // Ablations for diagnosing loss of valid surfaces.
+    bool clear_free_space = true;
+    bool replace_reobserved_cells = true;
   };
 
   explicit MeshCompression(double resolution);
@@ -78,12 +87,29 @@ class MeshCompression : public MeshCompressor {
   kimera_pgmo::MeshDelta::Ptr update(const ActiveWindowOutput& input,
                                      const VolumetricWindow* window) override;
 
+  // Diagnostic snapshots are opt-in and excluded from normal benchmark runs.
+  void enableDiagnostics(bool enabled);
+  void saveDiagnostics(const std::filesystem::path& output) const;
+
  private:
+  struct Removal {
+    GlobalIndex cell;
+    std::array<Eigen::Vector3f, 3> points;
+    std::string reason;
+    std::array<float, 8> distances;
+    std::array<float, 8> weights;
+  };
+
   struct Entry {
     Vertex vertex;
     // Frozen boundary vertices support faces already sent for archival. They
     // cannot be cleared or reused by a new observation until fully archived.
     bool frozen = false;
+  };
+
+  struct CellFace {
+    Face vertices;
+    GlobalIndex cell;
   };
 
   struct UpdateState {
@@ -92,16 +118,30 @@ class MeshCompression : public MeshCompressor {
     std::vector<bool> deleted;
     std::vector<bool> observed;
     GlobalIndexMap<size_t> mutable_cells;
+    GlobalIndexSet reobserved_cells;
+    GlobalIndexMap<bool> cleared_cells;
   };
 
   GlobalIndex compressionCell(const Eigen::Vector3f& pos) const;
-  bool isObservedFreeSpace(const VolumetricMap& map, const Eigen::Vector3f& pos) const;
-  UpdateState prepareUpdate(const VolumetricMap& map) const;
-  void integrateMeshBlock(const MeshBlock& block,
+  bool isObservedFreeSpace(const VolumetricMap& map, const GlobalIndex& cell) const;
+  UpdateState initializeUpdate(const VolumetricMap& map);
+  UpdateState prepareUpdate() const;
+  std::vector<size_t> integrateVertices(const MeshBlock& block,
+                                        uint64_t timestamp_ns,
+                                        UpdateState& state);
+  void integrateMeshBlock(const VolumetricMap& map,
+                          const MeshBlock& block,
                           uint64_t timestamp_ns,
                           UpdateState& state);
-  void markReobservedFrozenVertices(UpdateState& state) const;
-  void removeClearedAndReplacedFaces(const UpdateState& state);
+  void removeClearedAndReplacedFaces(const VolumetricMap& map, UpdateState& state);
+  void findUnusedVertices(UpdateState& state) const;
+  void recordRemovalPoints(const VolumetricMap& map,
+                           const GlobalIndex& cell,
+                           const std::array<Eigen::Vector3f, 3>& points,
+                           const char* reason);
+  void recordRemoval(const VolumetricMap& map,
+                     const CellFace& face,
+                     const char* reason);
   std::vector<bool> findArchivableVertices(const UpdateState& state,
                                            const ArchivePredicate& archive) const;
   std::vector<size_t> appendDeltaVertices(const UpdateState& state,
@@ -114,9 +154,12 @@ class MeshCompression : public MeshCompressor {
                             const std::vector<bool>& archivable);
   void updateTracking(const kimera_pgmo::MeshDelta& delta);
 
+  std::vector<Eigen::Vector3f> diagnostic_positions_;
+  bool diagnostics_enabled_ = false;
+  std::vector<Removal> removals_;
   const Config config_;
   std::vector<Entry> vertices_;
-  std::vector<Face> faces_;
+  std::vector<CellFace> faces_;
   kimera_pgmo::MeshDelta::TrackingInfo tracking_{1};
 };
 

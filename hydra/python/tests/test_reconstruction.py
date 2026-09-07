@@ -7,8 +7,10 @@ import spark_dsg
 import yaml
 
 
-def make_pipeline(method, comparison=None):
+def make_pipeline(method, comparison=None, debug_output=None):
     settings = {
+        "mesh_debug_output": str(debug_output) if debug_output else "",
+        "mesh_debug_frames": [0, 1] if debug_output else [],
         "default_num_threads": 1,
         "map_window": {"type": "spatial", "max_radius_m": 1.0},
         "reconstruction": {
@@ -101,3 +103,24 @@ def test_unwindowed_marching_cubes_without_compression(tmp_path):
     saved = spark_dsg.Mesh.load(tmp_path / "reference" / "mesh.sparkdsg")
     np.testing.assert_array_equal(saved.get_vertices(), mesh.get_vertices())
     np.testing.assert_array_equal(saved.get_faces(), mesh.get_faces())
+
+
+def test_replay_diagnostics_save_meshes_and_source_samples(tmp_path):
+    import csv
+
+    pipeline = make_pipeline("MeshCompression", debug_output=tmp_path)
+    assert step(pipeline, 1_000_000_000, 0.0)
+    assert step(pipeline, 2_000_000_000, 0.006)
+    frame = tmp_path / "1"
+    for path in [
+        frame / "incoming.sparkdsg",
+        frame / "MeshCompression" / "before.sparkdsg",
+        frame / "MeshCompression" / "after.sparkdsg",
+    ]:
+        assert spark_dsg.Mesh.load(path).num_faces() > 0
+    with (frame / "MeshCompression" / "removed.csv").open() as stream:
+        rows = list(csv.DictReader(stream))
+    assert any(row["reason"] == "replacement" for row in rows)
+    assert all("weight_7" in row and "cell_x" in row for row in rows)
+    removed = spark_dsg.Mesh.load(frame / "MeshCompression" / "removed.sparkdsg")
+    assert removed.num_faces() == len(rows)

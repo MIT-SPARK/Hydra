@@ -209,6 +209,18 @@ Block* maybeGetBlockPtr(spatial_hash::BlockLayer<Block>* layer,
   return layer->getBlockPtr(index).get();
 }
 
+namespace {
+
+void appendMeshCell(const MarchingCubes::SdfPoints& points,
+                    const GlobalIndex& cell,
+                    MeshBlock& mesh) {
+  const auto previous_faces = mesh.numFaces();
+  MarchingCubes::meshCube(points, mesh);
+  mesh.face_cells.insert(mesh.face_cells.end(), mesh.numFaces() - previous_faces, cell);
+}
+
+}  // namespace
+
 void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map) const {
@@ -249,7 +261,9 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
     }
   }
 
-  ::hydra::MarchingCubes::meshCube(points, *mesh);
+  const auto cell = spatial_hash::globalIndexFromLocalIndices(
+      block_index, index, map.config.voxels_per_side);
+  appendMeshCell(points, cell, *mesh);
 }
 
 BlockIndex MeshIntegrator::getNeighborIndex(const BlockIndex& block_idx,
@@ -333,7 +347,9 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
     }
   }
 
-  ::hydra::MarchingCubes::meshCube(points, *mesh);
+  const auto cell = spatial_hash::globalIndexFromLocalIndices(
+      block_index, index, map.config.voxels_per_side);
+  appendMeshCell(points, cell, *mesh);
 }
 
 const Eigen::Matrix<int, 3, 8> MeshIntegrator::cube_index_offsets_ = [] {

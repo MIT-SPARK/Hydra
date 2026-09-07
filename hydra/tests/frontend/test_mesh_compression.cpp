@@ -37,6 +37,7 @@
 #include <limits>
 
 #include "hydra/frontend/mesh_compression.h"
+#include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra {
@@ -49,435 +50,329 @@ VolumetricMap makeMap() {
   return VolumetricMap(config);
 }
 
-MeshBlock& triangle(VolumetricMap& map) {
-  map.allocateBlock(BlockIndex::Zero());
+MeshBlock& triangle(VolumetricMap& map,
+                    const GlobalIndex& cell = GlobalIndex(0, 0, 0)) {
   auto& mesh = map.getMeshLayer().allocateBlock(BlockIndex(0, 0, 0));
   mesh.resizeVertices(3);
-  mesh.points = {{0.05f, 0.05f, 0.05f}, {0.25f, 0.05f, 0.05f}, {0.05f, 0.25f, 0.05f}};
+  mesh.points = {{0.05f, 0.05f, 0.08f}, {0.15f, 0.05f, 0.08f}, {0.05f, 0.15f, 0.08f}};
   mesh.faces = {{0, 1, 2}};
+  mesh.face_cells = {cell};
   return mesh;
 }
 
-void observe(VolumetricMap& map,
-             const Eigen::Vector3f& pos,
-             float distance,
-             float weight = 1.0f) {
-  auto& voxel = map.getTsdfLayer().allocateVoxel(pos);
-  voxel.distance = distance;
-  voxel.weight = weight;
+void observeCell(VolumetricMap& map,
+                 const GlobalIndex& cell,
+                 float distance,
+                 float weight = 1.0f) {
+  for (int corner = 0; corner < 8; ++corner) {
+    const GlobalIndex offset(corner & 1, (corner >> 1) & 1, (corner >> 2) & 1);
+    const GlobalIndex index = cell + offset;
+    auto& voxel = map.getTsdfLayer().allocateVoxel(index);
+    voxel.distance = distance;
+    voxel.weight = weight;
+  }
 }
 
 void checkMesh(const spark_dsg::Mesh& mesh) {
   for (const auto& face : mesh.faces) {
-    for (const auto idx : face) {
-      EXPECT_LT(idx, mesh.numVertices());
+    for (const auto index : face) {
+      EXPECT_LT(index, mesh.numVertices());
     }
 
     EXPECT_NE(face[0], face[1]);
     EXPECT_NE(face[1], face[2]);
-    EXPECT_NE(face[2], face[0]);
+    EXPECT_NE(face[0], face[2]);
   }
 }
-class MeshCompressionBoundaryTest : public testing::Test {
+
+class CellCompressionTest : public testing::Test {
  protected:
-  void SetUp() override {
-    auto map = makeMap();
-    auto& block = triangle(map);
-    block.resizeVertices(5);
-    block.points = {{-0.25f, 0.05f, 0.05f},
-                    {-0.25f, 0.25f, 0.05f},
-                    {-0.045f, 0.05f, 0.05f},
-                    {0.25f, 0.05f, 0.05f},
-                    {0.25f, 0.25f, 0.05f}};
-    block.faces.push_back({2, 3, 4});
-    compression.update(map, 1)->updateMesh(mesh, offsets);
-    compression
-        .update(makeMap(), 2, [](const auto& vertex) { return vertex.pos.x() < 0.0f; })
-        ->updateMesh(mesh, offsets);
-    ASSERT_EQ(mesh.numFaces(), 2u);
-    ASSERT_EQ(offsets.archived_vertices, 2u);
+  void update(const VolumetricMap& map,
+              const MeshCompression::ArchivePredicate& archive = {}) {
+    delta = compression.update(map, ++stamp, archive);
+    delta->updateMesh(mesh, offsets);
+    checkMesh(mesh);
   }
 
-  VolumetricMap reobservedTriangle() const {
-    auto map = makeMap();
-    auto& block = triangle(map);
-    // The replacement moves within the frozen endpoint's compression cell.
-    block.points = {
-        {-0.044f, 0.05f, 0.05f}, {0.25f, 0.05f, 0.05f}, {0.25f, 0.25f, 0.05f}};
-    return map;
-  }
-
-  MeshCompression compression{0.01};
+  MeshCompression compression{0.005};
   spark_dsg::Mesh mesh;
   kimera_pgmo::MeshOffsetInfo offsets;
+  kimera_pgmo::MeshDelta::Ptr delta;
+  uint64_t stamp = 0;
 };
 
 }  // namespace
 
-TEST(MeshCompression, PartialReobservationPreservesUnknownGeometry) {
+TEST_F(CellCompressionTest, PartialReobservationPreservesUnknownGeometry) {
   auto map = makeMap();
   triangle(map);
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  compression.update(map, 1)->updateMesh(mesh, offsets);
-
-  // Same block has been reallocated after leaving reconstruction's window.
-  // Only one voxel is observed, and its new mesh is empty.
+  update(map);
   auto partial = makeMap();
-  partial.allocateBlock(BlockIndex::Zero());
   partial.getMeshLayer().allocateBlock(BlockIndex(0, 0, 0));
-  observe(partial, {0.05f, 0.05f, 0.05f}, 0.0f);
-  auto delta = compression.update(partial, 2);
-  EXPECT_EQ(delta->getNumArchivedVertices(), 0u);
-  ASSERT_EQ(delta->info.prev_to_curr->size(), 3u);
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numVertices(), 3u);
-  EXPECT_EQ(mesh.numFaces(), 1u);
-  checkMesh(mesh);
-}
-
-TEST(MeshCompression, OnlyObservedFreeSpaceDeletesVerticesAndIncidentFaces) {
-  auto map = makeMap();
-  const auto points = triangle(map).points;
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  compression.update(map, 1)->updateMesh(mesh, offsets);
-  auto partial = makeMap();
-  observe(partial, points[0], 0.3f);
-  observe(partial, points[1], 0.3f, 0.0f);
-  observe(partial, points[2], -0.3f);
-  auto delta = compression.update(partial, 2);
-  EXPECT_EQ(delta->info.prev_to_curr->count(0), 0u);
-  EXPECT_EQ(delta->info.prev_to_curr->size(), 2u);
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numVertices(), 2u);
-  EXPECT_EQ(mesh.numFaces(), 0u);
-}
-
-TEST(MeshCompression, CurrentZeroCrossingsOverrideNearbyPositiveSamples) {
-  auto map = makeMap();
-  const auto points = triangle(map).points;
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  compression.update(map, 1)->updateMesh(mesh, offsets);
-
-  // Projective TSDF values at voxel centers can exceed the clearance even when
-  // marching cubes interpolates a zero crossing within the same voxel.
-  for (const auto& pos : points) {
-    observe(map, pos, 0.3f);
-  }
-
-  auto delta = compression.update(map, 2);
-  ASSERT_EQ(delta->info.prev_to_curr->size(), 3u);
-  EXPECT_EQ(delta->getVertex(0).traits.first_seen_stamp, 1u);
-  delta->updateMesh(mesh, offsets);
+  auto& voxel = partial.getTsdfLayer().allocateVoxel(GlobalIndex(0, 0, 0));
+  voxel.distance = 0.3f;
+  voxel.weight = 1.0f;
+  update(partial);
   EXPECT_EQ(mesh.numFaces(), 1u);
   EXPECT_EQ(mesh.numVertices(), 3u);
-
-  // Without the current surface observation, the same TSDF clears the old mesh.
-  map.getMeshLayer().getBlock(BlockIndex(0, 0, 0)).clear();
-  compression.update(map, 3)->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numFaces(), 0u);
-  EXPECT_EQ(mesh.numVertices(), 0u);
+  EXPECT_EQ(delta->info.prev_to_curr->size(), 3u);
 }
 
-TEST(MeshCompression, MissingBlocksAndNearSurfaceSamplesAreNotCleared) {
-  auto map = makeMap();
-  const auto points = triangle(map).points;
-  MeshCompression compression(0.01);
-  compression.update(map, 1);
-  auto empty = makeMap();
-  EXPECT_EQ(compression.update(empty, 2)->getNumVertices(), 3u);
-  observe(empty, points[0], 0.04f);
-  observe(empty, points[1], std::numeric_limits<float>::quiet_NaN());
-  observe(empty, points[2], 0.3f, std::numeric_limits<float>::quiet_NaN());
-  auto delta = compression.update(empty, 3);
-  EXPECT_EQ(delta->getNumVertices(), 3u);
-  EXPECT_EQ(delta->getNumFaces(), 1u);
-}
-
-TEST(MeshCompression, CompressesAcrossBlocksAndRemovesDuplicateDegenerateFaces) {
-  auto map = makeMap();
-  auto& first = triangle(map);
-  first.faces.push_back({2, 1, 0});
-  first.faces.push_back({0, 0, 1});
-  auto& second = map.getMeshLayer().allocateBlock(BlockIndex(1, 0, 0));
-  second.resizeVertices(3);
-  second.points = first.points;
-  second.points[0].x() += 0.001f;
-  second.faces = {{0, 1, 2}};
-  MeshCompression compression(0.01);
-  auto delta = compression.update(map, 1);
-  EXPECT_EQ(delta->getNumVertices(), 3u);
-  EXPECT_EQ(delta->getNumFaces(), 1u);
-  delta = compression.update(map, 2);
-  EXPECT_EQ(delta->getNumVertices(), 3u);
-  EXPECT_EQ(delta->getNumFaces(), 1u);
-}
-
-TEST(MeshCompression, PreservesTraitsAndFirstObservation) {
-  auto map = makeMap();
-  auto& block = triangle(map);
-  block.colors[0] = spark_dsg::Color(10, 20, 30);
-  MeshCompression compression(0.01);
-  auto delta = compression.update(map, 10);
-  EXPECT_EQ(delta->getVertex(0).traits.first_seen_stamp, 10u);
-  block.colors[0] = spark_dsg::Color(40, 50, 60);
-  delta = compression.update(map, 20);
-  EXPECT_EQ(delta->timestamp_ns, 20u);
-  EXPECT_EQ(delta->getVertex(0).traits.stamp, 20u);
-  EXPECT_EQ(delta->getVertex(0).traits.first_seen_stamp, 10u);
-  EXPECT_EQ(delta->getVertex(0).traits.color[0], 40u);
-}
-
-TEST(MeshCompression, PreservesInputLabelsAndTimestamps) {
-  auto map = makeMap();
-  auto& block = map.getMeshLayer().allocateBlock(BlockIndex(0, 0, 0), true, true);
-  block.resizeVertices(1);
-  block.points[0] = {0.05f, 0.05f, 0.05f};
-  block.labels[0] = 7;
-  block.stamps[0] = 10;
-  block.first_seen_stamps[0] = 5;
-  MeshCompression compression(0.01);
-  compression.update(map, 20);
-  block.labels[0] = 8;
-  block.stamps[0] = 30;
-  block.first_seen_stamps[0] = 25;
-  const auto delta = compression.update(map, 40);
-  const auto& traits = delta->getVertex(0).traits;
-  EXPECT_TRUE(traits.properties.has_label);
-  EXPECT_TRUE(traits.properties.has_stamp);
-  EXPECT_TRUE(traits.properties.has_first_seen_stamp);
-  EXPECT_EQ(traits.label, 8u);
-  EXPECT_EQ(traits.stamp, 30u);
-  EXPECT_EQ(traits.first_seen_stamp, 5u);
-}
-
-TEST(MeshCompression, ArchivesAtVertexLevelWithinOneBlock) {
-  auto map = makeMap();
-  auto& block = triangle(map);
-  block.resizeVertices(6);
-  block.points[3] = {1.05f, 0.05f, 0.05f};
-  block.points[4] = {1.25f, 0.05f, 0.05f};
-  block.points[5] = {1.05f, 0.25f, 0.05f};
-  block.faces.push_back({3, 4, 5});
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  compression.update(map, 1)->updateMesh(mesh, offsets);
-  const auto outside = [](const auto& vertex) { return vertex.pos.x() > 1.0f; };
-  auto empty = makeMap();
-  auto delta = compression.update(empty, 2, outside);
-  EXPECT_EQ(delta->getNumArchivedVertices(), 3u);
-  EXPECT_EQ(delta->getNumArchivedFaces(), 1u);
-  EXPECT_EQ(delta->getNumActiveVertices(), 3u);
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(offsets.archived_vertices, 3u);
-  EXPECT_EQ(mesh.numFaces(), 2u);
-  delta = compression.update(empty, 3, outside);
-  EXPECT_EQ(delta->getNumArchivedVertices(), 0u);
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numVertices(), 6u);
-  checkMesh(mesh);
-}
-
-TEST(MeshCompression, BoundaryFacesRemainValidThroughClearingAndArchival) {
-  auto map = makeMap();
-  auto& block = triangle(map);
-  block.resizeVertices(5);
-  block.points[0] = {-0.25f, 0.05f, 0.05f};
-  block.points[1] = {-0.25f, 0.25f, 0.05f};
-  block.points[2] = {-0.05f, 0.05f, 0.05f};
-  block.points[3] = {0.25f, 0.05f, 0.05f};
-  block.points[4] = {0.25f, 0.25f, 0.05f};
-  block.faces.push_back({2, 3, 4});
-  const auto points = block.points;
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  compression.update(map, 1)->updateMesh(mesh, offsets);
-  auto empty = makeMap();
-  auto delta = compression.update(
-      empty, 2, [](const auto& vertex) { return vertex.pos.x() < 0.0f; });
-  EXPECT_EQ(delta->getNumArchivedVertices(), 2u);
-  EXPECT_EQ(delta->getNumArchivedFaces(), 1u);
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numFaces(), 2u);
-  checkMesh(mesh);
-
-  // Vertex 2 supports the immutable face and must survive. Clear the mutable
-  // face through vertex 3, then finish archiving the frozen boundary endpoint.
-  observe(empty, points[2], 0.3f);
-  observe(empty, points[3], 0.3f);
-  delta = compression.update(empty, 3);
-  EXPECT_EQ(delta->getNumArchivedVertices(), 1u);
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numFaces(), 1u);
-  EXPECT_EQ(mesh.numVertices(), 4u);
-  EXPECT_EQ(offsets.archived_faces, 1u);
-  checkMesh(mesh);
-  compression.update(makeMap(), 4, [](const auto&) { return true; })
-      ->updateMesh(mesh, offsets);
-  checkMesh(mesh);
-  EXPECT_EQ(mesh.numVertices(), 4u);
-}
-
-TEST_F(MeshCompressionBoundaryTest, ReplacesActiveTriangleWithFrozenEndpoint) {
-  const auto archived_face = mesh.faces[0];
-  const auto archived_endpoint = mesh.points[archived_face[2]];
-  auto map = reobservedTriangle();
-  for (uint64_t stamp = 3; stamp <= 5; ++stamp) {
-    const auto delta = compression.update(map, stamp);
-    EXPECT_EQ(delta->getNumActiveFaces(), 1u);
-    delta->updateMesh(mesh, offsets);
-    ASSERT_EQ(mesh.numFaces(), 2u);
-    EXPECT_EQ(mesh.faces[0], archived_face);
-    EXPECT_EQ(mesh.points[archived_face[2]], archived_endpoint);
-    EXPECT_EQ(mesh.numVertices(), 6u);
-    EXPECT_EQ(offsets.archived_vertices, 3u);
-    checkMesh(mesh);
-  }
-
-  auto cleared = makeMap();
-  observe(cleared, {-0.044f, 0.05f, 0.05f}, 0.3f);
-  compression.update(cleared, 6)->updateMesh(mesh, offsets);
-  ASSERT_EQ(mesh.numFaces(), 1u);
-  EXPECT_EQ(mesh.faces[0], archived_face);
-  EXPECT_EQ(mesh.points[archived_face[2]], archived_endpoint);
-  checkMesh(mesh);
-}
-
-TEST_F(MeshCompressionBoundaryTest, PartialReobservationRetainsBoundaryTriangle) {
-  auto map = reobservedTriangle();
-  auto& block = map.getMeshLayer().getBlock(BlockIndex(0, 0, 0));
-  block.resizeVertices(1);
-  block.faces.clear();
-  compression.update(map, 3)->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numFaces(), 2u);
-  EXPECT_EQ(offsets.archived_vertices, 2u);
-  checkMesh(mesh);
-
-  // Mutable endpoints in the cell map are not new observations by themselves.
-  compression.update(makeMap(), 4)->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numFaces(), 2u);
-  EXPECT_EQ(offsets.archived_vertices, 2u);
-  checkMesh(mesh);
-
-  compression.update(reobservedTriangle(), 5)->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numFaces(), 2u);
-  EXPECT_EQ(offsets.archived_vertices, 3u);
-  checkMesh(mesh);
-}
-
-TEST(MeshCompression, ReobservationCannotClearArchivedGeometry) {
-  auto map = makeMap();
-  const auto points = triangle(map).points;
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  compression.update(map, 1)->updateMesh(mesh, offsets);
-  compression.update(makeMap(), 2, [](const auto&) { return true; })
-      ->updateMesh(mesh, offsets);
-  auto partial = makeMap();
-  observe(partial, points[0], 0.3f);
-  compression.update(partial, 3)->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numVertices(), 3u);
-  EXPECT_EQ(mesh.numFaces(), 1u);
-  checkMesh(mesh);
-}
-
-TEST(MeshCompression, UpdatedVerticesOutsideWindowAreNotRepeatedlyArchived) {
+TEST_F(CellCompressionTest, ClearingRequiresAllEightObservedFreeCorners) {
   auto map = makeMap();
   triangle(map);
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  const auto outside = [](const auto&) { return true; };
-  for (uint64_t stamp = 1; stamp <= 3; ++stamp) {
-    auto delta = compression.update(map, stamp, outside);
-    EXPECT_EQ(delta->getNumArchivedVertices(), 0u);
-    delta->updateMesh(mesh, offsets);
-    EXPECT_EQ(mesh.numVertices(), 3u);
+  update(map);
+  auto cleared = makeMap();
+  observeCell(cleared, GlobalIndex(0, 0, 0), 0.3f);
+  auto& voxel = cleared.getTsdfLayer().getVoxel(GlobalIndex(1, 1, 1));
+  for (const auto weight : {0.0f, std::numeric_limits<float>::quiet_NaN()}) {
+    voxel.weight = weight;
+    update(cleared);
     EXPECT_EQ(mesh.numFaces(), 1u);
   }
 
-  auto delta = compression.update(makeMap(), 4, outside);
-  EXPECT_EQ(delta->getNumArchivedVertices(), 3u);
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numVertices(), 3u);
-  checkMesh(mesh);
+  voxel.weight = 1.0f;
+  for (const auto distance : {-0.1f, 0.0f, std::numeric_limits<float>::quiet_NaN()}) {
+    voxel.distance = distance;
+    update(cleared);
+    EXPECT_EQ(mesh.numFaces(), 1u);
+  }
+
+  voxel.distance = 0.3f;
+  update(cleared);
+  EXPECT_EQ(mesh.numFaces(), 0u);
+  EXPECT_EQ(mesh.numVertices(), 0u);
+  EXPECT_TRUE(delta->info.prev_to_curr->empty());
+  update(map);
+  EXPECT_EQ(mesh.numFaces(), 1u);
 }
 
-TEST(MeshCompression, ReobservedVerticesReplaceOldTopology) {
+TEST_F(CellCompressionTest, ReplacesMovingGroundSurfaceWithoutAccumulatingTriangles) {
+  auto map = makeMap();
+  auto& block = triangle(map);
+  for (size_t i = 0; i < 10; ++i) {
+    for (auto& point : block.points) {
+      point.z() += 0.006f;
+    }
+
+    update(map);
+    ASSERT_EQ(mesh.numFaces(), 1u);
+    ASSERT_EQ(mesh.numVertices(), 3u);
+    EXPECT_EQ(mesh.points, block.points);
+  }
+}
+
+TEST_F(CellCompressionTest, ReobservingVerticesDoesNotReplaceAnotherCellsFace) {
+  auto map = makeMap();
+  triangle(map);
+  update(map);
+  auto other = makeMap();
+  auto& block = triangle(other, GlobalIndex(1, 0, 0));
+  block.resizeVertices(4);
+  block.points[3] = {0.15f, 0.15f, 0.08f};
+  block.faces = {{0, 1, 3}, {0, 3, 2}};
+  block.face_cells.assign(2, GlobalIndex(1, 0, 0));
+  update(other);
+  EXPECT_EQ(mesh.numFaces(), 3u);
+  EXPECT_EQ(mesh.numVertices(), 4u);
+}
+
+TEST_F(CellCompressionTest, SharedVerticesSurviveClearingOneSourceCell) {
   auto map = makeMap();
   auto& block = triangle(map);
   block.resizeVertices(4);
-  block.points[3] = {0.25f, 0.25f, 0.05f};
+  block.points[3] = {0.15f, 0.15f, 0.08f};
   block.faces.push_back({1, 3, 2});
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  compression.update(map, 1)->updateMesh(mesh, offsets);
-  block.faces = {{0, 1, 3}, {0, 3, 2}};
-  compression.update(map, 2)->updateMesh(mesh, offsets);
-  ASSERT_EQ(mesh.numFaces(), 2u);
-  EXPECT_EQ(mesh.faces, block.faces);
-  checkMesh(mesh);
+  block.face_cells.push_back(GlobalIndex(1, 0, 0));
+  update(map);
+  auto partial = makeMap();
+  observeCell(partial, GlobalIndex(0, 0, 0), 0.3f);
+  update(partial);
+  EXPECT_EQ(mesh.numFaces(), 1u);
+  EXPECT_EQ(mesh.numVertices(), 3u);
 }
 
-TEST(MeshCompression, ClearsEntireMeshThenAcceptsNewGeometry) {
+TEST_F(CellCompressionTest, DuplicateFacesRetainBothSourceCells) {
   auto map = makeMap();
-  const auto points = triangle(map).points;
-  MeshCompression compression(0.01);
-  spark_dsg::Mesh mesh;
-  kimera_pgmo::MeshOffsetInfo offsets;
-  compression.update(map, 1)->updateMesh(mesh, offsets);
-  auto cleared = makeMap();
-  for (const auto& pos : points) {
-    observe(cleared, pos, 0.3f);
+  auto& block = triangle(map);
+  block.faces.push_back({2, 1, 0});
+  block.face_cells.push_back(GlobalIndex(1, 0, 0));
+  update(map);
+  ASSERT_EQ(mesh.numFaces(), 1u);
+  auto partial = makeMap();
+  observeCell(partial, GlobalIndex(0, 0, 0), 0.3f);
+  update(partial);
+  EXPECT_EQ(mesh.numFaces(), 1u);
+  EXPECT_EQ(mesh.numVertices(), 3u);
+  update(makeMap());
+  EXPECT_EQ(mesh.numFaces(), 1u);
+}
+
+TEST_F(CellCompressionTest, MissingNeighborBlockDoesNotClearBoundaryCell) {
+  const GlobalIndex cell(15, 0, 0);
+  auto map = makeMap();
+  triangle(map, cell);
+  update(map);
+  auto partial = makeMap();
+  observeCell(partial, cell, 0.3f);
+  partial.getTsdfLayer().removeBlock(BlockIndex(1, 0, 0));
+  update(partial);
+  EXPECT_EQ(mesh.numFaces(), 1u);
+}
+
+TEST_F(CellCompressionTest, FrozenEndpointsPreserveArchivedFacesDuringReplacement) {
+  auto map = makeMap();
+  auto& block = triangle(map);
+  block.resizeVertices(5);
+  block.points = {{-0.25f, 0.05f, 0.05f},
+                  {-0.25f, 0.25f, 0.05f},
+                  {-0.045f, 0.05f, 0.05f},
+                  {0.25f, 0.05f, 0.05f},
+                  {0.25f, 0.25f, 0.05f}};
+  block.faces.push_back({2, 3, 4});
+  block.face_cells.push_back(GlobalIndex(1, 0, 0));
+  update(map);
+  update(makeMap(), [](const auto& vertex) { return vertex.pos.x() < 0.0f; });
+  ASSERT_EQ(offsets.archived_vertices, 2u);
+  ASSERT_EQ(mesh.numFaces(), 2u);
+  const auto face = mesh.faces[0];
+  const auto endpoint = mesh.points[face[2]];
+  auto replacement = makeMap();
+  auto& mesh_block = triangle(replacement, GlobalIndex(1, 0, 0));
+  mesh_block.points = {
+      {-0.044f, 0.05f, 0.05f}, {0.25f, 0.05f, 0.05f}, {0.25f, 0.25f, 0.05f}};
+  for (size_t i = 0; i < 3; ++i) {
+    update(replacement);
+    ASSERT_EQ(mesh.numFaces(), 2u);
+    EXPECT_EQ(mesh.faces[0], face);
+    EXPECT_EQ(mesh.points[face[2]], endpoint);
   }
 
-  auto delta = compression.update(cleared, 2);
-  EXPECT_TRUE(delta->info.prev_to_curr->empty());
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numVertices(), 0u);
-  EXPECT_EQ(mesh.numFaces(), 0u);
-  delta = compression.update(map, 3);
-  EXPECT_EQ(delta->info.prev_active_vertices, 0u);
-  delta->updateMesh(mesh, offsets);
-  EXPECT_EQ(mesh.numVertices(), 3u);
+  auto cleared = makeMap();
+  observeCell(cleared, GlobalIndex(1, 0, 0), 0.3f);
+  update(cleared);
   EXPECT_EQ(mesh.numFaces(), 1u);
-  checkMesh(mesh);
+  EXPECT_EQ(mesh.points[face[2]], endpoint);
 }
 
-TEST(MeshCompression, ConfigurableClearanceAndMinimumWeight) {
+TEST_F(CellCompressionTest, ReobservationCannotClearArchivedGeometry) {
   auto map = makeMap();
-  const auto points = triangle(map).points;
+  triangle(map);
+  update(map);
+  update(makeMap(), [](const auto&) { return true; });
+  auto cleared = makeMap();
+  observeCell(cleared, GlobalIndex(0, 0, 0), 0.3f);
+  update(cleared);
+  EXPECT_EQ(mesh.numVertices(), 3u);
+  EXPECT_EQ(mesh.numFaces(), 1u);
+}
+
+TEST_F(CellCompressionTest, UpdatedVerticesOutsideWindowRemainActive) {
+  auto map = makeMap();
+  triangle(map);
+  for (size_t i = 0; i < 3; ++i) {
+    update(map, [](const auto&) { return true; });
+    EXPECT_EQ(delta->getNumArchivedVertices(), 0u);
+  }
+
+  update(makeMap(), [](const auto&) { return true; });
+  EXPECT_EQ(delta->getNumArchivedVertices(), 3u);
+  EXPECT_EQ(mesh.numFaces(), 1u);
+}
+
+TEST_F(CellCompressionTest, PreservesAttributesAndFirstObservation) {
+  auto map = makeMap();
+  auto& block = triangle(map);
+  block.colors[0] = spark_dsg::Color(10, 20, 30);
+  update(map);
+  block.colors[0] = spark_dsg::Color(40, 50, 60);
+  update(map);
+  EXPECT_EQ(delta->getVertex(0).traits.first_seen_stamp, 1u);
+  EXPECT_EQ(delta->getVertex(0).traits.color[0], 40u);
+}
+
+TEST_F(CellCompressionTest, EmptyUpdates) {
+  update(makeMap());
+  EXPECT_EQ(mesh.numVertices(), 0u);
+  EXPECT_EQ(mesh.numFaces(), 0u);
+}
+
+TEST(MeshCompression, MarchingCubesProvenanceSurvivesCopiesAndRemeshing) {
+  auto map = makeMap();
+  const GlobalIndex cell(-1, 0, 0);
+  observeCell(map, cell, 0.3f);
+  for (int y = 0; y < 2; ++y) {
+    for (int z = 0; z < 2; ++z) {
+      map.getTsdfLayer().getVoxel(GlobalIndex(0, y, z)).distance = -0.9f;
+    }
+  }
+
+  MeshIntegrator::Config config;
+  config.integrator_threads = 1;
+  MeshIntegrator integrator(config);
+  integrator.generateMesh(map, false, false);
+  const auto& block = map.getMeshLayer().getBlock(BlockIndex(-1, 0, 0));
+  ASSERT_EQ(block.numFaces(), 2u);
+  ASSERT_EQ(block.face_cells.size(), 2u);
+  EXPECT_EQ(block.face_cells[0], cell);
+  for (const auto& tsdf_block : map.getTsdfLayer()) {
+    tsdf_block.updated = true;
+  }
+
+  const auto copied = map.cloneUpdated();
+  EXPECT_EQ(copied->getMeshLayer().getBlock(BlockIndex(-1, 0, 0)).face_cells,
+            block.face_cells);
+  MeshCompression compression(0.005);
+  EXPECT_EQ(compression.update(map, 1)->getNumFaces(), 2u);
+  observeCell(map, cell, 0.3f);
+  integrator.generateMesh(map, false, false);
+  EXPECT_TRUE(block.face_cells.empty());
+  EXPECT_EQ(compression.update(map, 2)->getNumFaces(), 0u);
+}
+
+TEST(MeshCompression, ClearingAndReplacementAblations) {
+  MeshCompression::Config config;
+  config.clear_free_space = false;
+  config.replace_reobserved_cells = false;
+  MeshCompression compression(config);
+  auto map = makeMap();
+  auto& block = triangle(map);
+  compression.update(map, 1);
+  for (auto& point : block.points) {
+    point.z() += 0.05f;
+  }
+
+  EXPECT_EQ(compression.update(map, 2)->getNumFaces(), 2u);
+  auto cleared = makeMap();
+  observeCell(cleared, GlobalIndex(0, 0, 0), 0.3f);
+  EXPECT_EQ(compression.update(cleared, 3)->getNumFaces(), 2u);
+}
+
+TEST(MeshCompression, ConfiguredCornerWeightAndClearance) {
   MeshCompression::Config config;
   config.min_weight = 0.5f;
   config.min_clearance_m = 0.2;
   MeshCompression compression(config);
+  auto map = makeMap();
+  triangle(map);
   compression.update(map, 1);
   auto cleared = makeMap();
-  observe(cleared, points[0], 0.3f, 0.25f);
-  observe(cleared, points[1], 0.15f);
-  observe(cleared, points[2], 0.3f);
-  auto delta = compression.update(cleared, 2);
-  EXPECT_EQ(delta->getNumVertices(), 2u);
-  EXPECT_EQ(delta->info.prev_to_curr->count(0), 1u);
-  EXPECT_EQ(delta->info.prev_to_curr->count(1), 1u);
-  EXPECT_EQ(delta->info.prev_to_curr->count(2), 0u);
+  observeCell(cleared, GlobalIndex(0, 0, 0), 0.3f, 0.25f);
+  EXPECT_EQ(compression.update(cleared, 2)->getNumFaces(), 1u);
+  observeCell(cleared, GlobalIndex(0, 0, 0), 0.15f);
+  EXPECT_EQ(compression.update(cleared, 3)->getNumFaces(), 1u);
+  observeCell(cleared, GlobalIndex(0, 0, 0), 0.3f);
+  EXPECT_EQ(compression.update(cleared, 4)->getNumFaces(), 0u);
 }
 
-TEST(MeshCompression, EmptyUpdates) {
-  MeshCompression compression(0.01);
-  auto delta = compression.update(makeMap(), 1);
-  EXPECT_EQ(delta->getNumVertices(), 0u);
-  EXPECT_EQ(delta->getNumFaces(), 0u);
-  EXPECT_TRUE(delta->info.prev_to_curr->empty());
+TEST(MeshCompression, MissingProvenanceRejectsInputBeforeMutation) {
+  MeshCompression compression(0.005);
+  auto map = makeMap();
+  auto& block = triangle(map);
+  compression.update(map, 1);
+  block.face_cells.clear();
+  EXPECT_THROW(compression.update(map, 2), std::invalid_argument);
+  EXPECT_EQ(compression.update(makeMap(), 3)->getNumFaces(), 1u);
 }
 
 }  // namespace hydra
