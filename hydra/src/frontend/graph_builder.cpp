@@ -38,9 +38,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/compression/block_compression.h>
 #include <kimera_pgmo/compression/delta_compression.h>
-#include <kimera_pgmo/utils/common_functions.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
@@ -48,8 +46,9 @@
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
+#include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/mesh_segmenter.h"
-#include "hydra/utils/pgmo_mesh_interface.h"
+#include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
@@ -75,42 +74,39 @@ void declare_config(GraphBuilder::Config& config) {
   name("GraphBuilder::Config");
   base<VerbosityConfig>(config);
 
-  {
-    NameSpace ns("pgmo");
-    field(config.pgmo.mesh_resolution, "mesh_resolution");
-    field(config.pgmo.d_graph_resolution, "d_graph_resolution");
-    field(config.pgmo.time_horizon, "time_horizon");
-  }
-
-  field(config.graph_connector, "graph_connector");
-  field(config.graph_updater, "graph_updater");
-  config.pose_graph_tracker.setOptional();
-  field(config.pose_graph_tracker, "pose_graph_tracker");
-
-  field(config.enable_mesh_objects, "enable_mesh_objects");
-  field(config.object_config, "objects");
-  // surface (i.e., 2D) places
-  config.surface_places.setOptional();
-  field(config.surface_places, "surface_places");
-
-  // traversability places
-  config.traversability_places.setOptional();
-  field(config.traversability_places, "traversability_places");
-  // freespace (i.e., 3D) places
-  config.freespace_places.setOptional();
-  field(config.freespace_places, "freespace_places");
-  // frontier (i.e. 3D, boundary to unknown space) places
-  config.frontier_places.setOptional();
-  field(config.frontier_places, "frontier_places");
-
-  field(config.view_database, "view_database");
-  field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
   field(config.clear_object_meshes, "clear_object_meshes");
+  field(config.enable_mesh_objects, "enable_mesh_objects");
+  field(config.mesh_resolution, "mesh_resolution");
+
+  field(config.graph_updater, "graph_updater");
+  field(config.graph_connector, "graph_connector");
+
+  field(config.object_config, "objects");
+  config.surface_places.setOptional();
+  field(config.surface_places, "surface_places");
+  config.freespace_places.setOptional();
+  field(config.freespace_places, "freespace_places");
+  config.traversability_places.setOptional();
+  field(config.traversability_places, "traversability_places");
+  config.frontier_places.setOptional();
+  field(config.frontier_places, "frontier_places");
+  config.deformation_graph_builder.setOptional();
+  field(config.deformation_graph_builder, "deformation_graph_builder");
+
+  config.pose_graph_tracker.setOptional();
+  field(config.pose_graph_tracker, "pose_graph_tracker");
+  field(config.view_database, "view_database");
+  field(config.sinks, "sinks");
+
+  check(config.mesh_resolution, GT, 0.0, "mesh_resolution");
 }
 
 GraphBuilder::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")) {}
+    : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")),
+      graph_updater({{DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}),
+      deformation_graph_builder(DeformationGraphBuilder::Config()),
+      pose_graph_tracker(PoseGraphFromOdom::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
                            const SharedDsgInfo::Ptr& dsg,
@@ -120,6 +116,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       dsg_(dsg),
       state_(state),
+      mesh_compression_(new kimera_pgmo::DeltaCompression(config.mesh_resolution)),
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
@@ -139,12 +136,6 @@ GraphBuilder::GraphBuilder(const Config& config,
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
-  dsg_->graph->setMesh(global_info.createMesh());
-
-  mesh_compression_.reset(
-      new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
-  deformation_compression_.reset(
-      new kimera_pgmo::BlockCompression(config.pgmo.d_graph_resolution));
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   addInputCallback(
@@ -462,31 +453,11 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
 }
 
 void GraphBuilder::updateDeformationGraph(const ActiveWindowOutput& input) {
-  ScopedTimer timer("frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
-  double time_s =
-      std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
-  auto interface = PgmoMeshLayerInterface(input.map().getMeshLayer());
-
-  std::vector<size_t> new_idx;
-  std::vector<pcl::Vertices> new_faces;
-  kimera_pgmo::HashedIndexMapping new_remapping;
-  pcl::PointCloud<pcl::PointXYZRGBA> new_vertices;
-  deformation_compression_->pruneStoredMesh(time_s - config.pgmo.time_horizon);
-  deformation_compression_->compressAndIntegrate(
-      interface, new_vertices, new_faces, new_idx, new_remapping, time_s);
-
-  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
-      new pcl::PointCloud<pcl::PointXYZRGBA>());
-  deformation_compression_->getVertices(vertices);
-
-  // Add nodes and edges to graph
-  const auto new_edges = deformation_graph_.addPointsAndSurfaces(new_idx, new_faces);
-  if (curr_output_) {
-    curr_output_->deformation_graph =
-        kimera_pgmo::makePoseGraph(prefix.id, time_s, new_edges, new_idx, *vertices);
+  if (!deformation_graph_builder_) {
+    return;
   }
+
+  deformation_graph_builder_->call(input, *dsg_, *curr_output_);
 }
 
 void GraphBuilder::updateFrontiers(const ActiveWindowOutput& input) {
@@ -494,7 +465,7 @@ void GraphBuilder::updateFrontiers(const ActiveWindowOutput& input) {
     return;
   }
 
-  frontier_places_->call(input, *dsg_);
+  frontier_places_->call(input, *dsg_, *curr_output_);
 }
 
 void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
@@ -502,7 +473,7 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
     return;
   }
 
-  freespace_places_->call(input, *dsg_);
+  freespace_places_->call(input, *dsg_, *curr_output_);
 }
 
 void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
@@ -510,7 +481,7 @@ void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
     return;
   }
 
-  traversability_places_->call(input, *dsg_);
+  traversability_places_->call(input, *dsg_, *curr_output_);
 }
 
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {

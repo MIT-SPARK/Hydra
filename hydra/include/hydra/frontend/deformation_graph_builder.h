@@ -33,66 +33,40 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
+#include <kimera_pgmo/utils/graph.h>
 
 #include <memory>
 
-#include "hydra/active_window/volumetric_window.h"
-#include "hydra/common/output_sink.h"
 #include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/places/gvd_places/graph_extractor.h"
-#include "hydra/places/gvd_places/gvd_integrator.h"
-#include "hydra/reconstruction/tsdf_interpolators.h"
+#include "hydra/utils/logging.h"
+
+namespace kimera_pgmo {
+class MeshCompression;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 
-class GvdPlaceExtractor : public GraphBuilderFunctor {
+class DeformationGraphBuilder : public GraphBuilderFunctor {
  public:
-  using Sink = OutputSink<uint64_t,
-                          const Eigen::Isometry3d&,
-                          const places::GvdLayer&,
-                          const places::GraphExtractor&>;
+  struct Config : public VerbosityConfig {
+    Config();
 
-  struct Config : VerbosityConfig {
-    //! Node prefix to use
-    char node_prefix = 'p';
-    //! Target layer to add places
-    std::string layer = spark_dsg::DsgLayers::PLACES;
-    //! GVD integrator from TSDF
-    places::GvdIntegrator::Config gvd;
-    //! Graph extractor for processing GVD
-    places::GraphExtractor::Config graph;
-    //! Optional TSDF interpolator for downsampling TSDF
-    config::VirtualConfig<TsdfInterpolator> tsdf_interpolator;
-    //! Minimum number of places to keep a connected component
-    size_t min_component_size = 3;
-    //! Sinks for current pose and graph status
-    std::vector<Sink::Factory> sinks;
-
-    Config() : VerbosityConfig("[gvd_places] ") {}
+    double resolution = 1.5;
+    double horizon_s = 10.0;
   } const config;
 
-  explicit GvdPlaceExtractor(const Config& config);
+  DeformationGraphBuilder(const Config& config);
+  virtual ~DeformationGraphBuilder();
 
-  virtual ~GvdPlaceExtractor();
-
-  void call(const ActiveWindowOutput& msg,
-            SharedDsgInfo& graph,
-            FrontendOutput& output) override;
-
-  void detect(const ActiveWindowOutput& msg);
-
-  void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
+  virtual void call(const ActiveWindowOutput& msg,
+                    SharedDsgInfo& dsg,
+                    FrontendOutput& output) = 0;
 
  protected:
-  places::GvdLayer::Ptr gvd_;
-  std::unique_ptr<VolumetricWindow> map_window_;
-  std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
-  std::unique_ptr<places::GraphExtractor> graph_extractor_;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
-  Sink::List sinks_;
+  kimera_pgmo::Graph graph_;
+  std::unique_ptr<kimera_pgmo::MeshCompression> compression_;
 };
 
-void declare_config(GvdPlaceExtractor::Config& config);
+void declare_config(DeformationGraphBuilder::Config& config);
 
 }  // namespace hydra

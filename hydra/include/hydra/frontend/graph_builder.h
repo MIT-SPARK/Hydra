@@ -35,7 +35,6 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/mesh_offset_info.h>
-#include <kimera_pgmo/utils/graph.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
@@ -53,12 +52,10 @@
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_place_extractor.h"
 #include "hydra/frontend/view_database.h"
-#include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
 class DeltaCompression;
-class MeshCompression;
 class MeshDelta;
 }  // namespace kimera_pgmo
 
@@ -78,28 +75,30 @@ class GraphBuilder : public Module {
   struct Config : public VerbosityConfig {
     Config();
 
-    struct DeformationConfig {
-      double mesh_resolution = 0.1;
-      double d_graph_resolution = 1.5;
-      double time_horizon = 10.0;
-    } pgmo;
-    GraphUpdater::Config graph_updater{
-        {{spark_dsg::DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}};
-    GraphConnector::Config graph_connector;
+    //! Disable merging update packets from the active window if true
+    bool no_packet_collation = false;
+    //! Drop object meshes for memory savings
+    bool clear_object_meshes = false;
+    //! Whether or not to use mesh clustering for object extraction
     bool enable_mesh_objects = true;
+    //! Compression resolution for mesh
+    double mesh_resolution = 0.1;
+
+    GraphUpdater::Config graph_updater;
+    GraphConnector::Config graph_connector;
+
     MeshSegmenter::Config object_config;
-    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker{
-        PoseGraphFromOdom::Config()};
     config::VirtualConfig<SurfacePlaceExtractor> surface_places;
     config::VirtualConfig<GraphBuilderFunctor> freespace_places;
     config::VirtualConfig<GraphBuilderFunctor> traversability_places;
     config::VirtualConfig<GraphBuilderFunctor> frontier_places;
+    config::VirtualConfig<GraphBuilderFunctor> deformation_graph_builder;
+
+    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
+    //! Keyframes for feature assignment
     ViewDatabase::Config view_database;
+    //! Output sinks and visualization
     std::vector<Sink::Factory> sinks;
-    //! @brief Disable merging update packets from the active window if true
-    bool no_packet_collation = false;
-    //! @brief Drop object meshes for memory savings
-    bool clear_object_meshes = false;
   } const config;
 
   GraphBuilder(const Config& config,
@@ -167,12 +166,10 @@ class GraphBuilder : public Module {
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   FrontendOutput::Ptr curr_output_;
+
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;
   std::shared_ptr<kimera_pgmo::MeshDelta> last_mesh_update_;
-
-  kimera_pgmo::Graph deformation_graph_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
-  std::unique_ptr<kimera_pgmo::MeshCompression> deformation_compression_;
 
   GraphUpdater graph_updater_;
   GraphConnector graph_connector_;
@@ -184,6 +181,7 @@ class GraphBuilder : public Module {
   std::unique_ptr<GraphBuilderFunctor> traversability_places_;
   std::unique_ptr<GraphBuilderFunctor> freespace_places_;
   std::unique_ptr<GraphBuilderFunctor> frontier_places_;
+  std::unique_ptr<GraphBuilderFunctor> deformation_graph_builder_;
   ViewDatabase view_database_;
 
   spark_dsg::SceneGraphLogger frontend_graph_logger_;

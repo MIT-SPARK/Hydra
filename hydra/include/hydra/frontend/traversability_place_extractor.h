@@ -66,7 +66,9 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
 
   virtual ~TraversabilityPlaceExtractor() = default;
 
-  void call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) override;
+  void call(const ActiveWindowOutput& msg,
+            SharedDsgInfo& dsg,
+            FrontendOutput& output) override;
 
   void detect(const ActiveWindowOutput& msg);
 

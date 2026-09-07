@@ -52,7 +52,9 @@ class FrontierExtractor : public GraphBuilderFunctor {
 
   explicit FrontierExtractor(const Config& config);
 
-  void call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) override;
+  void call(const ActiveWindowOutput& msg,
+            SharedDsgInfo& dsg,
+            FrontendOutput&) override;
 
   void updateRecentBlocks(const Eigen::Vector3d& current_position, double block_size);
 

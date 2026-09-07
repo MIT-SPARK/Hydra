@@ -70,7 +70,8 @@ TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
       sinks_(Sink::instantiate(config.sinks)) {}
 
 void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
-                                        SharedDsgInfo& dsg) {
+                                        SharedDsgInfo& dsg,
+                                        FrontendOutput&) {
   detect(msg);
 
   std::lock_guard<std::mutex> graph_lock(dsg.mutex);

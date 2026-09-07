@@ -36,13 +36,16 @@
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/shared_dsg_info.h"
+#include "hydra/frontend/frontend_output.h"
 
 namespace hydra {
 
 class GraphBuilderFunctor {
  public:
   virtual ~GraphBuilderFunctor() = default;
-  virtual void call(const ActiveWindowOutput& msg, SharedDsgInfo& dsg) = 0;
+  virtual void call(const ActiveWindowOutput& msg,
+                    SharedDsgInfo& dsg,
+                    FrontendOutput& output) = 0;
 };
 
 }  // namespace hydra
