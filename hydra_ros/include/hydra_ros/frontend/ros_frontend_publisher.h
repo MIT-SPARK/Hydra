@@ -61,7 +61,7 @@ class RosFrontendPublisher : public GraphBuilder::Sink {
 
   void call(uint64_t timestamp_ns,
             const spark_dsg::SceneGraph& graph,
-            const BackendInput& backend_input) const override;
+            const FrontendOutput& output) const override;
 
   std::string printInfo() const override;
 

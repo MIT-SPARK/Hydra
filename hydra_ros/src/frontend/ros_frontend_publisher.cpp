@@ -88,18 +88,20 @@ RosFrontendPublisher::RosFrontendPublisher(ianvs::NodeHandle nh)
 
 void RosFrontendPublisher::call(uint64_t timestamp_ns,
                                 const SceneGraph& graph,
-                                const BackendInput& backend_input) const {
+                                const FrontendOutput& output) const {
   // TODO(nathan) make sure pgmo stamps the deformation graph
-  mesh_graph_pub_->publish(backend_input.deformation_graph);
+  if (output.deformation_graph && mesh_graph_pub_->get_subscription_count()) {
+    mesh_graph_pub_->publish(*output.deformation_graph);
+  }
 
-  if (backend_input.mesh_update) {
-    backend_input.mesh_update->timestamp_ns = timestamp_ns;
+  if (output.mesh_update) {
+    output.mesh_update->timestamp_ns = timestamp_ns;
     auto delta_msg = std::make_shared<MeshDeltaMsg>();
-    kimera_pgmo::conversions::to_ros(*backend_input.mesh_update, *delta_msg);
+    kimera_pgmo::conversions::to_ros(*output.mesh_update, *delta_msg);
     delta_msg->header.frame_id = GlobalInfo::instance().getFrames().odom;
     mesh_update_pub_->publish(*delta_msg);
 
-    stored_delta_.insert({backend_input.mesh_update->info.sequence_number, delta_msg});
+    stored_delta_.insert({output.mesh_update->info.sequence_number, delta_msg});
     if (config.mesh_delta_queue_size &&
         stored_delta_.size() > config.mesh_delta_queue_size) {
       stored_delta_.erase(stored_delta_.begin());

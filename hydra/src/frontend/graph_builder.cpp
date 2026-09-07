@@ -109,12 +109,15 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.clear_object_meshes, "clear_object_meshes");
 }
 
+GraphBuilder::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")) {}
+
 GraphBuilder::GraphBuilder(const Config& config,
                            const SharedDsgInfo::Ptr& dsg,
                            const SharedModuleState::Ptr& state)
     : config(config::checkValid(config)),
-      sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       queue_(std::make_shared<InputQueue>()),
+      sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       dsg_(dsg),
       state_(state),
       graph_updater_(config.graph_updater),
@@ -167,7 +170,7 @@ GraphBuilder::~GraphBuilder() {
 
 void GraphBuilder::start() {
   spin_thread_.reset(new std::thread(&GraphBuilder::spin, this));
-  LOG(INFO) << "[Hydra Frontend] started!";
+  MLOG(0) << "started!";
 }
 
 void GraphBuilder::stop() { stopImpl(); }
@@ -176,13 +179,12 @@ void GraphBuilder::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
-    VLOG(2) << "[Hydra Frontend] stopping frontend!";
+    MLOG(1) << "stopping frontend!";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra Frontend] stopped!";
+    MLOG(1) << "stopped!";
+    MLOG(1) << queue_->size() << " messages left";
   }
-
-  VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
 void GraphBuilder::save(const DataDirectory& output) {
@@ -301,7 +303,7 @@ void GraphBuilder::addSink(const Sink::Ptr& sink) {
   }
 }
 
-void GraphBuilder::setLcdQueue(const MessageQueue<LcdInput::Ptr>::Ptr& queue) {
+void GraphBuilder::setLcdQueue(const OutputQueue::Ptr& queue) {
   lcd_input_queue_ = queue;
 }
 
@@ -325,24 +327,16 @@ void GraphBuilder::dispatchSpin(ActiveWindowOutput::Ptr msg) {
 }
 
 void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
-  VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns << " [ns]";
+  MLOG(2) << "Popped input packet @ " << msg->timestamp_ns << " [ns]";
   std::lock_guard<std::mutex> lock(mutex_);
   ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
-  backend_input_.reset(new BackendInput());
-  backend_input_->timestamp_ns = msg->timestamp_ns;
-  backend_input_->sequence_number = sequence_number_;
-  if (lcd_input_queue_) {
-    lcd_input_.reset(new LcdInput());
-    lcd_input_->timestamp_ns = msg->timestamp_ns;
-    lcd_input_->sequence_number = sequence_number_;
-  }
-
+  curr_output_ = std::make_shared<FrontendOutput>(msg->timestamp_ns, sequence_number_);
   updateImpl(msg);
+  curr_output_->mesh_update = std::move(last_mesh_update_);
 
   // TODO(nathan) ideally make the copy lighter-weight
   // we need to copy over the latest updates to the backend and to LCD
-  // no fancy threading: we just mark the update time and copy all changes in one go
   {  // start critical section
     std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_graph", msg->timestamp_ns);
@@ -350,26 +344,24 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     state_->backend_graph->graph->mergeGraph(*dsg_->graph);
   }  // end critical section
 
-  if (lcd_input_queue_) {
-    // n.b., critical section in this scope!
+  if (lcd_input_queue_) {  // LCD graph critical section
     std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_lcd_graph", msg->timestamp_ns);
     state_->lcd_graph->sequence_number = sequence_number_;
     state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
-  backend_input_->mesh_update = std::move(last_mesh_update_);
-  PipelineQueues::instance().backend_queue.push(backend_input_);
+  PipelineQueues::instance().backend_queue.push(curr_output_);
   if (lcd_input_queue_) {
-    lcd_input_queue_->push(lcd_input_);
+    lcd_input_queue_->push(curr_output_);
   }
 
   // mutex not required because nothing is modifying the graph
   frontend_graph_logger_.logGraph(*dsg_->graph);
 
-  if (dsg_->graph && backend_input_) {
+  if (dsg_->graph && curr_output_) {
     ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
-    Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *backend_input_);
+    Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *curr_output_);
   }
 
   ++sequence_number_;
@@ -435,7 +427,7 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
 
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh.numBlocks() << " blocks";
+    MLOG(2) << "Updating mesh with " << mesh.numBlocks() << " blocks";
     const BlockMeshIter wrapper(mesh);
     last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
   }  // end timing scope
@@ -477,24 +469,23 @@ void GraphBuilder::updateDeformationGraph(const ActiveWindowOutput& input) {
       std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
   auto interface = PgmoMeshLayerInterface(input.map().getMeshLayer());
 
-  pcl::PointCloud<pcl::PointXYZRGBA> new_vertices;
-  std::vector<size_t> new_indices;
-  std::vector<pcl::Vertices> new_triangles;
+  std::vector<size_t> new_idx;
+  std::vector<pcl::Vertices> new_faces;
   kimera_pgmo::HashedIndexMapping new_remapping;
+  pcl::PointCloud<pcl::PointXYZRGBA> new_vertices;
   deformation_compression_->pruneStoredMesh(time_s - config.pgmo.time_horizon);
   deformation_compression_->compressAndIntegrate(
-      interface, new_vertices, new_triangles, new_indices, new_remapping, time_s);
+      interface, new_vertices, new_faces, new_idx, new_remapping, time_s);
 
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
       new pcl::PointCloud<pcl::PointXYZRGBA>());
   deformation_compression_->getVertices(vertices);
 
   // Add nodes and edges to graph
-  const auto new_edges =
-      deformation_graph_.addPointsAndSurfaces(new_indices, new_triangles);
-  if (backend_input_) {
-    backend_input_->deformation_graph = *CHECK_NOTNULL(kimera_pgmo::makePoseGraph(
-        prefix.id, time_s, new_edges, new_indices, *vertices));
+  const auto new_edges = deformation_graph_.addPointsAndSurfaces(new_idx, new_faces);
+  if (curr_output_) {
+    curr_output_->deformation_graph =
+        kimera_pgmo::makePoseGraph(prefix.id, time_s, new_edges, new_idx, *vertices);
   }
 }
 
@@ -542,23 +533,19 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
   ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
 
   PoseGraphPacket packet;
   while (!pose_graph_updates_.empty()) {
     packet.updateFrom(pose_graph_updates_.pop());
   }
 
-  if (backend_input_) {
-    backend_input_->agent_updates = packet;
-  }
+  curr_output_->agent_updates = packet;
 
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   // TODO(nathan) thinking about locking more
   std::lock_guard<std::mutex> lock(dsg_->mutex);
   const auto new_node_ids = packet.addToGraph(*dsg_->graph, prefix.id);
-  if (lcd_input_) {
-    lcd_input_->new_agent_nodes = new_node_ids;
-  }
+  curr_output_->new_agent_nodes = new_node_ids;
 }
 
 }  // namespace hydra

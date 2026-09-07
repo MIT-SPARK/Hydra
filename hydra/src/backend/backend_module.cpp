@@ -343,24 +343,28 @@ void BackendModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
-void BackendModule::updateFactorGraph(const BackendInput& input) {
+void BackendModule::updateFactorGraph(const FrontendOutput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
   const size_t prev_loop_closures = num_loop_closures_;
-  status_log_.back().new_graph_factors = input.deformation_graph.edges.size();
-  status_log_.back().new_factors += input.deformation_graph.edges.size();
+  if (input.deformation_graph) {
+    status_log_.back().new_graph_factors = input.deformation_graph->edges.size();
+    status_log_.back().new_factors += input.deformation_graph->edges.size();
+  } else {
+    status_log_.back().new_graph_factors = 0;
+  }
 
   std::vector<size_t> inc_mesh_indices;
   std::vector<uint64_t> inc_mesh_index_stamps;
 
-  if (!input.deformation_graph.nodes.empty() &&
-      !input.deformation_graph.edges.empty()) {
+  if (input.deformation_graph && !input.deformation_graph->nodes.empty() &&
+      !input.deformation_graph->edges.empty()) {
     try {
-      processIncrementalMeshGraph(input.deformation_graph,
+      processIncrementalMeshGraph(*input.deformation_graph,
                                   timestamps_,
                                   inc_mesh_indices,
                                   inc_mesh_index_stamps);
     } catch (const gtsam::ValuesKeyDoesNotExist& e) {
-      LOG(ERROR) << input.deformation_graph;
+      LOG(ERROR) << *input.deformation_graph;
       throw std::logic_error(e.what());
     }
   } else {
@@ -437,7 +441,7 @@ bool BackendModule::updateFromLcdQueue() {
   return added_new_loop_closure;
 }
 
-void BackendModule::copyMeshDelta(const BackendInput& input) {
+void BackendModule::copyMeshDelta(const FrontendOutput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
   if (!input.mesh_update) {
     LOG(WARNING) << "[Hydra Backend] invalid mesh update!";

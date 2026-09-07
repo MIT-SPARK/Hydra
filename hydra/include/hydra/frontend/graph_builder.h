@@ -42,18 +42,17 @@
 #include <mutex>
 #include <thread>
 
-#include "hydra/backend/backend_input.h"
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
+#include "hydra/frontend/frontend_output.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/frontend/graph_connector.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_place_extractor.h"
 #include "hydra/frontend/view_database.h"
-#include "hydra/loop_closure/lcd_input.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/logging.h"
 
@@ -71,10 +70,14 @@ class GraphBuilder : public Module {
  public:
   using Ptr = std::shared_ptr<GraphBuilder>;
   using InputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
+  using OutputQueue = MessageQueue<FrontendOutput::ConstPtr>;
   using InputCallback = std::function<void(const ActiveWindowOutput&)>;
-  using Sink = OutputSink<uint64_t, const spark_dsg::SceneGraph&, const BackendInput&>;
+  using Sink =
+      OutputSink<uint64_t, const spark_dsg::SceneGraph&, const FrontendOutput&>;
 
   struct Config : public VerbosityConfig {
+    Config();
+
     struct DeformationConfig {
       double mesh_resolution = 0.1;
       double d_graph_resolution = 1.5;
@@ -121,7 +124,7 @@ class GraphBuilder : public Module {
 
   void addSink(const Sink::Ptr& sink);
 
-  void setLcdQueue(const MessageQueue<LcdInput::Ptr>::Ptr& queue);
+  void setLcdQueue(const OutputQueue::Ptr& queue);
 
  protected:
   void addInputCallback(InputCallback callback);
@@ -155,17 +158,15 @@ class GraphBuilder : public Module {
   void processNextInput(const ActiveWindowOutput& msg);
 
  protected:
+  InputQueue::Ptr queue_;
   uint64_t sequence_number_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
-  InputQueue::Ptr queue_;
   std::atomic<bool> spin_finished_;
-
-  LcdInput::Ptr lcd_input_;
-  BackendInput::Ptr backend_input_;
 
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
+  FrontendOutput::Ptr curr_output_;
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;
   std::shared_ptr<kimera_pgmo::MeshDelta> last_mesh_update_;
 
@@ -187,7 +188,7 @@ class GraphBuilder : public Module {
 
   spark_dsg::SceneGraphLogger frontend_graph_logger_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
-  MessageQueue<LcdInput::Ptr>::Ptr lcd_input_queue_;
+  OutputQueue::Ptr lcd_input_queue_;
 
   Sink::List sinks_;
 

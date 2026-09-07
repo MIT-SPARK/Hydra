@@ -37,7 +37,6 @@
 #include <spark_dsg/scene_graph.h>
 
 #include <Eigen/Geometry>
-#include <list>
 #include <memory>
 #include <optional>
 
@@ -45,6 +44,8 @@ namespace hydra {
 
 struct PoseGraphPacket {
   using Ptr = std::shared_ptr<PoseGraphPacket>;
+  using NodeList = std::vector<spark_dsg::NodeId>;
+
   //! current update
   uint64_t timestamp_ns;
   //! pose graph updates
@@ -52,12 +53,12 @@ struct PoseGraphPacket {
   //! external optimization priors
   pose_graph_tools::PoseGraph::ConstPtr external_priors;
 
-  //! @brief Merge two update packets
+  //! Merge two update packets
   void updateFrom(const PoseGraphPacket& other);
 
-  //! @brief Add all pose graph nodes and edges to graph
-  std::vector<spark_dsg::NodeId> addToGraph(
-      spark_dsg::SceneGraph& graph, std::optional<int> robot_id = std::nullopt) const;
+  //! Add all pose graph nodes and edges to graph
+  NodeList addToGraph(spark_dsg::SceneGraph& graph,
+                      std::optional<int> robot_id = std::nullopt) const;
 };
 
 struct PoseGraphTracker {
