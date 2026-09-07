@@ -76,6 +76,9 @@ struct BackendModuleStatus {
   std::optional<double> last_mesh_update_s = 0.0;
 };
 
+// TODO(nathan) drop this shim typedef when khronos is updated
+using BackendInput = FrontendOutput;
+
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
   using Ptr = std::shared_ptr<BackendModule>;
