@@ -24,6 +24,7 @@ add_executable(
   common/test_partial_graph.cpp
   common/test_shared_dsg_info.cpp
   frontend/test_graph_connector.cpp
+  frontend/test_mesh_compression.cpp
   frontend/test_mesh_segmenter.cpp
   frontend/test_view_selector.cpp
   input/test_camera.cpp

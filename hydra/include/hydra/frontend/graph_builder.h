@@ -54,13 +54,13 @@
 #include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
-class DeltaCompression;
 class MeshDelta;
 }  // namespace kimera_pgmo
 
 namespace hydra {
 
 struct VolumetricWindow;
+class MeshCompression;
 
 class GraphBuilder : public Module {
  public:
@@ -154,7 +154,7 @@ class GraphBuilder : public Module {
 
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;
   std::shared_ptr<kimera_pgmo::MeshDelta> last_mesh_update_;
-  std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
+  std::unique_ptr<MeshCompression> mesh_compression_;
 
   GraphUpdater graph_updater_;
   GraphConnector graph_connector_;

@@ -38,7 +38,6 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
@@ -48,6 +47,7 @@
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/keyframe_selector.h"
+#include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
@@ -115,7 +115,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       dsg_(dsg),
       state_(state),
-      mesh_compression_(new kimera_pgmo::DeltaCompression(config.mesh_resolution)),
+      mesh_compression_(new MeshCompression(config.mesh_resolution)),
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
@@ -366,25 +366,16 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
-  {  // start timing scope
-    ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
-    // TODO(nathan) add this back when we fix the khronos active window
-    // const auto pose = input.world_T_body();
-    // const auto block_size = input.map().blockSize();
-    const spatial_hash::IndexSet archived(input.archived.begin(), input.archived.end());
-    mesh_compression_->archiveBlocks([&](const auto& index, const auto& /* info */) {
-      return archived.count(index);
-    });
-  }  // end timing scope
-
-  const auto& mesh = input.map().getMeshLayer();
-
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    MLOG(2) << "Updating mesh with " << mesh.numBlocks() << " blocks";
-    const BlockMeshIter wrapper(mesh);
-    last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
-  }  // end timing scope
+    last_mesh_update_ = mesh_compression_->update(
+        input.map(), input.timestamp_ns, [&](const MeshCompression::Vertex& vertex) {
+          return map_window_ && !map_window_->inBounds(input.timestamp_ns,
+                                                       input.world_T_body(),
+                                                       vertex.traits.stamp,
+                                                       vertex.pos.cast<double>());
+        });
+  }
 
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
