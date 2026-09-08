@@ -352,9 +352,9 @@ void MeshCompression::appendDeltaFaces(const std::vector<bool>& archivable,
     if (archive_face) {
       // Remaining endpoints support immutable faces. Keep remapping them, but
       // never merge new geometry into them or clear them using future TSDF data.
-      for (const auto i : face) {
-        vertices_[i].frozen = true;
-      }
+      vertices_[face[0]].frozen = true;
+      vertices_[face[1]].frozen = true;
+      vertices_[face[2]].frozen = true;
     } else {
       faces_[active_count++] = {{mapped[0] - archived_count,
                                  mapped[1] - archived_count,
@@ -381,7 +381,8 @@ void MeshCompression::retainActiveVertices(const UpdateState& state,
 void MeshCompression::updateTracking(const MeshDelta& delta) {
   tracking_.prev_active_vertices = delta.getNumActiveVertices();
   tracking_.prev_active_faces = delta.getNumActiveFaces();
-  if (++tracking_.sequence_number == 0) {
+  ++tracking_.sequence_number;
+  if (tracking_.sequence_number == 0) {
     tracking_.sequence_number = 1;
   }
 }
@@ -398,14 +399,13 @@ MeshDelta::Ptr MeshCompression::update(const VolumetricMap& map,
   findUnusedVertices(state);
   const auto archivable = findArchivableVertices(state, archive);
 
-  const auto info = MeshDelta::TrackingInfo::with_remap(tracking_.sequence_number,
-                                                        tracking_.prev_active_vertices,
-                                                        tracking_.prev_active_faces);
-  auto delta = std::make_unique<MeshDelta>(info);
+  tracking_.prev_to_curr = std::make_shared<std::map<size_t, size_t>>();
+  auto delta = std::make_unique<MeshDelta>(tracking_);
+  delta->timestamp_ns = timestamp_ns;
+
   const auto remap = appendDeltaVertices(state, archivable, *delta);
   appendDeltaFaces(archivable, remap, *delta);
   retainActiveVertices(state, archivable);
-  delta->timestamp_ns = timestamp_ns;
   updateTracking(*delta);
   return delta;
 }
