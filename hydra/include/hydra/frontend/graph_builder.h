@@ -141,8 +141,6 @@ class GraphBuilder : public Module {
 
   void updatePlaces2d(const ActiveWindowOutput& msg);
 
-  void updatePoseGraph(const ActiveWindowOutput& msg);
-
  protected:
   InputQueue::Ptr queue_;
   uint64_t sequence_number_;

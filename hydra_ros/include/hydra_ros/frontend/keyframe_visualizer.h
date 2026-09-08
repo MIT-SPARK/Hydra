@@ -33,64 +33,41 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
-
-#include <memory>
-
-#include "hydra/common/output_sink.h"
-#include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/frontend/view_selector.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+#include <config_utilities/dynamic_config.h>
+#include <hydra/frontend/keyframe_selector.h>
+#include <hydra_visualizer/utils/marker_group_pub.h>
+#include <ianvs/node_handle.h>
 
 namespace hydra {
 
-class KeyframeSelector : public GraphBuilderFunctor {
+class KeyframeVisualizer : public KeyframeSelector::Sink {
  public:
-  using Keyframes = std::list<InputData::ConstPtr>;
-  using Sink = OutputSink<uint64_t, const Keyframes&>;
-
-  struct Config : public VerbosityConfig {
-    Config();
-
-    //! Method for extracting pose graph from incoming poses
-    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
-    //! Method to control mapping from views to resulting feature
-    std::string view_selection_method = "average";
-    //! Amount to inflate field-of-view by
-    double inflation_distance = 0.0;
-    //! Layers to assign views for
-    std::vector<std::string> layers{spark_dsg::DsgLayers::PLACES,
-                                    spark_dsg::DsgLayers::MESH_PLACES};
-    //! Output sinks and visualization
-    std::vector<Sink::Factory> sinks;
+  struct Config {
+    //! ROS namespace for sink
+    std::string ns = "~/keyframes";
+    //! Distance from position that the image plane is draw
+    double far_distance = 1.0;
+    //! Marker line width
+    double line_width = 0.01;
+    //! Color to use
+    spark_dsg::Color color = spark_dsg::Color::blue();
+    //! Alpha for image plane
+    double image_plane_alpha = 0.1;
+    //! Draw image plane for both viewing directions
+    bool draw_both_image_plane_sides = true;
   } const config;
 
-  KeyframeSelector(const Config& config);
+  KeyframeVisualizer(const Config& config);
 
-  void call(const ActiveWindowOutput& msg,
-            SharedDsgInfo& dsg,
-            FrontendOutput& output,
-            const VolumetricWindow* window) override;
+  void call(uint64_t timestamp_ns,
+            const KeyframeSelector::Keyframes& frames) const override;
 
-  void callPostUpdate(SharedDsgInfo& dsg, FrontendOutput& output) override;
-
- protected:
-  void archiveKeyframes(const ActiveWindowOutput& output,
-                        const VolumetricWindow& window);
-
-  size_t assignLayerFeatures(const spark_dsg::SceneGraphLayer& layer,
-                             const std::vector<FeatureView>& views,
-                             ActiveWindowTracker& active) const;
-
-  Sink::List sinks_;
-  std::unique_ptr<PoseGraphTracker> tracker_;
-  std::unique_ptr<ViewSelector> view_selector_;
-
-  std::list<InputData::ConstPtr> keyframes_;
-  mutable std::map<std::string, ActiveWindowTracker> active_window_;
+ private:
+  ianvs::NodeHandle nh_;
+  MarkerGroupPub pubs_;
+  config::DynamicConfig<Config> config_;
 };
 
-void declare_config(KeyframeSelector::Config& config);
+void declare_config(KeyframeVisualizer::Config& config);
 
 }  // namespace hydra

@@ -4,136 +4,101 @@
 #include <config_utilities/factory.h>
 #include <glog/logging.h>
 
-#include "hydra/input/sensor.h"
+#include "hydra/input/input_data.h"
 
 namespace hydra {
+namespace {
 
-using spark_dsg::PlaceNodeAttributes;
+static const auto closest_reg =
+    config::Registration<ViewSelector, ClosestViewSelector>("closest");
+
+static const auto average_reg =
+    config::Registration<ViewSelector, AverageViewSelector>("average");
+
+}  // namespace
+
 using spark_dsg::SemanticNodeAttributes;
 
-FeatureView::FeatureView(uint64_t timestamp_ns,
-                         const Eigen::Isometry3d& sensor_T_world,
-                         const FeatureVector& feature,
-                         const Sensor* sensor)
-    : timestamp_ns(timestamp_ns),
-      sensor_T_world(sensor_T_world),
-      feature(feature),
-      sensor_(sensor) {
-  CHECK(sensor_);
-}
-
-const Sensor& FeatureView::sensor() const { return *sensor_; }
+FeatureView::FeatureView(const InputData& data)
+    : sensor(data.getSensor()),
+      feature(data.feature),
+      range_image(data.range_image),
+      sensor_T_world(data.getSensorPose().inverse()) {}
 
 bool FeatureView::pointInView(const Eigen::Vector3d& point_w,
-                              float inflation_distance,
+                              float max_range_difference_m,
                               Eigen::Vector3d* point_s) const {
   const Eigen::Vector3d p_s = (sensor_T_world * point_w);
   if (point_s) {
     *point_s = p_s;
   }
 
-  return sensor_->pointIsInViewFrustum(p_s.cast<float>(), inflation_distance);
+  float u = 0.0;
+  float v = 0.0;
+  if (!sensor.projectPointToImagePlane(p_s.cast<float>(), u, v)) {
+    return false;
+  }
+
+  const auto r = std::round(u);
+  const auto c = std::round(v);
+  if (c < 0 || c >= range_image.cols || r < 0 || r >= range_image.rows) {
+    return false;
+  }
+
+  const auto range = range_image.at<InputData::RangeType>(v, u);
+  if (range < 1.0e-6f || !std::isfinite(range)) {
+    return false;
+  }
+
+  // This is positive if the point is occluded by the observed range image
+  const auto diff = p_s.norm() - range;
+  return diff < max_range_difference_m;
 }
 
-struct BoundaryViewSelector : ViewSelector {
-  void selectFeature(const FeatureList& views,
-                     float inflation_distance,
-                     SemanticNodeAttributes& attrs) const override {
-    double min_dist = std::numeric_limits<double>::max();
-    const FeatureView* best_view = nullptr;
-    for (const auto& view : views) {
-      if (!view) {
-        continue;
-      }
-
-      Eigen::Vector3d p_s;
-      if (!view->pointInView(attrs.position, inflation_distance, &p_s)) {
-        continue;
-      }
-
-      // heuristic to pick the view that's closest to the boundary of the free-space
-      // sphere
-      auto derived = dynamic_cast<PlaceNodeAttributes*>(&attrs);
-      double radius = derived ? derived->distance : 0.0;
-      const auto dist = std::abs(radius - p_s.norm());
-      if (dist < min_dist) {
-        attrs.semantic_feature = view->feature;
-        best_view = view.get();
-        min_dist = dist;
-      }
+void ClosestViewSelector::selectFeature(const FeatureList& views,
+                                        float inflation_distance,
+                                        SemanticNodeAttributes& attrs) const {
+  const FeatureView* best_view = nullptr;
+  double min_dist = std::numeric_limits<double>::max();
+  for (const auto& view : views) {
+    Eigen::Vector3d p_s;
+    if (!view.pointInView(attrs.position, inflation_distance, &p_s)) {
+      continue;
     }
 
-    if (best_view) {
-      attrs.semantic_feature = best_view->feature;
+    // norm of position in sensor frame is distance in world frame
+    const auto dist = p_s.norm();
+    if (dist < min_dist) {
+      best_view = &view;
+      min_dist = dist;
     }
   }
 
-  inline static const auto registration_ =
-      config::Registration<ViewSelector, BoundaryViewSelector>("boundary");
-};
+  if (best_view) {
+    attrs.semantic_feature = best_view->feature;
+  }
+}
 
-struct ClosestViewSelector : ViewSelector {
-  void selectFeature(const FeatureList& views,
-                     float inflation_distance,
-                     SemanticNodeAttributes& attrs) const override {
-    const FeatureView* best_view = nullptr;
-    double min_dist = std::numeric_limits<double>::max();
-    for (const auto& view : views) {
-      if (!view) {
-        continue;
-      }
-
-      Eigen::Vector3d p_s;
-      if (!view->pointInView(attrs.position, inflation_distance, &p_s)) {
-        continue;
-      }
-
-      // norm of position in sensor frame is distance in world frame
-      const auto dist = p_s.norm();
-      if (dist < min_dist) {
-        best_view = view.get();
-        min_dist = dist;
-      }
+void AverageViewSelector::selectFeature(const FeatureList& views,
+                                        float inflation_distance,
+                                        SemanticNodeAttributes& attrs) const {
+  size_t num_visible = 0;
+  for (const auto& view : views) {
+    if (!view.pointInView(attrs.position, inflation_distance)) {
+      continue;
     }
 
-    if (best_view) {
-      attrs.semantic_feature = best_view->feature;
+    if (!num_visible) {
+      attrs.semantic_feature = view.feature;
+    } else {
+      attrs.semantic_feature += view.feature;
     }
+    ++num_visible;
   }
 
-  inline static const auto registration_ =
-      config::Registration<ViewSelector, ClosestViewSelector>("closest");
-};
-
-struct FusionViewSelector : ViewSelector {
-  void selectFeature(const FeatureList& views,
-                     float inflation_distance,
-                     SemanticNodeAttributes& attrs) const override {
-    size_t num_visible = 0;
-    for (const auto& view : views) {
-      if (!view) {
-        continue;
-      }
-
-      if (!view->pointInView(attrs.position, inflation_distance)) {
-        continue;
-      }
-
-      if (!num_visible) {
-        attrs.semantic_feature = view->feature;
-      } else {
-        attrs.semantic_feature += view->feature;
-      }
-      ++num_visible;
-    }
-
-    if (num_visible > 0) {
-      attrs.semantic_feature /= num_visible;
-    }
+  if (num_visible > 0) {
+    attrs.semantic_feature /= num_visible;
   }
-
-  inline static const auto registration_ =
-      config::Registration<ViewSelector, FusionViewSelector>("fusion");
-};
+}
 
 }  // namespace hydra

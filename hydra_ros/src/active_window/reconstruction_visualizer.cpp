@@ -200,11 +200,13 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
 
   publishMesh(config, output);
 
-  if (output.sensor_data) {
+  if (!output.sensor_data.empty()) {
+    const auto& data = *output.sensor_data.back();
+
     std_msgs::msg::Header header;
     header.stamp = rclcpp::Time(output.timestamp_ns);
     header.frame_id = GlobalInfo::instance().getFrames().map;
-    const auto sensor_name = output.sensor_data->getSensor().name;
+    const auto sensor_name = data.getSensor().name;
 
     DisplayConfig display_config;
     const auto display = sensor_displays_.get(sensor_name);
@@ -215,8 +217,8 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
     image_pubs_.publish(sensor_name + "/labels", [&]() {
       return makeOverlayImage(
           header,
-          output.sensor_data->label_image,
-          output.sensor_data->color_image,
+          data.label_image,
+          data.color_image,
           [this](const cv::Mat& img, int r, int c) {
             return label_colormap_(img.at<int32_t>(r, c));
           },
@@ -224,22 +226,22 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
     });
 
     image_pubs_.publish(sensor_name + "/range", [&]() {
-      return makeDistImage(header, output.sensor_data->range_image, display_config);
+      return makeDistImage(header, data.range_image, display_config);
     });
 
     cloud_pubs_.publish(sensor_name + "/pointcloud", [&]() {
-      return makeCloud(header, *output.sensor_data, config.filter_points_by_range);
+      return makeCloud(header, data, config.filter_points_by_range);
     });
 
-    if (!output.sensor_data->color_image.empty()) {
+    if (!data.color_image.empty()) {
       image_pubs_.publish(sensor_name + "/color", [&]() {
-        return convertImage(header, output.sensor_data->color_image, display_config);
+        return convertImage(header, data.color_image, display_config);
       });
     }
 
-    if (!output.sensor_data->depth_image.empty()) {
+    if (!data.depth_image.empty()) {
       image_pubs_.publish(sensor_name + "/depth", [&]() {
-        return makeDistImage(header, output.sensor_data->depth_image, display_config);
+        return makeDistImage(header, data.depth_image, display_config);
       });
     }
   }

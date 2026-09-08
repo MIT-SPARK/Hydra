@@ -43,6 +43,7 @@
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/global_info.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
+#include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;
@@ -65,7 +66,10 @@ void declare_config(KeyframeSelector::Config& config) {
   base<VerbosityConfig>(config);
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
-  field(config.view_database, "view_database");
+  field(config.view_selection_method, "view_selection_method");
+  field(config.inflation_distance, "inflation_distance");
+  field(config.layers, "layers");
+  field(config.sinks, "sinks");
 }
 
 KeyframeSelector::Config::Config()
@@ -74,8 +78,13 @@ KeyframeSelector::Config::Config()
 
 KeyframeSelector::KeyframeSelector(const Config& config)
     : config(config::checkValid(config)),
+      sinks_(Sink::instantiate(config.sinks)),
       tracker_(config.pose_graph_tracker.create()),
-      view_database_(config.view_database) {}
+      view_selector_(config::create<ViewSelector>(config.view_selection_method)) {
+  for (const auto& layer : config.layers) {
+    active_window_.emplace(layer, ActiveWindowTracker());
+  }
+}
 
 void KeyframeSelector::call(const ActiveWindowOutput& input,
                             SharedDsgInfo& dsg,
@@ -92,34 +101,100 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
   for (const auto& data : input.sensor_data) {
     const auto curr_packet = tracker_->update(data->timestamp_ns, data->world_T_body);
     packet.updateFrom(curr_packet);
+    keyframes_.push_back(data);
   }
 
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
 
-  // TODO(nathan) thinking about locking more
-  std::lock_guard<std::mutex> lock(dsg.mutex);
-  const auto new_node_ids = packet.addToGraph(*dsg.graph, prefix.id);
+  {  // critical section for updating graph and output
+    std::lock_guard<std::mutex> lock(dsg.mutex);
+    const auto new_node_ids = packet.addToGraph(*dsg.graph, prefix.id);
 
-  output.agent_updates = packet;
-  output.new_agent_nodes = new_node_ids;
+    output.agent_updates = packet;
+    output.new_agent_nodes = new_node_ids;
+  }
+
+  // MLOG(2) << "Got " << new_views << " new views!";
+  // TODO(nathan) actually do keyframing
+
+  if (window) {
+    archiveKeyframes(input, *window);
+  }
+
+  Sink::callAll(sinks_, input.timestamp_ns, keyframes_);
 }
 
-void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput& output) {
-  view_database_.updateAssignments(
-      *dsg.graph,
-      [&](const Eigen::Vector3d& pos, uint64_t timestamp) { return false; });
+void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
+                                        const VolumetricWindow& window) {
+  auto iter = keyframes_.begin();
+  while (iter != keyframes_.end()) {
+    const auto& frame = *iter;
+
+    const Eigen::Vector3d pos = frame->world_T_body.translation();
+    const auto stamp = frame->timestamp_ns;
+
+    const auto fmt = getDefaultFormat(3);
+    MLOG(3) << "view @ " << stamp << "[ns]: " << pos.format(fmt) << " vs. "
+            << msg.world_T_body().translation().format(fmt);
+
+    if (!window.inBounds(msg.timestamp_ns, msg.world_T_body(), stamp, pos)) {
+      MLOG(3) << "Archived keyframe @ " << stamp << " [ns]";
+      iter = keyframes_.erase(iter);
+      continue;
+    }
+
+    ++iter;
+  }
 }
 
-/*
-        if (!map_window_) {
-          return false;
-        }
+void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
+  if (!view_selector_) {
+    return;
+  }
 
-        const auto fmt = getDefaultFormat(3);
-        MLOG(2) << "view @ " << timestamp << "[ns]: " << pos.format(fmt) << " vs. "
-                << msg->world_T_body().translation().format(fmt);
-        return !map_window_->inBounds(
-            msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
-            */
+  if (keyframes_.empty()) {
+    MLOG(2) << "Skipping feature assignment without any active keyframes";
+    return;
+  }
+
+  MLOG(2) << "Assigning features with " << keyframes_.size() << " active keyframe(s)";
+  std::vector<FeatureView> views;
+  views.reserve(keyframes_.size());
+  for (const auto& frame : keyframes_) {
+    views.emplace_back(*frame);
+  }
+
+  for (auto& [name, layer_tracker] : active_window_) {
+    auto layer = dsg.graph->findLayer(name);
+    if (!layer) {
+      LOG(WARNING) << config.prefix << "Skipping unknown layer: '" << name << "'";
+      continue;
+    }
+
+    const auto num_assigned = assignLayerFeatures(*layer, views, layer_tracker);
+    MLOG(2) << "Assigned " << num_assigned << "features to nodes for layer '" << name
+            << "'";
+  }
+}
+
+size_t KeyframeSelector::assignLayerFeatures(const SceneGraphLayer& layer,
+                                             const std::vector<FeatureView>& views,
+                                             ActiveWindowTracker& active) const {
+  size_t num_assigned = 0;
+  active.clear();
+  const auto layer_view = active.view(layer);
+  for (const auto& node : layer_view) {
+    auto attrs = node.tryAttributes<SemanticNodeAttributes>();
+    if (!attrs) {
+      LOG(ERROR) << config.prefix << "Invalid node " << NodeSymbol(node.id).str();
+      continue;
+    }
+
+    ++num_assigned;
+    view_selector_->selectFeature(views, config.inflation_distance, *attrs);
+  }
+
+  return num_assigned;
+}
 
 }  // namespace hydra

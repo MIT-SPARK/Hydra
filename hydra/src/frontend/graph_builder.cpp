@@ -85,9 +85,8 @@ void declare_config(GraphBuilder::Config& config) {
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
 
-  // TODO(nathan) update configs with reasonable namespace
   config.keyframe_selector.setOptional();
-  field(config.keyframe_selector, "");
+  field(config.keyframe_selector, "keyframe_selector");
   config.deformation_graph_builder.setOptional();
   field(config.deformation_graph_builder, "deformation_graph_builder");
   config.freespace_places.setOptional();
@@ -134,8 +133,6 @@ GraphBuilder::GraphBuilder(const Config& config,
   dsg_->graph->setMesh(global_info.createMesh());
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updatePoseGraph, this, std::placeholders::_1));
 
   // TODO(nathan) this needs to be pushed to an actual config at some point
   functors_.emplace("keyframe_selector", config.keyframe_selector.create());
@@ -361,8 +358,10 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     graph_connector_.connect(*dsg_->graph);
   }
 
-  for (const auto& [_, functor] : functors_) {
-    functor->callPostUpdate(*dsg_, *curr_output_);
+  for (const auto& [name, functor] : functors_) {
+    if (functor) {
+      functor->callPostUpdate(*dsg_, *curr_output_);
+    }
   }
 }
 
