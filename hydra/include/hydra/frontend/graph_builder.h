@@ -51,7 +51,6 @@
 #include "hydra/frontend/graph_connector.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_place_extractor.h"
-#include "hydra/frontend/view_database.h"
 #include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
@@ -90,14 +89,12 @@ class GraphBuilder : public Module {
     MeshSegmenter::Config object_config;
     config::VirtualConfig<SurfacePlaceExtractor> surface_places;
 
+    config::VirtualConfig<GraphBuilderFunctor> keyframe_selector;
     config::VirtualConfig<GraphBuilderFunctor> deformation_graph_builder;
     config::VirtualConfig<GraphBuilderFunctor> freespace_places;
     config::VirtualConfig<GraphBuilderFunctor> traversability_places;
     config::VirtualConfig<GraphBuilderFunctor> frontier_places;
 
-    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
-    //! Keyframes for feature assignment
-    ViewDatabase::Config view_database;
     //! Output sinks and visualization
     std::vector<Sink::Factory> sinks;
   } const config;
@@ -147,9 +144,6 @@ class GraphBuilder : public Module {
   void updatePoseGraph(const ActiveWindowOutput& msg);
 
  protected:
-  void processNextInput(const ActiveWindowOutput& msg);
-
- protected:
   InputQueue::Ptr queue_;
   uint64_t sequence_number_;
   std::atomic<bool> should_shutdown_{false};
@@ -171,16 +165,9 @@ class GraphBuilder : public Module {
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
-
-  std::unique_ptr<GraphBuilderFunctor> deformation_graph_builder_;
-  std::unique_ptr<GraphBuilderFunctor> freespace_places_;
-  std::unique_ptr<GraphBuilderFunctor> traversability_places_;
-  std::unique_ptr<GraphBuilderFunctor> frontier_places_;
-
-  ViewDatabase view_database_;
+  std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
 
   spark_dsg::SceneGraphLogger frontend_graph_logger_;
-  MessageQueue<PoseGraphPacket> pose_graph_updates_;
   OutputQueue::Ptr lcd_input_queue_;
 
   Sink::List sinks_;

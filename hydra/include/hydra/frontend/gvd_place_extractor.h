@@ -37,7 +37,6 @@
 
 #include <memory>
 
-#include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/places/gvd_places/graph_extractor.h"
@@ -78,15 +77,15 @@ class GvdPlaceExtractor : public GraphBuilderFunctor {
 
   void call(const ActiveWindowOutput& msg,
             SharedDsgInfo& graph,
-            FrontendOutput& output) override;
+            FrontendOutput& output,
+            const VolumetricWindow* window) override;
 
-  void detect(const ActiveWindowOutput& msg);
+  void detect(const ActiveWindowOutput& msg, const VolumetricWindow* window = nullptr);
 
   void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
 
  protected:
   places::GvdLayer::Ptr gvd_;
-  std::unique_ptr<VolumetricWindow> map_window_;
   std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
   std::unique_ptr<places::GraphExtractor> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;

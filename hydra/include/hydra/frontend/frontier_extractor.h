@@ -3,7 +3,6 @@
 #include <pcl/point_types.h>
 #include <spatial_hash/types.h>
 
-#include "hydra/active_window/volumetric_window.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
@@ -54,9 +53,12 @@ class FrontierExtractor : public GraphBuilderFunctor {
 
   void call(const ActiveWindowOutput& msg,
             SharedDsgInfo& dsg,
-            FrontendOutput&) override;
+            FrontendOutput&,
+            const VolumetricWindow*) override;
 
-  void updateRecentBlocks(const Eigen::Vector3d& current_position, double block_size);
+  void updateRecentBlocks(const Eigen::Vector3d& current_position,
+                          double block_size,
+                          const VolumetricWindow* window);
 
   void detectFrontiers(const ActiveWindowOutput& input,
                        spark_dsg::SceneGraph& graph,
@@ -71,7 +73,6 @@ class FrontierExtractor : public GraphBuilderFunctor {
   TsdfLayer::Ptr tsdf_;
   spatial_hash::IndexSet just_archived_blocks_;
   spatial_hash::IndexSet recently_archived_blocks_;
-  std::unique_ptr<VolumetricWindow> map_window_;
 
   std::unique_ptr<NearestNodeFinder> place_finder_;
   std::vector<Frontier> frontiers_;

@@ -165,10 +165,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
     mesh_integrator_->generateMesh(map_, true, true);
   }  // timing scope
 
-  auto output = std::make_shared<ActiveWindowOutput>();
-  output->timestamp_ns = data->timestamp_ns;
-  output->sensor_data = data;
-
+  auto output = std::make_shared<ActiveWindowOutput>(data);
   if (map_window_) {
     // this comes before clearing the update flag as we don't archive updated blocks
     output->archived = map_window_->archiveBlocks(stamp, data->world_T_body, map_);

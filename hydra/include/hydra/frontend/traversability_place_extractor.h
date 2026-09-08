@@ -68,7 +68,8 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
 
   void call(const ActiveWindowOutput& msg,
             SharedDsgInfo& dsg,
-            FrontendOutput& output) override;
+            FrontendOutput& output,
+            const VolumetricWindow* window) override;
 
   void detect(const ActiveWindowOutput& msg);
 

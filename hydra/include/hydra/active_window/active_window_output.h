@@ -48,13 +48,13 @@ namespace hydra {
 struct ActiveWindowOutput {
   using Ptr = std::shared_ptr<ActiveWindowOutput>;
 
-  ActiveWindowOutput() = default;
+  explicit ActiveWindowOutput(const InputData::ConstPtr& sensor_data);
   virtual ~ActiveWindowOutput() = default;
 
   //! Timestamp of update
   uint64_t timestamp_ns;
   //! Sensor data from last update
-  InputData::ConstPtr sensor_data;
+  std::vector<InputData::ConstPtr> sensor_data;
   //! New nodes to add to the scene graph
   GraphUpdate graph_update;
   //! Archived blocks on this pass
@@ -88,7 +88,11 @@ struct ActiveWindowOutput {
    */
   template <typename T = double>
   Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
-    return sensor_data->world_T_body.cast<T>();
+    if (sensor_data.empty()) {
+      throw std::runtime_error("Invalid active window output; no sensor data");
+    }
+
+    return sensor_data.front()->world_T_body.cast<T>();
   }
 
  protected:

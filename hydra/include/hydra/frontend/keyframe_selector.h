@@ -33,25 +33,40 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
 
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/common/shared_dsg_info.h"
-#include "hydra/frontend/frontend_output.h"
+#include <memory>
+
+#include "hydra/frontend/graph_builder_functor.h"
+#include "hydra/frontend/view_database.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
-struct VolumetricWindow;
-
-class GraphBuilderFunctor {
+class KeyframeSelector : public GraphBuilderFunctor {
  public:
-  virtual ~GraphBuilderFunctor() = default;
+  struct Config : public VerbosityConfig {
+    Config();
 
-  virtual void call(const ActiveWindowOutput& msg,
-                    SharedDsgInfo& dsg,
-                    FrontendOutput& output,
-                    const VolumetricWindow* window) = 0;
+    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
+    //! Keyframes for feature assignment
+    ViewDatabase::Config view_database;
+  } const config;
 
-  virtual void callPostUpdate(SharedDsgInfo& /* dsg */, FrontendOutput& /* output */) {}
+  KeyframeSelector(const Config& config);
+
+  void call(const ActiveWindowOutput& msg,
+            SharedDsgInfo& dsg,
+            FrontendOutput& output,
+            const VolumetricWindow* window) override;
+
+  void callPostUpdate(SharedDsgInfo& dsg, FrontendOutput& output) override;
+
+ protected:
+  std::unique_ptr<PoseGraphTracker> tracker_;
+  ViewDatabase view_database_;
 };
+
+void declare_config(KeyframeSelector::Config& config);
 
 }  // namespace hydra

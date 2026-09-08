@@ -32,82 +32,94 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/deformation_graph_builder.h"
+#include "hydra/frontend/keyframe_selector.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/compression/block_compression.h>
-#include <kimera_pgmo/utils/common_functions.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/printing.h>
 
+#include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/global_info.h"
-#include "hydra/utils/pgmo_mesh_interface.h"
+#include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;
-using Vertices = pcl::PointCloud<pcl::PointXYZRGBA>;
-using kimera_pgmo::makePoseGraph;
 
 namespace hydra {
 namespace {
 
 static const auto registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
-                                   DeformationGraphBuilder,
-                                   DeformationGraphBuilder::Config>(
-        "DeformationGraphBuilder");
+                                   KeyframeSelector,
+                                   KeyframeSelector::Config>("KeyframeSelector");
 
 }
 
 using hydra::timing::ScopedTimer;
 
-void declare_config(DeformationGraphBuilder::Config& config) {
+void declare_config(KeyframeSelector::Config& config) {
   using namespace config;
-  name("DeformationGraphBuilder::Config");
+  name("KeyframeSelector::Config");
   base<VerbosityConfig>(config);
-  field(config.resolution, "resolution", "m");
-  field(config.horizon_s, "horizon_s", "s");
-  check(config.resolution, GT, 0.0, "resolution");
-  check(config.horizon_s, GT, 0.0, "horizon_s");
+  config.pose_graph_tracker.setOptional();
+  field(config.pose_graph_tracker, "pose_graph_tracker");
+  field(config.view_database, "view_database");
 }
 
-DeformationGraphBuilder::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("dgraph_compression")) {}
+KeyframeSelector::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("keyframes")),
+      pose_graph_tracker(PoseGraphFromOdom::Config()) {}
 
-DeformationGraphBuilder::DeformationGraphBuilder(const Config& config)
+KeyframeSelector::KeyframeSelector(const Config& config)
     : config(config::checkValid(config)),
-      compression_(new kimera_pgmo::BlockCompression(config.resolution)) {}
+      tracker_(config.pose_graph_tracker.create()),
+      view_database_(config.view_database) {}
 
-DeformationGraphBuilder::~DeformationGraphBuilder() = default;
+void KeyframeSelector::call(const ActiveWindowOutput& input,
+                            SharedDsgInfo& dsg,
+                            FrontendOutput& output,
+                            const VolumetricWindow* window) {
+  if (!tracker_) {
+    LOG_FIRST_N(WARNING, 1) << "pose graph tracking disabled";
+    return;
+  }
 
-void DeformationGraphBuilder::call(const ActiveWindowOutput& input,
-                                   SharedDsgInfo& dsg,
-                                   FrontendOutput& output,
-                                   const VolumetricWindow*) {
-  using namespace std::chrono;
+  ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
 
-  ScopedTimer timer("frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
-  const auto time_ns = nanoseconds(input.timestamp_ns);
-  const auto time_s = duration_cast<duration<double>>(time_ns).count();
-  compression_->pruneStoredMesh(time_s - config.horizon_s);
-
-  std::vector<size_t> indices;
-  std::vector<pcl::Vertices> faces;
-  kimera_pgmo::HashedIndexMapping remapping;
-  pcl::PointCloud<pcl::PointXYZRGBA> points;
-  auto mesh = PgmoMeshLayerInterface(input.map().getMeshLayer());
-  compression_->compressAndIntegrate(mesh, points, faces, indices, remapping, time_s);
-
-  Vertices::Ptr vertices(new Vertices());
-  compression_->getVertices(vertices);
+  PoseGraphPacket packet;
+  for (const auto& data : input.sensor_data) {
+    const auto curr_packet = tracker_->update(data->timestamp_ns, data->world_T_body);
+    packet.updateFrom(curr_packet);
+  }
 
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  const auto edges = graph_.addPointsAndSurfaces(indices, faces);
-  auto new_graph = makePoseGraph(prefix.id, time_s, edges, indices, *vertices);
 
-  // move deformation graph to output
+  // TODO(nathan) thinking about locking more
   std::lock_guard<std::mutex> lock(dsg.mutex);
-  output.deformation_graph = new_graph;
+  const auto new_node_ids = packet.addToGraph(*dsg.graph, prefix.id);
+
+  output.agent_updates = packet;
+  output.new_agent_nodes = new_node_ids;
 }
+
+void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput& output) {
+  view_database_.updateAssignments(
+      *dsg.graph,
+      [&](const Eigen::Vector3d& pos, uint64_t timestamp) { return false; });
+}
+
+/*
+        if (!map_window_) {
+          return false;
+        }
+
+        const auto fmt = getDefaultFormat(3);
+        MLOG(2) << "view @ " << timestamp << "[ns]: " << pos.format(fmt) << " vs. "
+                << msg->world_T_body().translation().format(fmt);
+        return !map_window_->inBounds(
+            msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
+            */
 
 }  // namespace hydra
