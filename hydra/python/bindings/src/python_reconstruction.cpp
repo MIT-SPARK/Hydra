@@ -91,14 +91,11 @@ class PythonReconstruction {
 
   void save(const std::filesystem::path& output);
 
-  const Sensor::ConstPtr sensor;
-
   Mesh::Ptr mesh() const;
 
-  std::string configString() const {
-    const auto global = config::toString(GlobalInfo::instance().getConfig());
-    return global + "\n" + config::toString(config);
-  }
+  std::string configString() const;
+
+  const Sensor::ConstPtr sensor;
 
  protected:
   SensorInputPacket::Ptr last_input_;
@@ -200,6 +197,13 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
     module_->map().save(logs.path() / "map");
     mesh()->save(logs.path() / "mesh.sparkdsg");
   }
+}
+
+Mesh::Ptr PythonReconstruction::mesh() const { return mesh_; }
+
+std::string PythonReconstruction::configString() const {
+  const auto global = config::toString(GlobalInfo::instance().getConfig());
+  return global + "\n" + config::toString(config);
 }
 
 namespace python_reconstruction {
