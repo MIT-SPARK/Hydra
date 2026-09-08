@@ -543,6 +543,7 @@ void BlockTraversabilityClustering::updatePlaceNodeAttributes(
     spark_dsg::TraversabilityNodeAttributes& attrs, const PlaceInfo& place) {
   // Boundary positions relative to the block origin.
   Boundary(place.boundary_info).toAttributes(attrs);
+  attrs.position.z() = current_robot_height_;
 
   // General attributes.
   attrs.last_update_time_ns = current_time_ns_;

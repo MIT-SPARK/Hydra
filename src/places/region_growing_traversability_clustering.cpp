@@ -363,6 +363,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
   const auto centroid_index = region.centroid.cast<int>();
   if (region.voxels.count(centroid_index)) {
     attrs.position = region.centroid.cast<double>() * layer.voxel_size;
+    attrs.position.z() = current_robot_height_;
   } else {
     // Centroid is not in the voxel set, pick the closest voxel to the centroid.
     // TODO(lschmid): Consider splitting up regions, as the resulting areas look bad if
@@ -377,6 +378,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
       }
     }
     attrs.position = closest_index.cast<double>() * layer.voxel_size;
+    attrs.position.z() = current_robot_height_;
   }
 
   // Compute the boundary from the exterior boundary voxels.
