@@ -33,9 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/odometry/pose_graph_tracker.h>
-
 #include <chrono>
+
+#include "hydra/odometry/pose_graph_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -46,7 +47,9 @@ struct StampedPose {
 
 class PoseGraphFromOdom : public PoseGraphTracker {
  public:
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config();
+
     //! @brief Minimum between pose norm to add new pose graph node
     double min_pose_separation = 0.5;
     //! @brief Weighting between rotation (frobenius) norm and translation (l2) norm

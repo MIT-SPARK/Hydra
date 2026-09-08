@@ -28,20 +28,20 @@ struct ViewSelector {
   using FeatureList = std::vector<FeatureView>;
 
   virtual ~ViewSelector() = default;
-  virtual void selectFeature(const FeatureList& views,
-                             float inflation_distance,
+  virtual bool selectFeature(const FeatureList& views,
+                             float max_range_difference_m,
                              spark_dsg::SemanticNodeAttributes& attrs) const = 0;
 };
 
 struct ClosestViewSelector : ViewSelector {
-  void selectFeature(const FeatureList& views,
-                     float inflation_distance,
+  bool selectFeature(const FeatureList& views,
+                     float max_range_difference_m,
                      spark_dsg::SemanticNodeAttributes& attrs) const override;
 };
 
 struct AverageViewSelector : ViewSelector {
-  void selectFeature(const FeatureList& views,
-                     float inflation_distance,
+  bool selectFeature(const FeatureList& views,
+                     float max_range_difference_m,
                      spark_dsg::SemanticNodeAttributes& attrs) const override;
 };
 

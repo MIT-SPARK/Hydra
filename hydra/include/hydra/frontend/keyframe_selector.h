@@ -57,8 +57,8 @@ class KeyframeSelector : public GraphBuilderFunctor {
     config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
     //! Method to control mapping from views to resulting feature
     std::string view_selection_method = "average";
-    //! Amount to inflate field-of-view by
-    double inflation_distance = 0.0;
+    //! Max range beyond range image
+    double max_range_difference_m = 0.1;
     //! Layers to assign views for
     std::vector<std::string> layers{spark_dsg::DsgLayers::PLACES,
                                     spark_dsg::DsgLayers::MESH_PLACES};
@@ -78,10 +78,6 @@ class KeyframeSelector : public GraphBuilderFunctor {
  protected:
   void archiveKeyframes(const ActiveWindowOutput& output,
                         const VolumetricWindow& window);
-
-  size_t assignLayerFeatures(const spark_dsg::SceneGraphLayer& layer,
-                             const std::vector<FeatureView>& views,
-                             ActiveWindowTracker& active) const;
 
   Sink::List sinks_;
   std::unique_ptr<PoseGraphTracker> tracker_;

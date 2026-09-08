@@ -67,7 +67,7 @@ void declare_config(KeyframeSelector::Config& config) {
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
   field(config.view_selection_method, "view_selection_method");
-  field(config.inflation_distance, "inflation_distance");
+  field(config.max_range_difference_m, "max_range_difference_m");
   field(config.layers, "layers");
   field(config.sinks, "sinks");
 }
@@ -97,13 +97,17 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
 
   ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
 
+  size_t num_added = 0;
   PoseGraphPacket packet;
   for (const auto& data : input.sensor_data) {
     const auto curr_packet = tracker_->update(data->timestamp_ns, data->world_T_body);
     packet.updateFrom(curr_packet);
-    keyframes_.push_back(data);
+    if (!curr_packet.pose_graphs.empty()) {
+      keyframes_.push_back(data);
+    }
   }
 
+  MLOG(2) << "Got " << num_added << " new views!";
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
 
   {  // critical section for updating graph and output
@@ -114,7 +118,6 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
     output.new_agent_nodes = new_node_ids;
   }
 
-  // MLOG(2) << "Got " << new_views << " new views!";
   // TODO(nathan) actually do keyframing
 
   if (window) {
@@ -171,30 +174,26 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
       continue;
     }
 
-    const auto num_assigned = assignLayerFeatures(*layer, views, layer_tracker);
-    MLOG(2) << "Assigned " << num_assigned << "features to nodes for layer '" << name
-            << "'";
-  }
-}
+    size_t num_seen = 0;
+    size_t num_assigned = 0;
+    layer_tracker.clear();
+    const auto layer_view = layer_tracker.view(*layer);
+    for (const auto& node : layer_view) {
+      auto attrs = node.tryAttributes<SemanticNodeAttributes>();
+      if (!attrs) {
+        LOG(ERROR) << config.prefix << "Invalid node " << NodeSymbol(node.id).str();
+        continue;
+      }
 
-size_t KeyframeSelector::assignLayerFeatures(const SceneGraphLayer& layer,
-                                             const std::vector<FeatureView>& views,
-                                             ActiveWindowTracker& active) const {
-  size_t num_assigned = 0;
-  active.clear();
-  const auto layer_view = active.view(layer);
-  for (const auto& node : layer_view) {
-    auto attrs = node.tryAttributes<SemanticNodeAttributes>();
-    if (!attrs) {
-      LOG(ERROR) << config.prefix << "Invalid node " << NodeSymbol(node.id).str();
-      continue;
+      ++num_seen;
+      if (view_selector_->selectFeature(views, config.max_range_difference_m, *attrs)) {
+        ++num_assigned;
+      }
     }
 
-    ++num_assigned;
-    view_selector_->selectFeature(views, config.inflation_distance, *attrs);
+    MLOG(2) << "Assigned features to " << num_assigned << " / " << num_seen
+            << " nodes for layer '" << name << "'";
   }
-
-  return num_assigned;
 }
 
 }  // namespace hydra

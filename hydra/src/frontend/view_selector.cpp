@@ -55,14 +55,18 @@ bool FeatureView::pointInView(const Eigen::Vector3d& point_w,
   return diff < max_range_difference_m;
 }
 
-void ClosestViewSelector::selectFeature(const FeatureList& views,
-                                        float inflation_distance,
+bool ClosestViewSelector::selectFeature(const FeatureList& views,
+                                        float max_range_difference_m,
                                         SemanticNodeAttributes& attrs) const {
   const FeatureView* best_view = nullptr;
   double min_dist = std::numeric_limits<double>::max();
   for (const auto& view : views) {
+    if (view.feature.size() == 0) {
+      continue;
+    }
+
     Eigen::Vector3d p_s;
-    if (!view.pointInView(attrs.position, inflation_distance, &p_s)) {
+    if (!view.pointInView(attrs.position, max_range_difference_m, &p_s)) {
       continue;
     }
 
@@ -77,14 +81,20 @@ void ClosestViewSelector::selectFeature(const FeatureList& views,
   if (best_view) {
     attrs.semantic_feature = best_view->feature;
   }
+
+  return best_view != nullptr;
 }
 
-void AverageViewSelector::selectFeature(const FeatureList& views,
-                                        float inflation_distance,
+bool AverageViewSelector::selectFeature(const FeatureList& views,
+                                        float max_range_difference_m,
                                         SemanticNodeAttributes& attrs) const {
   size_t num_visible = 0;
   for (const auto& view : views) {
-    if (!view.pointInView(attrs.position, inflation_distance)) {
+    if (view.feature.size() == 0) {
+      continue;
+    }
+
+    if (!view.pointInView(attrs.position, max_range_difference_m)) {
       continue;
     }
 
@@ -99,6 +109,8 @@ void AverageViewSelector::selectFeature(const FeatureList& views,
   if (num_visible > 0) {
     attrs.semantic_feature /= num_visible;
   }
+
+  return num_visible > 0;
 }
 
 }  // namespace hydra
