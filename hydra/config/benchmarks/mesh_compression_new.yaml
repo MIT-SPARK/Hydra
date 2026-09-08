@@ -1,8 +1,0 @@
-# Pass to GraphBuilder or debug_reconstruction.py with -f.
-mesh_compression: &new_compression
-  type: MeshCompression
-  resolution: 0.005
-  min_weight: 1.0e-6
-  min_clearance_m: 0.0
-frontend:
-  mesh_compression: *new_compression

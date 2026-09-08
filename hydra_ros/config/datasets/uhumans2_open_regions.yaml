@@ -25,7 +25,7 @@ frontend:
     cluster_tolerance: 0.25
     sinks:
       - {type: ObjectVisualizer}
-  mesh_compression: {type: MeshCompression, resolution: 0.005}
+  mesh_compression: {resolution: 0.005}
   traversability_places:
     type: traversability
     layer: PLACES

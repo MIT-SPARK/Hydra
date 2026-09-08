@@ -4,9 +4,7 @@ active_window:
   volumetric_map: {voxels_per_side: 16, voxel_size: 0.1, truncation_distance: 0.3, with_semantics: true}
   frame_data_buffer: {max_buffer_size: 10000}
 frontend:
-  mesh_compression:
-    type: MeshCompression
-    resolution: 0.005
+  mesh_compression: {resolution: 0.005}
   pgmo: {horizon_s: 15.0, resolution: 2.5}
   keyframe_selector:
     pose_graph_tracker: {min_pose_separation: 0.1, rotation_separation_weight: 1.0, min_time_separation_s: 1.0}
