@@ -100,8 +100,6 @@ void declare_config(MeshCompression::Config& config) {
   field(config.resolution, "resolution", "m");
   field(config.min_weight, "min_weight");
   field(config.min_clearance_m, "min_clearance_m", "m");
-  field(config.clear_free_space, "clear_free_space");
-  field(config.replace_reobserved_cells, "replace_reobserved_cells");
 
   check(config.resolution, GT, 0.0, "resolution");
   check(config.min_weight, GT, 0.0f, "min_weight");

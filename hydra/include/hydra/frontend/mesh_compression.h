@@ -59,9 +59,6 @@ class MeshCompression : public MeshCompressor {
     float min_weight = 1.0e-6f;
     //! Minimum TSDF distance for free-space
     double min_clearance_m = 0.0;
-    // Ablations for diagnosing loss of valid surfaces.
-    bool clear_free_space = true;
-    bool replace_reobserved_cells = true;
   } const config;
 
   explicit MeshCompression(double resolution);

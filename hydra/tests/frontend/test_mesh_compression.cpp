@@ -38,7 +38,7 @@
 
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/reconstruction/mesh_integrator.h"
-#include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 
 namespace hydra {
 namespace {
@@ -328,24 +328,6 @@ TEST(MeshCompression, MarchingCubesProvenanceSurvivesCopiesAndRemeshing) {
   integrator.generateMesh(map, false, false);
   EXPECT_TRUE(block.face_cells.empty());
   EXPECT_EQ(compression.update(map, 2)->getNumFaces(), 0u);
-}
-
-TEST(MeshCompression, ClearingAndReplacementAblations) {
-  MeshCompression::Config config;
-  config.clear_free_space = false;
-  config.replace_reobserved_cells = false;
-  MeshCompression compression(config);
-  auto map = makeMap();
-  auto& block = triangle(map);
-  compression.update(map, 1);
-  for (auto& point : block.points) {
-    point.z() += 0.05f;
-  }
-
-  EXPECT_EQ(compression.update(map, 2)->getNumFaces(), 2u);
-  auto cleared = makeMap();
-  observeCell(cleared, GlobalIndex(0, 0, 0), 0.3f);
-  EXPECT_EQ(compression.update(cleared, 3)->getNumFaces(), 2u);
 }
 
 TEST(MeshCompression, ConfiguredCornerWeightAndClearance) {
