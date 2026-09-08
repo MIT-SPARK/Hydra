@@ -120,9 +120,8 @@ GlobalIndex MeshCompression::cellIndex(const Eigen::Vector3f& pos) const {
 
 auto MeshCompression::prepare(const VolumetricMap& map) const -> UpdateState {
   for (const auto& block : map.getMeshLayer()) {
-    if (block.face_cells.size() != block.faces.size()) {
-      throw std::invalid_argument(
-          "MeshCompression requires marching-cubes cell provenance");
+    if (block.face_voxels.size() != block.faces.size()) {
+      throw std::invalid_argument("face voxel indices required for mesh compression");
     }
   }
 
@@ -174,7 +173,7 @@ void MeshCompression::integrate(const MeshBlock& block,
 
   for (size_t i = 0; i < block.faces.size(); ++i) {
     const auto& face = block.faces[i];
-    const auto& cell = block.face_cells[i];
+    const auto& cell = block.face_voxels[i];
 
     const Face mapped{remap.at(face[0]), remap.at(face[1]), remap.at(face[2])};
     const auto finite = isFiniteFace(mapped);

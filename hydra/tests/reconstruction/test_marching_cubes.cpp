@@ -124,10 +124,12 @@ TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
   EXPECT_EQ(3u, mesh.numVertices());
 }
 
+
+// Test that added face counts are correct
 TEST(MarchingCubes, FaceCounts) {
-  // Counts describe newly appended faces, including empty and multi-face cubes.
   PointMatrix positions;
   positions << 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1;
+
   Mesh mesh;
   std::set<size_t> counts;
   for (size_t config = 0; config < 256; ++config) {

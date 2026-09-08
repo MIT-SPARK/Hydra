@@ -56,7 +56,7 @@ MeshBlock& triangle(VolumetricMap& map,
   mesh.resizeVertices(3);
   mesh.points = {{0.05f, 0.05f, 0.08f}, {0.15f, 0.05f, 0.08f}, {0.05f, 0.15f, 0.08f}};
   mesh.faces = {{0, 1, 2}};
-  mesh.face_cells = {cell};
+  mesh.face_voxels = {cell};
   return mesh;
 }
 
@@ -175,7 +175,7 @@ TEST_F(CellCompressionTest, IndependentCells) {
   block.resizeVertices(4);
   block.points[3] = {0.15f, 0.15f, 0.08f};
   block.faces = {{0, 1, 3}, {0, 3, 2}};
-  block.face_cells.assign(2, GlobalIndex(1, 0, 0));
+  block.face_voxels.assign(2, GlobalIndex(1, 0, 0));
   update(other);
   EXPECT_EQ(mesh.numFaces(), 3u);
   EXPECT_EQ(mesh.numVertices(), 4u);
@@ -188,7 +188,7 @@ TEST_F(CellCompressionTest, SharedVertices) {
   block.resizeVertices(4);
   block.points[3] = {0.15f, 0.15f, 0.08f};
   block.faces.push_back({1, 3, 2});
-  block.face_cells.push_back(GlobalIndex(1, 0, 0));
+  block.face_voxels.push_back(GlobalIndex(1, 0, 0));
   update(map);
   auto partial = makeMap();
   observeCell(partial, GlobalIndex(0, 0, 0), 0.3f);
@@ -202,7 +202,7 @@ TEST_F(CellCompressionTest, DuplicateFaces) {
   auto map = makeMap();
   auto& block = triangle(map);
   block.faces.push_back({2, 1, 0});
-  block.face_cells.push_back(GlobalIndex(1, 0, 0));
+  block.face_voxels.push_back(GlobalIndex(1, 0, 0));
   update(map);
   ASSERT_EQ(mesh.numFaces(), 1u);
   auto partial = makeMap();
@@ -238,7 +238,7 @@ TEST_F(CellCompressionTest, FrozenEndpoints) {
                   {0.25f, 0.05f, 0.05f},
                   {0.25f, 0.25f, 0.05f}};
   block.faces.push_back({2, 3, 4});
-  block.face_cells.push_back(GlobalIndex(1, 0, 0));
+  block.face_voxels.push_back(GlobalIndex(1, 0, 0));
   update(map);
   update(makeMap(), [](const auto& vertex) { return vertex.pos.x() < 0.0f; });
   ASSERT_EQ(offsets.archived_vertices, 2u);
@@ -326,20 +326,20 @@ TEST(MeshCompression, CellProvenance) {
   integrator.generateMesh(map, false, false);
   const auto& block = map.getMeshLayer().getBlock(BlockIndex(-1, 0, 0));
   ASSERT_EQ(block.numFaces(), 2u);
-  ASSERT_EQ(block.face_cells.size(), 2u);
-  EXPECT_EQ(block.face_cells[0], cell);
+  ASSERT_EQ(block.face_voxels.size(), 2u);
+  EXPECT_EQ(block.face_voxels[0], cell);
   for (const auto& tsdf_block : map.getTsdfLayer()) {
     tsdf_block.updated = true;
   }
 
   const auto copied = map.cloneUpdated();
-  EXPECT_EQ(copied->getMeshLayer().getBlock(BlockIndex(-1, 0, 0)).face_cells,
-            block.face_cells);
+  EXPECT_EQ(copied->getMeshLayer().getBlock(BlockIndex(-1, 0, 0)).face_voxels,
+            block.face_voxels);
   MeshCompression compression(0.005);
   EXPECT_EQ(compression.update(map, 1)->getNumFaces(), 2u);
   observeCell(map, cell, 0.3f);
   integrator.generateMesh(map, false, false);
-  EXPECT_TRUE(block.face_cells.empty());
+  EXPECT_TRUE(block.face_voxels.empty());
   EXPECT_EQ(compression.update(map, 2)->getNumFaces(), 0u);
 }
 
@@ -367,7 +367,7 @@ TEST(MeshCompression, MissingProvenance) {
   auto map = makeMap();
   auto& block = triangle(map);
   compression.update(map, 1);
-  block.face_cells.clear();
+  block.face_voxels.clear();
   EXPECT_THROW(compression.update(map, 2), std::invalid_argument);
   EXPECT_EQ(compression.update(makeMap(), 3)->getNumFaces(), 1u);
 }
@@ -405,7 +405,7 @@ TEST(MeshCompression, CustomMerge) {
   auto other = makeMap();
   auto& second = other.getMeshLayer().allocateBlock(BlockIndex(1, 0, 0));
   static_cast<spark_dsg::Mesh&>(second) = block;
-  second.face_cells = block.face_cells;
+  second.face_voxels = block.face_voxels;
   second.points[0] += Eigen::Vector3f(0.001f, 0.0f, 0.0f);
   second.colors[0] = spark_dsg::Color(70, 80, 90);
   delta = compression.update<KeepFirstVertex>(other, 2);

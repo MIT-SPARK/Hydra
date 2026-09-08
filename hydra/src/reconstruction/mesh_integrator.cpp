@@ -52,6 +52,44 @@
 #include "hydra/utils/printing.h"
 
 namespace hydra {
+namespace {
+
+using spatial_hash::globalIndexFromLocalIndices;
+
+template <typename Block>
+Block* maybeGetBlockPtr(spatial_hash::BlockLayer<Block>* layer,
+                        const BlockIndex& index) {
+  if (!layer) {
+    return nullptr;
+  }
+  return layer->getBlockPtr(index).get();
+}
+
+void appendMeshCell(const MarchingCubes::SdfPoints& points,
+                    const BlockIndex& block_idx,
+                    const VoxelIndex& idx,
+                    size_t voxels_per_side,
+                    MeshBlock& mesh) {
+  const auto new_faces = MarchingCubes::meshCube(points, mesh);
+  if (!new_faces) {
+    return;
+  }
+
+  const auto global_idx = globalIndexFromLocalIndices(block_idx, idx, voxels_per_side);
+  mesh.face_voxels.insert(mesh.face_voxels.end(), new_faces, global_idx);
+}
+
+}  // namespace
+
+const Eigen::Matrix<int, 3, 8> MeshIntegrator::cube_index_offsets_ = [] {
+  Eigen::Matrix<int, 3, 8> offsets;
+  // clang-format off
+  offsets << 0, 1, 1, 0, 0, 1, 1, 0,
+             0, 0, 1, 1, 0, 0, 1, 1,
+             0, 0, 0, 0, 1, 1, 1, 1;
+  // clang-format on
+  return offsets;
+}();
 
 void declare_config(MeshIntegrator::Config& config) {
   using namespace config;
@@ -200,34 +238,6 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
   }
 }
 
-template <typename Block>
-Block* maybeGetBlockPtr(spatial_hash::BlockLayer<Block>* layer,
-                        const BlockIndex& index) {
-  if (!layer) {
-    return nullptr;
-  }
-  return layer->getBlockPtr(index).get();
-}
-
-namespace {
-
-void appendMeshCell(const MarchingCubes::SdfPoints& points,
-                    const BlockIndex& block_index,
-                    const VoxelIndex& index,
-                    size_t voxels_per_side,
-                    MeshBlock& mesh) {
-  const auto new_faces = MarchingCubes::meshCube(points, mesh);
-  if (!new_faces) {
-    return;
-  }
-
-  const auto cell =
-      spatial_hash::globalIndexFromLocalIndices(block_index, index, voxels_per_side);
-  mesh.face_cells.insert(mesh.face_cells.end(), new_faces, cell);
-}
-
-}  // namespace
-
 void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map) const {
@@ -354,15 +364,5 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
 
   appendMeshCell(points, block_index, index, map.config.voxels_per_side, *mesh);
 }
-
-const Eigen::Matrix<int, 3, 8> MeshIntegrator::cube_index_offsets_ = [] {
-  Eigen::Matrix<int, 3, 8> offsets;
-  // clang-format off
-  offsets << 0, 1, 1, 0, 0, 1, 1, 0,
-             0, 0, 1, 1, 0, 0, 1, 1,
-             0, 0, 0, 0, 1, 1, 1, 1;
-  // clang-format on
-  return offsets;
-}();
 
 }  // namespace hydra
