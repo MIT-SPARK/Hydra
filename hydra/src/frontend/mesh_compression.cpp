@@ -69,29 +69,6 @@ inline bool isDistinctFace(const kimera_pgmo::traits::Face& face) {
   return face[0] != face[1] && face[1] != face[2] && face[2] != face[0];
 }
 
-void updateVertexAttributes(MeshCompression::Vertex& vertex,
-                            const Eigen::Vector3f& pos,
-                            const kimera_pgmo::traits::VertexTraits& traits,
-                            uint64_t timestamp_ns) {
-  vertex.pos = pos;
-  auto& dest = vertex.traits;
-  dest.properties |= traits.properties;
-  dest.properties.has_stamp = true;
-  dest.properties.has_first_seen_stamp = true;
-  const auto stamp = traits.properties.has_stamp ? traits.stamp : timestamp_ns;
-  const auto first_seen =
-      traits.properties.has_first_seen_stamp ? traits.first_seen_stamp : timestamp_ns;
-  dest.stamp = std::max(dest.stamp, stamp);
-  dest.first_seen_stamp = std::min(dest.first_seen_stamp, first_seen);
-  if (traits.properties.has_color) {
-    dest.color = traits.color;
-  }
-
-  if (traits.properties.has_label) {
-    dest.label = traits.label;
-  }
-}
-
 }  // namespace
 
 void declare_config(MeshCompression::Config& config) {
@@ -115,8 +92,7 @@ MeshCompression::MeshCompression(double resolution)
 MeshCompression::MeshCompression(const Config& config)
     : config(config::checkValid(config)) {}
 
-bool MeshCompression::isObservedFreeSpace(const VolumetricMap& map,
-                                          const GlobalIndex& cell) const {
+bool MeshCompression::isFree(const VolumetricMap& map, const GlobalIndex& cell) const {
   const auto clearance =
       config.min_clearance_m > 0.0 ? config.min_clearance_m : config.resolution;
   for (size_t corner = 0; corner < 8; ++corner) {
@@ -138,11 +114,11 @@ bool MeshCompression::isObservedFreeSpace(const VolumetricMap& map,
   return true;
 }
 
-GlobalIndex MeshCompression::compressionCell(const Eigen::Vector3f& pos) const {
+GlobalIndex MeshCompression::cellIndex(const Eigen::Vector3f& pos) const {
   return spatial_hash::indexFromPoint<GlobalIndex>(pos, 1.0 / config.resolution);
 }
 
-auto MeshCompression::initializeUpdate(const VolumetricMap& map) -> UpdateState {
+auto MeshCompression::prepare(const VolumetricMap& map) const -> UpdateState {
   for (const auto& block : map.getMeshLayer()) {
     if (block.face_cells.size() != block.faces.size()) {
       throw std::invalid_argument(
@@ -150,15 +126,10 @@ auto MeshCompression::initializeUpdate(const VolumetricMap& map) -> UpdateState 
     }
   }
 
-  return prepareUpdate();
-}
-
-MeshCompression::UpdateState MeshCompression::prepareUpdate() const {
   UpdateState state{vertices_.size(),
                     faces_.size(),
-                    std::vector<bool>(vertices_.size(), false),
-                    std::vector<bool>(vertices_.size(), false),
                     {},
+                    std::vector<bool>(vertices_.size(), false),
                     {},
                     {}};
   state.mutable_cells.reserve(vertices_.size());
@@ -170,15 +141,16 @@ MeshCompression::UpdateState MeshCompression::prepareUpdate() const {
       continue;
     }
 
-    state.mutable_cells.emplace(compressionCell(entry.vertex.pos), i);
+    state.mutable_cells.emplace(cellIndex(entry.vertex.pos), i);
   }
 
   return state;
 }
 
-std::vector<size_t> MeshCompression::integrateVertices(const MeshBlock& block,
-                                                       uint64_t timestamp_ns,
-                                                       UpdateState& state) {
+void MeshCompression::integrate(const MeshBlock& block,
+                                uint64_t timestamp_ns,
+                                UpdateState& state,
+                                Merge merge) {
   std::vector<size_t> remap(block.numVertices(), INVALID);
   for (size_t i = 0; i < block.numVertices(); ++i) {
     kimera_pgmo::traits::VertexTraits traits;
@@ -188,29 +160,18 @@ std::vector<size_t> MeshCompression::integrateVertices(const MeshBlock& block,
       continue;
     }
 
-    const auto cell = compressionCell(pos);
+    const auto cell = cellIndex(pos);
     const auto [iter, inserted] = state.mutable_cells.emplace(cell, vertices_.size());
     if (inserted) {
       vertices_.emplace_back();
-      state.deleted.push_back(false);
       state.observed.push_back(false);
     }
 
     remap[i] = iter->second;
     state.observed[iter->second] = true;
-    // Marching cubes observes an interpolated zero crossing. A nearby positive
-    // projective TSDF sample must not clear that currently observed surface.
-    state.deleted[iter->second] = false;
-    updateVertexAttributes(vertices_[iter->second].vertex, pos, traits, timestamp_ns);
+    merge(timestamp_ns, pos, traits, vertices_[iter->second].vertex);
   }
 
-  return remap;
-}
-
-void MeshCompression::integrateMeshBlock(const MeshBlock& block,
-                                         uint64_t timestamp_ns,
-                                         UpdateState& state) {
-  const auto remap = integrateVertices(block, timestamp_ns, state);
   for (size_t i = 0; i < block.faces.size(); ++i) {
     const auto& face = block.faces[i];
     const auto& cell = block.face_cells[i];
@@ -227,8 +188,8 @@ void MeshCompression::integrateMeshBlock(const MeshBlock& block,
   }
 }
 
-void MeshCompression::removeClearedAndReplacedFaces(const VolumetricMap& map,
-                                                    UpdateState& state) {
+void MeshCompression::prune(const VolumetricMap& map, UpdateState& state) {
+  GlobalIndexMap<bool> cleared_cells;
   size_t retained = 0;
   for (size_t i = 0; i < faces_.size(); ++i) {
     const auto& face = faces_[i];
@@ -238,9 +199,9 @@ void MeshCompression::removeClearedAndReplacedFaces(const VolumetricMap& map,
         continue;
       }
 
-      const auto [iter, inserted] = state.cleared_cells.emplace(face.cell, false);
+      const auto [iter, inserted] = cleared_cells.emplace(face.cell, false);
       if (inserted) {
-        iter->second = isObservedFreeSpace(map, face.cell);
+        iter->second = isFree(map, face.cell);
       }
 
       if (iter->second) {
@@ -253,10 +214,8 @@ void MeshCompression::removeClearedAndReplacedFaces(const VolumetricMap& map,
   }
 
   faces_.resize(retained);
-}
 
-void MeshCompression::findUnusedVertices(UpdateState& state) const {
-  std::fill(state.deleted.begin(), state.deleted.end(), true);
+  state.deleted.assign(vertices_.size(), true);
   for (const auto& face : faces_) {
     for (const auto index : face.vertices) {
       state.deleted[index] = false;
@@ -270,8 +229,14 @@ void MeshCompression::findUnusedVertices(UpdateState& state) const {
   }
 }
 
-std::vector<bool> MeshCompression::findArchivableVertices(
-    const UpdateState& state, const ArchivePredicate& archive) const {
+MeshDelta::Ptr MeshCompression::makeDelta(const UpdateState& state,
+                                          uint64_t timestamp_ns,
+                                          const ArchivePredicate& archive) {
+  tracking_.prev_to_curr = std::make_shared<std::map<size_t, size_t>>();
+  auto result = std::make_unique<MeshDelta>(tracking_);
+  auto& delta = *result;
+  delta.timestamp_ns = timestamp_ns;
+
   std::vector<bool> outside(vertices_.size(), false);
   for (size_t i = 0; i < vertices_.size(); ++i) {
     if (state.deleted[i]) {
@@ -284,7 +249,8 @@ std::vector<bool> MeshCompression::findArchivableVertices(
     }
 
     const auto unobserved = !state.observed[i];
-    outside[i] = unobserved && archive && archive(vertices_[i].vertex);
+    const auto& vertex = vertices_[i].vertex;
+    outside[i] = unobserved && archive && archive({vertex.pos, vertex.traits});
   }
 
   auto archivable = outside;
@@ -299,13 +265,6 @@ std::vector<bool> MeshCompression::findArchivableVertices(
     }
   }
 
-  return archivable;
-}
-
-std::vector<size_t> MeshCompression::appendDeltaVertices(
-    const UpdateState& state,
-    const std::vector<bool>& archivable,
-    MeshDelta& delta) const {
   std::vector<size_t> remap(vertices_.size(), INVALID);
   // MeshDelta requires newly archived vertices before all active vertices.
   for (const auto archiving : {true, false}) {
@@ -327,12 +286,6 @@ std::vector<size_t> MeshCompression::appendDeltaVertices(
     }
   }
 
-  return remap;
-}
-
-void MeshCompression::appendDeltaFaces(const std::vector<bool>& archivable,
-                                       const std::vector<size_t>& remap,
-                                       MeshDelta& delta) {
   std::unordered_set<Face, kimera_pgmo::RedundancyChecker::FaceHash> unique_faces;
   unique_faces.reserve(faces_.size());
 
@@ -364,10 +317,6 @@ void MeshCompression::appendDeltaFaces(const std::vector<bool>& archivable,
   }
 
   faces_.resize(active_count);
-}
-
-void MeshCompression::retainActiveVertices(const UpdateState& state,
-                                           const std::vector<bool>& archivable) {
   size_t remaining = 0;
   for (size_t i = 0; i < vertices_.size(); ++i) {
     if (!state.deleted[i] && !archivable[i]) {
@@ -376,38 +325,28 @@ void MeshCompression::retainActiveVertices(const UpdateState& state,
   }
 
   vertices_.resize(remaining);
-}
 
-void MeshCompression::updateTracking(const MeshDelta& delta) {
   tracking_.prev_active_vertices = delta.getNumActiveVertices();
   tracking_.prev_active_faces = delta.getNumActiveFaces();
   ++tracking_.sequence_number;
   if (tracking_.sequence_number == 0) {
     tracking_.sequence_number = 1;
   }
+
+  return result;
 }
 
 MeshDelta::Ptr MeshCompression::update(const VolumetricMap& map,
                                        uint64_t timestamp_ns,
-                                       const ArchivePredicate& archive) {
-  auto state = initializeUpdate(map);
+                                       const ArchivePredicate& archive,
+                                       Merge merge) {
+  auto state = prepare(map);
   for (const auto& block : map.getMeshLayer()) {
-    integrateMeshBlock(block, timestamp_ns, state);
+    integrate(block, timestamp_ns, state, merge);
   }
 
-  removeClearedAndReplacedFaces(map, state);
-  findUnusedVertices(state);
-  const auto archivable = findArchivableVertices(state, archive);
-
-  tracking_.prev_to_curr = std::make_shared<std::map<size_t, size_t>>();
-  auto delta = std::make_unique<MeshDelta>(tracking_);
-  delta->timestamp_ns = timestamp_ns;
-
-  const auto remap = appendDeltaVertices(state, archivable, *delta);
-  appendDeltaFaces(archivable, remap, *delta);
-  retainActiveVertices(state, archivable);
-  updateTracking(*delta);
-  return delta;
+  prune(map, state);
+  return makeDelta(state, timestamp_ns, archive);
 }
 
 auto MeshCompression::update(const ActiveWindowOutput& input,

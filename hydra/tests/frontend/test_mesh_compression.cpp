@@ -103,7 +103,8 @@ class CellCompressionTest : public testing::Test {
 
 }  // namespace
 
-TEST_F(CellCompressionTest, PartialReobservationPreservesUnknownGeometry) {
+TEST_F(CellCompressionTest, PartialObservation) {
+  // Incomplete free-space evidence must preserve existing geometry.
   auto map = makeMap();
   triangle(map);
   update(map);
@@ -118,7 +119,8 @@ TEST_F(CellCompressionTest, PartialReobservationPreservesUnknownGeometry) {
   EXPECT_EQ(delta->info.prev_to_curr->size(), 3u);
 }
 
-TEST_F(CellCompressionTest, ClearingRequiresAllEightObservedFreeCorners) {
+TEST_F(CellCompressionTest, FreeCorners) {
+  // Clearing requires eight finite, observed corners with positive clearance.
   auto map = makeMap();
   triangle(map);
   update(map);
@@ -147,7 +149,8 @@ TEST_F(CellCompressionTest, ClearingRequiresAllEightObservedFreeCorners) {
   EXPECT_EQ(mesh.numFaces(), 1u);
 }
 
-TEST_F(CellCompressionTest, ReplacesMovingGroundSurfaceWithoutAccumulatingTriangles) {
+TEST_F(CellCompressionTest, MovingSurface) {
+  // Reobserved cells replace their old triangles as the surface moves.
   auto map = makeMap();
   auto& block = triangle(map);
   for (size_t i = 0; i < 10; ++i) {
@@ -162,7 +165,8 @@ TEST_F(CellCompressionTest, ReplacesMovingGroundSurfaceWithoutAccumulatingTriang
   }
 }
 
-TEST_F(CellCompressionTest, ReobservingVerticesDoesNotReplaceAnotherCellsFace) {
+TEST_F(CellCompressionTest, IndependentCells) {
+  // Shared compression vertices do not imply shared source cells.
   auto map = makeMap();
   triangle(map);
   update(map);
@@ -177,7 +181,8 @@ TEST_F(CellCompressionTest, ReobservingVerticesDoesNotReplaceAnotherCellsFace) {
   EXPECT_EQ(mesh.numVertices(), 4u);
 }
 
-TEST_F(CellCompressionTest, SharedVerticesSurviveClearingOneSourceCell) {
+TEST_F(CellCompressionTest, SharedVertices) {
+  // Clearing one cell retains vertices referenced by another cell.
   auto map = makeMap();
   auto& block = triangle(map);
   block.resizeVertices(4);
@@ -192,7 +197,8 @@ TEST_F(CellCompressionTest, SharedVerticesSurviveClearingOneSourceCell) {
   EXPECT_EQ(mesh.numVertices(), 3u);
 }
 
-TEST_F(CellCompressionTest, DuplicateFacesRetainBothSourceCells) {
+TEST_F(CellCompressionTest, DuplicateFaces) {
+  // Deduplicated output still tracks each source cell for clearing.
   auto map = makeMap();
   auto& block = triangle(map);
   block.faces.push_back({2, 1, 0});
@@ -208,7 +214,8 @@ TEST_F(CellCompressionTest, DuplicateFacesRetainBothSourceCells) {
   EXPECT_EQ(mesh.numFaces(), 1u);
 }
 
-TEST_F(CellCompressionTest, MissingNeighborBlockDoesNotClearBoundaryCell) {
+TEST_F(CellCompressionTest, MissingNeighbor) {
+  // A missing neighboring block leaves boundary geometry unknown.
   const GlobalIndex cell(15, 0, 0);
   auto map = makeMap();
   triangle(map, cell);
@@ -220,7 +227,8 @@ TEST_F(CellCompressionTest, MissingNeighborBlockDoesNotClearBoundaryCell) {
   EXPECT_EQ(mesh.numFaces(), 1u);
 }
 
-TEST_F(CellCompressionTest, FrozenEndpointsPreserveArchivedFacesDuringReplacement) {
+TEST_F(CellCompressionTest, FrozenEndpoints) {
+  // Replacement and clearing must preserve endpoints of archived faces.
   auto map = makeMap();
   auto& block = triangle(map);
   block.resizeVertices(5);
@@ -255,7 +263,8 @@ TEST_F(CellCompressionTest, FrozenEndpointsPreserveArchivedFacesDuringReplacemen
   EXPECT_EQ(mesh.points[face[2]], endpoint);
 }
 
-TEST_F(CellCompressionTest, ReobservationCannotClearArchivedGeometry) {
+TEST_F(CellCompressionTest, ArchivedGeometry) {
+  // Free-space observations cannot delete archived geometry.
   auto map = makeMap();
   triangle(map);
   update(map);
@@ -267,7 +276,8 @@ TEST_F(CellCompressionTest, ReobservationCannotClearArchivedGeometry) {
   EXPECT_EQ(mesh.numFaces(), 1u);
 }
 
-TEST_F(CellCompressionTest, UpdatedVerticesOutsideWindowRemainActive) {
+TEST_F(CellCompressionTest, ObservedOutsideWindow) {
+  // Current observations delay archival even outside the window.
   auto map = makeMap();
   triangle(map);
   for (size_t i = 0; i < 3; ++i) {
@@ -280,7 +290,8 @@ TEST_F(CellCompressionTest, UpdatedVerticesOutsideWindowRemainActive) {
   EXPECT_EQ(mesh.numFaces(), 1u);
 }
 
-TEST_F(CellCompressionTest, PreservesAttributesAndFirstObservation) {
+TEST_F(CellCompressionTest, VertexAttributes) {
+  // Reobservation refreshes color while preserving the first timestamp.
   auto map = makeMap();
   auto& block = triangle(map);
   block.colors[0] = spark_dsg::Color(10, 20, 30);
@@ -292,12 +303,14 @@ TEST_F(CellCompressionTest, PreservesAttributesAndFirstObservation) {
 }
 
 TEST_F(CellCompressionTest, EmptyUpdates) {
+  // An empty initial update produces an empty mesh.
   update(makeMap());
   EXPECT_EQ(mesh.numVertices(), 0u);
   EXPECT_EQ(mesh.numFaces(), 0u);
 }
 
-TEST(MeshCompression, MarchingCubesProvenanceSurvivesCopiesAndRemeshing) {
+TEST(MeshCompression, CellProvenance) {
+  // Source cells survive copying and reset when their mesh is regenerated.
   auto map = makeMap();
   const GlobalIndex cell(-1, 0, 0);
   observeCell(map, cell, 0.3f);
@@ -330,7 +343,8 @@ TEST(MeshCompression, MarchingCubesProvenanceSurvivesCopiesAndRemeshing) {
   EXPECT_EQ(compression.update(map, 2)->getNumFaces(), 0u);
 }
 
-TEST(MeshCompression, ConfiguredCornerWeightAndClearance) {
+TEST(MeshCompression, ClearanceThresholds) {
+  // Both configured weight and distance thresholds control clearing.
   MeshCompression::Config config;
   config.min_weight = 0.5f;
   config.min_clearance_m = 0.2;
@@ -347,7 +361,8 @@ TEST(MeshCompression, ConfiguredCornerWeightAndClearance) {
   EXPECT_EQ(compression.update(cleared, 4)->getNumFaces(), 0u);
 }
 
-TEST(MeshCompression, MissingProvenanceRejectsInputBeforeMutation) {
+TEST(MeshCompression, MissingProvenance) {
+  // Invalid provenance fails before changing the existing mesh.
   MeshCompression compression(0.005);
   auto map = makeMap();
   auto& block = triangle(map);
@@ -355,6 +370,54 @@ TEST(MeshCompression, MissingProvenanceRejectsInputBeforeMutation) {
   block.face_cells.clear();
   EXPECT_THROW(compression.update(map, 2), std::invalid_argument);
   EXPECT_EQ(compression.update(makeMap(), 3)->getNumFaces(), 1u);
+}
+
+namespace {
+
+struct KeepFirstVertex {
+  void operator()(uint64_t stamp,
+                  const Eigen::Vector3f& pos,
+                  const kimera_pgmo::traits::VertexTraits& traits,
+                  kimera_pgmo::VertexInfo& vertex) const {
+    if (!vertex.traits.properties.has_stamp) {
+      kimera_pgmo::DefaultVertexUpdate{}(stamp, pos, traits, vertex);
+    }
+  }
+};
+
+}  // namespace
+
+TEST(MeshCompression, CustomMerge) {
+  // A custom merger controls overlaps within a block, across blocks and updates.
+  auto map = makeMap();
+  auto& block = triangle(map);
+  block.colors[0] = spark_dsg::Color(10, 20, 30);
+  const auto first = block.points[0];
+  block.resizeVertices(4);
+  block.points[3] = first + Eigen::Vector3f(0.001f, 0.0f, 0.0f);
+  block.colors[3] = spark_dsg::Color(40, 50, 60);
+  MeshCompression compression(0.005);
+  auto delta = compression.update<KeepFirstVertex>(map, 1);
+  ASSERT_EQ(delta->getNumVertices(), 3u);
+  EXPECT_EQ(delta->getVertex(0).pos, first);
+  EXPECT_EQ(delta->getVertex(0).traits.color[0], 10u);
+
+  auto other = makeMap();
+  auto& second = other.getMeshLayer().allocateBlock(BlockIndex(1, 0, 0));
+  static_cast<spark_dsg::Mesh&>(second) = block;
+  second.face_cells = block.face_cells;
+  second.points[0] += Eigen::Vector3f(0.001f, 0.0f, 0.0f);
+  second.colors[0] = spark_dsg::Color(70, 80, 90);
+  delta = compression.update<KeepFirstVertex>(other, 2);
+  EXPECT_EQ(delta->getVertex(0).pos, first);
+  EXPECT_EQ(delta->getVertex(0).traits.color[0], 10u);
+  EXPECT_EQ(delta->getVertex(0).traits.stamp, 1u);
+
+  delta = compression.update(other, 3);
+  EXPECT_EQ(delta->getVertex(0).pos, second.points[3]);
+  EXPECT_EQ(delta->getVertex(0).traits.color[0], 40u);
+  EXPECT_EQ(delta->getVertex(0).traits.stamp, 3u);
+  EXPECT_EQ(delta->getVertex(0).traits.first_seen_stamp, 1u);
 }
 
 }  // namespace hydra

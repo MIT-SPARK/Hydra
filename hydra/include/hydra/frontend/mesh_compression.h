@@ -34,11 +34,10 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/mesh_delta.h>
 
-#include <array>
 #include <functional>
-#include <string>
 #include <vector>
 
 #include "hydra/frontend/mesh_compressor.h"
@@ -65,24 +64,30 @@ class MeshCompression : public MeshCompressor {
 
   explicit MeshCompression(const Config& config);
 
+  // MergeT is a const, default-constructible functor called for every observation,
+  // including the first observation of a compressed vertex.
+  template <typename MergeT = kimera_pgmo::DefaultVertexUpdate>
   kimera_pgmo::MeshDelta::Ptr update(const VolumetricMap& map,
                                      uint64_t timestamp_ns,
-                                     const ArchivePredicate& archive = {});
+                                     const ArchivePredicate& archive = {}) {
+    return update(map,
+                  timestamp_ns,
+                  archive,
+                  [](uint64_t stamp,
+                     const Eigen::Vector3f& pos,
+                     const kimera_pgmo::traits::VertexTraits& traits,
+                     kimera_pgmo::VertexInfo& vertex) {
+                    static const MergeT merger;
+                    merger(stamp, pos, traits, vertex);
+                  });
+  }
 
   MeshDeltaPtr update(const ActiveWindowOutput& input,
                       const VolumetricWindow* window) override;
 
  private:
-  struct Removal {
-    GlobalIndex cell;
-    std::array<Eigen::Vector3f, 3> points;
-    std::string reason;
-    std::array<float, 8> distances;
-    std::array<float, 8> weights;
-  };
-
   struct Entry {
-    Vertex vertex;
+    kimera_pgmo::VertexInfo vertex{};
     // Frozen boundary vertices support faces already sent for archival. They
     // cannot be cleared or reused by a new observation until fully archived.
     bool frozen = false;
@@ -100,44 +105,28 @@ class MeshCompression : public MeshCompressor {
     std::vector<bool> observed;
     GlobalIndexMap<size_t> mutable_cells;
     GlobalIndexSet reobserved_cells;
-    GlobalIndexMap<bool> cleared_cells;
   };
 
-  GlobalIndex compressionCell(const Eigen::Vector3f& pos) const;
+  using Merge = void (*)(uint64_t,
+                         const Eigen::Vector3f&,
+                         const kimera_pgmo::traits::VertexTraits&,
+                         kimera_pgmo::VertexInfo&);
 
-  bool isObservedFreeSpace(const VolumetricMap& map, const GlobalIndex& cell) const;
-
-  UpdateState initializeUpdate(const VolumetricMap& map);
-
-  UpdateState prepareUpdate() const;
-
-  std::vector<size_t> integrateVertices(const MeshBlock& block,
+  GlobalIndex cellIndex(const Eigen::Vector3f& pos) const;
+  bool isFree(const VolumetricMap& map, const GlobalIndex& cell) const;
+  UpdateState prepare(const VolumetricMap& map) const;
+  void integrate(const MeshBlock& block,
+                 uint64_t timestamp_ns,
+                 UpdateState& state,
+                 Merge merge);
+  void prune(const VolumetricMap& map, UpdateState& state);
+  kimera_pgmo::MeshDelta::Ptr makeDelta(const UpdateState& state,
                                         uint64_t timestamp_ns,
-                                        UpdateState& state);
-
-  void integrateMeshBlock(const MeshBlock& block,
-                          uint64_t timestamp_ns,
-                          UpdateState& state);
-
-  void removeClearedAndReplacedFaces(const VolumetricMap& map, UpdateState& state);
-
-  void findUnusedVertices(UpdateState& state) const;
-
-  std::vector<bool> findArchivableVertices(const UpdateState& state,
-                                           const ArchivePredicate& archive) const;
-
-  std::vector<size_t> appendDeltaVertices(const UpdateState& state,
-                                          const std::vector<bool>& archivable,
-                                          kimera_pgmo::MeshDelta& delta) const;
-
-  void appendDeltaFaces(const std::vector<bool>& archivable,
-                        const std::vector<size_t>& remap,
-                        kimera_pgmo::MeshDelta& delta);
-
-  void retainActiveVertices(const UpdateState& state,
-                            const std::vector<bool>& archivable);
-
-  void updateTracking(const kimera_pgmo::MeshDelta& delta);
+                                        const ArchivePredicate& archive);
+  kimera_pgmo::MeshDelta::Ptr update(const VolumetricMap& map,
+                                     uint64_t timestamp_ns,
+                                     const ArchivePredicate& archive,
+                                     Merge merge);
 
   std::vector<Entry> vertices_;
   std::vector<CellFace> faces_;
