@@ -124,7 +124,6 @@ TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
   EXPECT_EQ(3u, mesh.numVertices());
 }
 
-
 // Test that added face counts are correct
 TEST(MarchingCubes, FaceCounts) {
   PointMatrix positions;
