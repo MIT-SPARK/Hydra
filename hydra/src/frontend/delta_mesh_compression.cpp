@@ -51,6 +51,8 @@ const auto registration =
 
 }  // namespace
 
+using spatial_hash::IndexSet;
+
 void declare_config(DeltaMeshCompression::Config& config) {
   using namespace config;
   name("DeltaMeshCompression::Config");
@@ -59,15 +61,14 @@ void declare_config(DeltaMeshCompression::Config& config) {
 }
 
 DeltaMeshCompression::DeltaMeshCompression(const Config& config)
-    : compression_(config::checkValid(config).resolution) {}
+    : config(config::checkValid(config)), compression_(config.resolution) {}
 
-kimera_pgmo::MeshDelta::Ptr DeltaMeshCompression::update(
-    const ActiveWindowOutput& input, const VolumetricWindow* /* window */) {
-  const auto archived =
-      spatial_hash::IndexSet(input.archived.begin(), input.archived.end());
+auto DeltaMeshCompression::update(const ActiveWindowOutput& input,
+                                  const VolumetricWindow*) -> MeshDeltaPtr {
+  const auto wrapper = BlockMeshIter(input.map().getMeshLayer());
+  const IndexSet archived(input.archived.begin(), input.archived.end());
   compression_.archiveBlocks(
       [&](const auto& index, const auto&) { return archived.count(index); });
-  const auto wrapper = BlockMeshIter(input.map().getMeshLayer());
   return compression_.update(wrapper, input.timestamp_ns);
 }
 

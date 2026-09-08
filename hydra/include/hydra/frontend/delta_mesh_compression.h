@@ -40,17 +40,16 @@
 
 namespace hydra {
 
-// Adapter preserving the original GraphBuilder block archival/compression path.
 class DeltaMeshCompression : public MeshCompressor {
  public:
   struct Config {
     double resolution = 0.005;
-  };
+  } const config;
 
   explicit DeltaMeshCompression(const Config& config);
 
-  kimera_pgmo::MeshDelta::Ptr update(const ActiveWindowOutput& input,
-                                     const VolumetricWindow* window) override;
+  MeshDeltaPtr update(const ActiveWindowOutput& input,
+                      const VolumetricWindow* window) override;
 
  private:
   kimera_pgmo::DeltaCompression compression_;

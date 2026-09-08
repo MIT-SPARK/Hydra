@@ -37,7 +37,6 @@
 #include <kimera_pgmo/mesh_delta.h>
 
 #include <array>
-#include <filesystem>
 #include <functional>
 #include <string>
 #include <vector>
@@ -47,16 +46,6 @@
 
 namespace hydra {
 
-/** Spatially compress a mesh, retaining geometry until the TSDF observes free space.
- *
- * Input mesh blocks must supply face_cells provenance from MeshIntegrator. Active
- * triangles are replaced by source cell; clearing requires eight observed free
- * TSDF corners. Shared vertices survive while retained faces need them.
- * Input maps may contain only updated blocks. Missing blocks and zero-weight voxels
- * are unknown, not evidence that a surface disappeared. Archival is specified at
- * each vertex through a window predicate, independently of TSDF block ownership.
- * Archived geometry is immutable, as required by MeshDelta.
- */
 class MeshCompression : public MeshCompressor {
  public:
   using Vertex = kimera_pgmo::traits::Vertex;
@@ -64,32 +53,27 @@ class MeshCompression : public MeshCompressor {
   using ArchivePredicate = std::function<bool(const Vertex&)>;
 
   struct Config {
-    double resolution = 0.01;
+    //! Compression resolution
+    double resolution = 0.005;
+    //! Min observation weight for TSDF
     float min_weight = 1.0e-6f;
-    // All eight source-cell corners must exceed this distance to clear a cell.
-    // Zero uses the compression resolution as a positive-distance margin.
+    //! Minimum TSDF distance for free-space
     double min_clearance_m = 0.0;
     // Ablations for diagnosing loss of valid surfaces.
     bool clear_free_space = true;
     bool replace_reobserved_cells = true;
-  };
+  } const config;
 
   explicit MeshCompression(double resolution);
+
   explicit MeshCompression(const Config& config);
 
-  // The predicate returns true for vertices outside the active window. Without
-  // a predicate geometry remains active; absence from a partial map never archives.
-  // Vertices reobserved in this update remain active even outside the window.
   kimera_pgmo::MeshDelta::Ptr update(const VolumetricMap& map,
                                      uint64_t timestamp_ns,
                                      const ArchivePredicate& archive = {});
 
-  kimera_pgmo::MeshDelta::Ptr update(const ActiveWindowOutput& input,
-                                     const VolumetricWindow* window) override;
-
-  // Diagnostic snapshots are opt-in and excluded from normal benchmark runs.
-  void enableDiagnostics(bool enabled);
-  void saveDiagnostics(const std::filesystem::path& output) const;
+  MeshDeltaPtr update(const ActiveWindowOutput& input,
+                      const VolumetricWindow* window) override;
 
  private:
   struct Removal {
@@ -123,41 +107,41 @@ class MeshCompression : public MeshCompressor {
   };
 
   GlobalIndex compressionCell(const Eigen::Vector3f& pos) const;
+
   bool isObservedFreeSpace(const VolumetricMap& map, const GlobalIndex& cell) const;
+
   UpdateState initializeUpdate(const VolumetricMap& map);
+
   UpdateState prepareUpdate() const;
+
   std::vector<size_t> integrateVertices(const MeshBlock& block,
                                         uint64_t timestamp_ns,
                                         UpdateState& state);
-  void integrateMeshBlock(const VolumetricMap& map,
-                          const MeshBlock& block,
+
+  void integrateMeshBlock(const MeshBlock& block,
                           uint64_t timestamp_ns,
                           UpdateState& state);
+
   void removeClearedAndReplacedFaces(const VolumetricMap& map, UpdateState& state);
+
   void findUnusedVertices(UpdateState& state) const;
-  void recordRemovalPoints(const VolumetricMap& map,
-                           const GlobalIndex& cell,
-                           const std::array<Eigen::Vector3f, 3>& points,
-                           const char* reason);
-  void recordRemoval(const VolumetricMap& map,
-                     const CellFace& face,
-                     const char* reason);
+
   std::vector<bool> findArchivableVertices(const UpdateState& state,
                                            const ArchivePredicate& archive) const;
+
   std::vector<size_t> appendDeltaVertices(const UpdateState& state,
                                           const std::vector<bool>& archivable,
                                           kimera_pgmo::MeshDelta& delta) const;
+
   void appendDeltaFaces(const std::vector<bool>& archivable,
                         const std::vector<size_t>& remap,
                         kimera_pgmo::MeshDelta& delta);
+
   void retainActiveVertices(const UpdateState& state,
                             const std::vector<bool>& archivable);
+
   void updateTracking(const kimera_pgmo::MeshDelta& delta);
 
-  std::vector<Eigen::Vector3f> diagnostic_positions_;
-  bool diagnostics_enabled_ = false;
-  std::vector<Removal> removals_;
-  const Config config_;
   std::vector<Entry> vertices_;
   std::vector<CellFace> faces_;
   kimera_pgmo::MeshDelta::TrackingInfo tracking_{1};

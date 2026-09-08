@@ -34,21 +34,23 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/mesh_delta.h>
+#include <memory>
+
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 
 struct ActiveWindowOutput;
 struct VolumetricWindow;
 
-// Common frontend contract: implementations consume the same partial map packet
-// and return a delta that can be applied to the accumulated background mesh.
-class MeshCompressor {
- public:
+struct MeshCompressor {
+  using MeshDeltaPtr = std::shared_ptr<kimera_pgmo::MeshDelta>;
   virtual ~MeshCompressor() = default;
 
-  virtual kimera_pgmo::MeshDelta::Ptr update(const ActiveWindowOutput& input,
-                                             const VolumetricWindow* window) = 0;
+  virtual MeshDeltaPtr update(const ActiveWindowOutput& input,
+                              const VolumetricWindow* window) = 0;
 };
 
 }  // namespace hydra
