@@ -64,9 +64,10 @@ class MarchingCubes {
                                EdgePoints& edge_points,
                                float min_sdf_difference = 1.0e-6);
 
-  static void meshCube(const SdfPoints& points,
-                       spark_dsg::Mesh& mesh,
-                       bool compute_normals = true);
+  // Append the cube surface and return the number of faces added.
+  static size_t meshCube(const SdfPoints& points,
+                         spark_dsg::Mesh& mesh,
+                         bool compute_normals = true);
 
   static const int kTriangleTable[256][16];
   static const int kEdgeIndexPairs[12][2];
