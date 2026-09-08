@@ -150,6 +150,7 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
 
   void computeDaaamDistances(const DynamicSceneGraph& dsg) const;
+  void computeVmfDistances(const DynamicSceneGraph& dsg) const;
 
  protected:
   // Cached constants.
@@ -166,6 +167,8 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   mutable NearestNodeFinder::Ptr nn_;
 
   mutable std::unordered_map<NodeId, int> previous_max_labels_;
+  //! For the vMF path, the dirty signal is observation count, not max-label.
+  mutable std::unordered_map<NodeId, uint32_t> previous_vmf_n_;
 };
 
 void declare_config(UpdateTraversabilityFunctor::Config& config);

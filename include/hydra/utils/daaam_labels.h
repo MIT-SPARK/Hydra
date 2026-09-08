@@ -62,6 +62,15 @@ struct DaaamLabels {
     //! Distance metric to use for comparing features.
     config::VirtualConfig<hydra::EmbeddingDistance> distance_metric{
         hydra::CosineDistance::Config()};
+
+    //! When true, getNodeScore() computes vMF distance from per-node
+    //! sufficient statistics (vmf_feature_sum, vmf_observation_count) instead
+    //! of looking up a single feature per label_id. Falls back to legacy
+    //! max-label cosine when a node has zero observations.
+    bool use_vmf = false;
+
+    //! Max kappa value to clip the MLE estimate to (numerical stability).
+    float vmf_kappa_max = 500.0f;
   } const config;
 
   static DaaamLabels& instance();
@@ -73,6 +82,14 @@ struct DaaamLabels {
   static FeatureVector getFeature(const spark_dsg::DynamicSceneGraph& dsg, int id);
   static float getScore(const spark_dsg::DynamicSceneGraph& dsg, int id1, int id2);
   static float getScore(const FeatureVector& f1, const FeatureVector& f2);
+
+  //! Score in [0, 1] between two traversability nodes.
+  //! If config.use_vmf is true and both nodes have observations, uses the
+  //! vMF distance over per-node sufficient statistics. Otherwise (or as a
+  //! fallback) drops to cosine on the max-label features.
+  static float getNodeScore(const spark_dsg::DynamicSceneGraph& dsg,
+                            const spark_dsg::TraversabilityNodeAttributes& a,
+                            const spark_dsg::TraversabilityNodeAttributes& b);
 
  private:
   explicit DaaamLabels(const Config& config);

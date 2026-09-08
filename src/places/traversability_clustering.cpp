@@ -35,6 +35,7 @@
 #include "hydra/places/traversability_clustering.h"
 
 #include <config_utilities/config.h>
+#include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 namespace hydra::places {
@@ -48,6 +49,7 @@ void declare_config(SemanticLabelConfig& config) {
   field(config.robot_height, "robot_height");
   field(config.label_depth_tolerance, "label_depth_tolerance");
   field(config.label_use_const_weight, "label_use_const_weight");
+  field(config.enable_vmf_feature_accumulation, "enable_vmf_feature_accumulation");
 }
 
 void extractSemanticLabels(const SemanticLabelConfig& config,
@@ -98,6 +100,25 @@ void extractSemanticLabels(const SemanticLabelConfig& config,
       weight /= (place_range * place_range);
     }
     attrs->label_weights[static_cast<Label>(label)] += weight;
+
+    if (config.enable_vmf_feature_accumulation) {
+      const auto& feat = msg.sensor_data->feature;
+      if (feat.size() > 0) {
+        if (attrs->vmf_feature_sum.size() == 0) {
+          attrs->vmf_feature_sum = Eigen::VectorXf::Zero(feat.size());
+        }
+        if (attrs->vmf_feature_sum.size() == feat.size()) {
+          attrs->vmf_feature_sum += feat;  // feature is unit-norm
+          attrs->vmf_observation_count += 1u;
+        } else {
+          LOG_FIRST_N(WARNING, 1)
+              << "vMF feature dim mismatch on node "
+              << spark_dsg::NodeSymbol(id).str()
+              << ": stored=" << attrs->vmf_feature_sum.size()
+              << " incoming=" << feat.size();
+        }
+      }
+    }
   }
 }
 

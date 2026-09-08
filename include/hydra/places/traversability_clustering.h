@@ -64,6 +64,11 @@ struct SemanticLabelConfig {
   float robot_height = 0.0f;
   float label_depth_tolerance = 1.0f;
   bool label_use_const_weight = false;
+  //! When true, additionally accumulate per-place vMF sufficient statistics
+  //! (sum-of-unit-features, observation_count) from sensor_data->feature
+  //! during every active-window pass. The feature is expected to be unit
+  //! norm; DAAAM publishes it that way.
+  bool enable_vmf_feature_accumulation = false;
 };
 
 void declare_config(SemanticLabelConfig& config);

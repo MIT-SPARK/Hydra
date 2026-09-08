@@ -71,6 +71,8 @@ void declare_config(BlockTraversabilityClustering::Config& config) {
   field(config.label_config.robot_height, "robot_height");
   field(config.label_config.label_depth_tolerance, "label_depth_tolerance");
   field(config.label_config.label_use_const_weight, "label_use_const_weight");
+  field(config.label_config.enable_vmf_feature_accumulation,
+        "enable_vmf_feature_accumulation");
 
   check(config.min_place_width, GT, 0, "min_place_width");
   check(config.max_place_width, GT, 0, "max_place_width");

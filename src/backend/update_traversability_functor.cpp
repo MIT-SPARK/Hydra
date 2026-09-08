@@ -294,6 +294,22 @@ NodeAttributes::Ptr UpdateTraversabilityFunctor::mergeNodes(
       to_attrs.label_weights[label] += weight;
     }
 
+    // vMF sufficient statistics are additive across merges.
+    if (from_attrs.vmf_observation_count > 0u) {
+      if (to_attrs.vmf_feature_sum.size() == 0) {
+        to_attrs.vmf_feature_sum = from_attrs.vmf_feature_sum;
+      } else if (to_attrs.vmf_feature_sum.size() ==
+                 from_attrs.vmf_feature_sum.size()) {
+        to_attrs.vmf_feature_sum += from_attrs.vmf_feature_sum;
+      } else {
+        LOG_FIRST_N(WARNING, 1)
+            << "vMF dim mismatch during traversability node merge ("
+            << to_attrs.vmf_feature_sum.size() << " vs "
+            << from_attrs.vmf_feature_sum.size() << "); dropping observations";
+      }
+      to_attrs.vmf_observation_count += from_attrs.vmf_observation_count;
+    }
+
     // Simple case: If places are completely contained.
     if (isContained(from_boundary, to_boundary)) {
       continue;
@@ -505,6 +521,11 @@ void UpdateTraversabilityFunctor::resetNeighborFinder(
 
 void UpdateTraversabilityFunctor::computeDaaamDistances(
     const DynamicSceneGraph& dsg) const {
+  if (DaaamLabels::instance().config.use_vmf) {
+    computeVmfDistances(dsg);
+    return;
+  }
+
   const auto& layer = dsg.getLayer(config.layer);
   LazyDaaamLabels labels(dsg);
 
@@ -548,6 +569,42 @@ void UpdateTraversabilityFunctor::computeDaaamDistances(
     // LOG(INFO) << "\nUpdating edge " << NodeSymbol(edge_key.k1) << " <-> "
     //           << NodeSymbol(edge_key.k2) << ". Dims f1: " << f1.size()
     //           << ", f2: " << f2.size() << ", score: " << score;
+  }
+}
+
+void UpdateTraversabilityFunctor::computeVmfDistances(
+    const DynamicSceneGraph& dsg) const {
+  const auto& layer = dsg.getLayer(config.layer);
+
+  // Mark nodes whose vMF stats grew since the last pass; their incident edges
+  // need to be re-scored. attrs.distance is reset to be aggregated below.
+  EdgeSet to_update;
+  for (const auto& [node_id, node] : layer.nodes()) {
+    auto& attrs = node->attributes<TraversabilityNodeAttributes>();
+    if (attrs.vmf_observation_count == 0u) {
+      continue;
+    }
+    const auto it = previous_vmf_n_.find(node_id);
+    if (it != previous_vmf_n_.end() && it->second == attrs.vmf_observation_count) {
+      continue;
+    }
+    previous_vmf_n_[node_id] = attrs.vmf_observation_count;
+    attrs.distance = 0.0;  // reset distance to be aggregated below
+    for (const auto& to_id : node->siblings()) {
+      to_update.insert(EdgeKey(node_id, to_id));
+    }
+  }
+
+  for (const auto& edge_key : to_update) {
+    auto& edge = layer.getEdge(edge_key.k1, edge_key.k2);
+    auto& from_attrs =
+        layer.getNode(edge_key.k1).attributes<TraversabilityNodeAttributes>();
+    auto& to_attrs =
+        layer.getNode(edge_key.k2).attributes<TraversabilityNodeAttributes>();
+    const double score = DaaamLabels::getNodeScore(dsg, from_attrs, to_attrs);
+    edge.attributes().weight = score;
+    from_attrs.distance = std::max(from_attrs.distance, score);
+    to_attrs.distance = std::max(to_attrs.distance, score);
   }
 }
 

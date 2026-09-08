@@ -7,6 +7,8 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
+#include "hydra/utils/vmf_distance.h"
+
 namespace hydra {
 
 using FeatureType = DaaamLabels::Config::FeatureType;
@@ -21,6 +23,8 @@ void declare_config(DaaamLabels::Config& config) {
               {FeatureType::SENTENCE, "SENTENCE"},
               {FeatureType::BOTH, "BOTH"}});
   field(config.distance_metric, "distance_metric");
+  field(config.use_vmf, "use_vmf");
+  field(config.vmf_kappa_max, "vmf_kappa_max");
 }
 
 DaaamLabels::DaaamLabels(const Config& config)
@@ -121,6 +125,28 @@ float DaaamLabels::getScore(const FeatureVector& f1, const FeatureVector& f2) {
     return 0.0f;
   }
   return instance().distance_metric_->score(f1, f2);
+}
+
+float DaaamLabels::getNodeScore(const spark_dsg::DynamicSceneGraph& dsg,
+                                const spark_dsg::TraversabilityNodeAttributes& a,
+                                const spark_dsg::TraversabilityNodeAttributes& b) {
+  const auto& cfg = instance().config;
+  if (cfg.use_vmf) {
+    const auto sa = computeVmfStats(
+        a.vmf_feature_sum, a.vmf_observation_count, cfg.vmf_kappa_max);
+    const auto sb = computeVmfStats(
+        b.vmf_feature_sum, b.vmf_observation_count, cfg.vmf_kappa_max);
+    if (sa.valid && sb.valid) {
+      return vmfScore(sa, sb);
+    }
+    // Fallthrough to legacy max-label cosine when a node lacks observations.
+  }
+  const auto la = getMaxDaaamLabel(a.label_weights).first;
+  const auto lb = getMaxDaaamLabel(b.label_weights).first;
+  if (la < 0 || lb < 0) {
+    return 0.0f;
+  }
+  return getScore(dsg, la, lb);
 }
 
 DaaamLabels& DaaamLabels::instance() {
