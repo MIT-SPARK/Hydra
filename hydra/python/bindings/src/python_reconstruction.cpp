@@ -58,15 +58,22 @@ using namespace spark_dsg;
 namespace py = pybind11;
 
 namespace hydra::python {
+namespace {
+
+ReconstructionModule::Config default_config() {
+  ReconstructionModule::Config config;
+  config.volumetric_map = VolumetricMap::Config{0.1, 16, 0.3, false, false};
+  return config;
+}
+
+}  // namespace
 
 class PythonReconstruction {
  public:
   struct Config : VerbosityConfig {
-    Config() : VerbosityConfig("[python_reconstruction] ") {
-      reconstruction.volumetric_map.with_semantics = false;
-    }
+    Config() : VerbosityConfig("[python_reconstruction] ") {}
 
-    ReconstructionModule::Config reconstruction;
+    ReconstructionModule::Config reconstruction = default_config();
     std::vector<config::VirtualConfig<InputFilter, true>> filters;
     config::VirtualConfig<MeshCompressor> compression{MeshCompression::Config{}};
   } const config;
@@ -94,9 +101,6 @@ class PythonReconstruction {
   }
 
  protected:
-  bool reconstructAndStitch(const InputData::Ptr& data);
-  void updateMeshes(const ActiveWindowOutput& input);
-
   SensorInputPacket::Ptr last_input_;
   ActiveWindowModule::OutputQueue::Ptr queue_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
@@ -172,8 +176,7 @@ bool PythonReconstruction::stepImpl(const std::shared_ptr<SensorInputPacket>& pa
   data->world_T_body = odom_T_body;
   packet->fillInputData(*data);
 
-  const auto updated = module_->step(data);
-  if (!updated) {
+  if (!module_->step(data)) {
     return false;
   }
 
