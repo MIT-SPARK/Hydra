@@ -56,7 +56,30 @@ static const auto registration =
                                    KeyframeSelector,
                                    KeyframeSelector::Config>("KeyframeSelector");
 
+std::string showVec(const Eigen::MatrixXf& vec, size_t max_length = 100) {
+  if (vec.rows() * vec.cols() == 0) {
+    return "[]";
+  }
+
+  std::stringstream ss;
+  ss << "[";
+  for (int i = 0; i < vec.rows(); ++i) {
+    ss << std::setprecision(3) << vec(i, 0);
+    if (i < vec.rows() - 1) {
+      ss << ", ";
+    }
+
+    if (ss.str().size() >= max_length) {
+      ss << "...";
+      break;
+    }
+  }
+  ss << "]";
+
+  return ss.str();
 }
+
+}  // namespace
 
 using hydra::timing::ScopedTimer;
 
@@ -186,7 +209,10 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
       }
 
       ++num_seen;
-      if (view_selector_->selectFeature(views, config.max_range_difference_m, *attrs)) {
+      if (view_selector_->selectFeature(
+              views, config.max_range_difference_m, *attrs, config)) {
+        MLOG(4) << "node " << NodeSymbol(node.id).str() << ": "
+                << showVec(attrs->semantic_feature);
         ++num_assigned;
       }
     }

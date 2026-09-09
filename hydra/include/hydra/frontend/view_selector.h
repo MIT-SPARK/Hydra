@@ -4,6 +4,7 @@
 #include <opencv2/core/mat.hpp>
 
 #include "hydra/openset/openset_types.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -14,6 +15,7 @@ struct FeatureView {
   using Ptr = std::unique_ptr<FeatureView>;
   explicit FeatureView(const InputData& data);
 
+  const uint64_t timestamp_ns;
   const Sensor& sensor;
   const FeatureVector& feature;
   const cv::Mat range_image;
@@ -30,19 +32,22 @@ struct ViewSelector {
   virtual ~ViewSelector() = default;
   virtual bool selectFeature(const FeatureList& views,
                              float max_range_difference_m,
-                             spark_dsg::SemanticNodeAttributes& attrs) const = 0;
+                             spark_dsg::SemanticNodeAttributes& attrs,
+                             const VerbosityConfig& config = {}) const = 0;
 };
 
 struct ClosestViewSelector : ViewSelector {
   bool selectFeature(const FeatureList& views,
                      float max_range_difference_m,
-                     spark_dsg::SemanticNodeAttributes& attrs) const override;
+                     spark_dsg::SemanticNodeAttributes& attrs,
+                     const VerbosityConfig& config = {}) const override;
 };
 
 struct AverageViewSelector : ViewSelector {
   bool selectFeature(const FeatureList& views,
                      float max_range_difference_m,
-                     spark_dsg::SemanticNodeAttributes& attrs) const override;
+                     spark_dsg::SemanticNodeAttributes& attrs,
+                     const VerbosityConfig& config = {}) const override;
 };
 
 }  // namespace hydra
