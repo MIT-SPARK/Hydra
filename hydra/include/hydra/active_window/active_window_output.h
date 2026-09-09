@@ -45,14 +45,26 @@
 
 namespace hydra {
 
+// Mesh blocks are immutable while an output is being consumed. A batch archives
+// blocks first, then replaces blocks. Shared pointers retain only the final mesh
+// in each block lifetime when outputs are collated.
+struct MeshUpdateBatch {
+  uint64_t timestamp_ns = 0;
+  spatial_hash::BlockIndices archived;
+  std::vector<MeshBlock::ConstPtr> blocks;
+};
+
 struct ActiveWindowOutput {
   using Ptr = std::shared_ptr<ActiveWindowOutput>;
 
   ActiveWindowOutput() = default;
   virtual ~ActiveWindowOutput() = default;
 
+  //! Ordered, compacted mesh changes (also available for uncollated outputs).
+  std::vector<MeshUpdateBatch> meshUpdates() const;
+
   //! Timestamp of update
-  uint64_t timestamp_ns;
+  uint64_t timestamp_ns = 0;
   //! Sensor data from last update
   InputData::ConstPtr sensor_data;
   //! New nodes to add to the scene graph
@@ -93,6 +105,7 @@ struct ActiveWindowOutput {
 
  protected:
   std::shared_ptr<VolumetricMap> map_;
+  std::vector<MeshUpdateBatch> mesh_updates_;
 };
 
 }  // namespace hydra

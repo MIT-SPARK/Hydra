@@ -10,6 +10,7 @@ add_executable(
   test_${PROJECT_NAME}
   main.cpp
   src/resources.cpp
+  active_window/test_active_window_output.cpp
   backend/test_deformation_interpolator.cpp
   backend/test_external_loop_closure.cpp
   backend/test_merge_tracker.cpp

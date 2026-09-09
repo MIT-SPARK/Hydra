@@ -36,6 +36,9 @@
 
 #include <glog/logging.h>
 
+#include <algorithm>
+#include <iterator>
+
 namespace hydra {
 
 const VolumetricMap& ActiveWindowOutput::map() const {
@@ -43,11 +46,85 @@ const VolumetricMap& ActiveWindowOutput::map() const {
   return *map_;
 }
 
+std::vector<MeshUpdateBatch> ActiveWindowOutput::meshUpdates() const {
+  if (!mesh_updates_.empty()) {
+    return mesh_updates_;
+  }
+
+  MeshUpdateBatch batch;
+  batch.timestamp_ns = timestamp_ns;
+  batch.archived = archived;
+  if (map_) {
+    const auto& layer = map_->getMeshLayer();
+    for (const auto& block : layer) {
+      batch.blocks.push_back(layer.getBlockPtr(block.index));
+    }
+    std::sort(
+        batch.blocks.begin(), batch.blocks.end(), [](const auto& a, const auto& b) {
+          for (int i = 0; i < 3; ++i) {
+            if (a->index[i] != b->index[i]) {
+              return a->index[i] < b->index[i];
+            }
+          }
+          return false;
+        });
+  }
+  return {std::move(batch)};
+}
+
 void ActiveWindowOutput::updateFrom(ActiveWindowOutput&& msg, bool clone_map) {
+  auto batches = meshUpdates();
+  auto incoming = msg.meshUpdates();
+  batches.insert(batches.end(),
+                 std::make_move_iterator(incoming.begin()),
+                 std::make_move_iterator(incoming.end()));
+  spatial_hash::IndexHashMap<std::pair<size_t, size_t>> pending;
+  for (size_t i = 0; i < batches.size(); ++i) {
+    auto& batch = batches[i];
+    for (const auto& index : batch.archived) {
+      // An archive closes a lifetime. Its final payload must survive a later
+      // replacement at the same block index.
+      pending.erase(index);
+    }
+    for (size_t j = 0; j < batch.blocks.size(); ++j) {
+      const auto& block = batch.blocks[j];
+      auto previous = pending.find(block->index);
+      if (previous != pending.end()) {
+        const auto [old_batch, old_block] = previous->second;
+        batches[old_batch].blocks[old_block].reset();
+      }
+      pending[block->index] = {i, j};
+    }
+  }
+  for (auto& batch : batches) {
+    auto& blocks = batch.blocks;
+    blocks.erase(std::remove(blocks.begin(), blocks.end(), nullptr), blocks.end());
+  }
+  batches.erase(std::remove_if(batches.begin(),
+                               batches.end(),
+                               [](const auto& batch) {
+                                 return batch.blocks.empty() && batch.archived.empty();
+                               }),
+                batches.end());
+
+  // One snapshot per archive barrier: without an intervening archive all
+  // retained replacements can be processed together, avoiding repeated full
+  // clustering/compression when the frontend falls behind.
+  std::vector<MeshUpdateBatch> compacted;
+  for (auto& batch : batches) {
+    if (!compacted.empty() && batch.archived.empty()) {
+      auto& previous = compacted.back();
+      previous.timestamp_ns = batch.timestamp_ns;
+      previous.blocks.insert(
+          previous.blocks.end(), batch.blocks.begin(), batch.blocks.end());
+    } else {
+      compacted.push_back(std::move(batch));
+    }
+  }
+  batches = std::move(compacted);
+
   timestamp_ns = msg.timestamp_ns;
   sensor_data = msg.sensor_data;
-  // TODO(nathan) this leads to incorrect behavior if we add in one update but then
-  // archive in another
   archived.insert(archived.end(), msg.archived.begin(), msg.archived.end());
 
   // append graph updates to current message
@@ -76,15 +153,41 @@ void ActiveWindowOutput::updateFrom(ActiveWindowOutput&& msg, bool clone_map) {
     map_ = !clone_map ? msg.map_ : std::make_shared<VolumetricMap>(msg.map_->config);
   }
 
-  map_->updateFrom(*msg.map_);
+  // Detach replaced mesh blocks before merging: retained events may still refer
+  // to the previous generation. Other volumetric layers need only the final state.
+  if (map_ != msg.map_) {
+    map_->removeBlocks(msg.archived);
+    for (const auto& block : msg.map_->getMeshLayer()) {
+      map_->getMeshLayer().removeBlock(block.index);
+    }
+    map_->updateFrom(*msg.map_);
+  }
+
+  // Share the final payload with the collated map instead of keeping a second
+  // copy. Older generations remain owned only by their event records.
+  spatial_hash::IndexSet seen;
+  for (auto it = batches.rbegin(); it != batches.rend(); ++it) {
+    for (auto& block : it->blocks) {
+      if (seen.insert(block->index).second) {
+        const auto latest = map_->getMeshLayer().getBlockPtr(block->index);
+        if (latest) {
+          block = latest;
+        }
+      }
+    }
+    seen.insert(it->archived.begin(), it->archived.end());
+  }
+  mesh_updates_ = std::move(batches);
 }
 
 void ActiveWindowOutput::setMap(const VolumetricMap& map) {
+  mesh_updates_.clear();
   auto new_map = map.clone();
   map_.reset(new_map.release());
 }
 
 void ActiveWindowOutput::setMap(const std::shared_ptr<VolumetricMap>& map) {
+  mesh_updates_.clear();
   map_ = map;
 }
 
