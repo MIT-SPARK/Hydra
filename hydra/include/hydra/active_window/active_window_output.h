@@ -45,9 +45,20 @@
 
 namespace hydra {
 
-// Mesh blocks are immutable while an output is being consumed. A batch archives
-// blocks first, then replaces blocks. Shared pointers retain only the final mesh
-// in each block lifetime when outputs are collated.
+// Batches archive blocks before applying replacements. Payloads are immutable
+// while an output is in use; only the latest update in each lifetime is retained.
+struct MapUpdateBatch {
+  uint64_t timestamp_ns = 0;
+  spatial_hash::BlockIndices archived;
+  std::vector<TsdfBlock::ConstPtr> tsdf;
+  std::vector<MeshBlock::ConstPtr> mesh;
+  std::vector<SemanticBlock::ConstPtr> semantic;
+  std::vector<TrackingBlock::ConstPtr> tracking;
+
+  bool empty() const;
+};
+
+// Compatibility view for consumers that only need mesh updates.
 struct MeshUpdateBatch {
   uint64_t timestamp_ns = 0;
   spatial_hash::BlockIndices archived;
@@ -60,7 +71,10 @@ struct ActiveWindowOutput {
   ActiveWindowOutput() = default;
   virtual ~ActiveWindowOutput() = default;
 
-  //! Ordered, compacted mesh changes (also available for uncollated outputs).
+  //! Ordered changes for every volumetric layer, including uncollated outputs.
+  std::vector<MapUpdateBatch> mapUpdates() const;
+
+  //! Ordered mesh changes projected from mapUpdates().
   std::vector<MeshUpdateBatch> meshUpdates() const;
 
   //! Timestamp of update
@@ -95,6 +109,9 @@ struct ActiveWindowOutput {
    */
   virtual void updateFrom(ActiveWindowOutput&& msg, bool clone_map);
 
+  //! Whether final-map consumers can process both messages in a single pass.
+  bool canCollate(const ActiveWindowOutput& msg) const;
+
   /*
    * @brief Get the body pose from when this packet was created
    */
@@ -105,7 +122,10 @@ struct ActiveWindowOutput {
 
  protected:
   std::shared_ptr<VolumetricMap> map_;
-  std::vector<MeshUpdateBatch> mesh_updates_;
+  void updateMap(const ActiveWindowOutput& msg, bool clone_map);
+  void appendGraphUpdate(GraphUpdate& update);
+
+  std::vector<MapUpdateBatch> map_updates_;
 };
 
 }  // namespace hydra

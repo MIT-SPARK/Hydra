@@ -247,6 +247,13 @@ void GraphBuilder::spin() {
       continue;
     }
 
+    // Final-map callbacks cannot replay updates across a block lifetime boundary.
+    // Keep the next packet queued until the current collated input is dispatched.
+    if (input && !input->canCollate(*queue_->front())) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      continue;
+    }
+
     processNextInput(*queue_->front());
 
     // from this point on, we build an input packet by collating the maps together of

@@ -278,6 +278,10 @@ void VolumetricMap::updateFrom(const VolumetricMap& other) {
   if (has_semantics) {
     mergeLayer(*other.semantic_layer_, *semantic_layer_);
   }
+
+  if (tracking_layer_ && other.tracking_layer_) {
+    mergeLayer(*other.tracking_layer_, *tracking_layer_);
+  }
 }
 
 }  // namespace hydra
