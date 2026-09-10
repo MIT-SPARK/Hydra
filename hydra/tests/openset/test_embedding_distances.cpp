@@ -2,6 +2,15 @@
 #include <hydra/openset/embedding_distances.h>
 
 namespace hydra {
+namespace {
+
+Eigen::VectorXf getOneHot(size_t i, size_t dim) {
+  Eigen::VectorXf p = Eigen::VectorXf::Zero(dim);
+  p(i) = 1.0;
+  return p;
+}
+
+}  // namespace
 
 TEST(EmbeddingDistances, TestCosineCorrect) {
   FeatureVector a = FeatureVector::Zero(10);
@@ -69,11 +78,15 @@ TEST(EmbeddingDistances, TestL2Norm) {
   EXPECT_NEAR(dist.dist(a, b), 0.0f, 1.0e-9f);
 }
 
-/*
-// TODO(nathan) move embedding group fixture over
 TEST(EmbeddingDistances, TestLerf) {
+  EmbeddingGroup features;
+  for (size_t i = 0; i < 3; ++i) {
+    features.embeddings.push_back(getOneHot(i, 10));
+    features.names.push_back(std::to_string(i));
+  }
+
   LerfScore::Config config;
-  config.cannonical_features = test::TestEmbeddingGroup::getDefault();
+  config.cannonical_features = features;
   LerfScore dist(config);
 
   FeatureVector a = FeatureVector::Zero(10);
@@ -97,6 +110,5 @@ TEST(EmbeddingDistances, TestLerf) {
   a(0) = 0.0f;
   EXPECT_NEAR(dist.score(a, b), 0.5f, 1.0e-9f);
 }
-*/
 
 }  // namespace hydra
