@@ -56,7 +56,6 @@ void declare_config(TraversabilityVisualizer::Config& config) {
   field(config.confidence_colormap, "confidence_colormap");
   field(config.state_colors, "state_colors");
   field(config.drawing_offset_z, "drawing_offset_z", "m");
-  field(config.use_relative_offset, "use_relative_offset");
   check(config.state_colors.size(), EQ, 4, "state_colors");
 }
 
@@ -124,8 +123,7 @@ void TraversabilityVisualizer::visualizeLayer(
   msg4.ns = "debug";
 
   // Additive offset applied on top of each voxel's own surface height.
-  const auto z_offset = active_config_.drawing_offset_z +
-                        (active_config_.use_relative_offset ? world_t_body.z() : 0.0);
+  const auto z_offset = active_config_.drawing_offset_z;
   geometry_msgs::msg::Point pos;
 
   for (const auto& block : layer) {
