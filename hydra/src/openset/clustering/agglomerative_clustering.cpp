@@ -127,12 +127,12 @@ ClusterWorkspace::Workspace(const ClusteringConfig& config,
   py_z = py_x;  // p(y|z) = p(y|x) (as p(z) = p(x) and p(z|x) = I_n
 
   const auto fmt = getDefaultFormat();
-  VLOG(10) << "p(x): " << px.format(fmt);
-  VLOG(10) << "p(z): " << pz.format(fmt);
-  VLOG(10) << "p(y): " << py.format(fmt);
-  VLOG(10) << "p(y|x): " << py_x.format(fmt);
-  VLOG(10) << "p(y|z): " << py_z.format(fmt);
-  VLOG(10) << "p(z|x): " << pz_x.format(fmt);
+  MLOG(3) << "p(x): " << px.format(fmt);
+  MLOG(3) << "p(z): " << pz.format(fmt);
+  MLOG(3) << "p(y): " << py.format(fmt);
+  MLOG(3) << "p(y|x): " << py_x.format(fmt);
+  MLOG(3) << "p(y|z): " << py_z.format(fmt);
+  MLOG(3) << "p(z|x): " << pz_x.format(fmt);
 
   // initialize mutual information to starting values;
   I_xy = mutualInformation(py, px, py_x);
@@ -170,9 +170,8 @@ double ClusterWorkspace::score(const EdgeKey& edge) const {
   const auto divergence = jensenShannonDivergence(py_z_local, prior);
 
   const auto fmt = getDefaultFormat();
-  VLOG(20) << "Scoring edge (" << edge << "): prior: " << prior.format(fmt)
-           << ", p(y|z=z): " << py_z_local.format(fmt)
-           << ", divergence: " << divergence;
+  MLOG(5) << "Scoring edge (" << edge << "): prior: " << prior.format(fmt)
+          << ", p(y|z=z): " << py_z_local.format(fmt) << ", divergence: " << divergence;
 
   return total * divergence;
 }
@@ -200,11 +199,11 @@ bool AgglomerativeClustering::Workspace::merge(EdgeKey key,
 
   // avoid divide-by-zero and other weirdness with precision
   const auto delta = delta_weight * d_I_zy / I_xy;
-  VLOG(10) << "delta for (" << key << "): " << delta;
+  MLOG(2) << "delta for (" << key << "): " << delta;
 
   I_zy_prev = I_zy;
   deltas.push_back(delta);
-  if (!force && delta < config.max_delta) {
+  if (!force && delta >= config.max_delta) {
     return false;
   }
 
@@ -265,17 +264,17 @@ Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
   Eigen::MatrixXd py_x_temp = Eigen::MatrixXd::Zero(M, N);
   py_x_temp.row(0).setConstant(config.score_threshold);
 
-  VLOG(15) << "----------------------------------------";
-  VLOG(15) << "Computing workspace feature scores";
-  VLOG(15) << "----------------------------------------";
+  MLOG(3) << "----------------------------------------";
+  MLOG(3) << "Computing workspace feature scores";
+  MLOG(3) << "----------------------------------------";
 
   for (size_t idx = 0; idx < features.size(); ++idx) {
     const auto scores = tasks.getScores(metric, features[idx]);
-    VLOG(15) << "scores @ " << idx << ": " << scores.format(fmt);
+    MLOG(3) << "scores @ " << idx << ": " << scores.format(fmt);
     py_x_temp.block(1, idx, M - 1, 1) = scores.cast<double>();
   }
 
-  VLOG(15) << "----------------------------------------";
+  MLOG(3) << "----------------------------------------";
 
   size_t k = std::min(M, config.top_k);
   size_t l = k;
@@ -305,20 +304,20 @@ Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
     }
   }
 
-  VLOG(10) << "raw: p(y|x): " << py_x.format(fmt);
+  MLOG(3) << "raw: p(y|x): " << py_x.format(fmt);
 
   const auto scored = py_x.bottomRows(M - 1);
   const auto min = scored.rowwise().minCoeff();
   const auto max = scored.rowwise().maxCoeff();
   const auto avg = scored.rowwise().mean();
 
-  VLOG(10) << "score average: " << avg.format(fmt) << ", range: " << min.format(fmt)
-           << " -> " << max.format(fmt);
+  MLOG(3) << "score average: " << avg.format(fmt) << ", range: " << min.format(fmt)
+          << " -> " << max.format(fmt);
 
   const auto norm_factor = py_x.colwise().sum();
   py_x.array().rowwise() /= norm_factor.array();
 
-  VLOG(10) << "p(y|x): " << py_x.format(fmt);
+  MLOG(3) << "p(y|x): " << py_x.format(fmt);
 
   return py_x;
 }
@@ -326,6 +325,7 @@ Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
 void declare_config(AgglomerativeClustering::ClusteringConfig& config) {
   using namespace config;
   name("AgglomerativeClustering::ClusteringConfig");
+  base<VerbosityConfig>(config);
   field(config.score_threshold, "score_threshold");
   field(config.top_k, "top_k");
   field(config.cumulative, "cumulative");
@@ -339,7 +339,6 @@ void declare_config(AgglomerativeClustering::ClusteringConfig& config) {
 void declare_config(AgglomerativeClustering::Config& config) {
   using namespace config;
   name("AgglomerativeClustering::Config");
-  base<VerbosityConfig>(config);
   base<AgglomerativeClustering::ClusteringConfig>(config);
   field(config.tasks, "tasks");
   config.metric.setOptional();
@@ -361,7 +360,7 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
 
   Workspace ws(config, layer.edges(), features, *tasks_, *metric_);
   MLOG(1) << "starting clustering with " << ws.edges.size() << " edges";
-  cluster(ws);
+  cluster(ws, config);
   MLOG(1) << ws.summary();
 
   const auto cluster_nodes = ws.getClusters();
@@ -401,17 +400,17 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
   return to_return;
 }
 
-void AgglomerativeClustering::cluster(Workspace& ws) {
-  VLOG(10) << "-----------------------------------";
-  VLOG(10) << "Scoring edges";
-  VLOG(10) << "-----------------------------------";
+void AgglomerativeClustering::cluster(Workspace& ws, const VerbosityConfig& config) {
+  MLOG(3) << "-----------------------------------";
+  MLOG(3) << "Scoring edges";
+  MLOG(3) << "-----------------------------------";
 
   for (auto& [edge, weight] : ws.edges) {
     weight = ws.score(edge);
-    VLOG(10) << "edge (" << edge << "): " << weight;
+    MLOG(3) << "edge (" << edge << "): " << weight;
   }
 
-  VLOG(10) << "-----------------------------------";
+  MLOG(3) << "-----------------------------------";
 
   for (size_t i = 0; i < ws.order.size(); ++i) {
     if (ws.edges.empty()) {
@@ -426,34 +425,33 @@ void AgglomerativeClustering::cluster(Workspace& ws) {
         });
     CHECK(best_edge_ptr != ws.edges.end());
 
-    if (VLOG_IS_ON(15)) {
-      VLOG(15) << "***********************************";
-      VLOG(15) << "Candidates";
-      VLOG(15) << "***********************************";
-      for (auto&& [edge, weight] : ws.edges) {
-        VLOG(15) << "edge (" << edge << "): " << weight;
-      }
-      VLOG(15) << "***********************************";
+    MLOG(4) << "***********************************";
+    MLOG(4) << "Candidates";
+    MLOG(4) << "***********************************";
+    for (auto&& [edge, weight] : ws.edges) {
+      MLOG(4) << "edge (" << edge << "): " << weight;
     }
+    MLOG(4) << "***********************************";
 
     const auto best_edge = best_edge_ptr->first;
     std::list<EdgeKey> changed_edges;
     if (!ws.merge(best_edge, changed_edges)) {
+      MLOG(3) << "Finished clustering (did not merge " << best_edge << ")";
       // we've hit a stop criteria
       break;
     }
 
-    VLOG(10) << "-----------------------------------";
-    VLOG(10) << "Scoring changed edges";
-    VLOG(10) << "-----------------------------------";
+    MLOG(3) << "-----------------------------------";
+    MLOG(3) << "Scoring changed edges";
+    MLOG(3) << "-----------------------------------";
 
     for (const auto& edge : changed_edges) {
       const auto score = ws.score(edge);
       ws.edges[edge] = score;
-      VLOG(10) << "edge " << edge << ": " << score;
+      MLOG(3) << "edge " << edge << ": " << score;
     }
 
-    VLOG(10) << "-----------------------------------";
+    MLOG(3) << "-----------------------------------";
   }
 }
 
