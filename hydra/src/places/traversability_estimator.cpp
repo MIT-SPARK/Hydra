@@ -61,9 +61,6 @@ BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) {
   return block_indices;
 }
 
-//! Minimum TSDF weight for a voxel to count as observed.
-constexpr float kMinTsdfWeight = 1e-6f;
-
 static const std::array<Index2D, 8> kNeighborOffsets = {{
     {0, -1},   // bottom
     {-1, 0},   // left
@@ -230,6 +227,7 @@ void declare_config(HeightTraversabilityEstimator::Config& config) {
   base<TraversabilityEstimator::Config>(config);
   field(config.height_above, "height_above", "m");
   field(config.height_below, "height_below", "m");
+  field(config.min_weight, "min_weight");
   checkCondition(config.height_above >= -config.height_below,
                  "'height_above' and 'height_below' don't span any volume");
 }
@@ -292,7 +290,7 @@ void HeightTraversabilityEstimator::computeTraversability(
                                                 curr_z,
                                                 config.height_below,
                                                 config.height_above,
-                                                kMinTsdfWeight);
+                                                config.min_weight);
 
   const VoxelKey min_height =
       tsdf_layer_->getVoxelKey(Point(0, 0, curr_z - config.height_below));
@@ -328,7 +326,7 @@ void HeightTraversabilityEstimator::computeTraversability(
           for (int z = min_voxel_z; z <= max_voxel_z; ++z) {
             const auto& tsdf_voxel = tsdf_block->getVoxel(VoxelIndex(x, y, z));
             // Count number of observed and free voxels.
-            if (tsdf_voxel.weight < kMinTsdfWeight) {
+            if (tsdf_voxel.weight < config.min_weight) {
               continue;
             }
             traversability_voxel.confidence += 1.0f;

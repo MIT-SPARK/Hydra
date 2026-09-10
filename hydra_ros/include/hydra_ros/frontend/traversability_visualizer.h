@@ -68,9 +68,6 @@ class TraversabilityVisualizer : public places::TraversabilityPlaceExtractor::Si
     //! Offset added on top of each voxel's own surface height [m]. Useful to lift
     //! the overlay clear of the mesh.
     float drawing_offset_z = 0.0f;
-    //! True: additionally offset by the robot height. Off by default since voxel
-    //! heights are already absolute.
-    bool use_relative_offset = false;
     //! Alpha value to use for the voxel colors.
     double alpha = 0.3;
   };
