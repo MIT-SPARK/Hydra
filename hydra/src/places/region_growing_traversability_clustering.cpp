@@ -109,7 +109,7 @@ void RegionGrowingTraversabilityClustering::updateGraph(
   mergeRegions(assignment, graph);
 
   // Update the DSG.
-  updatePlaceNodesInDsg(graph, layer_name, layer);
+  updatePlaceNodesInDsg(graph, layer_name, msg, layer);
   updatePlaceEdgesInDsg(graph);
   visualizeAssignments(layer, assignment);
   pruneRegions();
@@ -274,6 +274,7 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
 void RegionGrowingTraversabilityClustering::updatePlaceNodesInDsg(
     SceneGraph& graph,
     const std::string& layer_name,
+    const ActiveWindowOutput& msg,
     const TraversabilityLayer& layer) {
   for (auto& [id, region] : regions_) {
     const bool is_valid = region.voxels.size() > 0;
@@ -283,7 +284,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodesInDsg(
       // Node does not exist yet, create a new place node.
       if (is_valid) {
         auto attrs = std::make_unique<TravNodeAttributes>();
-        updatePlaceNodeAttributes(*attrs, region, layer);
+        updatePlaceNodeAttributes(*attrs, region, msg, layer);
         graph.emplaceNode(layer_name, id, std::move(attrs));
       }
       continue;
@@ -297,7 +298,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodesInDsg(
 
     // Update the place attributes.
     auto& attrs = node->attributes<TravNodeAttributes>();
-    updatePlaceNodeAttributes(attrs, region, layer);
+    updatePlaceNodeAttributes(attrs, region, msg, layer);
   }
 }
 
@@ -362,7 +363,10 @@ void RegionGrowingTraversabilityClustering::visualizeAssignments(
 }
 
 void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
-    TravNodeAttributes& attrs, Region& region, const TraversabilityLayer& layer) const {
+    TravNodeAttributes& attrs,
+    Region& region,
+    const ActiveWindowOutput& msg,
+    const TraversabilityLayer& layer) const {
   // Position.
   const auto centroid_index = region.centroid.cast<int>();
   if (region.voxels.count(centroid_index)) {
@@ -412,6 +416,24 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     attrs.first_observed_ns = current_time_ns_;
   }
   attrs.last_observed_ns = current_time_ns_;
+
+  // has to come after setting the points because spark-dsg uses position to set radii
+  size_t num_valid = 0;
+  float z_value = 0.0f;
+  for (const auto& idx : region.voxels) {
+    const auto voxel = layer.voxel(idx);
+    if (voxel && voxel->height) {
+      z_value += *voxel->height;
+      ++num_valid;
+    }
+  }
+
+  // fallback to current robot height
+  if (num_valid) {
+    attrs.position.z() = z_value / num_valid;
+  } else {
+    attrs.position.z() = msg.world_T_body().translation().z();
+  }
 }
 
 RegionGrowingTraversabilityClustering::Region&
