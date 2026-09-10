@@ -160,7 +160,7 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
     const auto stamp = frame->timestamp_ns;
 
     const auto fmt = getDefaultFormat(3);
-    MLOG(3) << "view @ " << stamp << "[ns]: " << pos.format(fmt) << " vs. "
+    MLOG(4) << "view @ " << stamp << "[ns]: " << pos.format(fmt) << " vs. "
             << msg.world_T_body().translation().format(fmt);
 
     if (!window.inBounds(msg.timestamp_ns, msg.world_T_body(), stamp, pos)) {

@@ -2,7 +2,6 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
 
 #include "hydra/input/input_data.h"
 
@@ -58,19 +57,16 @@ bool FeatureView::pointInView(const Eigen::Vector3d& point_w,
 
 bool ClosestViewSelector::selectFeature(const FeatureList& views,
                                         float max_range_difference_m,
-                                        SemanticNodeAttributes& attrs,
-                                        const VerbosityConfig& config) const {
+                                        SemanticNodeAttributes& attrs) const {
   const FeatureView* best_view = nullptr;
   double min_dist = std::numeric_limits<double>::max();
   for (const auto& view : views) {
     if (view.feature.size() == 0) {
-      MLOG(4) << "View @ " << view.timestamp_ns << " [ns] is empty!";
       continue;
     }
 
     Eigen::Vector3d p_s;
     if (!view.pointInView(attrs.position, max_range_difference_m, &p_s)) {
-      MLOG(4) << "Out of frame for view @ " << view.timestamp_ns << " [ns]";
       continue;
     }
 
@@ -83,7 +79,6 @@ bool ClosestViewSelector::selectFeature(const FeatureList& views,
   }
 
   if (best_view) {
-    MLOG(4) << "Found valid view @ " << best_view->timestamp_ns << " [ns]";
     attrs.semantic_feature = best_view->feature;
   }
 
@@ -92,17 +87,14 @@ bool ClosestViewSelector::selectFeature(const FeatureList& views,
 
 bool AverageViewSelector::selectFeature(const FeatureList& views,
                                         float max_range_difference_m,
-                                        SemanticNodeAttributes& attrs,
-                                        const VerbosityConfig& config) const {
+                                        SemanticNodeAttributes& attrs) const {
   size_t num_visible = 0;
   for (const auto& view : views) {
     if (view.feature.size() == 0) {
-      MLOG(4) << "View @ " << view.timestamp_ns << " [ns] is empty!";
       continue;
     }
 
     if (!view.pointInView(attrs.position, max_range_difference_m)) {
-      MLOG(4) << "Out of frame for view @ " << view.timestamp_ns << " [ns]";
       continue;
     }
 
@@ -115,7 +107,6 @@ bool AverageViewSelector::selectFeature(const FeatureList& views,
   }
 
   if (num_visible > 0) {
-    MLOG(4) << "Found valid views!";
     attrs.semantic_feature /= num_visible;
   }
 

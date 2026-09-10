@@ -17,7 +17,7 @@ active_window:
 frontend:
   mesh_resolution: 0.005
   keyframe_selector:
-    verbosity: 4
+    verbosity: 3
     max_range_difference_m: 0.5
     sinks:
       - {type: KeyframeVisualizer}
@@ -30,7 +30,7 @@ frontend:
     type: traversability
     layer: PLACES
     estimator: {type: HeightTraversabilityEstimator, height_below: 0, height_above: 0.5, min_confidence: 1.0, min_traversability: 1.0, pessimistic: true}
-    clustering: {type: RegionGrowingTraversabilityClustering, max_radius: 4.0, num_orientation_bins: 20}
+    clustering: {type: RegionGrowingTraversabilityClustering, max_radius: 2.0, num_orientation_bins: 20}
     sinks:
       - {type: TraversabilityVisualizer}
 backend:
@@ -50,7 +50,7 @@ backend:
           type: RosEmbeddingGroup
           ns: ~/regions
           verbosity: 1
-          prompts: [an image of a cubicle group, an image of a hallway, an image of a bathroom, an image of a conference room, an image of a reception area, an image of a personal office]
+          prompts: [an image of a cubicle group, an image of a hallway, an image of a bathroom, an image of a conference room, an image of a reception area, an image of an office]
   pgmo:
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 3
