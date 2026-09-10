@@ -127,6 +127,7 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
     packet.updateFrom(curr_packet);
     if (!curr_packet.pose_graphs.empty()) {
       keyframes_.push_back(data);
+      ++num_added;
     }
   }
 
@@ -209,16 +210,17 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
       }
 
       ++num_seen;
-      if (view_selector_->selectFeature(
-              views, config.max_range_difference_m, *attrs, config)) {
-        MLOG(4) << "node " << NodeSymbol(node.id).str() << ": "
+      if (view_selector_->selectFeature(views, config.max_range_difference_m, *attrs)) {
+        MLOG(5) << "node " << NodeSymbol(node.id).str() << ": "
                 << showVec(attrs->semantic_feature);
         ++num_assigned;
       }
     }
 
-    MLOG(2) << "Assigned features to " << num_assigned << " / " << num_seen
-            << " nodes for layer '" << name << "'";
+    if (num_seen) {
+      MLOG(2) << "Assigned features to " << num_assigned << " / " << num_seen
+              << " nodes for layer '" << name << "'";
+    }
   }
 }
 

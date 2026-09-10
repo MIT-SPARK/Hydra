@@ -148,13 +148,18 @@ struct StatusFunctor {
 };
 
 struct IsActiveFunctor : StatusFunctor {
-  virtual bool eval(const spark_dsg::SceneGraph& graph,
-                    const spark_dsg::SceneGraphNode& node) const override;
+  bool eval(const spark_dsg::SceneGraph& graph,
+            const spark_dsg::SceneGraphNode& node) const override;
 };
 
 struct HasActiveMeshFunctor : StatusFunctor {
-  virtual bool eval(const spark_dsg::SceneGraph& graph,
-                    const spark_dsg::SceneGraphNode& node) const override;
+  bool eval(const spark_dsg::SceneGraph& graph,
+            const spark_dsg::SceneGraphNode& node) const override;
+};
+
+struct HasFeatureFunctor : StatusFunctor {
+  bool eval(const spark_dsg::SceneGraph& graph,
+            const spark_dsg::SceneGraphNode& node) const override;
 };
 
 struct StatusColorAdapter : NodeColorAdapter {
