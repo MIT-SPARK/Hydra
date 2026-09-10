@@ -17,7 +17,7 @@ active_window:
 frontend:
   mesh_resolution: 0.005
   keyframe_selector:
-    verbosity: 2
+    verbosity: 1
     max_range_difference_m: 0.5
     sinks:
       - {type: KeyframeVisualizer}
@@ -41,7 +41,8 @@ backend:
     regions:
       type: IBRegionsUpdateFunctor
       clustering:
-        max_delta: 0.010
+        verbosity: 1
+        max_delta: 0.02
         score_threshold: 0.21
         top_k: 2
         cumulative: true
@@ -50,7 +51,7 @@ backend:
           type: RosEmbeddingGroup
           ns: ~/regions
           verbosity: 1
-          prompts: [an image of a cubicle group, an image of a hallway, an image of a bathroom, an image of a conference room, an image of a reception area, an image of an office]
+          prompts: [an image of a hallway, an image of a bathroom, an image of a conference room, an image of an office]
   pgmo:
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 3

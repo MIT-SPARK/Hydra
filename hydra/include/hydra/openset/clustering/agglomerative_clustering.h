@@ -12,7 +12,7 @@ namespace hydra {
 
 class AgglomerativeClustering {
  public:
-  struct ClusteringConfig {
+  struct ClusteringConfig : VerbosityConfig {
     float score_threshold = 0.23f;
     size_t top_k = 2;
     bool cumulative = true;
@@ -20,7 +20,7 @@ class AgglomerativeClustering {
     double max_delta = 1.0e-3;
   };
 
-  struct Config : VerbosityConfig, ClusteringConfig {
+  struct Config : ClusteringConfig {
     config::VirtualConfig<EmbeddingGroup> tasks;
     config::VirtualConfig<EmbeddingDistance> metric{CosineDistance::Config()};
     bool filter_clusters = false;
@@ -99,7 +99,7 @@ class AgglomerativeClustering {
   Clusters cluster(const spark_dsg::SceneGraphLayer& layer,
                    const NodeEmbeddingMap& embeddings) const;
 
-  static void cluster(Workspace& workspace);
+  static void cluster(Workspace& workspace, const VerbosityConfig& config = {});
 
  protected:
   EmbeddingGroup::Ptr tasks_;
