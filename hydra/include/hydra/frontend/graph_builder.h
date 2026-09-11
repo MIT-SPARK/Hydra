@@ -161,7 +161,6 @@ class GraphBuilder : public Module {
 
   std::unique_ptr<VolumetricWindow> map_window_;
   std::unique_ptr<MeshSegmenter> segmenter_;
-  std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
   std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
 
