@@ -63,7 +63,7 @@ struct VmfStats {
 float estimateVmfKappa(float r_bar, size_t d, uint32_t n, float kappa_max = 500.0f);
 
 VmfStats computeVmfStats(const Eigen::VectorXf& feature_sum,
-                         uint32_t observation_count,
+                         size_t observation_count,
                          float kappa_max = 500.0f);
 
 float vmfDistance(const VmfStats& a, const VmfStats& b);

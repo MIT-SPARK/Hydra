@@ -38,8 +38,8 @@
 #include <memory>
 
 #include "hydra/common/output_sink.h"
+#include "hydra/frontend/feature_selector.h"
 #include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/frontend/view_selector.h"
 #include "hydra/utils/active_window_tracker.h"
 #include "hydra/utils/logging.h"
 
@@ -55,10 +55,8 @@ class KeyframeSelector : public GraphBuilderFunctor {
 
     //! Method for extracting pose graph from incoming poses
     config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
-    //! Method to control mapping from views to resulting feature
-    std::string view_selection_method = "average";
-    //! Max range beyond range image
-    double max_range_difference_m = 0.1;
+    //! Method to control mapping from views to resulting feature for a node
+    config::VirtualConfig<FeatureSelector> feature_selector;
     //! Layers to assign views for
     std::vector<std::string> layers{spark_dsg::DsgLayers::PLACES,
                                     spark_dsg::DsgLayers::MESH_PLACES};
@@ -81,7 +79,7 @@ class KeyframeSelector : public GraphBuilderFunctor {
 
   Sink::List sinks_;
   std::unique_ptr<PoseGraphTracker> tracker_;
-  std::unique_ptr<ViewSelector> view_selector_;
+  std::unique_ptr<FeatureSelector> feature_selector_;
 
   std::list<InputData::ConstPtr> keyframes_;
   mutable std::map<std::string, ActiveWindowTracker> active_window_;

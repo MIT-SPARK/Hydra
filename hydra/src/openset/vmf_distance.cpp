@@ -55,7 +55,7 @@ float estimateVmfKappa(float r_bar, size_t d, uint32_t n, float kappa_max) {
 }
 
 VmfStats computeVmfStats(const Eigen::VectorXf& feature_sum,
-                         uint32_t observation_count,
+                         size_t observation_count,
                          float kappa_max) {
   VmfStats s;
   s.n = observation_count;
