@@ -89,8 +89,7 @@ void declare_config(KeyframeSelector::Config& config) {
   base<VerbosityConfig>(config);
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
-  field(config.view_selection_method, "view_selection_method");
-  field(config.max_range_difference_m, "max_range_difference_m");
+  field(config.feature_selector, "feature_selector");
   field(config.layers, "layers");
   field(config.sinks, "sinks");
 }
@@ -103,7 +102,7 @@ KeyframeSelector::KeyframeSelector(const Config& config)
     : config(config::checkValid(config)),
       sinks_(Sink::instantiate(config.sinks)),
       tracker_(config.pose_graph_tracker.create()),
-      view_selector_(config::create<ViewSelector>(config.view_selection_method)) {
+      feature_selector_(config.feature_selector.create()) {
   for (const auto& layer : config.layers) {
     active_window_.emplace(layer, ActiveWindowTracker());
   }
@@ -175,7 +174,7 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
 }
 
 void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
-  if (!view_selector_) {
+  if (!feature_selector_) {
     return;
   }
 
@@ -210,7 +209,7 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
       }
 
       ++num_seen;
-      if (view_selector_->selectFeature(views, config.max_range_difference_m, *attrs)) {
+      if (feature_selector_->select(views, *attrs)) {
         MLOG(5) << "node " << NodeSymbol(node.id).str() << ": "
                 << showVec(attrs->semantic_feature);
         ++num_assigned;
