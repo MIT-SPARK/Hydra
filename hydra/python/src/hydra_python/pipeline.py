@@ -162,7 +162,6 @@ def load_pipeline(
     config_path=None,
     output_path=None,
     config_verbosity=0,
-    place_feature_strategy=None,
     freeze_global_info=True,
     zmq_url=None,
 ):
@@ -178,16 +177,6 @@ def load_pipeline(
             glog_dir.mkdir(parents=True)
 
         set_glog_dir(glog_dir)
-
-    if place_feature_strategy is not None:
-        update_nested(
-            contents,
-            {
-                "frontend": {
-                    "view_database": {"view_selection_method": place_feature_strategy}
-                }
-            },
-        )
 
     logging.debug(pprint.pformat(contents, sort_dicts=False))
     pipeline = HydraPipeline.from_config(
