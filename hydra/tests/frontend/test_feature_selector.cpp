@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <hydra/frontend/view_selector.h>
 
+#include "hydra/frontend/feature_selector.h"
 #include "hydra/input/camera.h"
 #include "hydra/input/input_data.h"
 

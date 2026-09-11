@@ -5,6 +5,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_builder.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_connector.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/gvd_place_extractor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/feature_selector.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/frontier_extractor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/keyframe_selector.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_compression.cpp
@@ -13,5 +14,4 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/place_mesh_connector.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/surface_place_extractor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/traversability_place_extractor.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/view_selector.cpp
 )
