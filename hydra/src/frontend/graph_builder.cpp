@@ -38,7 +38,6 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
@@ -48,6 +47,7 @@
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/keyframe_selector.h"
+#include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
@@ -76,7 +76,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.no_packet_collation, "no_packet_collation");
   field(config.clear_object_meshes, "clear_object_meshes");
   field(config.enable_mesh_objects, "enable_mesh_objects");
-  field(config.mesh_resolution, "mesh_resolution");
+  field(config.mesh_compression, "mesh_compression");
 
   field(config.graph_updater, "graph_updater");
   field(config.graph_connector, "graph_connector");
@@ -97,12 +97,11 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.frontier_places, "frontier_places");
 
   field(config.sinks, "sinks");
-
-  check(config.mesh_resolution, GT, 0.0, "mesh_resolution");
 }
 
 GraphBuilder::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")),
+      mesh_compression(MeshCompression::Config{0.005}),
       graph_updater({{DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}),
       keyframe_selector(KeyframeSelector::Config()),
       deformation_graph_builder(DeformationGraphBuilder::Config()) {}
@@ -115,7 +114,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       dsg_(dsg),
       state_(state),
-      mesh_compression_(new kimera_pgmo::DeltaCompression(config.mesh_resolution)),
+      mesh_compression_(config.mesh_compression.create()),
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
@@ -366,25 +365,10 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
-  {  // start timing scope
-    ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
-    // TODO(nathan) add this back when we fix the khronos active window
-    // const auto pose = input.world_T_body();
-    // const auto block_size = input.map().blockSize();
-    const spatial_hash::IndexSet archived(input.archived.begin(), input.archived.end());
-    mesh_compression_->archiveBlocks([&](const auto& index, const auto& /* info */) {
-      return archived.count(index);
-    });
-  }  // end timing scope
-
-  const auto& mesh = input.map().getMeshLayer();
-
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    MLOG(2) << "Updating mesh with " << mesh.numBlocks() << " blocks";
-    const BlockMeshIter wrapper(mesh);
-    last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
-  }  // end timing scope
+    last_mesh_update_ = mesh_compression_->update(input, map_window_.get());
+  }
 
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);

@@ -166,9 +166,9 @@ inline void addStamps(Mesh& mesh,
   }
 }
 
-void MarchingCubes::meshCube(const SdfPoints& points,
-                             Mesh& mesh,
-                             bool compute_normals) {
+size_t MarchingCubes::meshCube(const SdfPoints& points,
+                               Mesh& mesh,
+                               bool compute_normals) {
   if (VLOG_IS_ON(15)) {
     VLOG(15) << "[mesh] points: ";
     for (size_t i = 0; i < 8; ++i) {
@@ -180,7 +180,7 @@ void MarchingCubes::meshCube(const SdfPoints& points,
   VLOG(15) << "[mesh] vertex sdf index: " << index;
 
   if (index == 0) {
-    return;  // no surface crossing in sdf cube
+    return 0;  // no surface crossing in sdf cube
   }
 
   // TODO(nathan) augment edge points
@@ -223,6 +223,8 @@ void MarchingCubes::meshCube(const SdfPoints& points,
     next_index += 3;
     table_col += 3;
   }
+
+  return table_col / 3;
 }
 
 // Lookup table from the 256 possible cube configurations from

@@ -124,4 +124,29 @@ TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
   EXPECT_EQ(3u, mesh.numVertices());
 }
 
+// Test that added face counts are correct
+TEST(MarchingCubes, FaceCounts) {
+  PointMatrix positions;
+  positions << 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1;
+
+  Mesh mesh;
+  std::set<size_t> counts;
+  for (size_t config = 0; config < 256; ++config) {
+    SCOPED_TRACE(config);
+    SdfMatrix distances;
+    for (size_t corner = 0; corner < distances.size(); ++corner) {
+      distances[corner] = config & (1u << corner) ? -1.0f : 1.0f;
+    }
+
+    MarchingCubes::SdfPoints points;
+    fillPointsFromMatrices(positions, distances, points);
+    const auto previous_faces = mesh.numFaces();
+    const auto added = MarchingCubes::meshCube(points, mesh);
+    EXPECT_EQ(added, mesh.numFaces() - previous_faces);
+    counts.insert(added);
+  }
+
+  EXPECT_EQ(counts, (std::set<size_t>{0, 1, 2, 3, 4, 5}));
+}
+
 }  // namespace hydra

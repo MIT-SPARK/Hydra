@@ -32,45 +32,44 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
+#include "hydra/frontend/delta_mesh_compression.h"
 
-#include <spark_dsg/mesh.h>
+#include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+#include <config_utilities/validation.h>
 
-#include <Eigen/Dense>
-#include <array>
-#include <optional>
-
-#include "hydra/reconstruction/voxel_types.h"
+#include "hydra/active_window/active_window_output.h"
+#include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra {
+namespace {
 
-struct SdfPoint {
-  float distance;
-  float weight;
-  Eigen::Vector3f pos;
-  spark_dsg::Color color;
-  std::optional<uint32_t> label;
-  const TrackingVoxel* tracking_voxel = nullptr;
-};
+const auto registration =
+    config::RegistrationWithConfig<MeshCompressor,
+                                   DeltaMeshCompression,
+                                   DeltaMeshCompression::Config>("DeltaCompression");
 
-std::ostream& operator<<(std::ostream& out, const SdfPoint& point);
+}  // namespace
 
-class MarchingCubes {
- public:
-  using EdgePoints = std::array<SdfPoint, 12>;
-  using SdfPoints = std::array<SdfPoint, 8>;
+using spatial_hash::IndexSet;
 
-  static void interpolateEdges(const SdfPoints& points,
-                               EdgePoints& edge_points,
-                               float min_sdf_difference = 1.0e-6);
+void declare_config(DeltaMeshCompression::Config& config) {
+  using namespace config;
+  name("DeltaMeshCompression::Config");
+  field(config.resolution, "resolution", "m");
+  check(config.resolution, GT, 0.0, "resolution");
+}
 
-  // Append the cube surface and return the number of faces added.
-  static size_t meshCube(const SdfPoints& points,
-                         spark_dsg::Mesh& mesh,
-                         bool compute_normals = true);
+DeltaMeshCompression::DeltaMeshCompression(const Config& config)
+    : config(config::checkValid(config)), compression_(config.resolution) {}
 
-  static const int kTriangleTable[256][16];
-  static const int kEdgeIndexPairs[12][2];
-};
+auto DeltaMeshCompression::update(const ActiveWindowOutput& input,
+                                  const VolumetricWindow*) -> MeshDeltaPtr {
+  const auto wrapper = BlockMeshIter(input.map().getMeshLayer());
+  const IndexSet archived(input.archived.begin(), input.archived.end());
+  compression_.archiveBlocks(
+      [&](const auto& index, const auto&) { return archived.count(index); });
+  return compression_.update(wrapper, input.timestamp_ns);
+}
 
 }  // namespace hydra

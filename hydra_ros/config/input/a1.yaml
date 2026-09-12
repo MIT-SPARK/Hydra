@@ -33,7 +33,7 @@ active_window:
       type: MLESemanticIntegrator
 frontend:
   type: GraphBuilder
-  mesh_resolution: 0.005
+  mesh_compression: {resolution: 0.005}
   pgmo: {horizon_s: 15.0, resolution: 2.5}
   objects:
     min_cluster_size: 40

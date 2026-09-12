@@ -87,6 +87,8 @@ class ActiveWindowModule : public Module {
 
   const VolumetricMap& map() const { return map_; }
 
+  const VolumetricWindow* window() const { return map_window_.get(); }
+
  protected:
   cv::Mat getDefaultIntegrationMask(const InputData& data) const;
 

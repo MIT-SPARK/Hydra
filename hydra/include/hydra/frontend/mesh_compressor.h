@@ -34,43 +34,23 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <spark_dsg/mesh.h>
+#include <memory>
 
-#include <Eigen/Dense>
-#include <array>
-#include <optional>
-
-#include "hydra/reconstruction/voxel_types.h"
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 
-struct SdfPoint {
-  float distance;
-  float weight;
-  Eigen::Vector3f pos;
-  spark_dsg::Color color;
-  std::optional<uint32_t> label;
-  const TrackingVoxel* tracking_voxel = nullptr;
-};
+struct ActiveWindowOutput;
+struct VolumetricWindow;
 
-std::ostream& operator<<(std::ostream& out, const SdfPoint& point);
+struct MeshCompressor {
+  using MeshDeltaPtr = std::shared_ptr<kimera_pgmo::MeshDelta>;
+  virtual ~MeshCompressor() = default;
 
-class MarchingCubes {
- public:
-  using EdgePoints = std::array<SdfPoint, 12>;
-  using SdfPoints = std::array<SdfPoint, 8>;
-
-  static void interpolateEdges(const SdfPoints& points,
-                               EdgePoints& edge_points,
-                               float min_sdf_difference = 1.0e-6);
-
-  // Append the cube surface and return the number of faces added.
-  static size_t meshCube(const SdfPoints& points,
-                         spark_dsg::Mesh& mesh,
-                         bool compute_normals = true);
-
-  static const int kTriangleTable[256][16];
-  static const int kEdgeIndexPairs[12][2];
+  virtual MeshDeltaPtr update(const ActiveWindowOutput& input,
+                              const VolumetricWindow* window) = 0;
 };
 
 }  // namespace hydra

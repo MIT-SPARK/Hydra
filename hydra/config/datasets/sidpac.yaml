@@ -11,7 +11,7 @@ active_window:
     semantic_integrator:
       type: MLESemanticIntegrator
 frontend:
-  mesh_resolution: 0.005
+  mesh_compression: {resolution: 0.005}
   pgmo: {horizon_s: 100.0, resolution: 2.5}
   objects:
     min_cluster_size: 25
