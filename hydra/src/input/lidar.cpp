@@ -379,6 +379,8 @@ bool Lidar::pointIsInViewFrustum(const Eigen::Vector3f& point_C,
   return !(left_prod <= -inflation_distance && right_prod <= -inflation_distance);
 }
 
-YAML::Node Lidar::dump() const { return config::toYaml(config_); }
+YAML::Node Lidar::dump() const {
+  return config::toYaml(config::VirtualConfig<Sensor>(config_));
+}
 
 }  // namespace hydra

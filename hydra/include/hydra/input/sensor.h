@@ -176,9 +176,13 @@ class Sensor {
    */
   virtual const cv::Mat& getStaticMask() const { return static_mask_; }
 
+  //! Replace the effective mask with an owned copy (e.g., from an input archive).
+  void setStaticMask(const cv::Mat& mask) { static_mask_ = mask.clone(); }
+
   //! @brief Name of current sensor
   const std::string name;
 
+  //! Dump configuration, including the factory type for reconstructable sensors.
   virtual YAML::Node dump() const;
 
  protected:

@@ -5,6 +5,8 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/data_receiver.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/image_input_filters.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/input_data.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/input_data_io.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/input_data_archive.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/input_module.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/lidar.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_extrinsics.cpp

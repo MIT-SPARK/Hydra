@@ -35,6 +35,7 @@
 #pragma once
 
 #include <Eigen/Geometry>
+#include <filesystem>
 #include <limits>
 #include <opencv2/core/mat.hpp>
 
@@ -65,6 +66,13 @@ struct InputData {
   explicit InputData(Sensor::ConstPtr sensor);
 
   virtual ~InputData() = default;
+
+  //! Save a self-contained ZIP snapshot. Throws std::runtime_error on failure.
+  void save(const std::filesystem::path& filepath) const;
+
+  //! Restore a snapshot without finalizing or changing representations.
+  //! Throws std::runtime_error on invalid or incomplete archives.
+  static Ptr load(const std::filesystem::path& filepath);
 
   //! Get the sensor that captured this data.
   const Sensor& getSensor() const;

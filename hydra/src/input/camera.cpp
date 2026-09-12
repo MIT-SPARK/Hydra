@@ -293,6 +293,8 @@ cv::Mat Camera::computeRangeImageFromPoints(const cv::Mat& points,
   return range_image;
 }
 
-YAML::Node Camera::dump() const { return config::toYaml(config_); }
+YAML::Node Camera::dump() const {
+  return config::toYaml(config::VirtualConfig<Sensor>(config_));
+}
 
 }  // namespace hydra

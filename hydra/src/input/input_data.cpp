@@ -37,6 +37,7 @@
 #include <glog/logging.h>
 
 #include <opencv2/imgproc.hpp>
+#include <stdexcept>
 #include <utility>
 
 #include "hydra/common/global_info.h"
@@ -137,7 +138,12 @@ void convertVertexMap(InputData& data, bool in_world_frame) {
 
 InputData::InputData(Sensor::ConstPtr sensor) : sensor_(std::move(sensor)) {}
 
-const Sensor& InputData::getSensor() const { return *sensor_; }
+const Sensor& InputData::getSensor() const {
+  if (!sensor_) {
+    throw std::runtime_error("InputData has no sensor");
+  }
+  return *sensor_;
+}
 
 Eigen::Isometry3d InputData::getSensorPose() const {
   return world_T_body * sensor_->body_T_sensor();
