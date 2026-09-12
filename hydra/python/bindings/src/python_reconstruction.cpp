@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
+#include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <pybind11/eigen.h>
@@ -47,9 +48,14 @@
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/common/global_info.h"
+#include "hydra/frontend/mesh_compression.h"
 #include "hydra/input/input_filter.h"
 #include "hydra/utils/data_directory.h"
 #include "hydra/utils/logging.h"
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
+
+using namespace spark_dsg;
+namespace py = pybind11;
 
 namespace hydra::python {
 namespace {
@@ -62,46 +68,58 @@ ReconstructionModule::Config default_config() {
 
 }  // namespace
 
-using namespace spark_dsg;
-
 class PythonReconstruction {
  public:
   struct Config : VerbosityConfig {
     Config() : VerbosityConfig("[python_reconstruction] ") {}
-    std::vector<config::VirtualConfig<InputFilter, true>> filters;
+
     ReconstructionModule::Config reconstruction = default_config();
+    std::vector<config::VirtualConfig<InputFilter, true>> filters;
+    config::VirtualConfig<MeshCompressor> compression{MeshCompression::Config{}};
   } const config;
 
   PythonReconstruction(const Config& config, const Sensor::Ptr& sensor);
 
-  virtual ~PythonReconstruction();
+  bool step(size_t timestamp_ns,
+            const Eigen::Vector4d& odom_R_body,
+            const Eigen::Vector3d& odom_t_body,
+            const py::buffer& rgb,
+            const py::buffer& depth);
 
-  bool step(const std::shared_ptr<SensorInputPacket>& packet,
-            const Eigen::Isometry3d& world_T_body);
+  bool stepImpl(const std::shared_ptr<SensorInputPacket>& packet,
+                const Eigen::Isometry3d& world_T_body);
 
   void save(const std::filesystem::path& output);
 
-  void stop();
+  Mesh::Ptr mesh() const;
 
   const Sensor::ConstPtr sensor;
 
  protected:
   SensorInputPacket::Ptr last_input_;
+  ActiveWindowModule::OutputQueue::Ptr queue_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
   std::shared_ptr<ReconstructionModule> module_;
+
+  Mesh::Ptr mesh_;
+  kimera_pgmo::MeshOffsetInfo offsets_;
+  std::unique_ptr<MeshCompressor> compressor_;
 };
 
 void declare_config(PythonReconstruction::Config& config) {
   using namespace config;
   name("PythonReconstructionConfig");
   base<VerbosityConfig>(config);
-  field(config.filters, "filters");
   field(config.reconstruction, "reconstruction");
+  field(config.filters, "filters");
+  field(config.compression, "compression");
 }
 
 PythonReconstruction::PythonReconstruction(const Config& config,
                                            const Sensor::Ptr& sensor)
-    : config(config::checkValid(config)), sensor(sensor) {
+    : config(config::checkValid(config)),
+      sensor(sensor),
+      compressor_(config.compression.create()) {
   if (!sensor) {
     throw std::runtime_error("invalid sensor!");
   }
@@ -110,21 +128,31 @@ PythonReconstruction::PythonReconstruction(const Config& config,
     filters_.push_back(filter.create());
   }
 
-  module_ = std::make_shared<ReconstructionModule>(config.reconstruction, nullptr);
-  if (!module_) {
-    throw std::runtime_error("could not create reconstruction module");
+  queue_ = std::make_shared<ActiveWindowModule::OutputQueue>();
+  module_ = std::make_shared<ReconstructionModule>(config.reconstruction, queue_);
+  if (compressor_) {
+    mesh_ = std::make_shared<Mesh>();
   }
 
   MLOG(2) << "\n" << config::toString(GlobalInfo::instance().getConfig());
   MLOG(1) << "\n" << module_->printInfo();
 }
 
-void PythonReconstruction::stop() {}
+bool PythonReconstruction::step(size_t timestamp_ns,
+                                const Eigen::Vector4d& odom_R_body,
+                                const Eigen::Vector3d& odom_t_body,
+                                const py::buffer& rgb,
+                                const py::buffer& depth) {
+  auto packet = std::make_shared<PythonImageInput>(timestamp_ns, rgb, depth);
+  const auto rotation = Eigen::Quaterniond(
+      odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
+  const auto translation = Eigen::Translation3d(odom_t_body);
+  const auto odom_T_body = Eigen::Isometry3d(translation * rotation);
+  return stepImpl(packet, odom_T_body);
+}
 
-PythonReconstruction::~PythonReconstruction() { stop(); }
-
-bool PythonReconstruction::step(const std::shared_ptr<SensorInputPacket>& packet,
-                                const Eigen::Isometry3d& odom_T_body) {
+bool PythonReconstruction::stepImpl(const std::shared_ptr<SensorInputPacket>& packet,
+                                    const Eigen::Isometry3d& odom_T_body) {
   for (const auto& filter : filters_) {
     if (!filter) {
       continue;
@@ -142,7 +170,19 @@ bool PythonReconstruction::step(const std::shared_ptr<SensorInputPacket>& packet
   data->timestamp_ns = packet->timestamp_ns;
   data->world_T_body = odom_T_body;
   packet->fillInputData(*data);
-  return module_->step(data);
+
+  if (!module_->step(data)) {
+    return false;
+  }
+
+  const auto output = queue_->pop();
+  if (!output) {
+    return false;
+  }
+
+  const auto delta = compressor_->update(*output, module_->window());
+  delta->updateMesh(*mesh_, offsets_);
+  return true;
 }
 
 void PythonReconstruction::save(const std::filesystem::path& output) {
@@ -151,17 +191,21 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
   }
 
   DataDirectory logs(output);
-  if (logs.valid()) {
-    module_->map().save(logs.path("map"));
+  if (!logs) {
+    return;
   }
 
-  stop();
+  module_->map().save(logs.path() / "map");
+  if (mesh_) {
+    mesh_->save(logs.path() / "mesh.sparkdsg");
+  }
 }
+
+Mesh::Ptr PythonReconstruction::mesh() const { return mesh_; }
 
 namespace python_reconstruction {
 
 using namespace pybind11::literals;
-namespace py = pybind11;
 
 void addBindings(pybind11::module_& m) {
   py::class_<PythonReconstruction>(m, "ReconstructionPipeline")
@@ -172,27 +216,14 @@ void addBindings(pybind11::module_& m) {
            "sensor"_a,
            "ns"_a = "")
       .def("save", &PythonReconstruction::save)
-      .def("stop", &PythonReconstruction::stop)
-      .def(
-          "step",
-          [](PythonReconstruction& pipeline,
-             size_t timestamp_ns,
-             const Eigen::Vector4d& odom_R_body,
-             const Eigen::Vector3d& odom_t_body,
-             const py::buffer& rgb,
-             const py::buffer& depth) {
-            auto packet = std::make_shared<PythonImageInput>(timestamp_ns, rgb, depth);
-            const Eigen::Quaterniond q(
-                odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
-            const Eigen::Isometry3d odom_T_body =
-                Eigen::Translation<double, 3>(odom_t_body) * q;
-            return pipeline.step(packet, odom_T_body);
-          },
-          "timestamp_ns"_a,
-          "odom_R_body"_a,
-          "odom_t_body"_a,
-          "rgb"_a,
-          "depth"_a);
+      .def_property_readonly("mesh", &PythonReconstruction::mesh)
+      .def("step",
+           &PythonReconstruction::step,
+           "timestamp_ns"_a,
+           "odom_R_body"_a,
+           "odom_t_body"_a,
+           "rgb"_a,
+           "depth"_a);
 }
 
 }  // namespace python_reconstruction

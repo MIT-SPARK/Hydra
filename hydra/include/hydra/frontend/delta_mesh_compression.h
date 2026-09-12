@@ -34,43 +34,27 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <spark_dsg/mesh.h>
+#include <kimera_pgmo/compression/delta_compression.h>
 
-#include <Eigen/Dense>
-#include <array>
-#include <optional>
-
-#include "hydra/reconstruction/voxel_types.h"
+#include "hydra/frontend/mesh_compressor.h"
 
 namespace hydra {
 
-struct SdfPoint {
-  float distance;
-  float weight;
-  Eigen::Vector3f pos;
-  spark_dsg::Color color;
-  std::optional<uint32_t> label;
-  const TrackingVoxel* tracking_voxel = nullptr;
-};
-
-std::ostream& operator<<(std::ostream& out, const SdfPoint& point);
-
-class MarchingCubes {
+class DeltaMeshCompression : public MeshCompressor {
  public:
-  using EdgePoints = std::array<SdfPoint, 12>;
-  using SdfPoints = std::array<SdfPoint, 8>;
+  struct Config {
+    double resolution = 0.005;
+  } const config;
 
-  static void interpolateEdges(const SdfPoints& points,
-                               EdgePoints& edge_points,
-                               float min_sdf_difference = 1.0e-6);
+  explicit DeltaMeshCompression(const Config& config);
 
-  // Append the cube surface and return the number of faces added.
-  static size_t meshCube(const SdfPoints& points,
-                         spark_dsg::Mesh& mesh,
-                         bool compute_normals = true);
+  MeshDeltaPtr update(const ActiveWindowOutput& input,
+                      const VolumetricWindow* window) override;
 
-  static const int kTriangleTable[256][16];
-  static const int kEdgeIndexPairs[12][2];
+ private:
+  kimera_pgmo::DeltaCompression compression_;
 };
+
+void declare_config(DeltaMeshCompression::Config& config);
 
 }  // namespace hydra

@@ -8,7 +8,7 @@ active_window:
 frontend:
   publish_mesh: false
   serialize_dsg_mesh: false
-  mesh_resolution: 0.05
+  mesh_compression: {resolution: 0.05}
   pgmo: {horizon_s: 100.0, resolution: 2.5}
   keyframe_selector:
     pose_graph_tracker: {min_pose_separation: 1.0, rotation_separation_weight: 1.0, min_time_separation_s: 5.0}

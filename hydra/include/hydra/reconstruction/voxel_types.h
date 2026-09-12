@@ -144,6 +144,14 @@ struct MeshBlock : public spark_dsg::Mesh, public spatial_hash::Block {
             bool has_stamps = false)
       : Mesh(true, has_stamps, has_labels, has_stamps),
         spatial_hash::Block(block_size, index) {}
+
+  //! Global index of the minimum TSDF corner of each triangle's source cube.
+  std::vector<GlobalIndex> face_voxels;
+
+  void clear() {
+    Mesh::clear();
+    face_voxels.clear();
+  }
 };
 
 struct TrackingBlock : public spatial_hash::VoxelBlock<TrackingVoxel> {

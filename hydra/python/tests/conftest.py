@@ -7,4 +7,4 @@ import pytest
 @pytest.fixture(autouse=True)
 def setup_glog():
     """Set glog to be verbose."""
-    hydra.set_glog_level(min_log_level=0, verbosity=0)
+    hydra.set_glog_level(log_level=0, verbosity=0)

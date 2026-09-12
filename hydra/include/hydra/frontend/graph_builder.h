@@ -49,12 +49,12 @@
 #include "hydra/frontend/frontend_output.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/frontend/graph_connector.h"
+#include "hydra/frontend/mesh_compressor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_place_extractor.h"
 #include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
-class DeltaCompression;
 class MeshDelta;
 }  // namespace kimera_pgmo
 
@@ -80,8 +80,8 @@ class GraphBuilder : public Module {
     bool clear_object_meshes = false;
     //! Whether or not to use mesh clustering for object extraction
     bool enable_mesh_objects = true;
-    //! Compression resolution for mesh
-    double mesh_resolution = 0.005;
+    //! Background mesh compressor (defaults to MeshCompression).
+    config::VirtualConfig<MeshCompressor> mesh_compression;
 
     GraphUpdater::Config graph_updater;
     GraphConnector::Config graph_connector;
@@ -154,7 +154,7 @@ class GraphBuilder : public Module {
 
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;
   std::shared_ptr<kimera_pgmo::MeshDelta> last_mesh_update_;
-  std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
+  std::unique_ptr<MeshCompressor> mesh_compression_;
 
   GraphUpdater graph_updater_;
   GraphConnector graph_connector_;
