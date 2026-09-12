@@ -93,8 +93,6 @@ class PythonReconstruction {
 
   Mesh::Ptr mesh() const;
 
-  std::string configString() const;
-
   const Sensor::ConstPtr sensor;
 
  protected:
@@ -193,18 +191,17 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
   }
 
   DataDirectory logs(output);
-  if (logs.valid()) {
-    module_->map().save(logs.path() / "map");
-    mesh()->save(logs.path() / "mesh.sparkdsg");
+  if (!logs) {
+    return;
+  }
+
+  module_->map().save(logs.path() / "map");
+  if (mesh_) {
+    mesh_->save(logs.path() / "mesh.sparkdsg");
   }
 }
 
 Mesh::Ptr PythonReconstruction::mesh() const { return mesh_; }
-
-std::string PythonReconstruction::configString() const {
-  const auto global = config::toString(GlobalInfo::instance().getConfig());
-  return global + "\n" + config::toString(config);
-}
 
 namespace python_reconstruction {
 
@@ -220,7 +217,6 @@ void addBindings(pybind11::module_& m) {
            "ns"_a = "")
       .def("save", &PythonReconstruction::save)
       .def_property_readonly("mesh", &PythonReconstruction::mesh)
-      .def_property_readonly("config", &PythonReconstruction::configString)
       .def("step",
            &PythonReconstruction::step,
            "timestamp_ns"_a,

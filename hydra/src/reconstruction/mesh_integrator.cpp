@@ -62,6 +62,7 @@ Block* maybeGetBlockPtr(spatial_hash::BlockLayer<Block>* layer,
   if (!layer) {
     return nullptr;
   }
+
   return layer->getBlockPtr(index).get();
 }
 
