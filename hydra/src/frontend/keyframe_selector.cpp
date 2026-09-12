@@ -174,7 +174,9 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
   }
 }
 
-void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
+void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg,
+                                      FrontendOutput&,
+                                      const MeshUpdateInfo&) {
   if (!view_selector_) {
     return;
   }

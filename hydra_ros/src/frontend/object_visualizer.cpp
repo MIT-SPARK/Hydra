@@ -39,7 +39,6 @@
 #include <config_utilities/validation.h>
 #include <hydra/common/global_info.h>
 #include <hydra_visualizer/drawing.h>
-#include <kimera_pgmo/mesh_delta.h>
 
 namespace hydra {
 namespace {
@@ -73,22 +72,21 @@ ObjectVisualizer::ObjectVisualizer(const Config& config)
 
 std::string ObjectVisualizer::printInfo() const { return config::toString(config); }
 
-struct DeltaPointAdaptor : spark_dsg::BoundingBox::PointAdaptor {
-  DeltaPointAdaptor(const kimera_pgmo::MeshDelta& delta,
-                    const std::vector<size_t>& indices)
-      : delta(delta), indices(indices) {}
+struct MeshPointAdaptor : spark_dsg::BoundingBox::PointAdaptor {
+  MeshPointAdaptor(const spark_dsg::Mesh& mesh, const std::vector<size_t>& indices)
+      : mesh(mesh), indices(indices) {}
 
   size_t size() const override { return indices.size(); }
 
   Eigen::Vector3f get(size_t index) const override {
-    return delta.getVertex(indices.at(index)).pos;
+    return mesh.pos(indices.at(index));
   }
-  const kimera_pgmo::MeshDelta& delta;
+  const spark_dsg::Mesh& mesh;
   const std::vector<size_t>& indices;
 };
 
 void ObjectVisualizer::call(uint64_t timestamp_ns,
-                            const kimera_pgmo::MeshDelta& delta,
+                            const spark_dsg::Mesh& mesh,
                             const LabelIndices& label_indices,
                             const MeshSegmenter::LabelClusters& clusters) const {
   pubs_.publish("active_vertices", [&]() {
@@ -98,9 +96,9 @@ void ObjectVisualizer::call(uint64_t timestamp_ns,
     msg.header.frame_id = GlobalInfo::instance().getFrames().odom;
     msg.ns = "active_vertices";
     msg.id = 0;
-    std::vector<size_t> active(delta.getNumActiveVertices());
-    std::iota(active.begin(), active.end(), delta.getNumArchivedVertices());
-    fillMarkerFromCloud(delta, active, msg);
+    std::vector<size_t> active(mesh.numVertices());
+    std::iota(active.begin(), active.end(), 0);
+    fillMarkerFromCloud(mesh, active, msg);
     return arr;
   });
 
@@ -112,7 +110,7 @@ void ObjectVisualizer::call(uint64_t timestamp_ns,
       msg.header.frame_id = GlobalInfo::instance().getFrames().odom;
       msg.ns = "label_vertices_" + std::to_string(label);
       msg.id = 0;
-      fillMarkerFromCloud(delta, indices, msg);
+      fillMarkerFromCloud(mesh, indices, msg);
     }
 
     return arr;
@@ -131,7 +129,7 @@ void ObjectVisualizer::call(uint64_t timestamp_ns,
     for (const auto& [label, label_clusters] : clusters) {
       const auto color = visualizer::makeColorMsg(colormap_(label));
       for (const auto& cluster : label_clusters) {
-        const DeltaPointAdaptor adaptor(delta, cluster.indices);
+        const MeshPointAdaptor adaptor(mesh, cluster.indices);
         const spark_dsg::BoundingBox bbox(adaptor);
         visualizer::drawBoundingBox(bbox, color, msg);
       }
@@ -141,7 +139,7 @@ void ObjectVisualizer::call(uint64_t timestamp_ns,
   });
 }
 
-void ObjectVisualizer::fillMarkerFromCloud(const kimera_pgmo::MeshDelta& delta,
+void ObjectVisualizer::fillMarkerFromCloud(const spark_dsg::Mesh& mesh,
                                            const std::vector<size_t>& indices,
                                            Marker& msg) const {
   msg.type = config.use_spheres ? Marker::SPHERE_LIST : Marker::CUBE_LIST;
@@ -155,15 +153,16 @@ void ObjectVisualizer::fillMarkerFromCloud(const kimera_pgmo::MeshDelta& delta,
   msg.points.reserve(indices.size());
   msg.colors.reserve(indices.size());
   for (const auto idx : indices) {
-    const auto& p = delta.getVertex(idx);
+    const auto& p = mesh.pos(idx);
+    const auto c = mesh.color(idx);
     auto& point = msg.points.emplace_back();
-    point.x = p.pos.x();
-    point.y = p.pos.y();
-    point.z = p.pos.z();
+    point.x = p.x();
+    point.y = p.y();
+    point.z = p.z();
     auto& color = msg.colors.emplace_back();
-    color.r = p.traits.color[0] / 255.0f;
-    color.g = p.traits.color[1] / 255.0f;
-    color.b = p.traits.color[2] / 255.0f;
+    color.r = c.r / 255.0f;
+    color.g = c.g / 255.0f;
+    color.b = c.b / 255.0f;
     color.a = config.point_alpha;
   }
 }

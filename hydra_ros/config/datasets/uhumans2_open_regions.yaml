@@ -21,11 +21,7 @@ frontend:
     max_range_difference_m: 0.5
     sinks:
       - {type: KeyframeVisualizer}
-  objects:
-    min_cluster_size: 40
-    cluster_tolerance: 0.25
-    sinks:
-      - {type: ObjectVisualizer}
+  objects: {type: MeshSegmenter, min_cluster_size: 40, cluster_tolerance: 0.25, sinks: [type: ObjectVisualizer]}
   traversability_places:
     type: traversability
     layer: PLACES

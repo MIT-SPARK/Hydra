@@ -49,7 +49,7 @@
 #include "hydra/frontend/frontend_output.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/frontend/graph_connector.h"
-#include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/mesh_update_info.h"
 #include "hydra/frontend/surface_place_extractor.h"
 #include "hydra/utils/logging.h"
 
@@ -78,15 +78,13 @@ class GraphBuilder : public Module {
     bool no_packet_collation = false;
     //! Drop object meshes for memory savings
     bool clear_object_meshes = false;
-    //! Whether or not to use mesh clustering for object extraction
-    bool enable_mesh_objects = true;
     //! Compression resolution for mesh
     double mesh_resolution = 0.005;
 
     GraphUpdater::Config graph_updater;
     GraphConnector::Config graph_connector;
 
-    MeshSegmenter::Config object_config;
+    config::VirtualConfig<GraphBuilderFunctor> objects;
     config::VirtualConfig<SurfacePlaceExtractor> surface_places;
 
     config::VirtualConfig<GraphBuilderFunctor> keyframe_selector;
@@ -137,8 +135,6 @@ class GraphBuilder : public Module {
  protected:
   void updateMesh(const ActiveWindowOutput& msg);
 
-  void updateObjects(const ActiveWindowOutput& msg);
-
   void updatePlaces2d(const ActiveWindowOutput& msg);
 
  protected:
@@ -152,7 +148,7 @@ class GraphBuilder : public Module {
   SharedModuleState::Ptr state_;
   FrontendOutput::Ptr curr_output_;
 
-  kimera_pgmo::MeshOffsetInfo mesh_offsets_;
+  MeshUpdateInfo mesh_update_info_;
   std::shared_ptr<kimera_pgmo::MeshDelta> last_mesh_update_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
 
@@ -160,7 +156,6 @@ class GraphBuilder : public Module {
   GraphConnector graph_connector_;
 
   std::unique_ptr<VolumetricWindow> map_window_;
-  std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
   std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
 

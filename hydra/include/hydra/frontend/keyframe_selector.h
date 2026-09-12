@@ -73,7 +73,9 @@ class KeyframeSelector : public GraphBuilderFunctor {
             FrontendOutput& output,
             const VolumetricWindow* window) override;
 
-  void callPostUpdate(SharedDsgInfo& dsg, FrontendOutput& output) override;
+  void callPostUpdate(SharedDsgInfo& dsg,
+                      FrontendOutput& output,
+                      const MeshUpdateInfo& info) override;
 
  protected:
   void archiveKeyframes(const ActiveWindowOutput& output,

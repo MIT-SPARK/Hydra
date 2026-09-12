@@ -13,9 +13,7 @@ active_window:
 frontend:
   mesh_resolution: 0.005
   pgmo: {horizon_s: 100.0, resolution: 2.5}
-  objects:
-    min_cluster_size: 25
-    cluster_tolerance: 0.18
+  objects: {type: MeshSegmenter, min_cluster_size: 25, cluster_tolerance: 0.18}
   surface_places:
     prefix: P
     place_memory_radius_m: 15.0

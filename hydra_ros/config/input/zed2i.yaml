@@ -38,10 +38,7 @@ frontend:
       - {parent_layer: MESH_PLACES}
   mesh_resolution: 0.005
   pgmo: {horizon_s: 15.0, resolution: 2.5}
-  objects:
-    min_cluster_size: 40
-    cluster_tolerance: 0.25
-    bounding_box_type: AABB
+  objects: {type: MeshSegmenter, min_cluster_size: 40, cluster_tolerance: 0.25, bounding_box_type: AABB}
   surface_places:
     type: place_2d
     prefix: P

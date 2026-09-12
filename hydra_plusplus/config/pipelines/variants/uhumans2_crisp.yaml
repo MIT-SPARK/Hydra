@@ -10,4 +10,4 @@ active_window:
     min_object_allocation_confidence: 0.5
     excluded_labels: []
 frontend:
-  enable_mesh_objects: false
+  objects: {type: ''}

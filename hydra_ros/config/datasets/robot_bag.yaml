@@ -17,7 +17,7 @@ active_window:
   tracker: {type: MaxIouTracker}
   object_extractor: {type: MeshObjectExtractor}
 frontend:
-  enable_mesh_objects: false
+  objects: {type: ''}
   mesh_resolution: 0.005
   graph_updater:
     layer_updates:

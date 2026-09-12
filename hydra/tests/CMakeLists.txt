@@ -27,6 +27,7 @@ add_executable(
   frontend/test_deformation_graph_builder.cpp
   frontend/test_mesh_segmenter.cpp
   frontend/test_view_selector.cpp
+  frontend/test_mesh_clustering.cpp
   input/test_camera.cpp
   input/test_lidar.cpp
   input/test_sensor.cpp
