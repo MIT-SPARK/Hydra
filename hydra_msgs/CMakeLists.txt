@@ -15,7 +15,6 @@ endif()
 
 rosidl_generate_interfaces(
   ${PROJECT_NAME}
-  msg/ActiveLayer.msg
   msg/DsgUpdate.msg
   srv/GetDsg.srv
   DEPENDENCIES
