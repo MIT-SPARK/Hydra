@@ -48,8 +48,4 @@ std::filesystem::path get_resource_path(const std::string& name) {
   return get_resource_path() / name;
 }
 
-std::filesystem::path get_default_semantic_map() {
-  return get_resource_path("test_semantic_map.csv");
-}
-
 }  // namespace hydra::test

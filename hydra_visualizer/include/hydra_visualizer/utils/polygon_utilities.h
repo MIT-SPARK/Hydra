@@ -54,9 +54,6 @@ Eigen::MatrixXd getCirclePolygon(const spark_dsg::SceneGraphNode& node,
                                  double radius,
                                  size_t num_samples);
 
-Eigen::MatrixXd getChildrenConvexHull(const spark_dsg::SceneGraph& graph,
-                                      const spark_dsg::SceneGraphNode& parent);
-
 void makeFilledPolygon(const Eigen::MatrixXd& points,
                        const std_msgs::msg::ColorRGBA& color,
                        visualization_msgs::msg::Marker& marker,
