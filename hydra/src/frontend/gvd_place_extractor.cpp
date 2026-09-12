@@ -41,7 +41,7 @@
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/printing.h>
 
-#include "hydra/common/global_info.h"
+#include "hydra/active_window/volumetric_window.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -100,7 +100,6 @@ void declare_config(GvdPlaceExtractor::Config& config) {
 
 GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
     : config(config::checkValid(c)),
-      map_window_(GlobalInfo::instance().createVolumetricWindow()),
       tsdf_interpolator_(config.tsdf_interpolator.create()),
       sinks_(Sink::instantiate(config.sinks)) {
   if (tsdf_interpolator_) {
@@ -114,14 +113,16 @@ GvdPlaceExtractor::~GvdPlaceExtractor() {}
 
 void GvdPlaceExtractor::call(const ActiveWindowOutput& msg,
                              SharedDsgInfo& dsg,
-                             FrontendOutput&) {
-  detect(msg);
+                             FrontendOutput&,
+                             const VolumetricWindow* window) {
+  detect(msg, window);
 
   std::lock_guard<std::mutex> graph_lock(dsg.mutex);
   updateGraph(msg.timestamp_ns, *dsg.graph);
 }
 
-void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
+void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
+                               const VolumetricWindow* window) {
   ScopedTimer timer("frontend/detect_gvd", msg.timestamp_ns, true, 2, false);
 
   const auto& map = msg.map();
@@ -158,10 +159,10 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   graph_extractor_->extract(
       msg.timestamp_ns, *gvd_, changes, gvd_integrator_->parent_tracker());
 
-  if (map_window_) {
+  if (window) {
     BlockIndices to_archive;
     for (const auto& block : *gvd_) {
-      if (!map_window_->inBounds(msg.timestamp_ns, world_T_body, block)) {
+      if (!window->inBounds(msg.timestamp_ns, world_T_body, block)) {
         to_archive.push_back(block.index);
       }
     }

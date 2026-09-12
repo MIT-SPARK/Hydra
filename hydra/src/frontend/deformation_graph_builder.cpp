@@ -82,7 +82,8 @@ DeformationGraphBuilder::~DeformationGraphBuilder() = default;
 
 void DeformationGraphBuilder::call(const ActiveWindowOutput& input,
                                    SharedDsgInfo& dsg,
-                                   FrontendOutput& output) {
+                                   FrontendOutput& output,
+                                   const VolumetricWindow*) {
   using namespace std::chrono;
 
   ScopedTimer timer("frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);

@@ -99,9 +99,12 @@ std::string showVec(const Eigen::MatrixXf& vec, size_t max_length = 100) {
 
 }  // namespace
 
+FeatureScoreColor::Config::Config() : VerbosityConfig("[feature_score] ") {}
+
 void declare_config(FeatureScoreColor::Config& config) {
   using namespace config;
   name("FeatureScoreColor::Config");
+  base<VerbosityConfig>(config);
   field(config.ns, "ns");
   field(config.min_score, "min_score");
   field(config.max_score, "max_score");
@@ -133,8 +136,8 @@ void FeatureScoreColor::setGraph(const SceneGraph& graph, LayerKey layer_key) {
   for (const auto& [node_id, node] : layer.nodes()) {
     const auto& attrs = node->attributes<SemanticNodeAttributes>();
     const auto score = metric_->score(feature_, attrs.semantic_feature);
-    VLOG(20) << "node " << NodeSymbol(node_id).str() << " -> " << score << ": "
-             << showVec(attrs.semantic_feature);
+    MLOG(3) << "node " << NodeSymbol(node_id).str() << " -> " << score << ": "
+            << showVec(attrs.semantic_feature);
     range_.min = std::min(range_.min, score);
     range_.max = std::max(range_.max, score);
     values_[node_id] = score;
@@ -144,7 +147,7 @@ void FeatureScoreColor::setGraph(const SceneGraph& graph, LayerKey layer_key) {
     range_ = {config.min_score, config.max_score};
   }
 
-  VLOG(2) << "score range: [" << range_.min << ", " << range_.max << "]";
+  MLOG(2) << "score range: [" << range_.min << ", " << range_.max << "]";
 }
 
 Color FeatureScoreColor::getColor(const SceneGraph&, const SceneGraphNode& node) const {
@@ -158,7 +161,7 @@ Color FeatureScoreColor::getColor(const SceneGraph&, const SceneGraphNode& node)
 }
 
 void FeatureScoreColor::setFeature(const Eigen::VectorXf& feature) {
-  VLOG(1) << "Got new task!";
+  MLOG(1) << "Got new task!";
   feature_ = feature;
   has_feature_ = true;
   has_change_ = true;
@@ -172,6 +175,7 @@ void FeatureScoreColor::callback(const InputMsg::ConstSharedPtr& msg) {
 void declare_config(NearestFeatureColor::Config& config) {
   using namespace config;
   name("NearestFeatureColor::Config");
+  base<VerbosityConfig>(config);
   config.metric.setOptional();
   field(config.metric, "metric");
   config.features.setOptional();
@@ -199,6 +203,7 @@ Color NearestFeatureColor::getColor(const SceneGraph&,
 void declare_config(NearestFeatureLabel::Config& config) {
   using namespace config;
   name("NearestFeatureColor::Config");
+  base<VerbosityConfig>(config);
   config.metric.setOptional();
   field(config.metric, "metric");
   config.features.setOptional();

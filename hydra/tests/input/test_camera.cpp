@@ -38,6 +38,7 @@
 #include <hydra/input/camera.h>
 
 namespace hydra {
+namespace {
 
 std::shared_ptr<Camera> createCamera(double vfov,
                                      double hfov,
@@ -55,6 +56,8 @@ std::shared_ptr<Camera> createCamera(double vfov,
   config.extrinsics = ParamSensorExtrinsics::Config();
   return std::make_unique<Camera>(config, "");
 }
+
+}  // namespace
 
 TEST(Camera, ProjectionCorrect) {
   // 640 x 480

@@ -54,7 +54,7 @@ struct TraversabilityVoxel {
 
   //! @brief The height of the surface in meters in global coordinate, used for
   //! debugging and visualization.
-  std::optional<float> height = 0.0f;
+  std::optional<float> height;
 
   //! @brief Discrete traversability state for of the voxel, computed as a function of
   // traversability and confidence.

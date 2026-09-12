@@ -25,6 +25,7 @@ add_executable(
   common/test_shared_dsg_info.cpp
   frontend/test_graph_connector.cpp
   frontend/test_mesh_segmenter.cpp
+  frontend/test_view_selector.cpp
   input/test_camera.cpp
   input/test_lidar.cpp
   input/test_sensor.cpp

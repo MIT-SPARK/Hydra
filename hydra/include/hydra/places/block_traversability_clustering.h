@@ -144,6 +144,7 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
 
   // Extract places and add to DSG.
   void updatePlaceNodesInDsg(spark_dsg::SceneGraph& graph,
+                             const ActiveWindowOutput& msg,
                              const std::string& layer_name);
 
   void updatePlaceEdgesInDsg(spark_dsg::SceneGraph& graph);
@@ -176,6 +177,8 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
 
   // Update the scene graph place node attributes.
   void updatePlaceNodeAttributes(spark_dsg::TraversabilityNodeAttributes& attrs,
+                                 const ActiveWindowOutput& msg,
+                                 const InfoBlock& block,
                                  const PlaceInfo& place);
 
   bool shouldConnect(const spark_dsg::Boundary& from,

@@ -12,7 +12,9 @@ namespace hydra {
 
 class FeatureScoreColor : public NodeColorAdapter {
  public:
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config();
+
     std::string ns = "~";
     float min_score = 0.0f;
     float max_score = 1.0f;
@@ -51,7 +53,7 @@ void declare_config(FeatureScoreColor::Config& config);
 
 class NearestFeatureColor : public NodeColorAdapter {
  public:
-  struct Config {
+  struct Config : VerbosityConfig {
     config::VirtualConfig<EmbeddingDistance> metric{CosineDistance::Config()};
     config::VirtualConfig<EmbeddingGroup> features{RosEmbeddingGroup::Config()};
     visualizer::DiscreteColormap::Config colormap;
@@ -71,7 +73,7 @@ void declare_config(NearestFeatureColor::Config& config);
 
 class NearestFeatureLabel : public visualizer::NodeTextAdapter {
  public:
-  struct Config {
+  struct Config : VerbosityConfig {
     config::VirtualConfig<EmbeddingDistance> metric{CosineDistance::Config()};
     config::VirtualConfig<EmbeddingGroup> features{RosEmbeddingGroup::Config()};
     //! Breaks label around spaces to meet max width if > 0

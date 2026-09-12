@@ -66,6 +66,9 @@ static const auto is_active_reg =
 static const auto has_active_mesh_reg =
     config::Registration<StatusFunctor, HasActiveMeshFunctor>("has_active_mesh");
 
+static const auto has_feature_reg =
+    config::Registration<StatusFunctor, HasFeatureFunctor>("has_feature");
+
 static const auto place_distance_reg =
     config::Registration<ValueFunctor, DistanceFunctor>("place_distance");
 
@@ -166,7 +169,13 @@ bool IsActiveFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const 
 }
 
 bool HasActiveMeshFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {
-  return node.attributes<Place2dNodeAttributes>().has_active_mesh_indices;
+  const auto attrs = node.tryAttributes<Place2dNodeAttributes>();
+  return attrs ? attrs->has_active_mesh_indices : false;
+}
+
+bool HasFeatureFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {
+  const auto attrs = node.tryAttributes<SemanticNodeAttributes>();
+  return attrs ? attrs->semantic_feature.size() > 0 : false;
 }
 
 StatusColorAdapter::StatusColorAdapter(const Config& config)

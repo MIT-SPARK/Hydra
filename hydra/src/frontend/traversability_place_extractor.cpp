@@ -71,7 +71,8 @@ TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
 
 void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
                                         SharedDsgInfo& dsg,
-                                        FrontendOutput&) {
+                                        FrontendOutput&,
+                                        const VolumetricWindow*) {
   detect(msg);
 
   std::lock_guard<std::mutex> graph_lock(dsg.mutex);

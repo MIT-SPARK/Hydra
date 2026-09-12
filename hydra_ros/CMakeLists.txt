@@ -40,6 +40,7 @@ add_library(
   src/backend/ros_backend_publisher.cpp
   src/backend/gt_room_publisher.cpp
   src/frontend/gvd_occupancy_publisher.cpp
+  src/frontend/keyframe_visualizer.cpp
   src/frontend/object_visualizer.cpp
   src/frontend/ros_frontend_publisher.cpp
   src/frontend/traversability_visualizer.cpp

@@ -38,6 +38,11 @@
 
 namespace hydra {
 
+ActiveWindowOutput::ActiveWindowOutput(const InputData::ConstPtr& _data)
+    : timestamp_ns(_data->timestamp_ns) {
+  sensor_data.push_back(_data);
+}
+
 const VolumetricMap& ActiveWindowOutput::map() const {
   CHECK(map_) << "Invalid map!";
   return *map_;
@@ -45,9 +50,8 @@ const VolumetricMap& ActiveWindowOutput::map() const {
 
 void ActiveWindowOutput::updateFrom(ActiveWindowOutput&& msg, bool clone_map) {
   timestamp_ns = msg.timestamp_ns;
-  sensor_data = msg.sensor_data;
-  // TODO(nathan) this leads to incorrect behavior if we add in one update but then
-  // archive in another
+  sensor_data.insert(sensor_data.end(), msg.sensor_data.begin(), msg.sensor_data.end());
+  // TODO(nathan) incorrect behavior if we add in one update but then archive in another
   archived.insert(archived.end(), msg.archived.begin(), msg.archived.end());
 
   // append graph updates to current message

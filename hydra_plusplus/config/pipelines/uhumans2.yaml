@@ -6,7 +6,8 @@ active_window:
 frontend:
   mesh_resolution: 0.005
   pgmo: {horizon_s: 15.0, resolution: 2.5}
-  pose_graph_tracker: {type: PoseGraphFromOdom, min_pose_separation: 0.1, rotation_separation_weight: 1.0, min_time_separation_s: 1.0}
+  keyframe_selector:
+    pose_graph_tracker: {min_pose_separation: 0.1, rotation_separation_weight: 1.0, min_time_separation_s: 1.0}
   freespace_places:
     type: gvd
     gvd: {max_distance_m: 4.5, min_diff_m: 0.1, voronoi_config: {min_distance_m: 0.30, parent_l1_separation: 20, parent_cos_angle_separation: 0.2}}

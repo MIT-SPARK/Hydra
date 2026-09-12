@@ -90,6 +90,9 @@ PoseGraph makePoseGraph(const StampedPose& curr_pose,
   return graph;
 }
 
+PoseGraphFromOdom::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("pose_graph_tracker")) {}
+
 PoseGraphFromOdom::PoseGraphFromOdom(const PoseGraphFromOdom::Config& config)
     : config(config::checkValid(config)), num_poses_received_(0) {}
 
@@ -103,9 +106,8 @@ PoseGraphPacket PoseGraphFromOdom::update(uint64_t timestamp_ns,
     const auto diff_s =
         std::chrono::duration_cast<std::chrono::duration<double>>(diff_ns);
     if (config.min_time_separation_s && diff_s.count() < config.min_time_separation_s) {
-      VLOG(2) << "[PoseGraphFromOdom] Dropped pose @ " << timestamp_ns
-              << "[ns] with time separation " << diff_s.count() << " < "
-              << config.min_time_separation_s << " [s]";
+      MLOG(2) << "Dropped pose @ " << timestamp_ns << "[ns] with time separation "
+              << diff_s.count() << " < " << config.min_time_separation_s << " [s]";
       return packet;
     }
 
@@ -115,9 +117,8 @@ PoseGraphPacket PoseGraphFromOdom::update(uint64_t timestamp_ns,
     const auto total_diff =
         translation_diff + config.rotation_separation_weight * rotation_diff;
     if (config.min_pose_separation && total_diff < config.min_pose_separation) {
-      VLOG(2) << "[PoseGraphFromOdom] Dropped pose @ " << timestamp_ns
-              << "[ns] with pose separation " << total_diff << " < "
-              << config.min_pose_separation;
+      MLOG(2) << "Dropped pose @ " << timestamp_ns << "[ns] with pose separation "
+              << total_diff << " < " << config.min_pose_separation;
       return packet;
     }
 
@@ -134,6 +135,7 @@ PoseGraphPacket PoseGraphFromOdom::update(uint64_t timestamp_ns,
 void declare_config(PoseGraphFromOdom::Config& config) {
   using namespace config;
   name("PoseGraphFromOdom::Config");
+  base<VerbosityConfig>(config);
   field(config.min_pose_separation, "min_pose_separation");
   field(config.rotation_separation_weight, "rotation_separation_weight");
   field(config.min_time_separation_s, "min_time_separation_s");

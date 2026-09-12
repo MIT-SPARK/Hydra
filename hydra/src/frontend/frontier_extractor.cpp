@@ -25,7 +25,7 @@
 
 #include <queue>
 
-#include "hydra/common/global_info.h"
+#include "hydra/active_window/volumetric_window.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
@@ -148,15 +148,14 @@ Frontier::Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
     : center(c), num_frontier_voxels(n), block_index(b), has_shape_information(false) {}
 
 FrontierExtractor::FrontierExtractor(const Config& config)
-    : config(config),
-      next_node_id_(config.prefix, 0),
-      map_window_(GlobalInfo::instance().createVolumetricWindow()) {}
+    : config(config), next_node_id_(config.prefix, 0) {}
 
 void FrontierExtractor::call(const ActiveWindowOutput& msg,
                              SharedDsgInfo& dsg,
-                             FrontendOutput&) {
+                             FrontendOutput&,
+                             const VolumetricWindow* window) {
   const auto timestamp = msg.timestamp_ns;
-  updateRecentBlocks(msg.world_T_body().translation(), msg.map().blockSize());
+  updateRecentBlocks(msg.world_T_body().translation(), msg.map().blockSize(), window);
 
   std::lock_guard<std::mutex> graph_lock(dsg.mutex);
   timing::ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
@@ -450,12 +449,13 @@ void FrontierExtractor::addFrontiers(const uint64_t timestamp_ns, SceneGraph& gr
 }
 
 void FrontierExtractor::updateRecentBlocks(const Eigen::Vector3d& current_pos,
-                                           double block_size) {
-  if (tsdf_ && map_window_) {
+                                           double block_size,
+                                           const VolumetricWindow* window) {
+  if (tsdf_ && window) {
     const Eigen::Isometry3d pose =
         Eigen::Translation3d(current_pos) * Eigen::Quaterniond::Identity();
     for (const auto& block : *tsdf_) {
-      if (!map_window_->inBounds(0, pose, block)) {
+      if (!window->inBounds(0, pose, block)) {
         just_archived_blocks_.insert(block.index);
       }
     }

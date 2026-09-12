@@ -7,7 +7,7 @@ launch:
   - set_remap: {from: hydra/input/left_cam/rgb/image_raw, to: /tesse/left_cam/rgb/image_raw}
   - set_remap: {from: hydra/input/left_cam/rgb/camera_info, to: /tesse/left_cam/camera_info}
   - set_remap: {from: hydra/input/left_cam/semantic/image_raw, to: /tesse/seg_cam/converted/image_raw}
-  - set_remap: {from: hydra/input/left_cam/feature, to: /tesse/left_cam/semantic/feature}
+  - set_remap: {from: hydra/input/left_cam/semantic/feature, to: /tesse/left_cam/semantic/feature}
   - set_remap: {from: hydra/regions/embed, to: /tesse/left_cam/semantic/embed}
   - node:
       pkg: tf2_ros
@@ -31,8 +31,6 @@ launch:
       args: >
         --config-utilities-file $(find-pkg-share hydra_ros)/config/datasets/uhumans2_open_regions.yaml
         --config-utilities-file $(find-pkg-share hydra)/config/label_spaces/uhumans2_office_label_space.yaml@labelspace
-        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/mesh_segmenter_sinks.yaml@frontend/objects
-        --config-utilities-file $(find-pkg-share hydra_ros)/config/sinks/active_window_sinks.yaml@active_window
         --config-utilities-yaml {semantic_label_remap_filepath: $(var label_remap_path)}
         --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
         --config-utilities-yaml {robot_id: 0, odom_frame: world, robot_frame: base_link_gt, map_frame: map}

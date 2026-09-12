@@ -33,25 +33,60 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
 
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/common/shared_dsg_info.h"
-#include "hydra/frontend/frontend_output.h"
+#include <memory>
+
+#include "hydra/common/output_sink.h"
+#include "hydra/frontend/graph_builder_functor.h"
+#include "hydra/frontend/view_selector.h"
+#include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
-struct VolumetricWindow;
-
-class GraphBuilderFunctor {
+class KeyframeSelector : public GraphBuilderFunctor {
  public:
-  virtual ~GraphBuilderFunctor() = default;
+  using Keyframes = std::list<InputData::ConstPtr>;
+  using Sink = OutputSink<uint64_t, const Keyframes&>;
 
-  virtual void call(const ActiveWindowOutput& msg,
-                    SharedDsgInfo& dsg,
-                    FrontendOutput& output,
-                    const VolumetricWindow* window) = 0;
+  struct Config : public VerbosityConfig {
+    Config();
 
-  virtual void callPostUpdate(SharedDsgInfo& /* dsg */, FrontendOutput& /* output */) {}
+    //! Method for extracting pose graph from incoming poses
+    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
+    //! Method to control mapping from views to resulting feature
+    std::string view_selection_method = "average";
+    //! Max range beyond range image
+    double max_range_difference_m = 0.1;
+    //! Layers to assign views for
+    std::vector<std::string> layers{spark_dsg::DsgLayers::PLACES,
+                                    spark_dsg::DsgLayers::MESH_PLACES};
+    //! Output sinks and visualization
+    std::vector<Sink::Factory> sinks;
+  } const config;
+
+  KeyframeSelector(const Config& config);
+
+  void call(const ActiveWindowOutput& msg,
+            SharedDsgInfo& dsg,
+            FrontendOutput& output,
+            const VolumetricWindow* window) override;
+
+  void callPostUpdate(SharedDsgInfo& dsg, FrontendOutput& output) override;
+
+ protected:
+  void archiveKeyframes(const ActiveWindowOutput& output,
+                        const VolumetricWindow& window);
+
+  Sink::List sinks_;
+  std::unique_ptr<PoseGraphTracker> tracker_;
+  std::unique_ptr<ViewSelector> view_selector_;
+
+  std::list<InputData::ConstPtr> keyframes_;
+  mutable std::map<std::string, ActiveWindowTracker> active_window_;
 };
+
+void declare_config(KeyframeSelector::Config& config);
 
 }  // namespace hydra

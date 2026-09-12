@@ -166,6 +166,7 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
 
   void updatePlaceNodesInDsg(spark_dsg::SceneGraph& graph,
                              const std::string& layer_name,
+                             const ActiveWindowOutput& msg,
                              const TraversabilityLayer& layer);
 
   void updatePlaceEdgesInDsg(spark_dsg::SceneGraph& graph) const;
@@ -182,6 +183,7 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
 
   void updatePlaceNodeAttributes(spark_dsg::TravNodeAttributes& attrs,
                                  Region& region,
+                                 const ActiveWindowOutput& msg,
                                  const TraversabilityLayer& layer) const;
 
   inline static const std::array<VoxelIndex, 8> neighbors_ = {

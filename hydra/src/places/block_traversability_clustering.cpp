@@ -53,6 +53,27 @@ static const auto registration =
                                    BlockTraversabilityClustering::Config>(
         "BlockTraversabilityClustering");
 
+std::optional<float> getHeight(const BlockTraversabilityClustering::InfoBlock& info,
+                               const BlockTraversabilityClustering::PlaceInfo& place) {
+  float z_value = 0.0;
+  size_t num_heights = 0;
+  for (size_t x = place.range.x_start; x <= place.range.x_end; ++x) {
+    for (size_t y = place.range.y_start; y <= place.range.y_end; ++y) {
+      const auto& voxel = info.voxel(x, y);
+      if (voxel.height) {
+        z_value += *voxel.height;
+        ++num_heights;
+      }
+    }
+  }
+
+  if (!num_heights) {
+    return std::nullopt;
+  }
+
+  return z_value / num_heights;
+}
+
 }  // namespace
 
 using Timer = hydra::timing::ScopedTimer;
@@ -86,7 +107,7 @@ void BlockTraversabilityClustering::updateGraph(const TraversabilityLayer& layer
   updateInfoLayer(layer);
   computePlaces();
   classifyPlaceBoundaries();
-  updatePlaceNodesInDsg(graph, layer_name);
+  updatePlaceNodesInDsg(graph, msg, layer_name);
   updatePlaceEdgesInDsg(graph);
   archivePlaceInfos(graph);
 }
@@ -497,7 +518,9 @@ void BlockTraversabilityClustering::updateDsgEdge(const PlaceInfo& from,
 }
 
 void BlockTraversabilityClustering::updatePlaceNodesInDsg(
-    spark_dsg::SceneGraph& graph, const std::string& layer_name) {
+    spark_dsg::SceneGraph& graph,
+    const ActiveWindowOutput& msg,
+    const std::string& layer_name) {
   for (auto& info : infos_) {
     if (!info.places_updated) {
       continue;
@@ -525,16 +548,23 @@ void BlockTraversabilityClustering::updatePlaceNodesInDsg(
       // Update the place attributes.
       auto& attrs =
           graph.getNode(place.node_id).attributes<TraversabilityNodeAttributes>();
-      updatePlaceNodeAttributes(attrs, place);
+      updatePlaceNodeAttributes(attrs, msg, info, place);
       ++it;
     }
   }
 }
 
 void BlockTraversabilityClustering::updatePlaceNodeAttributes(
-    TraversabilityNodeAttributes& attrs, const PlaceInfo& place) {
+    TraversabilityNodeAttributes& attrs,
+    const ActiveWindowOutput& msg,
+    const InfoBlock& block,
+    const PlaceInfo& place) {
   // Boundary positions relative to the block origin.
   Boundary(place.boundary_info).toAttributes(attrs);
+
+  // attempt to use voxel height values for place z value, and fallback to current z
+  const auto z_value = getHeight(block, place);
+  attrs.position.z() = z_value.value_or(msg.world_T_body().translation().z());
 
   // General attributes.
   attrs.last_update_time_ns = current_time_ns_;

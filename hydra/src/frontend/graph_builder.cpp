@@ -47,10 +47,9 @@
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/deformation_graph_builder.h"
+#include "hydra/frontend/keyframe_selector.h"
 #include "hydra/frontend/mesh_segmenter.h"
-#include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
-#include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;
@@ -86,6 +85,8 @@ void declare_config(GraphBuilder::Config& config) {
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
 
+  config.keyframe_selector.setOptional();
+  field(config.keyframe_selector, "keyframe_selector");
   config.deformation_graph_builder.setOptional();
   field(config.deformation_graph_builder, "deformation_graph_builder");
   config.freespace_places.setOptional();
@@ -95,9 +96,6 @@ void declare_config(GraphBuilder::Config& config) {
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
 
-  config.pose_graph_tracker.setOptional();
-  field(config.pose_graph_tracker, "pose_graph_tracker");
-  field(config.view_database, "view_database");
   field(config.sinks, "sinks");
 
   check(config.mesh_resolution, GT, 0.0, "mesh_resolution");
@@ -106,8 +104,8 @@ void declare_config(GraphBuilder::Config& config) {
 GraphBuilder::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")),
       graph_updater({{DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}),
-      deformation_graph_builder(DeformationGraphBuilder::Config()),
-      pose_graph_tracker(PoseGraphFromOdom::Config()) {}
+      keyframe_selector(KeyframeSelector::Config()),
+      deformation_graph_builder(DeformationGraphBuilder::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
                            const SharedDsgInfo::Ptr& dsg,
@@ -121,14 +119,8 @@ GraphBuilder::GraphBuilder(const Config& config,
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
-      tracker_(config.pose_graph_tracker.create()),
       surface_places_(config.surface_places.create(
           GlobalInfo::instance().labelspace().surface_places_labels)),
-      deformation_graph_builder_(config.deformation_graph_builder.create()),
-      freespace_places_(config.freespace_places.create()),
-      traversability_places_(config.traversability_places.create()),
-      frontier_places_(config.frontier_places.create()),
-      view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
   const auto& global_info = GlobalInfo::instance();
   if (config.enable_mesh_objects) {
@@ -141,32 +133,21 @@ GraphBuilder::GraphBuilder(const Config& config,
   dsg_->graph->setMesh(global_info.createMesh());
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updatePoseGraph, this, std::placeholders::_1));
 
-  callbacks_.push_back([this](auto msg) {
-    if (msg && deformation_graph_builder_) {
-      deformation_graph_builder_->call(*msg, *dsg_, *curr_output_);
-    }
-  });
-
-  callbacks_.push_back([this](auto msg) {
-    if (msg && freespace_places_) {
-      freespace_places_->call(*msg, *dsg_, *curr_output_);
-    }
-  });
-
-  callbacks_.push_back([this](auto msg) {
-    if (msg && traversability_places_) {
-      traversability_places_->call(*msg, *dsg_, *curr_output_);
-    }
-  });
-
-  callbacks_.push_back([this](auto msg) {
-    if (msg && frontier_places_) {
-      frontier_places_->call(*msg, *dsg_, *curr_output_);
-    }
-  });
+  // TODO(nathan) this needs to be pushed to an actual config at some point
+  functors_.emplace("keyframe_selector", config.keyframe_selector.create());
+  functors_.emplace("deformation_graph_builder",
+                    config.deformation_graph_builder.create());
+  functors_.emplace("freespace_places", config.freespace_places.create());
+  functors_.emplace("traversability_places", config.traversability_places.create());
+  functors_.emplace("frontier_places", config.frontier_places.create());
+  for (const auto& [_, functor] : functors_) {
+    callbacks_.push_back([&](auto msg) {
+      if (msg && functor) {
+        functor->call(*msg, *dsg_, *curr_output_, map_window_.get());
+      }
+    });
+  }
 
   addPostMeshCallback(
       std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
@@ -217,9 +198,10 @@ std::string GraphBuilder::printInfo() const {
 }
 
 void GraphBuilder::spin() {
-  bool should_shutdown = false;
-  spin_finished_ = true;
+  using namespace std::chrono_literals;
 
+  spin_finished_ = true;
+  bool should_shutdown = false;
   ActiveWindowOutput::Ptr input;
   while (!should_shutdown) {
     if (input && spin_finished_) {
@@ -242,12 +224,9 @@ void GraphBuilder::spin() {
     }
 
     if (!spin_finished_ && config.no_packet_collation) {
-      using namespace std::chrono_literals;
       std::this_thread::sleep_for(1ms);
       continue;
     }
-
-    processNextInput(*queue_->front());
 
     // from this point on, we build an input packet by collating the maps together of
     // subsequent outputs. This doesn't take effect until multiple packets from the
@@ -264,34 +243,8 @@ void GraphBuilder::spin() {
 
   while (!spin_finished_) {
     // wait for current spin to finish before shutting down
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(10ms);
   }
-}
-
-void GraphBuilder::processNextInput(const ActiveWindowOutput& msg) {
-  if (tracker_) {
-    const auto packet = tracker_->update(msg.timestamp_ns, msg.world_T_body());
-    pose_graph_updates_.push(packet);
-  } else {
-    LOG_FIRST_N(WARNING, 1)
-        << "PoseGraphTracker disabled, no agent layer will be created";
-    return;
-  }
-
-  if (!msg.sensor_data) {
-    return;
-  }
-
-  const auto& data = *msg.sensor_data;
-  if (data.feature.rows() * data.feature.cols() == 0) {
-    return;  // no feature present
-  }
-
-  auto view = std::make_unique<FeatureView>(data.timestamp_ns,
-                                            data.getSensorPose().inverse(),
-                                            data.feature,
-                                            &data.getSensor());
-  // TODO(nathan) do something with view
 }
 
 bool GraphBuilder::spinOnce() {
@@ -300,10 +253,7 @@ bool GraphBuilder::spinOnce() {
     return false;
   }
 
-  ActiveWindowOutput::Ptr input = queue_->front();
-  processNextInput(*input);
-  queue_->pop();
-
+  auto input = queue_->pop();
   spinOnce(input);
   return true;
 }
@@ -408,18 +358,11 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     graph_connector_.connect(*dsg_->graph);
   }
 
-  view_database_.updateAssignments(
-      *dsg_->graph, [&](const Eigen::Vector3d& pos, uint64_t timestamp) {
-        if (!map_window_) {
-          return false;
-        }
-
-        const auto fmt = getDefaultFormat(3);
-        MLOG(2) << "view @ " << timestamp << "[ns]: " << pos.format(fmt) << " vs. "
-                << msg->world_T_body().translation().format(fmt);
-        return !map_window_->inBounds(
-            msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
-      });
+  for (const auto& [name, functor] : functors_) {
+    if (functor) {
+      functor->callPostUpdate(*dsg_, *curr_output_);
+    }
+  }
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
@@ -486,23 +429,6 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
   surface_places_->updateGraph(input, mesh_offsets_, *dsg_->graph);
-}
-
-void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
-  ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-
-  PoseGraphPacket packet;
-  while (!pose_graph_updates_.empty()) {
-    packet.updateFrom(pose_graph_updates_.pop());
-  }
-
-  curr_output_->agent_updates = packet;
-
-  // TODO(nathan) thinking about locking more
-  std::lock_guard<std::mutex> lock(dsg_->mutex);
-  const auto new_node_ids = packet.addToGraph(*dsg_->graph, prefix.id);
-  curr_output_->new_agent_nodes = new_node_ids;
 }
 
 }  // namespace hydra

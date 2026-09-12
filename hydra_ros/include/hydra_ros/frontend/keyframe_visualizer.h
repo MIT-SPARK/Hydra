@@ -33,25 +33,41 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/common/shared_dsg_info.h"
-#include "hydra/frontend/frontend_output.h"
+#include <config_utilities/dynamic_config.h>
+#include <hydra/frontend/keyframe_selector.h>
+#include <hydra_visualizer/utils/marker_group_pub.h>
+#include <ianvs/node_handle.h>
 
 namespace hydra {
 
-struct VolumetricWindow;
-
-class GraphBuilderFunctor {
+class KeyframeVisualizer : public KeyframeSelector::Sink {
  public:
-  virtual ~GraphBuilderFunctor() = default;
+  struct Config {
+    //! ROS namespace for sink
+    std::string ns = "~/keyframes";
+    //! Distance from position that the image plane is draw
+    double far_distance = 1.0;
+    //! Marker line width
+    double line_width = 0.01;
+    //! Color to use
+    spark_dsg::Color color = spark_dsg::Color::blue();
+    //! Alpha for image plane
+    double image_plane_alpha = 0.1;
+    //! Draw image plane for both viewing directions
+    bool draw_both_image_plane_sides = true;
+  } const config;
 
-  virtual void call(const ActiveWindowOutput& msg,
-                    SharedDsgInfo& dsg,
-                    FrontendOutput& output,
-                    const VolumetricWindow* window) = 0;
+  KeyframeVisualizer(const Config& config);
 
-  virtual void callPostUpdate(SharedDsgInfo& /* dsg */, FrontendOutput& /* output */) {}
+  void call(uint64_t timestamp_ns,
+            const KeyframeSelector::Keyframes& frames) const override;
+
+ private:
+  ianvs::NodeHandle nh_;
+  MarkerGroupPub pubs_;
+  config::DynamicConfig<Config> config_;
 };
+
+void declare_config(KeyframeVisualizer::Config& config);
 
 }  // namespace hydra
