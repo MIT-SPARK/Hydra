@@ -50,6 +50,8 @@ class MeshIntegrator {
 
     float min_weight = 1.0e-4f;
     int integrator_threads;
+    //! Tolerance to use to merge vertices within each block (0 disables)
+    double vertex_merge_tolerance_m = 1.0e-5;
   } const config;
 
   explicit MeshIntegrator(const Config& config);
