@@ -100,6 +100,17 @@ inline void addVerticesToDelta(const std::vector<MeshCompression::Entry>& vertic
 
 }  // namespace
 
+const std::array<GlobalIndex, 8> MeshCompression::cube_offsets = {
+    GlobalIndex(0, 0, 0),
+    GlobalIndex(1, 0, 0),
+    GlobalIndex(0, 1, 0),
+    GlobalIndex(1, 1, 0),
+    GlobalIndex(0, 0, 1),
+    GlobalIndex(1, 0, 1),
+    GlobalIndex(0, 1, 1),
+    GlobalIndex(1, 1, 1),
+};
+
 void declare_config(MeshCompression::Config& config) {
   using namespace config;
   name("MeshCompression::Config");
@@ -132,10 +143,9 @@ MeshCompression::MeshCompression(const Config& config)
       inv_resolution(1.0 / config.resolution),
       tracking_(1) {}
 
-bool MeshCompression::isFree(const VolumetricMap& map, const GlobalIndex& cell) const {
+bool MeshCompression::isFree(const VolumetricMap& map, const GlobalIndex& voxel) const {
   for (size_t corner = 0; corner < 8; ++corner) {
-    const GlobalIndex offset(corner & 1, (corner >> 1) & 1, (corner >> 2) & 1);
-    const GlobalIndex index = cell + offset;
+    const GlobalIndex index = voxel + MeshCompression::cube_offsets[corner];
     const auto voxel = map.getTsdfLayer().getVoxelPtr(index);
     if (!voxel) {
       return false;
@@ -223,7 +233,7 @@ void MeshCompression::integrate(const MeshBlock& block,
 
 void MeshCompression::prune(const VolumetricMap& map, UpdateState& state) {
   size_t retained = 0;
-  GlobalIndexMap<bool> cleared_cells;
+  GlobalIndexMap<bool> cleared;
   for (size_t i = 0; i < faces_.size(); ++i) {
     const auto& face = faces_[i];
     if (i < state.previous_faces) {
@@ -232,7 +242,7 @@ void MeshCompression::prune(const VolumetricMap& map, UpdateState& state) {
         continue;  // drop faces if parent voxel was updated during marching cubes
       }
 
-      const auto [iter, inserted] = cleared_cells.emplace(face.voxel, false);
+      const auto [iter, inserted] = cleared.emplace(face.voxel, false);
       if (inserted) {
         // check if parent voxel is in freespace for first face in parent voxel
         iter->second = isFree(map, face.voxel);

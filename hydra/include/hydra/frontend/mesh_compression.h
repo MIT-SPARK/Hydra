@@ -88,6 +88,8 @@ class MeshCompression : public MeshCompressor {
     GlobalIndex voxel;
   };
 
+  static const std::array<GlobalIndex, 8> cube_offsets;
+
  private:
   using UpdateCallback = std::function<void(const Pos&, const Traits&, Entry&)>;
 
@@ -104,7 +106,7 @@ class MeshCompression : public MeshCompressor {
 
   GlobalIndex compressedIndex(const Eigen::Vector3f& pos) const;
 
-  bool isFree(const VolumetricMap& map, const GlobalIndex& cell) const;
+  bool isFree(const VolumetricMap& map, const GlobalIndex& index) const;
 
   UpdateState prepare(const VolumetricMap& map) const;
 
