@@ -52,6 +52,10 @@ struct PgmoMeshLayerInterface : public kimera_pgmo::MeshInterface {
 
   size_t activeBlockSize() const override;
 
+  size_t activeBlockNumFaces() const override;
+
+  std::array<size_t, 3> getActiveFace(size_t index) const override;
+
   pcl::PointXYZRGBA getActiveVertex(size_t index) const override;
 
   bool hasSemantics() const override;
@@ -77,6 +81,10 @@ struct PgmoMeshInterface : public kimera_pgmo::MeshInterface {
   void markBlockActive(const BlockIndex&) const override {}
 
   size_t activeBlockSize() const override;
+
+  size_t activeBlockNumFaces() const override;
+
+  std::array<size_t, 3> getActiveFace(size_t index) const override;
 
   pcl::PointXYZRGBA getActiveVertex(size_t index) const override;
 

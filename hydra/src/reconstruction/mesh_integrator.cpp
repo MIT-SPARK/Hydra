@@ -42,6 +42,7 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
+#include <cmath>
 #include <iomanip>
 #include <list>
 #include <thread>
@@ -49,6 +50,7 @@
 #include "hydra/common/global_info.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/mesh_deduplication.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {
@@ -58,8 +60,12 @@ void declare_config(MeshIntegrator::Config& config) {
   name("MeshIntegratorConfig");
   field(config.min_weight, "min_weight");
   field<ThreadNumConversion>(config.integrator_threads, "integrator_threads");
+  field(config.vertex_merge_tolerance_m, "vertex_merge_tolerance_m", "m");
   check(config.min_weight, GT, 0.0f, "min_weight");
   check(config.integrator_threads, GT, 0, "integrator_threads");
+  check(config.vertex_merge_tolerance_m, GE, 0.0, "vertex_merge_tolerance_m");
+  checkCondition(std::isfinite(config.vertex_merge_tolerance_m),
+                 "finite merge tolerance");
 }
 
 MeshIntegrator::Config::Config()
@@ -196,6 +202,10 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
       for (v_idx.x() = 0; v_idx.x() < vps - 1; v_idx.x()++) {
         meshBlockExterior(block_index, v_idx, *map);
       }
+    }
+    if (config.vertex_merge_tolerance_m > 0) {
+      deduplicateMesh(map->getMeshLayer().getBlock(block_index),
+                      config.vertex_merge_tolerance_m);
     }
   }
 }

@@ -54,6 +54,14 @@ size_t PgmoMeshLayerInterface::activeBlockSize() const {
   return active_mesh_->points.size();
 }
 
+size_t PgmoMeshLayerInterface::activeBlockNumFaces() const {
+  return active_mesh_->numFaces();
+}
+
+std::array<size_t, 3> PgmoMeshLayerInterface::getActiveFace(size_t index) const {
+  return active_mesh_->face(index);
+}
+
 pcl::PointXYZRGBA PgmoMeshLayerInterface::getActiveVertex(size_t index) const {
   // Assumes we mark the active block first.
   pcl::PointXYZRGBA point;
@@ -96,6 +104,12 @@ const BlockIndices& PgmoMeshInterface::blockIndices() const { return block_indic
 size_t PgmoMeshInterface::activeBlockSize() const {
   // Assumes we mark the active block first.
   return mesh_.numVertices();
+}
+
+size_t PgmoMeshInterface::activeBlockNumFaces() const { return mesh_.numFaces(); }
+
+std::array<size_t, 3> PgmoMeshInterface::getActiveFace(size_t index) const {
+  return mesh_.face(index);
 }
 
 pcl::PointXYZRGBA PgmoMeshInterface::getActiveVertex(size_t index) const {

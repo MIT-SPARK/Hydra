@@ -24,6 +24,7 @@ add_executable(
   common/test_partial_graph.cpp
   common/test_shared_dsg_info.cpp
   frontend/test_graph_connector.cpp
+  frontend/test_deformation_graph_builder.cpp
   frontend/test_mesh_segmenter.cpp
   frontend/test_view_selector.cpp
   input/test_camera.cpp
@@ -47,6 +48,7 @@ add_executable(
   places/test_region_growing_traversability_clustering.cpp
   reconstruction/test_integration_masking.cpp
   reconstruction/test_marching_cubes.cpp
+  reconstruction/test_mesh_integrator.cpp
   reconstruction/test_projection_interpolators.cpp
   reconstruction/test_semantic_integrator.cpp
   reconstruction/test_tsdf_interpolators.cpp
@@ -57,6 +59,7 @@ add_executable(
   rooms/test_room_utilities.cpp
   utils/test_active_window_tracker.cpp
   utils/test_mesh_utilities.cpp
+  utils/test_mesh_deduplication.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp
   utils/test_probability_utilities.cpp
