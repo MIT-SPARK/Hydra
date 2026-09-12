@@ -6,16 +6,14 @@
 #include <unordered_set>
 #include <vector>
 
+#include "hydra/frontend/clustering_types.h"
+
 namespace kimera_pgmo {
 class MeshDelta;
 struct MeshOffsetInfo;
 }  // namespace kimera_pgmo
 
 namespace hydra::clustering {
-
-using Clusters = std::vector<std::vector<size_t>>;
-using LabelIndices = std::map<uint32_t, std::vector<size_t>>;
-using LabelSet = std::set<uint32_t>;
 
 struct ClusteringConfig {
   double cluster_tolerance = 0.25;
@@ -24,8 +22,6 @@ struct ClusteringConfig {
 };
 
 void declare_config(ClusteringConfig& config);
-
-std::string printLabels(const LabelSet& labels);
 
 LabelIndices getLabelIndices(const LabelSet& desired_labels,
                              const kimera_pgmo::MeshDelta& delta,

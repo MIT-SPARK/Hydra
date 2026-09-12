@@ -41,6 +41,7 @@
 namespace hydra {
 
 struct VolumetricWindow;
+struct MeshUpdateInfo;
 
 class GraphBuilderFunctor {
  public:
@@ -51,7 +52,7 @@ class GraphBuilderFunctor {
                     FrontendOutput& output,
                     const VolumetricWindow* window) = 0;
 
-  virtual void callPostUpdate(SharedDsgInfo& /* dsg */, FrontendOutput& /* output */) {}
+  virtual void callPostUpdate(SharedDsgInfo&, FrontendOutput&, const MeshUpdateInfo&) {}
 };
 
 }  // namespace hydra

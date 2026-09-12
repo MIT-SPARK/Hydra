@@ -33,80 +33,95 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/bounding_box.h>
 #include <spark_dsg/node_symbol.h>
-#include <spark_dsg/scene_graph.h>
 
-#include <Eigen/Dense>
-
+#include "hydra/active_window/active_window_output.h"
 #include "hydra/common/output_sink.h"
-#include "hydra/frontend/mesh_delta_clustering.h"
-
-namespace kimera_pgmo {
-class MeshDelta;
-struct MeshOffsetInfo;
-}  // namespace kimera_pgmo
+#include "hydra/frontend/graph_builder_functor.h"
+#include "hydra/frontend/mesh_clustering.h"
+#include "hydra/frontend/mesh_connection_updater.h"
 
 namespace hydra {
 
-using clustering::Clusters;
 using clustering::LabelIndices;
 
-class MeshSegmenter {
+// A block pointer is an opaque revision token, not a persistent mesh index.
+// The active cache or input packet owns it until the post-callback connection pass.
+struct ObjectMeshVertex {
+  const MeshBlock* block = nullptr;
+  size_t vertex = 0;
+};
+
+class MeshSegmenter : public GraphBuilderFunctor {
  public:
   struct Cluster {
-    Eigen::Vector3d centroid;
+    Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
     std::vector<size_t> indices;
   };
-
   using LabelClusters = std::map<uint32_t, std::vector<Cluster>>;
   using Sink = OutputSink<uint64_t,
-                          const kimera_pgmo::MeshDelta&,
+                          const spark_dsg::Mesh&,
                           const LabelIndices&,
                           const LabelClusters&>;
 
   struct Config {
     std::string layer_id = spark_dsg::DsgLayers::OBJECTS;
-    clustering::ClusteringConfig clustering;
+    clustering::VoxelClusteringConfig clustering;
+    //! Tolerance to merge same-label vertices across active blocks (0 uses exact
+    //! equality)
+    double vertex_merge_tolerance_m = 1.0e-5;
     spark_dsg::BoundingBox::Type bounding_box_type = spark_dsg::BoundingBox::Type::AABB;
-    std::string timer_namespace = "frontend/objects";
+    // Association uses same-label spatial support within this radius.
+    double association_tolerance = 0.25;
+    double min_overlap_ratio = 0.2;
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
+  struct Object {
+    spark_dsg::NodeId id;
+    uint32_t label;
+    uint64_t timestamp_ns = 0;
+    bool is_active = true;
+    bool has_archived = false;
+    std::vector<ObjectMeshVertex> vertices;
+    // Only support newly archived during this call. Resolved by the caller.
+    std::vector<ObjectMeshVertex> archived_vertices;
+    std::vector<Eigen::Vector3f> points;
+  };
 
-  LabelClusters detect(uint64_t timestamp_ns,
-                       const kimera_pgmo::MeshDelta& active,
-                       const kimera_pgmo::MeshOffsetInfo& offsets);
+  explicit MeshSegmenter(const Config& config);
+  MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
 
-  void updateGraph(uint64_t timestamp,
-                   const kimera_pgmo::MeshOffsetInfo& offsets,
-                   const LabelClusters& clusters,
-                   spark_dsg::SceneGraph& graph);
+  void call(const ActiveWindowOutput& msg,
+            SharedDsgInfo& dsg,
+            FrontendOutput& output,
+            const VolumetricWindow* window) override;
 
+  void callPostUpdate(SharedDsgInfo& dsg,
+                      FrontendOutput& output,
+                      const MeshUpdateInfo& info) override;
+
+  // Input block ownership is retained through connection resolution.
+  void update(const ActiveWindowOutput& input);
+  const std::map<spark_dsg::NodeId, Object>& objects() const { return objects_; }
+  const std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>>& merges() const {
+    return merges_;
+  }
   std::unordered_set<spark_dsg::NodeId> getActiveNodes() const;
 
  private:
-  void updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
-                      spark_dsg::SceneGraph& graph);
-
-  void addNodeToGraph(spark_dsg::SceneGraph& graph,
-                      const Cluster& cluster,
-                      uint32_t label,
-                      uint64_t timestamp);
-
-  void updateNodeInGraph(spark_dsg::SceneGraph& graph,
-                         const Cluster& cluster,
-                         const spark_dsg::SceneGraphNode& node,
-                         uint64_t timestamp);
-
-  void mergeActiveNodes(spark_dsg::SceneGraph& graph, uint32_t label);
-
- private:
+  struct Detection;
+  Detection prepareSamples() const;
+  void cluster(uint64_t timestamp_ns);
+  void associate(uint64_t timestamp_ns, const Detection& detection);
   spark_dsg::NodeSymbol next_node_id_;
   std::set<uint32_t> labels_;
-  std::map<uint32_t, std::set<spark_dsg::NodeId>> active_nodes_;
+  spatial_hash::IndexHashMap<MeshBlock::ConstPtr> blocks_;
+  std::map<spark_dsg::NodeId, Object> objects_;
+  std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> merges_;
+  std::vector<MeshBlock::ConstPtr> retired_blocks_;
   Sink::List sinks_;
+  MeshConnectionUpdater connections_;
 };
 
 void declare_config(MeshSegmenter::Config& config);
