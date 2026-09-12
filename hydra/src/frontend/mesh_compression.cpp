@@ -140,16 +140,15 @@ auto MeshCompression::prepare(const VolumetricMap& map) const -> UpdateState {
       continue;
     }
 
-    state.mutable_cells.emplace(cellIndex(entry.vertex.pos), i);
+    state.mutable_cells.emplace(cellIndex(entry.pos), i);
   }
 
   return state;
 }
 
 void MeshCompression::integrate(const MeshBlock& block,
-                                uint64_t timestamp_ns,
                                 UpdateState& state,
-                                Merge merge) {
+                                const UpdateCallback& merge) {
   std::vector<size_t> remap(block.numVertices(), INVALID);
   for (size_t i = 0; i < block.numVertices(); ++i) {
     kimera_pgmo::traits::VertexTraits traits;
@@ -168,7 +167,7 @@ void MeshCompression::integrate(const MeshBlock& block,
 
     remap[i] = iter->second;
     state.observed[iter->second] = true;
-    merge(timestamp_ns, pos, traits, vertices_[iter->second].vertex);
+    merge(pos, traits, vertices_[iter->second]);
   }
 
   for (size_t i = 0; i < block.faces.size(); ++i) {
@@ -248,7 +247,7 @@ MeshDelta::Ptr MeshCompression::makeDelta(const UpdateState& state,
     }
 
     const auto unobserved = !state.observed[i];
-    const auto& vertex = vertices_[i].vertex;
+    const auto& vertex = vertices_[i];
     outside[i] = unobserved && archive && archive({vertex.pos, vertex.traits});
   }
 
@@ -272,7 +271,7 @@ MeshDelta::Ptr MeshCompression::makeDelta(const UpdateState& state,
         continue;
       }
 
-      const auto& vertex = vertices_[i].vertex;
+      const auto& vertex = vertices_[i];
       remap[i] = delta.addVertex(vertex.pos, vertex.traits, archiving);
     }
   }
@@ -333,19 +332,6 @@ MeshDelta::Ptr MeshCompression::makeDelta(const UpdateState& state,
   }
 
   return result;
-}
-
-MeshDelta::Ptr MeshCompression::update(const VolumetricMap& map,
-                                       uint64_t timestamp_ns,
-                                       const ArchivePredicate& archive,
-                                       Merge merge) {
-  auto state = prepare(map);
-  for (const auto& block : map.getMeshLayer()) {
-    integrate(block, timestamp_ns, state, merge);
-  }
-
-  prune(map, state);
-  return makeDelta(state, timestamp_ns, archive);
 }
 
 auto MeshCompression::update(const ActiveWindowOutput& input,

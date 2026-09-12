@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/utils/vertex_update.h>
 
 #include <functional>
 #include <vector>
@@ -48,6 +48,8 @@ namespace hydra {
 class MeshCompression : public MeshCompressor {
  public:
   using Vertex = kimera_pgmo::traits::Vertex;
+  using Traits = kimera_pgmo::traits::VertexTraits;
+  using Pos = kimera_pgmo::traits::Pos;
   using Face = kimera_pgmo::traits::Face;
   using ArchivePredicate = std::function<bool(const Vertex&)>;
 
@@ -64,34 +66,25 @@ class MeshCompression : public MeshCompressor {
 
   explicit MeshCompression(const Config& config);
 
-  // MergeT is a const, default-constructible functor called for every observation,
-  // including the first observation of a compressed vertex.
   template <typename MergeT = kimera_pgmo::DefaultVertexUpdate>
   kimera_pgmo::MeshDelta::Ptr update(const VolumetricMap& map,
                                      uint64_t timestamp_ns,
-                                     const ArchivePredicate& archive = {}) {
-    return update(map,
-                  timestamp_ns,
-                  archive,
-                  [](uint64_t stamp,
-                     const Eigen::Vector3f& pos,
-                     const kimera_pgmo::traits::VertexTraits& traits,
-                     kimera_pgmo::VertexInfo& vertex) {
-                    static const MergeT merger;
-                    merger(stamp, pos, traits, vertex);
-                  });
-  }
+                                     const ArchivePredicate& archive = {});
 
   MeshDeltaPtr update(const ActiveWindowOutput& input,
                       const VolumetricWindow* window) override;
 
  private:
   struct Entry {
-    kimera_pgmo::VertexInfo vertex{};
-    // Frozen boundary vertices support faces already sent for archival. They
-    // cannot be cleared or reused by a new observation until fully archived.
+    //! Position of compressed entry
+    kimera_pgmo::traits::Pos pos;
+    //! Traits of compressed entry
+    kimera_pgmo::traits::VertexTraits traits;
+    //! Whether or not the entry can be deelted
     bool frozen = false;
   };
+
+  using UpdateCallback = std::function<void(const Pos&, const Traits&, Entry&)>;
 
   struct CellFace {
     Face vertices;
@@ -107,26 +100,21 @@ class MeshCompression : public MeshCompressor {
     GlobalIndexSet reobserved_cells;
   };
 
-  using Merge = void (*)(uint64_t,
-                         const Eigen::Vector3f&,
-                         const kimera_pgmo::traits::VertexTraits&,
-                         kimera_pgmo::VertexInfo&);
-
   GlobalIndex cellIndex(const Eigen::Vector3f& pos) const;
+
   bool isFree(const VolumetricMap& map, const GlobalIndex& cell) const;
+
   UpdateState prepare(const VolumetricMap& map) const;
+
   void integrate(const MeshBlock& block,
-                 uint64_t timestamp_ns,
                  UpdateState& state,
-                 Merge merge);
+                 const UpdateCallback& callback);
+
   void prune(const VolumetricMap& map, UpdateState& state);
+
   kimera_pgmo::MeshDelta::Ptr makeDelta(const UpdateState& state,
                                         uint64_t timestamp_ns,
                                         const ArchivePredicate& archive);
-  kimera_pgmo::MeshDelta::Ptr update(const VolumetricMap& map,
-                                     uint64_t timestamp_ns,
-                                     const ArchivePredicate& archive,
-                                     Merge merge);
 
   std::vector<Entry> vertices_;
   std::vector<CellFace> faces_;
@@ -134,5 +122,21 @@ class MeshCompression : public MeshCompressor {
 };
 
 void declare_config(MeshCompression::Config& config);
+
+template <typename MergeT>
+kimera_pgmo::MeshDelta::Ptr MeshCompression::update(const VolumetricMap& map,
+                                                    uint64_t stamp,
+                                                    const ArchivePredicate& archive) {
+  auto state = prepare(map);
+  for (const auto& block : map.getMeshLayer()) {
+    integrate(block, state, [stamp](const auto& pos, const auto& traits, auto& entry) {
+      constexpr static const MergeT merge;
+      merge(stamp, pos, traits, entry.pos, entry.traits);
+    });
+  }
+
+  prune(map, state);
+  return makeDelta(state, stamp, archive);
+}
 
 }  // namespace hydra
