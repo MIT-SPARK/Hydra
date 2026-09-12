@@ -116,22 +116,6 @@ struct NodeAdapter : public ::spark_dsg::bounding_box::PointAdaptor {
   const std::vector<NodeId>& nodes;
 };
 
-Eigen::MatrixXd getChildrenConvexHull(const SceneGraph& graph,
-                                      const SceneGraphNode& parent) {
-  std::vector<NodeId> children(parent.children().begin(), parent.children().end());
-  const NodeAdapter adapter(&graph, children);
-  std::list<size_t> hull_indices = ::spark_dsg::bounding_box::get2dConvexHull(adapter);
-
-  Eigen::MatrixXd hull_points(3, hull_indices.size());
-  size_t i = 0;
-  for (const auto idx : hull_indices) {
-    hull_points.col(i) = graph.getNode(children.at(idx)).attributes().position;
-    ++i;
-  }
-
-  return hull_points;
-}
-
 void makeFilledPolygon(const Eigen::MatrixXd& points,
                        const std_msgs::msg::ColorRGBA& color,
                        visualization_msgs::msg::Marker& marker,
