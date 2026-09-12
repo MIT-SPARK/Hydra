@@ -74,41 +74,43 @@ class MeshCompression : public MeshCompressor {
   MeshDeltaPtr update(const ActiveWindowOutput& input,
                       const VolumetricWindow* window) override;
 
- private:
+  const float min_clearance;
+  const float inv_resolution;
+
   struct Entry {
-    //! Position of compressed entry
     kimera_pgmo::traits::Pos pos;
-    //! Traits of compressed entry
     kimera_pgmo::traits::VertexTraits traits;
-    //! Whether or not the entry can be deelted
     bool frozen = false;
   };
 
-  using UpdateCallback = std::function<void(const Pos&, const Traits&, Entry&)>;
-
-  struct CellFace {
+  struct FaceEntry {
     Face vertices;
-    GlobalIndex cell;
+    GlobalIndex voxel;
   };
 
+ private:
+  using UpdateCallback = std::function<void(const Pos&, const Traits&, Entry&)>;
+
   struct UpdateState {
+    UpdateState(size_t num_vertices, size_t num_faces);
+
     size_t previous_vertices;
     size_t previous_faces;
     std::vector<bool> deleted;
     std::vector<bool> observed;
-    GlobalIndexMap<size_t> mutable_cells;
-    GlobalIndexSet reobserved_cells;
+    GlobalIndexMap<size_t> active;
+    GlobalIndexSet reobserved;
   };
 
-  GlobalIndex cellIndex(const Eigen::Vector3f& pos) const;
+  GlobalIndex compressedIndex(const Eigen::Vector3f& pos) const;
 
   bool isFree(const VolumetricMap& map, const GlobalIndex& cell) const;
 
   UpdateState prepare(const VolumetricMap& map) const;
 
   void integrate(const MeshBlock& block,
-                 UpdateState& state,
-                 const UpdateCallback& callback);
+                 const UpdateCallback& callback,
+                 UpdateState& state);
 
   void prune(const VolumetricMap& map, UpdateState& state);
 
@@ -117,8 +119,8 @@ class MeshCompression : public MeshCompressor {
                                         const ArchivePredicate& archive);
 
   std::vector<Entry> vertices_;
-  std::vector<CellFace> faces_;
-  kimera_pgmo::MeshDelta::TrackingInfo tracking_{1};
+  std::vector<FaceEntry> faces_;
+  kimera_pgmo::MeshDelta::TrackingInfo tracking_;
 };
 
 void declare_config(MeshCompression::Config& config);
@@ -127,15 +129,25 @@ template <typename MergeT>
 kimera_pgmo::MeshDelta::Ptr MeshCompression::update(const VolumetricMap& map,
                                                     uint64_t stamp,
                                                     const ArchivePredicate& archive) {
+  // validate mesh has face origin voxel indices and add unfrozen vertices to state
   auto state = prepare(map);
+
+  // compress mesh blocks into voxel grid
   for (const auto& block : map.getMeshLayer()) {
-    integrate(block, state, [stamp](const auto& pos, const auto& traits, auto& entry) {
-      constexpr static const MergeT merge;
-      merge(stamp, pos, traits, entry.pos, entry.traits);
-    });
+    integrate(
+        block,
+        [stamp](const auto& pos, const auto& traits, auto& entry) {
+          constexpr static const MergeT merge;
+          merge(stamp, pos, traits, entry.pos, entry.traits);
+        },
+        state);
   }
 
+  // remove faces and vertices that are in observed free-space or overriden by a
+  // marching cubes update
   prune(map, state);
+
+  // compile and return delta information
   return makeDelta(state, stamp, archive);
 }
 

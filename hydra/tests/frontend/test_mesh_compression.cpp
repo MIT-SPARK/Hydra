@@ -181,8 +181,8 @@ TEST_F(CellCompressionTest, IndependentCells) {
   EXPECT_EQ(mesh.numVertices(), 4u);
 }
 
+// Clearing one cell retains vertices referenced by another cell.
 TEST_F(CellCompressionTest, SharedVertices) {
-  // Clearing one cell retains vertices referenced by another cell.
   auto map = makeMap();
   auto& block = triangle(map);
   block.resizeVertices(4);
@@ -197,14 +197,16 @@ TEST_F(CellCompressionTest, SharedVertices) {
   EXPECT_EQ(mesh.numVertices(), 3u);
 }
 
+// Deduplicated output still tracks each source cell for clearing.
 TEST_F(CellCompressionTest, DuplicateFaces) {
-  // Deduplicated output still tracks each source cell for clearing.
   auto map = makeMap();
   auto& block = triangle(map);
-  block.faces.push_back({2, 1, 0});
+  // permutation of default face with same winding order
+  block.faces.push_back({2, 0, 1});
   block.face_voxels.push_back(GlobalIndex(1, 0, 0));
   update(map);
   ASSERT_EQ(mesh.numFaces(), 1u);
+
   auto partial = makeMap();
   observeCell(partial, GlobalIndex(0, 0, 0), 0.3f);
   update(partial);
@@ -214,8 +216,8 @@ TEST_F(CellCompressionTest, DuplicateFaces) {
   EXPECT_EQ(mesh.numFaces(), 1u);
 }
 
+// A missing neighboring block leaves boundary geometry unknown.
 TEST_F(CellCompressionTest, MissingNeighbor) {
-  // A missing neighboring block leaves boundary geometry unknown.
   const GlobalIndex cell(15, 0, 0);
   auto map = makeMap();
   triangle(map, cell);
