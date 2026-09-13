@@ -39,14 +39,14 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/frontend/mesh_clustering.h"
-#include "hydra/frontend/mesh_connection_updater.h"
+#include "hydra/frontend/mesh_update_info.h"
 
 namespace hydra {
 
 using clustering::LabelIndices;
 
-// A block pointer is an opaque revision token, not a persistent mesh index.
-// The active cache or input packet owns it until the post-callback connection pass.
+// Identifies a vertex in a particular mesh block update. Block ownership is
+// retained until the post-update connection pass finishes.
 struct ObjectMeshVertex {
   const MeshBlock* block = nullptr;
   size_t vertex = 0;
@@ -81,12 +81,14 @@ class MeshSegmenter : public GraphBuilderFunctor {
     spark_dsg::NodeId id;
     uint32_t label;
     uint64_t timestamp_ns = 0;
+    //! Whether this object participates in cluster association.
     bool is_active = true;
+    //! Whether any source block support has archived, independently of compression.
     bool has_archived = false;
     std::vector<ObjectMeshVertex> vertices;
-    // Only support newly archived during this call. Resolved by the caller.
-    std::vector<ObjectMeshVertex> archived_vertices;
     std::vector<Eigen::Vector3f> points;
+    //! Owned samples from archived blocks for geometry and connection retention.
+    std::vector<Eigen::Vector3f> archived_points;
   };
 
   explicit MeshSegmenter(const Config& config);
@@ -101,7 +103,7 @@ class MeshSegmenter : public GraphBuilderFunctor {
                       FrontendOutput& output,
                       const MeshUpdateInfo& info) override;
 
-  // Input block ownership is retained through connection resolution.
+  // Cache active blocks and cluster their selected semantic labels.
   void update(const ActiveWindowOutput& input);
   const std::map<spark_dsg::NodeId, Object>& objects() const { return objects_; }
   const std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>>& merges() const {
@@ -111,17 +113,29 @@ class MeshSegmenter : public GraphBuilderFunctor {
 
  private:
   struct Detection;
+  struct Match {
+    double score;
+    size_t cluster;
+    spark_dsg::NodeId id;
+  };
+
+  std::vector<Match> findMatches(const Detection& detection) const;
   Detection prepareSamples() const;
   void cluster(uint64_t timestamp_ns);
   void associate(uint64_t timestamp_ns, const Detection& detection);
+  void updateNodes(spark_dsg::SceneGraph& graph);
+  void updateGeometry(const Object& object,
+                      spark_dsg::ObjectNodeAttributes& attrs) const;
+  void updateConnections(const Object& object,
+                         const MeshUpdateInfo& info,
+                         spark_dsg::ObjectNodeAttributes& attrs) const;
   spark_dsg::NodeSymbol next_node_id_;
   std::set<uint32_t> labels_;
   spatial_hash::IndexHashMap<MeshBlock::ConstPtr> blocks_;
   std::map<spark_dsg::NodeId, Object> objects_;
   std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> merges_;
-  std::vector<MeshBlock::ConstPtr> retired_blocks_;
   Sink::List sinks_;
-  MeshConnectionUpdater connections_;
+  std::set<spark_dsg::NodeId> tracked_nodes_;
 };
 
 void declare_config(MeshSegmenter::Config& config);

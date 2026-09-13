@@ -346,19 +346,13 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     launchCallbacks(callbacks_, msg);
   }
 
-  // Finalize objects before connecting layers and assigning keyframe features.
-  const auto& objects = functors_.at("objects");
-  if (objects) {
-    objects->callPostUpdate(*dsg_, *curr_output_, mesh_update_info_);
-  }
-
   {  // start timing scope
     ScopedTimer timer("frontend/interlayer_edges", msg->timestamp_ns, true, 1, false);
     graph_connector_.connect(*dsg_->graph);
   }
 
   for (const auto& [name, functor] : functors_) {
-    if (functor && name != "objects") {
+    if (functor) {
       functor->callPostUpdate(*dsg_, *curr_output_, mesh_update_info_);
     }
   }
@@ -368,6 +362,7 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     last_mesh_update_ = mesh_compression_->update(input, map_window_.get());
+    mesh_update_info_.correspondence = &mesh_compression_->correspondence();
   }
 
   {  // start timing scope

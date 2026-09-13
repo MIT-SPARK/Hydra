@@ -61,7 +61,9 @@ void declare_config(DeltaMeshCompression::Config& config) {
 }
 
 DeltaMeshCompression::DeltaMeshCompression(const Config& config)
-    : config(config::checkValid(config)), compression_(config.resolution) {}
+    : config(config::checkValid(config)),
+      compression_(config.resolution),
+      correspondence_(config.resolution) {}
 
 auto DeltaMeshCompression::update(const ActiveWindowOutput& input,
                                   const VolumetricWindow*) -> MeshDeltaPtr {
@@ -69,7 +71,20 @@ auto DeltaMeshCompression::update(const ActiveWindowOutput& input,
   const IndexSet archived(input.archived.begin(), input.archived.end());
   compression_.archiveBlocks(
       [&](const auto& index, const auto&) { return archived.count(index); });
-  return compression_.update(wrapper, input.timestamp_ns);
+  auto delta = compression_.update(wrapper, input.timestamp_ns);
+  compression_.fillCorrespondence(*delta, correspondence_);
+  return delta;
+}
+
+void DeltaMeshCompression::Compression::fillCorrespondence(
+    const kimera_pgmo::MeshDelta& delta, MeshCorrespondence& result) const {
+  result.clear();
+  for (size_t i = 0; i < delta.getNumVertices(); ++i) {
+    result.retained[grid_.toIndex(delta.getVertex(i).pos)].push_back(i);
+  }
+  for (const auto& [cell, vertex] : vertices_map_) {
+    result.active[cell] = vertex.mesh_index;
+  }
 }
 
 }  // namespace hydra

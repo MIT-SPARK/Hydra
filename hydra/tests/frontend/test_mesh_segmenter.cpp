@@ -33,11 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/active_window/volumetric_window.h>
 #include <hydra/common/global_info.h>
+#include <hydra/frontend/delta_mesh_compression.h>
 #include <hydra/frontend/graph_builder.h>
+#include <hydra/frontend/mesh_compression.h>
 #include <hydra/frontend/mesh_delta_clustering.h>
 #include <hydra/frontend/mesh_segmenter.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
+#include <hydra/utils/timing_utilities.h>
 
 #include <array>
 #include <future>
@@ -100,13 +104,21 @@ struct Pipeline {
     c.association_tolerance = 0.08;
     return c;
   }
-  explicit Pipeline(const MeshSegmenter::Config& config = Pipeline::config())
-      : segmenter(config, {1, 2}), compression(0.005) {
+  explicit Pipeline(const MeshSegmenter::Config& config = Pipeline::config(),
+                    bool voxel = false)
+      : segmenter(config, {1, 2}) {
+    if (voxel) {
+      compression = std::make_unique<MeshCompression>(0.005);
+    } else {
+      compression =
+          std::make_unique<DeltaMeshCompression>(DeltaMeshCompression::Config{});
+    }
     graph.setMesh(std::make_shared<Mesh>());
     replay.setMesh(std::make_shared<Mesh>());
   }
   MeshSegmenter segmenter;
-  kimera_pgmo::DeltaCompression compression;
+  std::unique_ptr<MeshCompressor> compression;
+  const VolumetricWindow* window = nullptr;
   MeshUpdateInfo mesh_update;
   SharedDsgInfo shared{SharedDsgInfo::Config{}};
   SceneGraph& graph = *shared.graph;
@@ -118,15 +130,26 @@ struct Pipeline {
     for (const auto& packet : packets) {
       const auto input = output(packet.timestamp_ns, packet.blocks, packet.archived);
       // Exercise the actual independence of clustering and compression.
-      const auto previous_objects = graph.getLayer(DsgLayers::OBJECTS).nodes().size();
       FrontendOutput result(packet.timestamp_ns, 1);
       GraphBuilderFunctor& functor = segmenter;
       auto worker = std::async(std::launch::async,
-                               [&] { functor.call(input, shared, result, nullptr); });
-      auto delta = hydra::updateMesh(compression, input, *graph.mesh(), mesh_update);
+                               [&] { functor.call(input, shared, result, window); });
+      auto delta = compression->update(input, window);
+      delta->updateMesh(*graph.mesh(), mesh_update.offsets);
+      mesh_update.correspondence = &compression->correspondence();
       worker.get();
-      EXPECT_EQ(graph.getLayer(DsgLayers::OBJECTS).nodes().size(), previous_objects);
+      const auto before_post = graph.clone();
       functor.callPostUpdate(shared, result, mesh_update);
+      EXPECT_EQ(graph.getLayer(DsgLayers::OBJECTS).nodes().size(),
+                before_post->getLayer(DsgLayers::OBJECTS).nodes().size());
+      for (const auto& [id, node] : graph.getLayer(DsgLayers::OBJECTS).nodes()) {
+        const auto& before =
+            before_post->getNode(id).attributes<ObjectNodeAttributes>();
+        const auto& after = node->attributes<ObjectNodeAttributes>();
+        EXPECT_EQ(before.position, after.position);
+        EXPECT_EQ(before.bounding_box, after.bounding_box);
+        EXPECT_EQ(before.last_update_time_ns, after.last_update_time_ns);
+      }
       delta->updateMesh(*replay.mesh(), replay_offsets);
       ASSERT_EQ(graph.mesh()->numVertices(), replay.mesh()->numVertices());
       ASSERT_EQ(graph.mesh()->faces, replay.mesh()->faces);
@@ -178,19 +201,17 @@ TEST(GraphBuilder, PostUpdateRunsAllFunctorsAfterCallbacksAndCompression) {
       order.push_back(name);
       ++post_calls;
       if (output.timestamp_ns == 1) {
-        ASSERT_EQ(info.blocks.size(), 1u);
-        EXPECT_TRUE(info.archived_blocks.empty());
+        ASSERT_NE(info.correspondence, nullptr);
+        EXPECT_EQ(info.correspondence->active.size(), 8u);
         EXPECT_EQ(info.offsets.archived_vertices, 0u);
-        const auto& mapping = info.blocks.begin()->second;
-        ASSERT_EQ(mapping.vertices.size(), 8u);
-        for (size_t i = 0; i < mapping.vertices.size(); ++i) {
-          ASSERT_TRUE(mapping.vertices[i]);
-          EXPECT_EQ(dsg.graph->mesh()->pos(*mapping.vertices[i]),
-                    mapping.block->pos(i));
+        const auto sample = box({0, 0, 0}, {0, 0, 0});
+        for (const auto& point : sample->points) {
+          const auto index = info.correspondence->find(point);
+          ASSERT_TRUE(index);
+          EXPECT_EQ(dsg.graph->mesh()->pos(info.offsets.toGlobalVertex(*index)), point);
         }
       } else {
-        EXPECT_TRUE(info.blocks.empty());
-        EXPECT_EQ(info.archived_blocks.size(), 1u);
+        EXPECT_TRUE(info.correspondence->active.empty());
         EXPECT_EQ(info.offsets.archived_vertices, 8u);
       }
     }
@@ -208,7 +229,7 @@ TEST(GraphBuilder, PostUpdateRunsAllFunctorsAfterCallbacksAndCompression) {
       curr_output_ = std::make_shared<FrontendOutput>(input.timestamp_ns, 1);
       updateImpl(std::make_shared<ActiveWindowOutput>(input));
       ASSERT_EQ(order.size(), 6u);
-      EXPECT_EQ(order.front(), "objects");
+      EXPECT_TRUE(std::is_sorted(order.begin(), order.end()));
     }
     void checkCalls() const {
       for (const auto& [name, functor] : functors_) {
@@ -220,8 +241,9 @@ TEST(GraphBuilder, PostUpdateRunsAllFunctorsAfterCallbacksAndCompression) {
   {
     std::atomic<size_t> completed{0};
     auto shared = std::make_shared<SharedDsgInfo>(SharedDsgInfo::Config{});
-    Builder builder(
-        GraphBuilder::Config{}, shared, std::make_shared<SharedModuleState>());
+    GraphBuilder::Config config;
+    config.mesh_compression = DeltaMeshCompression::Config{};
+    Builder builder(config, shared, std::make_shared<SharedModuleState>());
     builder.install(completed);
     builder.run(output(1, {box({0, 0, 0}, {0, 0, 0})}));
     completed = 0;
@@ -229,6 +251,90 @@ TEST(GraphBuilder, PostUpdateRunsAllFunctorsAfterCallbacksAndCompression) {
     builder.checkCalls();
   }
   GlobalInfo::reset();
+}
+
+TEST(MeshSegmenter, BothCompressorsResolveUnchangedSupportAndArchive) {
+  struct Window : VolumetricWindow {
+    bool retain = true;
+    bool inBounds(uint64_t,
+                  const Eigen::Isometry3d&,
+                  uint64_t,
+                  const Eigen::Vector3d&) const override {
+      return retain;
+    }
+  };
+  for (const bool voxel : {false, true}) {
+    SCOPED_TRACE(voxel ? "MeshCompression" : "DeltaCompression");
+    auto config = Pipeline::config();
+    config.clustering.min_cluster_size = 3;
+    Pipeline p(config, voxel);
+    Window window;
+    p.window = &window;
+    const auto a = block({0, 0, 0}, {{0.01f, 0, 0}, {0.1f, 0, 0}, {0.01f, 0.1f, 0}});
+    a->faces = {{0, 1, 2}};
+    a->face_voxels = {GlobalIndex(0, 0, 0)};
+    const auto b = block({1, 0, 0}, {{1.01f, 0, 0}, {1.1f, 0, 0}, {1.01f, 0.1f, 0}}, 2);
+    b->faces = {{0, 1, 2}};
+    b->face_voxels = {GlobalIndex(10, 0, 0)};
+    p.step({{1, {}, {a}}, {2, {}, {b}}});
+    ASSERT_EQ(p.attrs("O0"_id).mesh_connections.size(), 3u);
+    ASSERT_EQ(p.attrs("O1"_id).mesh_connections.size(), 3u);
+    p.step({{3, {}, {b}}});
+    for (const auto index : p.attrs("O0"_id).mesh_connections) {
+      EXPECT_LT(p.graph.mesh()->pos(index).x(), 0.2f);
+    }
+    window.retain = false;
+    p.step({{4, {{0, 0, 0}, {1, 0, 0}}, {}}});
+    EXPECT_FALSE(p.attrs("O0"_id).is_active);
+    EXPECT_FALSE(p.attrs("O1"_id).is_active);
+    EXPECT_EQ(p.attrs("O0"_id).mesh_connections.size(), 3u);
+    EXPECT_EQ(p.attrs("O1"_id).mesh_connections.size(), 3u);
+  }
+}
+
+TEST(MeshSegmenter, FrozenConnectionsStayWithTheirPreviousObject) {
+  struct Window : VolumetricWindow {
+    bool archive_left = false;
+    bool inBounds(uint64_t,
+                  const Eigen::Isometry3d&,
+                  uint64_t,
+                  const Eigen::Vector3d& point) const override {
+      return !archive_left || point.x() >= 0.0;
+    }
+  };
+  auto config = Pipeline::config();
+  config.clustering.min_cluster_size = 3;
+  config.clustering.cluster_tolerance = 0.4;
+  Pipeline p(config, true);
+  Window window;
+  p.window = &window;
+  const auto left =
+      block({-1, 0, 0},
+            {{-0.25f, 0.05f, 0.05f}, {-0.25f, 0.25f, 0.05f}, {-0.045f, 0.05f, 0.05f}});
+  left->faces = {{0, 1, 2}};
+  left->face_voxels = {GlobalIndex(-1, 0, 0)};
+  const auto right =
+      block({0, 0, 0},
+            {{-0.045f, 0.05f, 0.05f}, {0.25f, 0.05f, 0.05f}, {0.25f, 0.25f, 0.05f}},
+            2);
+  right->faces = {{0, 1, 2}};
+  right->face_voxels = {GlobalIndex(1, 0, 0)};
+  p.step({{1, {}, {left, right}}});
+  window.archive_left = true;
+  p.step({{2, {{-1, 0, 0}}, {}}});
+  EXPECT_TRUE(p.attrs("O0"_id).is_active);
+  // The right block still owns the shared frozen endpoint without reobservation.
+  p.step({{3, {}, {}}});
+  EXPECT_EQ(p.attrs("O1"_id).mesh_connections.size(), 3u);
+  const auto replacement = std::make_shared<MeshBlock>(*right);
+  replacement->points[0].x() = -0.044f;
+  p.step({{4, {}, {replacement}}, {5, {}, {replacement}}});
+  EXPECT_FALSE(p.attrs("O0"_id).is_active);
+  EXPECT_EQ(p.attrs("O0"_id).mesh_connections.size(), 3u);
+  EXPECT_EQ(p.attrs("O1"_id).mesh_connections.size(), 3u);
+  for (const auto index : p.attrs("O1"_id).mesh_connections) {
+    EXPECT_GE(index, p.offsets.archived_vertices);
+  }
 }
 
 TEST(MeshSegmenter, LabelsUnchangedBlocksAndRemeshing) {
@@ -511,7 +617,7 @@ TEST(MeshSegmenter, NearDuplicatesAcrossBlocksKeepSourcesAndStableOrdering) {
   segmenter.update(output(2, {}, {a->index}));
   ASSERT_EQ(segmenter.objects().size(), 1u);
   EXPECT_EQ(segmenter.objects().begin()->second.vertices.size(), 2u);
-  EXPECT_EQ(segmenter.objects().begin()->second.archived_vertices.size(), 2u);
+  EXPECT_EQ(segmenter.objects().begin()->second.archived_points.size(), 2u);
   EXPECT_EQ(segmenter.objects().begin()->second.points.size(), 2u);
 }
 

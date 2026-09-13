@@ -1,22 +1,39 @@
 #pragma once
 
-#include <kimera_pgmo/compression/delta_compression.h>
+#include <kimera_pgmo/mesh_offset_info.h>
+#include <spatial_hash/grid.h>
+#include <spatial_hash/hash.h>
 
-#include "hydra/reconstruction/voxel_types.h"
+#include <optional>
+#include <vector>
 
 namespace hydra {
 
-struct MeshUpdateInfo {
-  struct BlockMapping {
-    MeshBlock::ConstPtr block;
-    //! Local vertex to global compressed mesh index; empty entries were removed.
-    std::vector<std::optional<size_t>> vertices;
-  };
+// Correspondence for one compressor update. Indices are local to its MeshDelta.
+struct MeshCorrespondence {
+  explicit MeshCorrespondence(double resolution) : grid(resolution) {}
 
+  void clear() {
+    active.clear();
+    retained.clear();
+  }
+
+  std::optional<size_t> find(const Eigen::Vector3f& point) const {
+    const auto it = active.find(grid.toIndex(point));
+    return it == active.end() ? std::nullopt : std::optional<size_t>(it->second);
+  }
+
+  spatial_hash::Grid<spatial_hash::LongIndex> grid;
+  //! Current vertex for each compression cell, including unchanged support.
+  spatial_hash::LongIndexHashMap<size_t> active;
+  //! Includes frozen and newly archived vertices that may share a cell with
+  //! an active replacement. Used only to retain previously owned connections.
+  spatial_hash::LongIndexHashMap<std::vector<size_t>> retained;
+};
+
+struct MeshUpdateInfo {
   kimera_pgmo::MeshOffsetInfo offsets;
-  BlockIndices archived_blocks;
-  //! Mappings for block instances received in the latest input packet.
-  std::map<const MeshBlock*, BlockMapping> blocks;
+  const MeshCorrespondence* correspondence = nullptr;
 };
 
 }  // namespace hydra

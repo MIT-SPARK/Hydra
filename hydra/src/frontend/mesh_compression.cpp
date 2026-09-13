@@ -141,6 +141,7 @@ MeshCompression::MeshCompression(const Config& config)
       min_clearance(config.min_clearance_m > 0.0 ? config.min_clearance_m
                                                  : config.resolution),
       inv_resolution(1.0 / config.resolution),
+      correspondence_(config.resolution),
       tracking_(1) {}
 
 bool MeshCompression::isFree(const VolumetricMap& map, const GlobalIndex& voxel) const {
@@ -322,6 +323,19 @@ MeshDelta::Ptr MeshCompression::makeDelta(const UpdateState& state,
     }
   }
 
+  correspondence_.clear();
+  for (size_t i = 0; i < vertices_.size(); ++i) {
+    if (!state.deleted[i]) {
+      correspondence_.retained[correspondence_.grid.toIndex(vertices_[i].pos)]
+          .push_back(remap[i]);
+    }
+  }
+  for (const auto& [cell, index] : state.active) {
+    if (!state.deleted[index]) {
+      correspondence_.active[cell.cast<int64_t>()] = remap[index];
+    }
+  }
+
   size_t active_count = 0;
   kimera_pgmo::RedundancyChecker face_checker(faces_.size());
   const auto archived_count = result->getNumArchivedVertices();
@@ -348,7 +362,8 @@ MeshDelta::Ptr MeshCompression::makeDelta(const UpdateState& state,
   size_t remaining = 0;
   for (size_t i = 0; i < vertices_.size(); ++i) {
     if (!state.deleted[i] && !archivable[i]) {
-      vertices_[remaining++] = vertices_[i];
+      vertices_[remaining] = vertices_[i];
+      ++remaining;
     }
   }
 

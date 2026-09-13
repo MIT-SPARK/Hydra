@@ -42,13 +42,14 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <numeric>
 #include <tuple>
 #include <unordered_map>
 
 #include "hydra/common/global_info.h"
 #include "hydra/frontend/mesh_clustering.h"
-#include "hydra/frontend/mesh_connection_updater.h"
 #include "hydra/utils/mesh_deduplication.h"
+#include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -58,6 +59,7 @@ const auto registration =
                                    MeshSegmenter,
                                    MeshSegmenter::Config>("MeshSegmenter");
 using Cell = std::array<int64_t, 3>;
+
 struct CellHash {
   size_t operator()(const Cell& key) const {
     size_t result = 0;
@@ -67,11 +69,13 @@ struct CellHash {
     return result;
   }
 };
+
 Cell cellFor(const Eigen::Vector3f& point, double resolution) {
   return {static_cast<int64_t>(std::floor(point.x() / resolution)),
           static_cast<int64_t>(std::floor(point.y() / resolution)),
           static_cast<int64_t>(std::floor(point.z() / resolution))};
 }
+
 template <typename Callback>
 void neighbors(const Cell& cell, const Callback& callback) {
   for (int x = -1; x <= 1; ++x) {
@@ -117,28 +121,133 @@ MeshSegmenter::MeshSegmenter(const Config& config)
     : MeshSegmenter(config, GlobalInfo::instance().labelspace().object_labels) {}
 
 void MeshSegmenter::call(const ActiveWindowOutput& msg,
-                         SharedDsgInfo&,
+                         SharedDsgInfo& dsg,
                          FrontendOutput&,
                          const VolumetricWindow*) {
   update(msg);
+  std::lock_guard<std::mutex> lock(dsg.mutex);
+  updateNodes(*dsg.graph);
 }
 
 void MeshSegmenter::callPostUpdate(SharedDsgInfo& dsg,
                                    FrontendOutput& output,
                                    const MeshUpdateInfo& info) {
   timing::ScopedTimer timer("object/connections", output.timestamp_ns);
-  connections_.updateObjects(*this, info, *dsg.graph);
+  if (!info.correspondence) {
+    throw std::logic_error("Missing compressor correspondence");
+  }
+  for (auto it = tracked_nodes_.begin(); it != tracked_nodes_.end();) {
+    auto& attrs = dsg.graph->getNode(*it).attributes<spark_dsg::ObjectNodeAttributes>();
+    info.offsets.remapVertexIndices(attrs.mesh_connections);
+    const auto object = objects_.find(*it);
+    if (object != objects_.end() && object->second.is_active) {
+      updateConnections(object->second, info, attrs);
+    }
+    attrs.mesh_connections.sort();
+    attrs.mesh_connections.unique();
+    attrs.is_active = !attrs.mesh_connections.empty() &&
+                      attrs.mesh_connections.back() >= info.offsets.archived_vertices;
+    if (!attrs.is_active && (object == objects_.end() || !object->second.is_active)) {
+      it = tracked_nodes_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+void MeshSegmenter::updateConnections(const Object& object,
+                                      const MeshUpdateInfo& info,
+                                      spark_dsg::ObjectNodeAttributes& attrs) const {
+  const auto& correspondence = *info.correspondence;
+  std::set<size_t> current;
+  std::set<size_t> history;
+  const auto retain = [&](const Eigen::Vector3f& point) {
+    const auto it = correspondence.retained.find(correspondence.grid.toIndex(point));
+    if (it == correspondence.retained.end()) {
+      return;
+    }
+    for (const auto index : it->second) {
+      history.insert(info.offsets.toGlobalVertex(index));
+    }
+  };
+  for (const auto& ref : object.vertices) {
+    const auto index = correspondence.find(ref.block->pos(ref.vertex));
+    if (index) {
+      current.insert(info.offsets.toGlobalVertex(*index));
+    } else {
+      // A frozen vertex can still support an unchanged block. Preserve an
+      // existing connection without assigning it to a newly detected object.
+      retain(ref.block->pos(ref.vertex));
+    }
+  }
+
+  for (const auto& point : object.archived_points) {
+    retain(point);
+  }
+  attrs.mesh_connections.remove_if([&](size_t index) {
+    return index >= info.offsets.prev_archived_vertices && !history.count(index) &&
+           !current.count(index);
+  });
+  attrs.mesh_connections.insert(
+      attrs.mesh_connections.end(), current.begin(), current.end());
+}
+
+void MeshSegmenter::updateGeometry(const Object& object,
+                                   spark_dsg::ObjectNodeAttributes& attrs) const {
+  spark_dsg::Mesh samples;
+  MeshVertexDeduplicator deduplicator(config.vertex_merge_tolerance_m);
+  const auto append = [&](const auto& points) {
+    for (const auto& point : points) {
+      if (deduplicator.add(point) == samples.numVertices()) {
+        samples.points.push_back(point);
+      }
+    }
+  };
+  append(object.archived_points);
+  append(object.points);
+  std::vector<size_t> indices(samples.numVertices());
+  std::iota(indices.begin(), indices.end(), 0);
+  updateObjectGeometry(samples, attrs, &indices, config.bounding_box_type);
+}
+
+void MeshSegmenter::updateNodes(spark_dsg::SceneGraph& graph) {
+  for (const auto& [from, into] : merges_) {
+    if (graph.hasNode(from) && graph.hasNode(into)) {
+      const auto& source =
+          graph.getNode(from).attributes<spark_dsg::ObjectNodeAttributes>();
+      auto& target = graph.getNode(into).attributes<spark_dsg::ObjectNodeAttributes>();
+      target.mesh_connections.insert(target.mesh_connections.end(),
+                                     source.mesh_connections.begin(),
+                                     source.mesh_connections.end());
+    }
+    graph.removeNode(from);
+    tracked_nodes_.erase(from);
+  }
+  for (const auto& [id, object] : objects_) {
+    if (!object.is_active && !object.has_archived) {
+      graph.removeNode(id);
+      tracked_nodes_.erase(id);
+      continue;
+    }
+    if (!graph.hasNode(id)) {
+      auto attrs = std::make_unique<spark_dsg::ObjectNodeAttributes>();
+      attrs->semantic_label = object.label;
+      graph.emplaceNode(config.layer_id, id, std::move(attrs));
+      tracked_nodes_.insert(id);
+    }
+    auto& attrs = graph.getNode(id).attributes<spark_dsg::ObjectNodeAttributes>();
+    attrs.last_update_time_ns = object.timestamp_ns;
+    updateGeometry(object, attrs);
+  }
 }
 
 void MeshSegmenter::update(const ActiveWindowOutput& input) {
   merges_.clear();
-  retired_blocks_.clear();
   // Finalized objects are owned by the graph after the previous connection pass.
   for (auto it = objects_.begin(); it != objects_.end();) {
     if (!it->second.is_active) {
       it = objects_.erase(it);
     } else {
-      it->second.archived_vertices.clear();
       ++it;
     }
   }
@@ -150,7 +259,6 @@ void MeshSegmenter::update(const ActiveWindowOutput& input) {
       const auto it = blocks_.find(index);
       if (it != blocks_.end()) {
         archived.insert(it->second.get());
-        retired_blocks_.push_back(it->second);
       }
     }
     for (auto& [id, object] : objects_) {
@@ -162,7 +270,7 @@ void MeshSegmenter::update(const ActiveWindowOutput& input) {
       object.points.clear();
       for (const auto& ref : object.vertices) {
         if (archived.count(ref.block)) {
-          object.archived_vertices.push_back(ref);
+          object.archived_points.push_back(ref.block->pos(ref.vertex));
           object.has_archived = true;
         } else {
           remaining.push_back(ref);
@@ -283,7 +391,8 @@ void MeshSegmenter::cluster(uint64_t timestamp_ns) {
   associate(timestamp_ns, detection);
 }
 
-void MeshSegmenter::associate(uint64_t timestamp_ns, const Detection& detection) {
+auto MeshSegmenter::findMatches(const Detection& detection) const
+    -> std::vector<Match> {
   const auto& [mesh, sources, labels, clusters, cluster_labels] = detection;
   struct PreviousPoint {
     spark_dsg::NodeId id;
@@ -300,11 +409,6 @@ void MeshSegmenter::associate(uint64_t timestamp_ns, const Detection& detection)
           {id, p, object.label});
     }
   }
-  struct Match {
-    double score;
-    size_t cluster;
-    spark_dsg::NodeId id;
-  };
   std::vector<Match> matches;
   const auto association_squared =
       config.association_tolerance * config.association_tolerance;
@@ -331,7 +435,7 @@ void MeshSegmenter::associate(uint64_t timestamp_ns, const Detection& detection)
       }
     }
     for (const auto& [id, count] : overlaps) {
-      const double score = static_cast<double>(count) / clusters[c].indices.size();
+      const auto score = static_cast<double>(count) / clusters[c].indices.size();
       if (score >= config.min_overlap_ratio) {
         matches.push_back({score, c, id});
       }
@@ -346,6 +450,12 @@ void MeshSegmenter::associate(uint64_t timestamp_ns, const Detection& detection)
     }
     return a.cluster < b.cluster;
   });
+  return matches;
+}
+
+void MeshSegmenter::associate(uint64_t timestamp_ns, const Detection& detection) {
+  const auto& [mesh, sources, labels, clusters, cluster_labels] = detection;
+  const auto matches = findMatches(detection);
   std::map<size_t, spark_dsg::NodeId> assigned;
   std::set<spark_dsg::NodeId> used;
   for (const auto& match : matches) {
@@ -363,9 +473,9 @@ void MeshSegmenter::associate(uint64_t timestamp_ns, const Detection& detection)
     auto& target = objects_.at(into);
     auto& from = objects_.at(match.id);
     target.has_archived |= from.has_archived;
-    target.archived_vertices.insert(target.archived_vertices.end(),
-                                    from.archived_vertices.begin(),
-                                    from.archived_vertices.end());
+    target.archived_points.insert(target.archived_points.end(),
+                                  from.archived_points.begin(),
+                                  from.archived_points.end());
     merges_.emplace_back(match.id, into);
     objects_.erase(match.id);
     used.insert(match.id);

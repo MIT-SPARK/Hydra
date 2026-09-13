@@ -10,8 +10,6 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_compression.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_delta_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_clustering.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/mesh_connection_updater.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/mesh_update_info.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_segmenter.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/place_mesh_connector.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/surface_place_extractor.cpp
