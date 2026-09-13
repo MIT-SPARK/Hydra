@@ -55,8 +55,11 @@ void declare_config(TraversabilityVisualizer::Config& config) {
   field(config.traversability_colormap, "traversability_colormap");
   field(config.confidence_colormap, "confidence_colormap");
   field(config.state_colors, "state_colors");
+  field(config.skip_invalid_voxels, "skip_invalid_voxels");
   field(config.drawing_offset_z, "drawing_offset_z", "m");
+  field(config.alpha, "alpha");
   check(config.state_colors.size(), EQ, 4, "state_colors");
+  checkInRange(config.alpha, 0.0, 1.0, "alpha", false);
 }
 
 TraversabilityVisualizer::TraversabilityVisualizer(const Config& config)
@@ -134,8 +137,13 @@ void TraversabilityVisualizer::visualizeLayer(
         if (voxel.confidence <= 0.0f) {
           continue;  // Unobserved voxels.
         }
+
+        if (!voxel.height && active_config_.skip_invalid_voxels) {
+          continue;  // Voxels without surface support
+        }
+
         pos.y = block.origin().y() + (y + 0.5f) * layer.voxel_size;
-        pos.z = voxel.height + z_offset;
+        pos.z = voxel.height.value_or(world_t_body.z()) + z_offset;
         msg.points.push_back(pos);
         msg.colors.push_back(visualizer::makeColorMsg(
             traversability_colormap_->getColor(voxel.traversability),

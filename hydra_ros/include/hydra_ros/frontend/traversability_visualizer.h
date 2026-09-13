@@ -59,14 +59,14 @@ class TraversabilityVisualizer : public places::TraversabilityPlaceExtractor::Si
         createSpectrumColormap({spark_dsg::Color::black(),
                                 spark_dsg::Color::blue(),
                                 spark_dsg::Color::cyan()})};
-    //! Colors to use for the different traversability states (unknown, traversable,
-    //! intraversable, traversed).
+    //! Color for traversability states (unknown, traversable, intraversable, traversed)
     std::vector<spark_dsg::Color> state_colors{spark_dsg::Color::black(),
                                                spark_dsg::Color::blue(),
                                                spark_dsg::Color::red(),
                                                spark_dsg::Color::green()};
-    //! Offset added on top of each voxel's own surface height [m]. Useful to lift
-    //! the overlay clear of the mesh.
+    //! Skip voxels without height when drawing
+    bool skip_invalid_voxels = true;
+    //! Offset added on top of each voxel's own surface height.
     float drawing_offset_z = 0.0f;
     //! Alpha value to use for the voxel colors.
     double alpha = 0.3;
