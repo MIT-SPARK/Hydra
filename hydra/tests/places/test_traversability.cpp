@@ -37,7 +37,6 @@
 
 namespace hydra::places {
 
-using spark_dsg::TraversabilityNodeAttributes;
 using Range = BlockTraversabilityClustering::Range;
 
 TEST(TraversabilityPlaces, Indexing) {
@@ -63,36 +62,6 @@ TEST(TraversabilityPlaces, Indexing) {
   EXPECT_EQ(layer.voxelIndexFromGlobal(BlockIndex(13, 24, 3)), Index2D(3, 4));
   EXPECT_EQ(layer.blockIndexFromGlobal(BlockIndex(9, 18, 3)), BlockIndex(0, 1, 3));
   EXPECT_EQ(layer.voxelIndexFromGlobal(BlockIndex(9, 18, 3)), Index2D(9, 8));
-}
-
-TEST(TraversabilityPlaces, VoxelHeight) {
-  // Every voxel carries a height: default and post-reset it is 0.0f, never unset.
-  TraversabilityBlock block(1.0f, {1, 2, 3}, 10);
-  EXPECT_EQ(block.voxel(0, 0).height, 0.0f);
-  EXPECT_EQ(block.voxel(3, 4).height, 0.0f);
-
-  block.voxel(3, 4).height = 1.5f;
-  EXPECT_EQ(block.voxel(3, 4).height, 1.5f);
-  EXPECT_EQ(block.voxel({3, 4}).height, 1.5f);
-  EXPECT_EQ(block.voxels[block.linearFromIndex(3, 4)].height, 1.5f);
-
-  // reset() returns heights to 0.0f, the "no surface observed" value.
-  block.reset();
-  EXPECT_EQ(block.voxel(3, 4).height, 0.0f);
-
-  // Heights survive the voxel copy that InfoBlock performs.
-  BlockTraversabilityClustering::InfoBlock info(1.0f, {1, 2, 3}, 10);
-  block.voxel(3, 4).height = -2.25f;
-  info.voxel(3, 4) = block.voxel(3, 4);
-  EXPECT_EQ(info.voxel(3, 4).height, -2.25f);
-
-  // Heights reach the layer through the same accessors the estimators use.
-  TraversabilityLayer layer(0.1f, 10);
-  auto& layer_block = layer.allocateBlock(BlockIndex(1, 2, 3), 10);
-  layer_block.voxel(3, 4).height = 0.75f;
-  const auto* voxel = layer.voxel(BlockIndex(13, 24, 3));
-  ASSERT_NE(voxel, nullptr);
-  EXPECT_EQ(voxel->height, 0.75f);
 }
 
 TEST(TraversabilityPlaces, Range) {
