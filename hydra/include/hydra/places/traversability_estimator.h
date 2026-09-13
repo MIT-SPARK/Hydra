@@ -48,8 +48,12 @@
 namespace hydra::places {
 
 struct GradientInfo {
-  float gradient = 0.0f;    // mean gradient magnitude
-  float confidence = 0.0f;  // num_neighbors / 8.0
+  //! Surface height
+  float height = 0.0f;
+  //! Mean gradient magnitude
+  float gradient = 0.0f;
+  //! Gradient confidence (ratio of valid neighbors)
+  float confidence = 0.0f;
 };
 
 using HeightMap = Index2DMap<float>;
@@ -142,6 +146,9 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
 
     //! @brief The height below the robot body to consider for traversability in meters.
     float height_below = 0.5f;
+
+    //! @brief Minimum TSDF weight for a voxel to count as observed.
+    float min_weight = 1.0e-6f;
   };
 
   HeightTraversabilityEstimator(const Config& config);

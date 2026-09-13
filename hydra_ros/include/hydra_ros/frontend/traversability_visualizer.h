@@ -59,16 +59,15 @@ class TraversabilityVisualizer : public places::TraversabilityPlaceExtractor::Si
         createSpectrumColormap({spark_dsg::Color::black(),
                                 spark_dsg::Color::blue(),
                                 spark_dsg::Color::cyan()})};
-    //! Colors to use for the different traversability states (unknown, traversable,
-    //! intraversable, traversed).
+    //! Color for traversability states (unknown, traversable, intraversable, traversed)
     std::vector<spark_dsg::Color> state_colors{spark_dsg::Color::black(),
                                                spark_dsg::Color::blue(),
                                                spark_dsg::Color::red(),
                                                spark_dsg::Color::green()};
-    //! Height where the slice is visualized [m].
+    //! Skip voxels without height when drawing
+    bool skip_invalid_height = true;
+    //! Offset added on top of each voxel's own surface height.
     float drawing_offset_z = 0.0f;
-    //! True: Use height relative to the robot, false: use absolute height.
-    bool use_relative_offset = true;
     //! Alpha value to use for the voxel colors.
     double alpha = 0.3;
   };

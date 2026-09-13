@@ -37,7 +37,6 @@
 
 namespace hydra::places {
 
-using spark_dsg::TraversabilityNodeAttributes;
 using Range = BlockTraversabilityClustering::Range;
 
 TEST(TraversabilityPlaces, Indexing) {

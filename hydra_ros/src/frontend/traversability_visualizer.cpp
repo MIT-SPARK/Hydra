@@ -55,9 +55,11 @@ void declare_config(TraversabilityVisualizer::Config& config) {
   field(config.traversability_colormap, "traversability_colormap");
   field(config.confidence_colormap, "confidence_colormap");
   field(config.state_colors, "state_colors");
+  field(config.skip_invalid_height, "skip_invalid_height");
   field(config.drawing_offset_z, "drawing_offset_z", "m");
-  field(config.use_relative_offset, "use_relative_offset");
+  field(config.alpha, "alpha");
   check(config.state_colors.size(), EQ, 4, "state_colors");
+  checkInRange(config.alpha, 0.0, 1.0, "alpha", false);
 }
 
 TraversabilityVisualizer::TraversabilityVisualizer(const Config& config)
@@ -123,12 +125,9 @@ void TraversabilityVisualizer::visualizeLayer(
   visualization_msgs::msg::Marker msg4 = msg;
   msg4.ns = "debug";
 
-  auto height = active_config_.drawing_offset_z;
-  if (active_config_.use_relative_offset) {
-    height += world_t_body.z();
-  }
+  // Additive offset applied on top of each voxel's own surface height.
+  const auto z_offset = active_config_.drawing_offset_z;
   geometry_msgs::msg::Point pos;
-  pos.z = height;
 
   for (const auto& block : layer) {
     for (size_t x = 0; x < block.voxels_per_side; ++x) {
@@ -138,10 +137,13 @@ void TraversabilityVisualizer::visualizeLayer(
         if (voxel.confidence <= 0.0f) {
           continue;  // Unobserved voxels.
         }
-        pos.y = block.origin().y() + (y + 0.5f) * layer.voxel_size;
-        if (voxel.height) {
-          pos.z = *voxel.height;
+
+        if (!voxel.height && active_config_.skip_invalid_height) {
+          continue;  // Voxels without surface support
         }
+
+        pos.y = block.origin().y() + (y + 0.5f) * layer.voxel_size;
+        pos.z = voxel.height.value_or(world_t_body.z()) + z_offset;
         msg.points.push_back(pos);
         msg.colors.push_back(visualizer::makeColorMsg(
             traversability_colormap_->getColor(voxel.traversability),
