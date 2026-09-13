@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <hydra/reconstruction/voxel_types.h>
 #include <hydra/utils/mesh_deduplication.h>
 
 #include <limits>
@@ -80,6 +81,21 @@ TEST(MeshDeduplication, UnlabelledMeshesAndInvalidFaces) {
   const auto original = mesh;
   EXPECT_THROW(deduplicateMesh(mesh, 1.0e-5), std::out_of_range);
   EXPECT_EQ(mesh, original);
+}
+
+TEST(MeshDeduplication, RemovedFacesKeepSourceVoxelsAligned) {
+  MeshBlock mesh(1.0f, BlockIndex(0, 0, 0));
+  mesh.resizeVertices(4);
+  mesh.points = {{0, 0, 0}, {1.0e-6f, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+  mesh.faces = {{0, 1, 2}, {1, 2, 3}, {0, 1, 3}};
+  mesh.face_voxels = {GlobalIndex(0, 0, 0), GlobalIndex(1, 0, 0), GlobalIndex(2, 0, 0)};
+  deduplicateMesh(mesh, 0.0);
+  EXPECT_EQ(mesh.face_voxels.size(), 3u);
+  deduplicateMesh(mesh, 1.0e-5);
+  ASSERT_EQ(mesh.faces.size(), 1u);
+  ASSERT_EQ(mesh.face_voxels.size(), mesh.faces.size());
+  EXPECT_EQ(mesh.face_voxels.front(), GlobalIndex(1, 0, 0));
+  EXPECT_EQ(mesh.faces.front(), (spark_dsg::Mesh::Face{0, 1, 2}));
 }
 
 }  // namespace hydra

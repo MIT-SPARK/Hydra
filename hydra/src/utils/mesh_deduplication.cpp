@@ -5,7 +5,72 @@
 #include <limits>
 #include <stdexcept>
 
+#include "hydra/reconstruction/voxel_types.h"
+
 namespace hydra {
+namespace {
+
+void compactMesh(spark_dsg::Mesh& mesh,
+                 double tolerance,
+                 std::vector<GlobalIndex>* face_voxels) {
+  MeshVertexDeduplicator deduplicator(tolerance, mesh.numVertices() / 3);
+  if (tolerance == 0 || mesh.numVertices() == 0) {
+    return;
+  }
+  spark_dsg::Mesh compact(mesh.has_colors,
+                          mesh.has_timestamps,
+                          mesh.has_labels,
+                          mesh.has_first_seen_stamps);
+  compact.reserveVertices(mesh.numVertices() / 3);
+  compact.faces.reserve(mesh.numFaces());
+  std::vector<size_t> remapping(mesh.numVertices());
+  for (size_t i = 0; i < mesh.numVertices(); ++i) {
+    const auto index =
+        deduplicator.add(mesh.pos(i), mesh.has_labels ? mesh.label(i) : 0);
+    remapping[i] = index;
+    if (index == compact.numVertices()) {
+      compact.points.push_back(mesh.pos(i));
+      if (mesh.has_colors) {
+        compact.colors.push_back(mesh.colors[i]);
+      }
+      if (mesh.has_labels) {
+        compact.labels.push_back(mesh.labels[i]);
+      }
+      if (mesh.has_timestamps) {
+        compact.stamps.push_back(mesh.stamps[i]);
+      }
+      if (mesh.has_first_seen_stamps) {
+        compact.first_seen_stamps.push_back(mesh.first_seen_stamps[i]);
+      }
+      continue;
+    }
+    if (mesh.has_timestamps) {
+      compact.stamps[index] = std::max(compact.stamps[index], mesh.stamps[i]);
+    }
+    if (mesh.has_first_seen_stamps) {
+      compact.first_seen_stamps[index] =
+          std::min(compact.first_seen_stamps[index], mesh.first_seen_stamps[i]);
+    }
+  }
+  std::vector<GlobalIndex> retained;
+  for (size_t i = 0; i < mesh.faces.size(); ++i) {
+    const auto& face = mesh.faces[i];
+    const spark_dsg::Mesh::Face mapped{
+        remapping.at(face[0]), remapping.at(face[1]), remapping.at(face[2])};
+    if (mapped[0] != mapped[1] && mapped[0] != mapped[2] && mapped[1] != mapped[2]) {
+      compact.faces.push_back(mapped);
+      if (face_voxels) {
+        retained.push_back(face_voxels->at(i));
+      }
+    }
+  }
+  mesh = std::move(compact);
+  if (face_voxels) {
+    *face_voxels = std::move(retained);
+  }
+}
+
+}  // namespace
 
 MeshVertexDeduplicator::MeshVertexDeduplicator(double tolerance,
                                                size_t expected_vertices)
@@ -46,12 +111,14 @@ MeshVertexDeduplicator::Cell MeshVertexDeduplicator::cellFor(
 size_t MeshVertexDeduplicator::find(const Cell& cell,
                                     const Eigen::Vector3f& point) const {
   const auto it = cells_.find(cell);
-  if (it != cells_.end()) {
-    for (const auto index : it->second) {
-      const auto delta = point.cast<double>() - representatives_[index].cast<double>();
-      if (delta.squaredNorm() <= radius_squared_) {
-        return index;
-      }
+  if (it == cells_.end()) {
+    return representatives_.size();
+  }
+
+  for (const auto index : it->second) {
+    const auto delta = point.cast<double>() - representatives_[index].cast<double>();
+    if (delta.squaredNorm() <= radius_squared_) {
+      return index;
     }
   }
   return representatives_.size();
@@ -96,53 +163,14 @@ size_t MeshVertexDeduplicator::add(const Eigen::Vector3f& point, uint32_t label)
 }
 
 void deduplicateMesh(spark_dsg::Mesh& mesh, double tolerance) {
-  MeshVertexDeduplicator deduplicator(tolerance, mesh.numVertices() / 3);
-  if (tolerance == 0 || mesh.numVertices() == 0) {
-    return;
+  compactMesh(mesh, tolerance, nullptr);
+}
+
+void deduplicateMesh(MeshBlock& mesh, double tolerance) {
+  if (!mesh.face_voxels.empty() && mesh.face_voxels.size() != mesh.numFaces()) {
+    throw std::invalid_argument("Face voxel indices do not match mesh faces");
   }
-  spark_dsg::Mesh compact(mesh.has_colors,
-                          mesh.has_timestamps,
-                          mesh.has_labels,
-                          mesh.has_first_seen_stamps);
-  compact.reserveVertices(mesh.numVertices() / 3);
-  compact.faces.reserve(mesh.numFaces());
-  std::vector<size_t> remapping(mesh.numVertices());
-  for (size_t i = 0; i < mesh.numVertices(); ++i) {
-    const auto index =
-        deduplicator.add(mesh.pos(i), mesh.has_labels ? mesh.label(i) : 0);
-    remapping[i] = index;
-    if (index == compact.numVertices()) {
-      compact.points.push_back(mesh.pos(i));
-      if (mesh.has_colors) {
-        compact.colors.push_back(mesh.colors[i]);
-      }
-      if (mesh.has_labels) {
-        compact.labels.push_back(mesh.labels[i]);
-      }
-      if (mesh.has_timestamps) {
-        compact.stamps.push_back(mesh.stamps[i]);
-      }
-      if (mesh.has_first_seen_stamps) {
-        compact.first_seen_stamps.push_back(mesh.first_seen_stamps[i]);
-      }
-      continue;
-    }
-    if (mesh.has_timestamps) {
-      compact.stamps[index] = std::max(compact.stamps[index], mesh.stamps[i]);
-    }
-    if (mesh.has_first_seen_stamps) {
-      compact.first_seen_stamps[index] =
-          std::min(compact.first_seen_stamps[index], mesh.first_seen_stamps[i]);
-    }
-  }
-  for (const auto& face : mesh.faces) {
-    const spark_dsg::Mesh::Face mapped{
-        remapping.at(face[0]), remapping.at(face[1]), remapping.at(face[2])};
-    if (mapped[0] != mapped[1] && mapped[0] != mapped[2] && mapped[1] != mapped[2]) {
-      compact.faces.push_back(mapped);
-    }
-  }
-  mesh = std::move(compact);
+  compactMesh(mesh, tolerance, mesh.face_voxels.empty() ? nullptr : &mesh.face_voxels);
 }
 
 }  // namespace hydra

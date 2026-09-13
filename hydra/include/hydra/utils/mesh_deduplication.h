@@ -9,6 +9,8 @@
 
 namespace hydra {
 
+struct MeshBlock;
+
 // Merge each vertex with an existing representative of the same label within
 // tolerance. Representatives keep their original positions and remain separate.
 class MeshVertexDeduplicator {
@@ -40,5 +42,8 @@ class MeshVertexDeduplicator {
 // Keeps the first position/color and removes faces collapsed by merging vertices.
 // Zero disables compaction entirely, preserving the original mesh layout.
 void deduplicateMesh(spark_dsg::Mesh& mesh, double tolerance);
+
+// Also preserve source voxel indices for the remaining faces.
+void deduplicateMesh(MeshBlock& mesh, double tolerance);
 
 }  // namespace hydra
