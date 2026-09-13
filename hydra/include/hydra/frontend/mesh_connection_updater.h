@@ -1,5 +1,7 @@
 #pragma once
 
+#include <spark_dsg/scene_graph.h>
+
 #include "hydra/frontend/mesh_update_info.h"
 
 namespace hydra {

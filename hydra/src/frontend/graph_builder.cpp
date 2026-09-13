@@ -48,7 +48,6 @@
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/keyframe_selector.h"
 #include "hydra/frontend/mesh_compression.h"
-#include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
@@ -366,8 +365,15 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
-  last_mesh_update_ = hydra::updateMesh(
-      *mesh_compression_, input, *dsg_->graph->mesh(), mesh_update_info_);
+  {
+    ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
+    last_mesh_update_ = mesh_compression_->update(input, map_window_.get());
+  }
+
+  {  // start timing scope
+    ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
+    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_update_info_.offsets);
+  }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
   launchCallbacks(post_mesh_callbacks_, input);

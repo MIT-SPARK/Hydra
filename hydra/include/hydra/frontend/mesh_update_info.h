@@ -2,7 +2,7 @@
 
 #include <kimera_pgmo/compression/delta_compression.h>
 
-#include "hydra/active_window/active_window_output.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
@@ -18,10 +18,5 @@ struct MeshUpdateInfo {
   //! Mappings for block instances received in the latest input packet.
   std::map<const MeshBlock*, BlockMapping> blocks;
 };
-
-kimera_pgmo::MeshDelta::Ptr updateMesh(kimera_pgmo::DeltaCompression& compression,
-                                       const ActiveWindowOutput& input,
-                                       spark_dsg::Mesh& mesh,
-                                       MeshUpdateInfo& info);
 
 }  // namespace hydra
