@@ -342,6 +342,7 @@ void HeightTraversabilityEstimator::computeTraversability(
         }
       }
     }
+
     // Normalize the traversability values and assign surface heights.
     for (int x = 0; x < voxels_per_side; ++x) {
       for (int y = 0; y < voxels_per_side; ++y) {
@@ -350,12 +351,14 @@ void HeightTraversabilityEstimator::computeTraversability(
           voxel.traversability /= voxel.confidence;
           voxel.confidence /= num_voxels;
         }
+
         const BlockIndex global_2d =
             traversability_block.globalFromLocalIndex(Index2D(x, y));
-        const auto it = height_map.find(Index2D(global_2d.x(), global_2d.y()));
-        if (it != height_map.end()) {
-          voxel.height = it->second;
-        }  // Otherwise the height stays at the 0.0f set by reset().
+        const auto iter = height_map.find(Index2D(global_2d.x(), global_2d.y()));
+        if (iter != height_map.end()) {
+          voxel.height = iter->second;
+        }
+
         classifyTraversabilityVoxel(voxel);
       }
     }
