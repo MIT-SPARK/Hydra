@@ -48,8 +48,12 @@
 namespace hydra::places {
 
 struct GradientInfo {
-  float gradient = 0.0f;    // mean gradient magnitude
-  float confidence = 0.0f;  // num_neighbors / 8.0
+  //! Surface height
+  float height = 0.0f;
+  //! Mean gradient magnitude
+  float gradient = 0.0f;
+  //! Gradient confidence (ratio of valid neighbors)
+  float confidence = 0.0f;
 };
 
 using HeightMap = Index2DMap<float>;

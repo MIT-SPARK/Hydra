@@ -55,7 +55,7 @@ void declare_config(TraversabilityVisualizer::Config& config) {
   field(config.traversability_colormap, "traversability_colormap");
   field(config.confidence_colormap, "confidence_colormap");
   field(config.state_colors, "state_colors");
-  field(config.skip_invalid_voxels, "skip_invalid_voxels");
+  field(config.skip_invalid_height, "skip_invalid_height");
   field(config.drawing_offset_z, "drawing_offset_z", "m");
   field(config.alpha, "alpha");
   check(config.state_colors.size(), EQ, 4, "state_colors");
@@ -138,7 +138,7 @@ void TraversabilityVisualizer::visualizeLayer(
           continue;  // Unobserved voxels.
         }
 
-        if (!voxel.height && active_config_.skip_invalid_voxels) {
+        if (!voxel.height && active_config_.skip_invalid_height) {
           continue;  // Voxels without surface support
         }
 

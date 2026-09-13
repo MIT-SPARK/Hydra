@@ -65,7 +65,7 @@ class TraversabilityVisualizer : public places::TraversabilityPlaceExtractor::Si
                                                spark_dsg::Color::red(),
                                                spark_dsg::Color::green()};
     //! Skip voxels without height when drawing
-    bool skip_invalid_voxels = true;
+    bool skip_invalid_height = true;
     //! Offset added on top of each voxel's own surface height.
     float drawing_offset_z = 0.0f;
     //! Alpha value to use for the voxel colors.
