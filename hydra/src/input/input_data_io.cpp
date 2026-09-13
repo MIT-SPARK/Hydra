@@ -370,18 +370,6 @@ void declare_config(SaveOptions& config) {
   check(config.png_compression, LE, 9, "png_compression");
 }
 
-InputData::Ptr cloneInputData(const InputData& input) {
-  const auto& source = input.getSensor();
-  auto sensor = readSensor(writeSensor(source));
-  sensor->setStaticMask(source.getStaticMask());
-  auto copy = std::make_shared<InputData>(input);
-  copy->sensor_ = std::move(sensor);
-  for (const auto& field : kImages) {
-    copy.get()->*field.member = (input.*field.member).clone();
-  }
-  return copy;
-}
-
 void writeInputData(const InputData& input,
                     const WriteEntry& write,
                     const SaveOptions& options) {
@@ -413,16 +401,14 @@ InputData::Ptr readInputData(const ReadEntry& read) {
     }
 
     auto sensor = readSensor(record["sensor"]);
+    const auto& images = record["images"];
+    sensor->setStaticMask(readImage(kSensorMask, images[kSensorMask.name], read));
     auto input = std::make_shared<InputData>(sensor);
     readMetadata(record, *input);
-
-    const auto& images = record["images"];
     for (const auto& field : kImages) {
       (*input).*field.member = readImage(field, images[field.name], read);
     }
 
-    const auto mask = readImage(kSensorMask, images[kSensorMask.name], read);
-    sensor->setStaticMask(mask);
     return input;
   } catch (const std::exception& e) {
     throw std::runtime_error(std::string("input deserialization: ") + e.what());

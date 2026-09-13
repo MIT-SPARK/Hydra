@@ -44,10 +44,8 @@
 #include "hydra/openset/openset_types.h"
 
 namespace hydra {
-struct InputData;
 namespace input {
 struct SaveOptions;
-std::shared_ptr<InputData> cloneInputData(const InputData& input);
 }  // namespace input
 
 struct InputData {
@@ -68,9 +66,13 @@ struct InputData {
   using MaskType = uint8_t;
   inline static constexpr auto MaskMatType = CV_8UC1;
 
+  //! The sensor and its static mask must not be modified after assignment.
   explicit InputData(Sensor::ConstPtr sensor);
 
   virtual ~InputData() = default;
+
+  //! Deep-copy input data, sharing the immutable sensor and its static mask.
+  Ptr clone() const;
 
   //! Save a self-contained ZIP snapshot. Throws std::runtime_error on failure.
   void save(const std::filesystem::path& filepath) const;
@@ -132,8 +134,7 @@ struct InputData {
   float max_range = std::numeric_limits<float>::infinity();
 
  private:
-  friend InputData::Ptr input::cloneInputData(const InputData& input);
-  Sensor::ConstPtr sensor_;
+  const Sensor::ConstPtr sensor_;
 };
 
 };  // namespace hydra

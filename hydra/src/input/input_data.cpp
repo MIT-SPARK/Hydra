@@ -138,6 +138,19 @@ void convertVertexMap(InputData& data, bool in_world_frame) {
 
 InputData::InputData(Sensor::ConstPtr sensor) : sensor_(std::move(sensor)) {}
 
+InputData::Ptr InputData::clone() const {
+  auto copy = std::make_shared<InputData>(*this);
+  copy->color_image = color_image.clone();
+  copy->color_mask = color_mask.clone();
+  copy->depth_image = depth_image.clone();
+  copy->range_image = range_image.clone();
+  copy->label_image = label_image.clone();
+  copy->instance_image = instance_image.clone();
+  copy->vertex_map = vertex_map.clone();
+  copy->traversability_image = traversability_image.clone();
+  return copy;
+}
+
 const Sensor& InputData::getSensor() const {
   if (!sensor_) {
     throw std::runtime_error("InputData has no sensor");

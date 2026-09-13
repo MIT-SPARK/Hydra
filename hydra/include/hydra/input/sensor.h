@@ -171,12 +171,12 @@ class Sensor {
                                     float inflation_distance = 0.f) const = 0;
 
   /**
-   * @brief Get the static mask for this sensor
+   * @brief Get the read-only static mask; shallow copies must not modify its data.
    * @return cv::Mat containing the mask, or empty cv::Mat if no mask is defined
    */
   virtual const cv::Mat& getStaticMask() const { return static_mask_; }
 
-  //! Replace the effective mask with an owned copy (e.g., from an input archive).
+  //! Initialize an owned mask before sharing this sensor with any InputData.
   void setStaticMask(const cv::Mat& mask) { static_mask_ = mask.clone(); }
 
   //! @brief Name of current sensor

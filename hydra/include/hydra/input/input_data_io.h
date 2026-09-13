@@ -49,9 +49,6 @@ struct SaveOptions {
 
 void declare_config(SaveOptions& config);
 
-//! Copy input fields and own all images, including a reconstructed sensor and its mask.
-InputData::Ptr cloneInputData(const InputData& input);
-
 using io::Bytes;
 using io::ReadEntry;
 using io::WriteEntry;

@@ -70,6 +70,7 @@ Camera::Config cameraConfig() {
 }
 
 InputData sampleInput(const Sensor::Ptr& sensor) {
+  sensor->setStaticMask(cv::Mat(3, 4, CV_8UC3, cv::Scalar(1, 2, 3)));
   InputData data(sensor);
   data.timestamp_ns = 18446744073709551614ULL;
   data.world_T_body =
@@ -107,7 +108,6 @@ InputData sampleInput(const Sensor::Ptr& sensor) {
   data.label_features[-1] = FeatureVector::LinSpaced(3, -1, 1);
   data.label_features[42] = FeatureVector();
 
-  sensor->setStaticMask(cv::Mat(3, 4, CV_8UC3, cv::Scalar(1, 2, 3)));
   return data;
 }
 
@@ -379,17 +379,16 @@ TEST_F(InputDataIo, CompressionOptionsPreserveValues) {
   }
 }
 
-TEST_F(InputDataIo, SnapshotOwnsImagesAndSensor) {
+TEST_F(InputDataIo, SnapshotOwnsImagesAndSharesSensor) {
   const auto camera = std::make_shared<Camera>(cameraConfig(), "camera");
   auto data = sampleInput(camera);
-  const auto copy = input::cloneInputData(data);
+  const auto copy = data.clone();
   expectInput(data, *copy);
-  EXPECT_NE(&copy->getSensor(), &data.getSensor());
+  EXPECT_EQ(&copy->getSensor(), &data.getSensor());
   EXPECT_NE(copy->depth_image.data, data.depth_image.data);
   data.color_image.setTo(cv::Scalar(0, 0, 0));
   data.depth_image.setTo(0);
   data.feature.setZero();
-  camera->setStaticMask({});
   EXPECT_EQ(copy->color_image.at<cv::Vec3b>(0, 0), cv::Vec3b(10, 20, 30));
   EXPECT_TRUE(std::isnan(copy->depth_image.at<float>(0, 0)));
   EXPECT_EQ(copy->feature[0], 0.25f);
