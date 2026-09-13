@@ -363,4 +363,37 @@ TEST_F(InputDataIo, NativeYamlMetadata) {
   EXPECT_THROW(decode(entries), std::runtime_error);
 }
 
+TEST_F(InputDataIo, CompressionOptionsPreserveValues) {
+  const auto camera = std::make_shared<Camera>(cameraConfig(), "camera");
+  const auto data = sampleInput(camera);
+  using Compression = input::SaveOptions::FloatCompression;
+  for (const auto compression :
+       {Compression::NONE, Compression::RLE, Compression::ZIP}) {
+    input::SaveOptions options;
+    options.float_compression = compression;
+    options.png_compression = 0;
+    options.archive.compression_level = compression == Compression::NONE ? 0 : 1;
+    const auto path = directory / "compression.zip";
+    data.save(path, options);
+    expectInput(data, *InputData::load(path));
+  }
+}
+
+TEST_F(InputDataIo, SnapshotOwnsImagesAndSensor) {
+  const auto camera = std::make_shared<Camera>(cameraConfig(), "camera");
+  auto data = sampleInput(camera);
+  const auto copy = input::cloneInputData(data);
+  expectInput(data, *copy);
+  EXPECT_NE(&copy->getSensor(), &data.getSensor());
+  EXPECT_NE(copy->depth_image.data, data.depth_image.data);
+  data.color_image.setTo(cv::Scalar(0, 0, 0));
+  data.depth_image.setTo(0);
+  data.feature.setZero();
+  camera->setStaticMask({});
+  EXPECT_EQ(copy->color_image.at<cv::Vec3b>(0, 0), cv::Vec3b(10, 20, 30));
+  EXPECT_TRUE(std::isnan(copy->depth_image.at<float>(0, 0)));
+  EXPECT_EQ(copy->feature[0], 0.25f);
+  EXPECT_FALSE(copy->getSensor().getStaticMask().empty());
+}
+
 }  // namespace hydra

@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/input/input_data_io.h"
 
+#include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
@@ -157,20 +158,41 @@ std::vector<std::string> getChannelOrder(const ImageField& field, int type) {
   return {"scalar"};
 }
 
-std::vector<int> getEncodingOptions(const cv::Mat& image) {
-  if (image.depth() != CV_32F) {
+std::vector<int> getEncodingOptions(const ImageField& field,
+                                    const SaveOptions& options) {
+  if (std::string(field.extension) == ".png") {
+    // Setting the level otherwise changes OpenCV's default RLE strategy.
+    return {cv::IMWRITE_PNG_COMPRESSION,
+            options.png_compression,
+            cv::IMWRITE_PNG_STRATEGY,
+            cv::IMWRITE_PNG_STRATEGY_RLE};
+  }
+
+  if (std::string(field.extension) != ".exr") {
     return {};
   }
 
+  int compression = cv::IMWRITE_EXR_COMPRESSION_ZIP;
+  switch (options.float_compression) {
+    case SaveOptions::FloatCompression::NONE:
+      compression = cv::IMWRITE_EXR_COMPRESSION_NO;
+      break;
+    case SaveOptions::FloatCompression::RLE:
+      compression = cv::IMWRITE_EXR_COMPRESSION_RLE;
+      break;
+    case SaveOptions::FloatCompression::ZIP:
+      break;
+  }
   return {cv::IMWRITE_EXR_TYPE,
           cv::IMWRITE_EXR_TYPE_FLOAT,
           cv::IMWRITE_EXR_COMPRESSION,
-          cv::IMWRITE_EXR_COMPRESSION_ZIP};
+          compression};
 }
 
 YAML::Node writeImage(const ImageField& field,
                       const cv::Mat& image,
-                      const WriteEntry& write) {
+                      const WriteEntry& write,
+                      const SaveOptions& options) {
   if (image.empty()) {
     return YAML::Node(YAML::NodeType::Null);
   }
@@ -188,8 +210,8 @@ YAML::Node writeImage(const ImageField& field,
     }
 
     Bytes bytes;
-    const auto options = getEncodingOptions(image);
-    if (!cv::imencode(field.extension, encoded_image, bytes, options)) {
+    const auto encoding = getEncodingOptions(field, options);
+    if (!cv::imencode(field.extension, encoded_image, bytes, encoding)) {
       throw std::runtime_error("image encoding failed");
     }
 
@@ -338,16 +360,41 @@ void readMetadata(const YAML::Node& record, InputData& input) {
 
 }  // namespace
 
-void writeInputData(const InputData& input, const WriteEntry& write) {
+void declare_config(SaveOptions& config) {
+  using namespace config;
+  name("InputData::SaveOptions");
+  enum_field(config.float_compression, "float_compression", {"none", "rle", "zip"});
+  field(config.png_compression, "png_compression");
+  field(config.archive, "archive");
+  check(config.png_compression, GE, 0, "png_compression");
+  check(config.png_compression, LE, 9, "png_compression");
+}
+
+InputData::Ptr cloneInputData(const InputData& input) {
+  const auto& source = input.getSensor();
+  auto sensor = readSensor(writeSensor(source));
+  sensor->setStaticMask(source.getStaticMask());
+  auto copy = std::make_shared<InputData>(input);
+  copy->sensor_ = std::move(sensor);
+  for (const auto& field : kImages) {
+    copy.get()->*field.member = (input.*field.member).clone();
+  }
+  return copy;
+}
+
+void writeInputData(const InputData& input,
+                    const WriteEntry& write,
+                    const SaveOptions& options) {
   try {
+    config::checkValid(options);
     auto record = writeMetadata(input);
     auto images = record["images"];
     for (const auto& field : kImages) {
-      images[field.name] = writeImage(field, input.*field.member, write);
+      images[field.name] = writeImage(field, input.*field.member, write, options);
     }
 
     const auto& mask = input.getSensor().getStaticMask();
-    images[kSensorMask.name] = writeImage(kSensorMask, mask, write);
+    images[kSensorMask.name] = writeImage(kSensorMask, mask, write, options);
 
     const auto text = YAML::Dump(record);
     write("metadata.yaml", Bytes(text.begin(), text.end()));

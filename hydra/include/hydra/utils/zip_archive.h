@@ -32,29 +32,38 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/input/input_data_io.h"
+#pragma once
 
-namespace hydra {
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <string>
+#include <vector>
 
-void InputData::save(const std::filesystem::path& filepath) const {
-  save(filepath, input::SaveOptions{});
-}
+namespace hydra::io {
 
-void InputData::save(const std::filesystem::path& filepath,
-                     const input::SaveOptions& options) const {
-  io::writeArchive(
-      filepath,
-      [this, &options](const auto& write) {
-        input::writeInputData(*this, write, options);
-      },
-      options.archive);
-}
+struct ArchiveOptions {
+  //! Deflate level: -1 uses the library default, 0 stores entries, 1-9 compress.
+  //! PNG and EXR entries are always stored without additional compression.
+  int compression_level = -1;
+};
 
-InputData::Ptr InputData::load(const std::filesystem::path& filepath) {
-  InputData::Ptr input;
-  io::readArchive(filepath,
-                  [&input](const auto& read) { input = input::readInputData(read); });
-  return input;
-}
+void declare_config(ArchiveOptions& config);
 
-}  // namespace hydra
+using Bytes = std::vector<uint8_t>;
+using WriteEntry = std::function<void(const std::string&, const Bytes&)>;
+using ReadEntry = std::function<Bytes(const std::string&)>;
+
+//! Write entries to a temporary ZIP and replace the destination after completion.
+//! The parent directory must exist. Callbacks must not retain the entry writer.
+void writeArchive(const std::filesystem::path& path,
+                  const std::function<void(const WriteEntry&)>& write,
+                  const ArchiveOptions& options = {});
+
+//! Read named ZIP entries with size and checksum validation.
+//! Callbacks must not retain the entry reader. Archive failures throw
+//! std::runtime_error.
+void readArchive(const std::filesystem::path& path,
+                 const std::function<void(const ReadEntry&)>& read);
+
+}  // namespace hydra::io

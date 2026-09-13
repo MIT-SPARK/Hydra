@@ -44,6 +44,11 @@
 #include "hydra/openset/openset_types.h"
 
 namespace hydra {
+struct InputData;
+namespace input {
+struct SaveOptions;
+std::shared_ptr<InputData> cloneInputData(const InputData& input);
+}  // namespace input
 
 struct InputData {
   using Ptr = std::shared_ptr<InputData>;
@@ -69,6 +74,8 @@ struct InputData {
 
   //! Save a self-contained ZIP snapshot. Throws std::runtime_error on failure.
   void save(const std::filesystem::path& filepath) const;
+  void save(const std::filesystem::path& filepath,
+            const input::SaveOptions& options) const;
 
   //! Restore a snapshot without finalizing or changing representations.
   //! Throws std::runtime_error on invalid or incomplete archives.
@@ -125,6 +132,7 @@ struct InputData {
   float max_range = std::numeric_limits<float>::infinity();
 
  private:
+  friend InputData::Ptr input::cloneInputData(const InputData& input);
   Sensor::ConstPtr sensor_;
 };
 

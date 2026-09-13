@@ -34,27 +34,33 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <cstdint>
-#include <functional>
-#include <string>
-#include <vector>
-
 #include "hydra/input/input_data.h"
+#include "hydra/utils/zip_archive.h"
 
 namespace hydra::input {
 
-using Bytes = std::vector<uint8_t>;
+struct SaveOptions {
+  enum class FloatCompression { NONE, RLE, ZIP };
+  FloatCompression float_compression = FloatCompression::ZIP;
+  //! PNG compression level in [0, 9].
+  int png_compression = 1;
+  io::ArchiveOptions archive;
+};
 
-//! Write a relative entry name and consume its bytes before returning.
-//! Prefix entry names to embed input data in another archive.
-using WriteEntry = std::function<void(const std::string&, const Bytes&)>;
+void declare_config(SaveOptions& config);
 
-//! Read an entry by relative name. Throw if the entry is missing.
-using ReadEntry = std::function<Bytes(const std::string&)>;
+//! Copy input fields and own all images, including a reconstructed sensor and its mask.
+InputData::Ptr cloneInputData(const InputData& input);
+
+using io::Bytes;
+using io::ReadEntry;
+using io::WriteEntry;
 
 //! Serialize input data one entry at a time, with metadata written last.
 //! Throws std::runtime_error with field context on failure.
-void writeInputData(const InputData& input, const WriteEntry& write);
+void writeInputData(const InputData& input,
+                    const WriteEntry& write,
+                    const SaveOptions& options = {});
 
 //! Restore input entries, including their sensor, without calling finalize().
 //! Throws std::runtime_error with field context on failure.
