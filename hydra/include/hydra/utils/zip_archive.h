@@ -44,7 +44,6 @@ namespace hydra::io {
 
 struct ArchiveOptions {
   //! Deflate level: -1 uses the library default, 0 stores entries, 1-9 compress.
-  //! PNG and EXR entries are always stored without additional compression.
   int compression_level = -1;
 };
 

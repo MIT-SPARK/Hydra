@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/input/input_data_io.h"
 
-#include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
@@ -48,6 +47,9 @@
 #include <utility>
 
 namespace hydra::input {
+
+using SaveOptions = InputData::SaveOptions;
+
 namespace {
 
 YAML::Node writeFeature(const FeatureVector& x) {
@@ -129,7 +131,7 @@ void writeImage(const std::string& name,
                 const std::string& extension,
                 const SaveOptions& options,
                 const cv::Mat& image,
-                const WriteEntry& write,
+                const io::WriteEntry& write,
                 YAML::Node& record) {
   if (image.empty()) {
     return;
@@ -139,7 +141,7 @@ void writeImage(const std::string& name,
     throw std::runtime_error(name + ": unsupported matrix type or dimensions");
   }
 
-  Bytes bytes;
+  io::Bytes bytes;
   const auto encoding = getEncodingOptions(extension, options);
   if (!cv::imencode(extension, image, bytes, encoding)) {
     throw std::runtime_error(name + ": image encoding failed");
@@ -158,7 +160,7 @@ void writeImage(const std::string& name,
 
 cv::Mat readImage(const std::string& name,
                   const YAML::Node& record,
-                  const ReadEntry& read) {
+                  const io::ReadEntry& read) {
   if (!record[name]) {
     return {};
   }
@@ -266,17 +268,8 @@ void readMetadata(const YAML::Node& record, InputData& input) {
 
 }  // namespace
 
-void declare_config(SaveOptions& config) {
-  using namespace config;
-  name("InputData::SaveOptions");
-  enum_field(config.float_compression, "float_compression", {"none", "rle", "zip"});
-  field(config.png_compression, "png_compression");
-  field(config.archive, "archive");
-  checkInRange(config.png_compression, 0, 9, "png_compression");
-}
-
 void writeInputData(const InputData& input,
-                    const WriteEntry& write,
+                    const io::WriteEntry& write,
                     const SaveOptions& opts) {
   config::checkValid(opts);
   auto record = writeMetadata(input);
@@ -295,10 +288,10 @@ void writeInputData(const InputData& input,
   writeImage("sensor_mask", ".png", opts, mask, write, images);
 
   const auto text = YAML::Dump(record);
-  write("metadata.yaml", Bytes(text.begin(), text.end()));
+  write("metadata.yaml", io::Bytes(text.begin(), text.end()));
 }
 
-InputData::Ptr readInputData(const ReadEntry& read) {
+InputData::Ptr readInputData(const io::ReadEntry& read) {
   const auto bytes = read("metadata.yaml");
   const auto record = YAML::Load(std::string(bytes.begin(), bytes.end()));
   if (record["version"].as<int>() != 1) {

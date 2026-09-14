@@ -39,28 +39,18 @@
 
 namespace hydra::input {
 
-struct SaveOptions {
-  enum class FloatCompression { NONE, RLE, ZIP };
-  FloatCompression float_compression = FloatCompression::ZIP;
-  //! PNG compression level in [0, 9].
-  int png_compression = 1;
-  io::ArchiveOptions archive;
-};
-
-void declare_config(SaveOptions& config);
-
-using io::Bytes;
-using io::ReadEntry;
-using io::WriteEntry;
-
-//! Serialize input data one entry at a time, with metadata written last.
-//! Throws std::runtime_error with field context on failure.
+/**
+ * @brief Serialize input data with writer
+ * @throws std::runtime_error with field context on failure.
+ */
 void writeInputData(const InputData& input,
-                    const WriteEntry& write,
-                    const SaveOptions& options = {});
+                    const io::WriteEntry& write,
+                    const InputData::SaveOptions& options = {});
 
-//! Restore input entries, including their sensor, without calling finalize().
-//! Throws std::runtime_error with field context on failure.
-InputData::Ptr readInputData(const ReadEntry& read);
+/**
+ * @brief Load input data with reader
+ * @throws std::runtime_error with field context on failure.
+ */
+InputData::Ptr readInputData(const io::ReadEntry& read);
 
 }  // namespace hydra::input

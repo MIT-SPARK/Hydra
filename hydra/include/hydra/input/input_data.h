@@ -44,15 +44,23 @@
 #include "hydra/openset/openset_types.h"
 
 namespace hydra {
-namespace input {
-
-struct SaveOptions;
-
-}  // namespace input
 
 struct InputData {
   using Ptr = std::shared_ptr<InputData>;
   using ConstPtr = std::shared_ptr<const InputData>;
+
+  struct SaveOptions {
+    //! Compression type to apply to exr images
+    enum class FloatCompression {
+      NONE,
+      RLE,
+      ZIP
+    } float_compression = FloatCompression::NONE;
+    //! PNG compression level in [0, 9]
+    int png_compression = 1;
+    //! Amount of compression to apply to input data archive
+    int archive_compression = -1;
+  };
 
   // Types of the stored image data.
   using ColorType = cv::Vec3b;
@@ -80,8 +88,7 @@ struct InputData {
    * @throws std::runtime_error on failure.
    */
   void save(const std::filesystem::path& filepath) const;
-  void save(const std::filesystem::path& filepath,
-            const input::SaveOptions& options) const;
+  void save(const std::filesystem::path& filepath, const SaveOptions& options) const;
 
   /**
    * @brief Restore a snapshot without finalizing or changing representations.
@@ -142,5 +149,7 @@ struct InputData {
  private:
   const Sensor::ConstPtr sensor_;
 };
+
+void declare_config(InputData::SaveOptions& config);
 
 };  // namespace hydra
