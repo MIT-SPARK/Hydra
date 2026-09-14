@@ -20,7 +20,7 @@
   <depend>teaserpp</depend>
   <depend>libgoogle-glog-dev</depend>
   <depend>libopencv-dev</depend>
-  <depend>libminizip-dev</depend>
+  <depend>libzip-dev</depend>
   <build_depend>pkg-config</build_depend>
   <build_export_depend>pkg-config</build_export_depend>
   <depend>libpcl-all-dev</depend>

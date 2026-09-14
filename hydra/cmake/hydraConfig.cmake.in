@@ -13,7 +13,7 @@ find_dependency(spark_dsg REQUIRED)
 find_dependency(teaserpp REQUIRED)
 find_dependency(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
 find_dependency(PkgConfig REQUIRED)
-pkg_check_modules(MINIZIP REQUIRED IMPORTED_TARGET minizip)
+pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
 
 if(NOT TARGET hydra::hydra)
   include("${hydra_CMAKE_DIR}/hydraTargets.cmake")

@@ -36,23 +36,28 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <minizip/unzip.h>
-#include <minizip/zip.h>
 #include <unistd.h>
+#include <zip.h>
 
-#include <algorithm>
 #include <cstdlib>
+#include <fstream>
 #include <limits>
+#include <list>
+#include <memory>
 #include <stdexcept>
 
 namespace hydra::io {
 namespace {
 
-// Limit each Minizip read/write call to 1 MiB.
-constexpr size_t kChunkSize = 1 << 20;
-
-unsigned int getChunkSize(size_t remaining) {
-  return static_cast<unsigned int>(std::min(remaining, kChunkSize));
+void writeEmptyArchive(const std::filesystem::path& path) {
+  // Older libzip versions cannot retain empty archives. Write the ZIP end of
+  // central directory record with zero entries, directory size, and comment.
+  constexpr char record[22] = {'P', 'K', 5, 6};
+  std::ofstream output;
+  output.exceptions(std::ios::failbit | std::ios::badbit);
+  output.open(path, std::ios::binary | std::ios::trunc);
+  output.write(record, sizeof(record));
+  output.close();
 }
 
 class ZipWriter {
@@ -69,7 +74,7 @@ class ZipWriter {
 
     close(fd);
     temporary_ = name.data();
-    file_ = zipOpen64(temporary_.c_str(), APPEND_STATUS_CREATE);
+    file_ = zip_open(temporary_.c_str(), ZIP_CREATE | ZIP_TRUNCATE, nullptr);
     if (!file_) {
       std::filesystem::remove(temporary_);
       throw std::runtime_error("could not open temporary archive");
@@ -78,7 +83,7 @@ class ZipWriter {
 
   ~ZipWriter() {
     if (file_) {
-      zipClose(file_, nullptr);
+      zip_discard(file_);
     }
 
     std::error_code error;
@@ -89,90 +94,79 @@ class ZipWriter {
   ZipWriter& operator=(const ZipWriter&) = delete;
 
   void write(const std::string& name, const Bytes& bytes) {
-    openEntry(name, bytes.size());
-
-    size_t offset = 0;
-    while (offset < bytes.size()) {
-      const auto size = getChunkSize(bytes.size() - offset);
-      if (zipWriteInFileInZip(file_, bytes.data() + offset, size) != ZIP_OK) {
-        zipCloseFileInZip(file_);
-        throw std::runtime_error("could not write entry " + name);
-      }
-
-      offset += size;
+    // Libzip reads sources during commit, after the caller's buffers may be gone.
+    entries_.push_back(bytes);
+    const auto& data = entries_.back();
+    const auto source = zip_source_buffer(file_, data.data(), data.size(), 0);
+    if (!source) {
+      throw std::runtime_error("could not create source for entry " + name);
     }
 
-    if (zipCloseFileInZip(file_) != ZIP_OK) {
-      throw std::runtime_error("could not finish entry " + name);
-    }
-  }
-
-  void commit() {
-    const auto status = zipClose(file_, nullptr);
-    file_ = nullptr;
-    if (status != ZIP_OK) {
-      throw std::runtime_error("could not finish archive");
+    const auto index = zip_file_add(file_, name.c_str(), source, ZIP_FL_ENC_UTF_8);
+    if (index < 0) {
+      zip_source_free(source);
+      throw std::runtime_error("could not create entry " + name);
     }
 
-    std::filesystem::rename(temporary_, destination_);
-  }
-
- private:
-  void openEntry(const std::string& name, size_t size) {
     // Some OpenCV TIFF encoders leave int32 images uncompressed.
     const auto extension = std::filesystem::path(name).extension();
     const auto compress =
         options_.compression_level != 0 && extension != ".png" && extension != ".exr";
-    const auto method = compress ? Z_DEFLATED : 0;
-    const auto level = compress ? options_.compression_level : 0;
-    const auto zip64 = size >= std::numeric_limits<uint32_t>::max();
-    const auto status = zipOpenNewFileInZip64(file_,
-                                              name.c_str(),
-                                              nullptr,
-                                              nullptr,
-                                              0,
-                                              nullptr,
-                                              0,
-                                              nullptr,
-                                              method,
-                                              level,
-                                              zip64);
-    if (status != ZIP_OK) {
-      throw std::runtime_error("could not create entry " + name);
+    const auto method = compress ? ZIP_CM_DEFLATE : ZIP_CM_STORE;
+    const auto level = options_.compression_level > 0 ? options_.compression_level : 0;
+    if (zip_set_file_compression(file_, index, method, level) < 0) {
+      throw std::runtime_error("could not set compression for entry " + name);
     }
   }
 
+  void commit() {
+    if (entries_.empty()) {
+      zip_discard(file_);
+      file_ = nullptr;
+      writeEmptyArchive(temporary_);
+    } else if (zip_close(file_) < 0) {
+      throw std::runtime_error("could not finish archive: " +
+                               std::string(zip_strerror(file_)));
+    }
+
+    file_ = nullptr;
+    std::filesystem::rename(temporary_, destination_);
+  }
+
+ private:
   std::filesystem::path destination_;
   std::filesystem::path temporary_;
-  zipFile file_ = nullptr;
+  zip_t* file_ = nullptr;
+  std::list<Bytes> entries_;
   const ArchiveOptions options_;
 };
 
 class ZipReader {
  public:
   explicit ZipReader(const std::filesystem::path& path)
-      : file_(unzOpen64(path.c_str())) {
+      : file_(zip_open(path.c_str(), ZIP_RDONLY, nullptr)) {
     if (!file_) {
       throw std::runtime_error("could not open ZIP archive");
     }
   }
 
-  ~ZipReader() { unzClose(file_); }
+  ~ZipReader() { zip_discard(file_); }
   ZipReader(const ZipReader&) = delete;
   ZipReader& operator=(const ZipReader&) = delete;
 
   Bytes read(const std::string& name) {
     Bytes bytes(getEntrySize(name));
-    if (unzOpenCurrentFile(file_) != UNZ_OK) {
+    const auto entry = std::unique_ptr<zip_file_t, decltype(&zip_fclose)>(
+        zip_fopen(file_, name.c_str(), 0), zip_fclose);
+    if (!entry) {
       throw std::runtime_error("could not open entry " + name);
     }
 
     size_t offset = 0;
     while (offset < bytes.size()) {
-      const auto size = getChunkSize(bytes.size() - offset);
-      const auto count = unzReadCurrentFile(file_, bytes.data() + offset, size);
+      const auto count =
+          zip_fread(entry.get(), bytes.data() + offset, bytes.size() - offset);
       if (count <= 0) {
-        unzCloseCurrentFile(file_);
         throw std::runtime_error("truncated or corrupt entry " + name);
       }
 
@@ -180,9 +174,8 @@ class ZipReader {
     }
 
     uint8_t extra;
-    const auto trailing = unzReadCurrentFile(file_, &extra, 1);
-    const auto status = unzCloseCurrentFile(file_);
-    if (trailing != 0 || status != UNZ_OK) {
+    const auto trailing = zip_fread(entry.get(), &extra, 1);
+    if (trailing != 0) {
       throw std::runtime_error("invalid size or checksum for entry " + name);
     }
 
@@ -191,21 +184,19 @@ class ZipReader {
 
  private:
   size_t getEntrySize(const std::string& name) {
-    if (unzLocateFile(file_, name.c_str(), 1) != UNZ_OK) {
+    zip_stat_t info{};
+    if (zip_stat(file_, name.c_str(), 0, &info) < 0) {
       throw std::runtime_error("missing entry " + name);
     }
 
-    unz_file_info64 info{};
-    const auto status =
-        unzGetCurrentFileInfo64(file_, &info, nullptr, 0, nullptr, 0, nullptr, 0);
-    if (status != UNZ_OK || info.uncompressed_size > std::numeric_limits<int>::max()) {
+    if (!(info.valid & ZIP_STAT_SIZE) || info.size > std::numeric_limits<int>::max()) {
       throw std::runtime_error("invalid or oversized entry " + name);
     }
 
-    return info.uncompressed_size;
+    return info.size;
   }
 
-  unzFile file_;
+  zip_t* file_;
 };
 
 }  // namespace

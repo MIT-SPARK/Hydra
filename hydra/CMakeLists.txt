@@ -37,7 +37,7 @@ find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(MINIZIP REQUIRED IMPORTED_TARGET minizip)
+pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
 # we turn off PCL precompile internally to get around having vtk linked. Note: kdtree is
 # REQUIRED to make sure we link against FLANN (used by euclidean extraction)
 find_package(PCL REQUIRED COMPONENTS common kdtree)
@@ -63,7 +63,7 @@ target_link_libraries(
          spatial_hash::spatial_hash
          teaserpp::teaser_registration
          ${OpenCV_LIBRARIES}
-  PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES} PkgConfig::MINIZIP
+  PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES} PkgConfig::LIBZIP
 )
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(hydra::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
