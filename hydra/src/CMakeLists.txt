@@ -1,6 +1,7 @@
 add_subdirectory(active_window)
 add_subdirectory(backend)
 add_subdirectory(common)
+add_subdirectory(eval)
 add_subdirectory(frontend)
 add_subdirectory(input)
 add_subdirectory(loop_closure)
