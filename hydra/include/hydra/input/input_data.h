@@ -45,7 +45,9 @@
 
 namespace hydra {
 namespace input {
+
 struct SaveOptions;
+
 }  // namespace input
 
 struct InputData {
@@ -66,7 +68,6 @@ struct InputData {
   using MaskType = uint8_t;
   inline static constexpr auto MaskMatType = CV_8UC1;
 
-  //! The sensor and its static mask must not be modified after assignment.
   explicit InputData(Sensor::ConstPtr sensor);
 
   virtual ~InputData() = default;
@@ -74,13 +75,18 @@ struct InputData {
   //! Deep-copy input data, sharing the immutable sensor and its static mask.
   Ptr clone() const;
 
-  //! Save a self-contained ZIP snapshot. Throws std::runtime_error on failure.
+  /**
+   * @brief Save a self-contained ZIP snapshot
+   * @throws std::runtime_error on failure.
+   */
   void save(const std::filesystem::path& filepath) const;
   void save(const std::filesystem::path& filepath,
             const input::SaveOptions& options) const;
 
-  //! Restore a snapshot without finalizing or changing representations.
-  //! Throws std::runtime_error on invalid or incomplete archives.
+  /**
+   * @brief Restore a snapshot without finalizing or changing representations.
+   * @throws std::runtime_error on invalid or incomplete archives.
+   */
   static Ptr load(const std::filesystem::path& filepath);
 
   //! Get the sensor that captured this data.

@@ -47,34 +47,11 @@
 #include <stdexcept>
 #include <utility>
 
-#include "hydra/common/config_utilities.h"
-
 namespace hydra::input {
 namespace {
 
-struct ImageField {
-  const char* name;
-  cv::Mat InputData::* member;
-  int type;
-  const char* extension;
-};
-
-const std::array<ImageField, 8> kImages{{
-    {"color", &InputData::color_image, CV_8UC3, ".png"},
-    {"color_mask", &InputData::color_mask, CV_8UC1, ".png"},
-    {"depth", &InputData::depth_image, CV_32FC1, ".exr"},
-    {"range", &InputData::range_image, CV_32FC1, ".exr"},
-    {"labels", &InputData::label_image, CV_32SC1, ".tiff"},
-    {"instances", &InputData::instance_image, CV_16SC1, ".tiff"},
-    {"vertices", &InputData::vertex_map, CV_32FC3, ".exr"},
-    {"traversability", &InputData::traversability_image, CV_32FC1, ".exr"},
-}};
-
-const ImageField kSensorMask{"sensor_mask", nullptr, CV_8UC3, ".png"};
-
-YAML::Node writeFeature(const FeatureVector& feature) {
-  auto node =
-      feature.size() ? YAML::Node(feature) : YAML::Node(YAML::NodeType::Sequence);
+YAML::Node writeFeature(const FeatureVector& x) {
+  auto node = x.size() ? YAML::Node(x) : YAML::Node(YAML::NodeType::Sequence);
   node.SetStyle(YAML::EmitterStyle::Flow);
   return node;
 }
@@ -94,12 +71,10 @@ YAML::Node writePose(const Eigen::Isometry3d& pose) {
     throw std::runtime_error("non-finite pose");
   }
 
-  const auto rotation = Eigen::Quaterniond(pose.rotation());
-  const auto& p = pose.translation();
+  const Eigen::Quaterniond q(pose.rotation());
   YAML::Node node;
-  node["translation_m"] = Eigen::Vector3d(p);
-  node["rotation_wxyz"] =
-      std::array<double, 4>{rotation.w(), rotation.x(), rotation.y(), rotation.z()};
+  node["translation_m"] = Eigen::Vector3d(pose.translation());
+  node["rotation_wxyz"] = std::array<double, 4>{q.w(), q.x(), q.y(), q.z()};
   node["translation_m"].SetStyle(YAML::EmitterStyle::Flow);
   node["rotation_wxyz"].SetStyle(YAML::EmitterStyle::Flow);
   return node;
@@ -108,14 +83,9 @@ YAML::Node writePose(const Eigen::Isometry3d& pose) {
 Eigen::Isometry3d readPose(const YAML::Node& record) {
   const auto p = record["translation_m"].as<std::array<double, 3>>();
   const auto q = record["rotation_wxyz"].as<std::array<double, 4>>();
-  const auto rotation = Eigen::Quaterniond(q[0], q[1], q[2], q[3]);
-  if (!rotation.coeffs().allFinite() || std::abs(rotation.norm() - 1.0) > 1.0e-6) {
-    throw std::runtime_error("invalid pose quaternion");
-  }
-
-  auto result = Eigen::Isometry3d::Identity();
-  result.linear() = rotation.toRotationMatrix();
-  result.translation() = Eigen::Vector3d(p.data());
+  const Eigen::Quaterniond rot(q[0], q[1], q[2], q[3]);
+  const Eigen::Vector3d vec(p[0], p[1], p[2]);
+  const Eigen::Isometry3d result = Eigen::Translation<double, 3>(vec) * rot;
   if (!result.matrix().allFinite()) {
     throw std::runtime_error("non-finite pose");
   }
@@ -123,44 +93,9 @@ Eigen::Isometry3d readPose(const YAML::Node& record) {
   return result;
 }
 
-std::string readEntryName(const YAML::Node& description) {
-  const auto name = description["file"].as<std::string>();
-  if (name.empty() || name.find('/') != std::string::npos ||
-      name.find('\\') != std::string::npos || name == "." || name == "..") {
-    throw std::runtime_error("invalid input entry name");
-  }
-
-  return name;
-}
-
-bool isValidImageType(const ImageField& field, int type) {
-  // Sensor masks are read as BGR by Sensor, but an in-memory mask may be scalar.
-  if (!field.member) {
-    return type == CV_8UC1 || type == CV_8UC3;
-  }
-
-  return type == field.type;
-}
-
-std::vector<std::string> getChannelOrder(const ImageField& field, int type) {
-  if (field.member == &InputData::vertex_map) {
-    return {"X", "Y", "Z"};
-  }
-
-  if (field.member == &InputData::color_image) {
-    return {"R", "G", "B"};
-  }
-
-  if (type == CV_8UC3) {
-    return {"B", "G", "R"};
-  }
-
-  return {"scalar"};
-}
-
-std::vector<int> getEncodingOptions(const ImageField& field,
+std::vector<int> getEncodingOptions(const std::string& extension,
                                     const SaveOptions& options) {
-  if (std::string(field.extension) == ".png") {
+  if (extension == ".png") {
     // Setting the level otherwise changes OpenCV's default RLE strategy.
     return {cv::IMWRITE_PNG_COMPRESSION,
             options.png_compression,
@@ -168,7 +103,7 @@ std::vector<int> getEncodingOptions(const ImageField& field,
             cv::IMWRITE_PNG_STRATEGY_RLE};
   }
 
-  if (std::string(field.extension) != ".exr") {
+  if (extension != ".exr") {
     return {};
   }
 
@@ -183,88 +118,65 @@ std::vector<int> getEncodingOptions(const ImageField& field,
     case SaveOptions::FloatCompression::ZIP:
       break;
   }
+
   return {cv::IMWRITE_EXR_TYPE,
           cv::IMWRITE_EXR_TYPE_FLOAT,
           cv::IMWRITE_EXR_COMPRESSION,
           compression};
 }
 
-YAML::Node writeImage(const ImageField& field,
-                      const cv::Mat& image,
-                      const WriteEntry& write,
-                      const SaveOptions& options) {
+void writeImage(const std::string& name,
+                const std::string& extension,
+                const SaveOptions& options,
+                const cv::Mat& image,
+                const WriteEntry& write,
+                YAML::Node& record) {
   if (image.empty()) {
-    return YAML::Node(YAML::NodeType::Null);
+    return;
   }
 
-  try {
-    if (image.dims != 2 || !isValidImageType(field, image.type())) {
-      throw std::runtime_error("unsupported matrix type or dimensions");
-    }
-
-    cv::Mat encoded_image;
-    if (field.member == &InputData::color_image) {
-      cv::cvtColor(image, encoded_image, cv::COLOR_RGB2BGR);
-    } else {
-      encoded_image = image;
-    }
-
-    Bytes bytes;
-    const auto encoding = getEncodingOptions(field, options);
-    if (!cv::imencode(field.extension, encoded_image, bytes, encoding)) {
-      throw std::runtime_error("image encoding failed");
-    }
-
-    const auto filename = std::string(field.name) + field.extension;
-    write(filename, bytes);
-    YAML::Node node;
-    node["file"] = filename;
-    node["rows"] = image.rows;
-    node["cols"] = image.cols;
-    node["opencv_type"] = image.type();
-    node["channel_order"] = getChannelOrder(field, image.type());
-    node.SetStyle(YAML::EmitterStyle::Flow);
-    return node;
-  } catch (const std::exception& e) {
-    throw std::runtime_error(std::string(field.name) + ": " + e.what());
+  if (image.dims != 2) {
+    throw std::runtime_error(name + ": unsupported matrix type or dimensions");
   }
+
+  Bytes bytes;
+  const auto encoding = getEncodingOptions(extension, options);
+  if (!cv::imencode(extension, image, bytes, encoding)) {
+    throw std::runtime_error(name + ": image encoding failed");
+  }
+
+  const auto filename = name + extension;
+  write(filename, bytes);
+
+  auto node = record[name];
+  node["file"] = filename;
+  node["rows"] = image.rows;
+  node["cols"] = image.cols;
+  node["opencv_type"] = image.type();
+  node.SetStyle(YAML::EmitterStyle::Flow);
 }
 
-cv::Mat readImage(const ImageField& field,
-                  const YAML::Node& description,
+cv::Mat readImage(const std::string& name,
+                  const YAML::Node& record,
                   const ReadEntry& read) {
-  if (description.IsNull()) {
+  if (!record[name]) {
     return {};
   }
 
-  try {
-    const auto type = description["opencv_type"].as<int>();
-    if (!isValidImageType(field, type)) {
-      throw std::runtime_error("unsupported matrix type");
-    }
+  const auto& description = record[name];
+  const auto filename = description["file"].as<std::string>();
+  const auto type = description["opencv_type"].as<int>();
+  const auto rows = description["rows"].as<int>();
+  const auto cols = description["cols"].as<int>();
 
-    if (description["channel_order"].as<std::vector<std::string>>() !=
-        getChannelOrder(field, type)) {
-      throw std::runtime_error("unsupported channel order");
-    }
-
-    const auto rows = description["rows"].as<int>();
-    const auto cols = description["cols"].as<int>();
-    const auto bytes = read(readEntryName(description));
-    auto image = cv::imdecode(bytes, cv::IMREAD_UNCHANGED);
-    if (image.empty() || image.type() != type || image.rows != rows ||
-        image.cols != cols) {
-      throw std::runtime_error("decoded image does not match metadata");
-    }
-
-    if (field.member == &InputData::color_image) {
-      cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
-    }
-
-    return image;
-  } catch (const std::exception& e) {
-    throw std::runtime_error(std::string(field.name) + ": " + e.what());
+  const auto bytes = read(filename);
+  const auto image = cv::imdecode(bytes, cv::IMREAD_UNCHANGED);
+  if (image.empty() || image.type() != type || image.rows != rows ||
+      image.cols != cols) {
+    throw std::runtime_error(name + ": decoded image does not match metadata");
   }
+
+  return image;
 }
 
 YAML::Node writeSensor(const Sensor& sensor) {
@@ -289,19 +201,14 @@ YAML::Node writeSensor(const Sensor& sensor) {
   return record;
 }
 
-Sensor::Ptr readSensor(const YAML::Node& record) {
+Sensor::Ptr readSensor(const YAML::Node& record, const cv::Mat& mask) {
   const auto node = record["config"];
   if (!node["extrinsics"] || node["extrinsics"]["type"].as<std::string>() != "param" ||
       node["static_mask_fp"].as<std::string>() != "") {
     throw std::runtime_error("sensor configuration is not self-contained");
   }
 
-  const auto cfg = config::fromYaml<config::VirtualConfig<Sensor>>(node);
-  if (!cfg || !config::isValid(cfg)) {
-    throw std::runtime_error("invalid sensor configuration");
-  }
-
-  auto sensor = cfg.create(record["name"].as<std::string>());
+  auto sensor = Sensor::fromRecord(node, record["name"].as<std::string>(), mask);
   if (!sensor) {
     throw std::runtime_error("could not construct sensor");
   }
@@ -311,8 +218,7 @@ Sensor::Ptr readSensor(const YAML::Node& record) {
 
 YAML::Node writeMetadata(const InputData& input) {
   YAML::Node record;
-  record["format"] = "hydra_input";
-  record["version"] = 2;
+  record["version"] = 1;
   record["timestamp_ns"] = input.timestamp_ns;
   record["world_T_body"] = writePose(input.world_T_body);
   record["sensor"] = writeSensor(input.getSensor());
@@ -366,53 +272,54 @@ void declare_config(SaveOptions& config) {
   enum_field(config.float_compression, "float_compression", {"none", "rle", "zip"});
   field(config.png_compression, "png_compression");
   field(config.archive, "archive");
-  check(config.png_compression, GE, 0, "png_compression");
-  check(config.png_compression, LE, 9, "png_compression");
+  checkInRange(config.png_compression, 0, 9, "png_compression");
 }
 
 void writeInputData(const InputData& input,
                     const WriteEntry& write,
-                    const SaveOptions& options) {
-  try {
-    config::checkValid(options);
-    auto record = writeMetadata(input);
-    auto images = record["images"];
-    for (const auto& field : kImages) {
-      images[field.name] = writeImage(field, input.*field.member, write, options);
-    }
+                    const SaveOptions& opts) {
+  config::checkValid(opts);
+  auto record = writeMetadata(input);
 
-    const auto& mask = input.getSensor().getStaticMask();
-    images[kSensorMask.name] = writeImage(kSensorMask, mask, write, options);
+  auto images = record["images"];
+  writeImage("color", ".png", opts, input.color_image, write, images);
+  writeImage("color_mask", ".png", opts, input.color_mask, write, images);
+  writeImage("depth", ".exr", opts, input.depth_image, write, images);
+  writeImage("range", ".exr", opts, input.range_image, write, images);
+  writeImage("labels", ".tiff", opts, input.label_image, write, images);
+  writeImage("instances", ".tiff", opts, input.instance_image, write, images);
+  writeImage("vertices", ".exr", opts, input.vertex_map, write, images);
+  writeImage("traversability", ".exr", opts, input.traversability_image, write, images);
 
-    const auto text = YAML::Dump(record);
-    write("metadata.yaml", Bytes(text.begin(), text.end()));
-  } catch (const std::exception& e) {
-    throw std::runtime_error(std::string("input serialization: ") + e.what());
-  }
+  const auto& mask = input.getSensor().getStaticMask();
+  writeImage("sensor_mask", ".png", opts, mask, write, images);
+
+  const auto text = YAML::Dump(record);
+  write("metadata.yaml", Bytes(text.begin(), text.end()));
 }
 
 InputData::Ptr readInputData(const ReadEntry& read) {
-  try {
-    const auto bytes = read("metadata.yaml");
-    const auto record = YAML::Load(std::string(bytes.begin(), bytes.end()));
-    if (record["format"].as<std::string>() != "hydra_input" ||
-        record["version"].as<int>() != 2) {
-      throw std::runtime_error("unsupported input format/version");
-    }
-
-    auto sensor = readSensor(record["sensor"]);
-    const auto& images = record["images"];
-    sensor->setStaticMask(readImage(kSensorMask, images[kSensorMask.name], read));
-    auto input = std::make_shared<InputData>(sensor);
-    readMetadata(record, *input);
-    for (const auto& field : kImages) {
-      (*input).*field.member = readImage(field, images[field.name], read);
-    }
-
-    return input;
-  } catch (const std::exception& e) {
-    throw std::runtime_error(std::string("input deserialization: ") + e.what());
+  const auto bytes = read("metadata.yaml");
+  const auto record = YAML::Load(std::string(bytes.begin(), bytes.end()));
+  if (record["version"].as<int>() != 1) {
+    throw std::runtime_error("unsupported input version");
   }
+
+  const auto& images = record["images"];
+  const auto mask = readImage("sensor_mask", images, read);
+  const auto sensor = readSensor(record["sensor"], mask);
+
+  auto input = std::make_shared<InputData>(sensor);
+  readMetadata(record, *input);
+  input->color_image = readImage("color", images, read);
+  input->color_mask = readImage("color_mask", images, read);
+  input->depth_image = readImage("depth", images, read);
+  input->range_image = readImage("range", images, read);
+  input->label_image = readImage("labels", images, read);
+  input->instance_image = readImage("instances", images, read);
+  input->vertex_map = readImage("vertices", images, read);
+  input->traversability_image = readImage("traversability", images, read);
+  return input;
 }
 
 }  // namespace hydra::input

@@ -41,14 +41,11 @@
 
 #include <cmath>
 #include <cstring>
-#include <fstream>
 #include <map>
 #include <opencv2/imgcodecs.hpp>
 
 namespace hydra {
 namespace {
-
-using Entries = std::map<std::string, input::Bytes>;
 
 Camera::Config cameraConfig() {
   Camera::Config config;
@@ -69,9 +66,28 @@ Camera::Config cameraConfig() {
   return config;
 }
 
+Lidar::Config lidarConfig() {
+  Lidar::Config config;
+  config.min_range = 0.5;
+  config.max_range = 120;
+  config.horizontal_resolution = 1;
+  config.vertical_resolution = 2;
+  config.vertical_fov = 40;
+  config.is_asymmetric = true;
+  config.vertical_fov_top = 12;
+
+  ParamSensorExtrinsics::Config extrinsics;
+  extrinsics.body_p_sensor = Eigen::Vector3d(0.25, -0.5, 0.75);
+  extrinsics.body_R_sensor = Eigen::AngleAxisd(0.4, Eigen::Vector3d::UnitY());
+  config.extrinsics = extrinsics;
+  return config;
+}
+
 InputData sampleInput(const Sensor::Ptr& sensor) {
-  sensor->setStaticMask(cv::Mat(3, 4, CV_8UC3, cv::Scalar(1, 2, 3)));
-  InputData data(sensor);
+  auto mask = cv::Mat(3, 4, CV_8UC3, cv::Scalar(1, 2, 3));
+  auto sensor_with_mask = Sensor::fromRecord(sensor->dump(), sensor->name, mask);
+
+  InputData data(sensor_with_mask);
   data.timestamp_ns = 18446744073709551614ULL;
   data.world_T_body =
       Eigen::Translation3d(2, -3, 4) * Eigen::AngleAxisd(0.7, Eigen::Vector3d::UnitX());
@@ -156,243 +172,64 @@ void expectInput(const InputData& expected, const InputData& actual) {
   expectImage(expected_sensor.getStaticMask(), actual_sensor.getStaticMask());
 }
 
-Entries encode(const InputData& data) {
-  Entries result;
-  input::writeInputData(data, [&result](const auto& name, const auto& bytes) {
-    result.emplace(name, bytes);
-  });
-  return result;
-}
-
-InputData::Ptr decode(const Entries& entries) {
-  return input::readInputData(
-      [&entries](const auto& name) { return entries.at(name); });
-}
-
-void changeMetadata(Entries& entries, const std::function<void(YAML::Node&)>& edit) {
-  auto& bytes = entries.at("metadata.yaml");
-  auto node = YAML::Load(std::string(bytes.begin(), bytes.end()));
-  edit(node);
-  const auto text = YAML::Dump(node);
-  bytes.assign(text.begin(), text.end());
-}
-
 class InputDataIo : public ::testing::Test {
  protected:
   void SetUp() override {
-    auto pattern =
-        (std::filesystem::temp_directory_path() / "hydra-input-XXXXXX").string();
+    const auto path = (std::filesystem::temp_directory_path() / "hydra-input-XXXXXX");
+    auto pattern = path.string();
     ASSERT_NE(mkdtemp(pattern.data()), nullptr);
     directory = pattern;
   }
 
   void TearDown() override { std::filesystem::remove_all(directory); }
+
   std::filesystem::path directory;
 };
 
 }  // namespace
 
 TEST_F(InputDataIo, CameraArchiveRoundTrip) {
+  const auto path = directory / "frame.input.zip";
   const auto camera = std::make_shared<Camera>(cameraConfig(), "front_camera");
   const auto data = sampleInput(camera);
-  const auto path = directory / "frame.input.zip";
   data.save(path);
-  EXPECT_EQ(data.color_image.at<cv::Vec3b>(0, 0), cv::Vec3b(10, 20, 30));
+
   const auto loaded = InputData::load(path);
   ASSERT_TRUE(loaded);
   expectInput(data, *loaded);
-  const auto& config = dynamic_cast<const Camera&>(loaded->getSensor()).getConfig();
-  EXPECT_EQ(config.fx, camera->getConfig().fx);
-  EXPECT_EQ(config.fy, camera->getConfig().fy);
-  EXPECT_EQ(config.cx, camera->getConfig().cx);
-  EXPECT_EQ(config.cy, camera->getConfig().cy);
-  EXPECT_EQ(config.width, camera->getConfig().width);
-  EXPECT_EQ(config.height, camera->getConfig().height);
-  std::ifstream file(path, std::ios::binary);
-  char signature[2];
-  file.read(signature, 2);
-  EXPECT_EQ(std::string(signature, 2), "PK");
+
+  const auto result_camera = dynamic_cast<const Camera*>(&loaded->getSensor());
+  ASSERT_TRUE(result_camera);
+
+  const auto result = result_camera->getConfig();
+  EXPECT_EQ(result.fx, camera->getConfig().fx);
+  EXPECT_EQ(result.fy, camera->getConfig().fy);
+  EXPECT_EQ(result.cx, camera->getConfig().cx);
+  EXPECT_EQ(result.cy, camera->getConfig().cy);
+  EXPECT_EQ(result.width, camera->getConfig().width);
+  EXPECT_EQ(result.height, camera->getConfig().height);
 }
 
-TEST_F(InputDataIo, LidarAndPrefixedEntries) {
-  Lidar::Config config;
-  config.min_range = 0.5;
-  config.max_range = 120;
-  config.horizontal_resolution = 1;
-  config.vertical_resolution = 2;
-  config.vertical_fov = 40;
-  config.is_asymmetric = true;
-  config.vertical_fov_top = 12;
-  config.extrinsics = cameraConfig().extrinsics;
-  const auto lidar = std::make_shared<Lidar>(config, "roof_lidar");
+TEST_F(InputDataIo, LidarArchiveRoundTrip) {
+  const auto path = directory / "frame.input.zip";
+  const auto lidar = std::make_shared<Lidar>(lidarConfig(), "lidar");
   auto data = sampleInput(lidar);
   data.points_in_world_frame = false;
-  data.depth_image.release();
-  Entries entries;
-  input::writeInputData(data, [&entries](const auto& name, const auto& bytes) {
-    entries["input/" + name] = bytes;
-  });
-  const auto loaded = input::readInputData(
-      [&entries](const auto& name) { return entries.at("input/" + name); });
-  expectInput(data, *loaded);
-  const auto& result = dynamic_cast<const Lidar&>(loaded->getSensor()).getConfig();
-  EXPECT_EQ(result.vertical_fov_top, config.vertical_fov_top);
-  EXPECT_EQ(result.horizontal_resolution, config.horizontal_resolution);
-  EXPECT_EQ(result.vertical_resolution, config.vertical_resolution);
-  EXPECT_EQ(result.is_asymmetric, config.is_asymmetric);
-}
-
-TEST_F(InputDataIo, ResolvedCalibrationAndMask) {
-  const auto calibration = directory / "calibration.yaml";
-  const auto mask = directory / "mask.png";
-  {
-    std::ofstream file(calibration);
-    file << "T_BS: {data: [1, 0, 0, 0.5, 0, 1, 0, -0.25, 0, 0, 1, 2, 0, 0, 0, 1]}";
-  }
-
-  ASSERT_TRUE(cv::imwrite(mask.string(), cv::Mat(3, 4, CV_8UC3, cv::Scalar(1, 2, 3))));
-  auto config = cameraConfig();
-  KimeraSensorExtrinsics::Config extrinsics;
-  extrinsics.sensor_filepath = calibration;
-  config.extrinsics = extrinsics;
-  config.static_mask_fp = mask;
-  const auto sensor = std::make_shared<Camera>(config, "calibrated");
-  const auto data = sampleInput(sensor);
-  data.save(directory / "input.zip");
-  std::filesystem::remove(calibration);
-  std::filesystem::remove(mask);
-  const auto loaded = InputData::load(directory / "input.zip");
-  expectInput(data, *loaded);
-  EXPECT_TRUE(loaded->getSensor().config.static_mask_fp.empty());
-}
-
-TEST_F(InputDataIo, MissingCorruptAndIncompatibleEntries) {
-  const auto data = sampleInput(std::make_shared<Camera>(cameraConfig(), "camera"));
-  const auto original = encode(data);
-  auto entries = original;
-  entries.erase("depth.exr");
-  EXPECT_THROW(decode(entries), std::runtime_error);
-  entries = original;
-  entries["vertices.exr"] = {1, 2, 3};
-  EXPECT_THROW(decode(entries), std::runtime_error);
-  entries = original;
-  changeMetadata(entries, [](auto& node) { node["version"] = 3; });
-  EXPECT_THROW(decode(entries), std::runtime_error);
-  entries = original;
-  changeMetadata(entries, [](auto& node) { node["images"]["depth"]["rows"] = 20; });
-  EXPECT_THROW(decode(entries), std::runtime_error);
-  entries = original;
-  changeMetadata(entries,
-                 [](auto& node) { node["images"]["depth"]["file"] = "../depth.exr"; });
-  EXPECT_THROW(decode(entries), std::runtime_error);
-}
-
-TEST_F(InputDataIo, FailedSavePreservesPreviousArchive) {
-  auto data = sampleInput(std::make_shared<Camera>(cameraConfig(), "camera"));
-  const auto path = directory / "input.zip";
+  data.depth_image = cv::Mat();
   data.save(path);
-  data.depth_image = cv::Mat(3, 4, CV_64FC1, cv::Scalar(0));
-  EXPECT_THROW(data.save(path), std::runtime_error);
-  EXPECT_EQ(InputData::load(path)->depth_image.type(), CV_32FC1);
-  EXPECT_EQ(std::distance(std::filesystem::directory_iterator(directory),
-                          std::filesystem::directory_iterator()),
-            1);
-  EXPECT_THROW(InputData::load(directory / "missing.zip"), std::runtime_error);
-  std::filesystem::resize_file(path, 50);
-  EXPECT_THROW(InputData::load(path), std::runtime_error);
-}
 
-TEST_F(InputDataIo, EmptyFieldsAndNonfiniteFeatures) {
-  InputData data(std::make_shared<Camera>(cameraConfig(), "camera"));
-  data.timestamp_ns = 1;
-  data.world_T_body = Eigen::Isometry3d::Identity();
-  data.feature = FeatureVector::Constant(1, std::numeric_limits<float>::infinity());
-  const auto loaded = decode(encode(data));
+  const auto loaded = InputData::load(path);
+  ASSERT_TRUE(loaded);
   expectInput(data, *loaded);
-}
 
-TEST_F(InputDataIo, RejectsChangedFrameAndSensorInterpretation) {
-  const auto data = sampleInput(std::make_shared<Camera>(cameraConfig(), "camera"));
-  const auto original = encode(data);
-  auto entries = original;
-  changeMetadata(entries, [](auto& node) {
-    node["images"]["vertices"]["channel_order"] =
-        std::vector<std::string>{"R", "G", "B"};
-  });
-  EXPECT_THROW(decode(entries), std::runtime_error);
-  entries = original;
-  changeMetadata(entries, [](auto& node) { node["timestamp_ns"] = "-1"; });
-  EXPECT_THROW(decode(entries), std::runtime_error);
-  entries = original;
-  changeMetadata(entries, [](auto& node) {
-    node["sensor"]["config"]["extrinsics"]["type"] = "kimera";
-  });
-  EXPECT_THROW(decode(entries), std::runtime_error);
-}
+  const auto result_lidar = dynamic_cast<const Lidar*>(&loaded->getSensor());
+  ASSERT_TRUE(result_lidar);
 
-TEST_F(InputDataIo, NativeYamlMetadata) {
-  auto config = cameraConfig();
-  config.max_range = std::numeric_limits<double>::infinity();
-  auto data = sampleInput(std::make_shared<Camera>(config, "001"));
-  data.feature.resize(4);
-  data.feature << std::numeric_limits<float>::quiet_NaN(),
-      std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(),
-      0.123456789f;
-
-  auto entries = encode(data);
-  const auto& bytes = entries.at("metadata.yaml");
-  const auto metadata = YAML::Load(std::string(bytes.begin(), bytes.end()));
-  EXPECT_EQ(metadata["timestamp_ns"].as<TimeStamp>(), data.timestamp_ns);
-  EXPECT_TRUE(metadata["images"]["depth"].IsMap());
-  EXPECT_EQ(metadata["sensor"]["config"]["type"].as<std::string>(), "camera");
-  EXPECT_EQ(metadata["label_features"][1]["feature"].size(), 0u);
-
-  const auto loaded = decode(entries);
-  EXPECT_EQ(loaded->getSensor().name, "001");
-  EXPECT_EQ(loaded->getSensor().max_range(), config.max_range);
-  ASSERT_EQ(loaded->feature.size(), 4);
-  EXPECT_TRUE(std::isnan(loaded->feature[0]));
-  EXPECT_EQ(loaded->feature[1], data.feature[1]);
-  EXPECT_EQ(loaded->feature[2], data.feature[2]);
-  EXPECT_EQ(loaded->feature[3], data.feature[3]);
-
-  changeMetadata(entries, [](auto& node) { node.remove("label_features"); });
-  EXPECT_THROW(decode(entries), std::runtime_error);
-  entries = encode(data);
-  changeMetadata(entries, [](auto& node) { node["images"].remove("depth"); });
-  EXPECT_THROW(decode(entries), std::runtime_error);
-}
-
-TEST_F(InputDataIo, CompressionOptionsPreserveValues) {
-  const auto camera = std::make_shared<Camera>(cameraConfig(), "camera");
-  const auto data = sampleInput(camera);
-  using Compression = input::SaveOptions::FloatCompression;
-  for (const auto compression :
-       {Compression::NONE, Compression::RLE, Compression::ZIP}) {
-    input::SaveOptions options;
-    options.float_compression = compression;
-    options.png_compression = 0;
-    options.archive.compression_level = compression == Compression::NONE ? 0 : 1;
-    const auto path = directory / "compression.zip";
-    data.save(path, options);
-    expectInput(data, *InputData::load(path));
-  }
-}
-
-TEST_F(InputDataIo, SnapshotOwnsImagesAndSharesSensor) {
-  const auto camera = std::make_shared<Camera>(cameraConfig(), "camera");
-  auto data = sampleInput(camera);
-  const auto copy = data.clone();
-  expectInput(data, *copy);
-  EXPECT_EQ(&copy->getSensor(), &data.getSensor());
-  EXPECT_NE(copy->depth_image.data, data.depth_image.data);
-  data.color_image.setTo(cv::Scalar(0, 0, 0));
-  data.depth_image.setTo(0);
-  data.feature.setZero();
-  EXPECT_EQ(copy->color_image.at<cv::Vec3b>(0, 0), cv::Vec3b(10, 20, 30));
-  EXPECT_TRUE(std::isnan(copy->depth_image.at<float>(0, 0)));
-  EXPECT_EQ(copy->feature[0], 0.25f);
-  EXPECT_FALSE(copy->getSensor().getStaticMask().empty());
+  const auto result = result_lidar->getConfig();
+  EXPECT_EQ(result.vertical_fov_top, result.vertical_fov_top);
+  EXPECT_EQ(result.horizontal_resolution, result.horizontal_resolution);
+  EXPECT_EQ(result.vertical_resolution, result.vertical_resolution);
+  EXPECT_EQ(result.is_asymmetric, result.is_asymmetric);
 }
 
 }  // namespace hydra

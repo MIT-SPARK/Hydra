@@ -47,14 +47,12 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 
-// TODO(nathan) try to avoid pulling in factories in the header
 #include <config_utilities/virtual_config.h>
 
 #include <Eigen/Geometry>
 #include <filesystem>
 #include <limits>
 #include <opencv2/core/mat.hpp>
-#include <vector>
 
 #include "hydra/input/sensor_extrinsics.h"
 
@@ -80,7 +78,6 @@ class Sensor {
     double max_range = std::numeric_limits<double>::infinity();
     //! Filepath to load static mask from
     std::filesystem::path static_mask_fp;
-    // TODO(nathan) try to avoid pulling in factories in the header
     //! Transform between body and sensor
     config::VirtualConfig<SensorExtrinsics> extrinsics;
     //! Sensor-specific semantic labels that the sensor should ignore
@@ -170,24 +167,24 @@ class Sensor {
   virtual bool pointIsInViewFrustum(const Eigen::Vector3f& point_C,
                                     float inflation_distance = 0.f) const = 0;
 
-  /**
-   * @brief Get the read-only static mask; shallow copies must not modify its data.
-   * @return cv::Mat containing the mask, or empty cv::Mat if no mask is defined
-   */
-  virtual const cv::Mat& getStaticMask() const { return static_mask_; }
+  //! Dump configuration, including the factory type for reconstructable sensors.
+  virtual YAML::Node dump() const = 0;
 
-  //! Initialize an owned mask before sharing this sensor with any InputData.
-  void setStaticMask(const cv::Mat& mask) { static_mask_ = mask.clone(); }
+  //! Get the sensor's input mask
+  virtual const cv::Mat& getStaticMask() const;
 
-  //! @brief Name of current sensor
+  //! Initialize sensor from yaml and a static mask for loading from serialization
+  static Sensor::Ptr fromRecord(const YAML::Node& node,
+                                const std::string& name,
+                                const cv::Mat& static_mask = {});
+
+  //! Name of current sensor
   const std::string name;
 
-  //! Dump configuration, including the factory type for reconstructable sensors.
-  virtual YAML::Node dump() const;
-
  protected:
-  const std::unique_ptr<SensorExtrinsics> extrinsics_;
+  void setStaticMask(const cv::Mat& mask);
 
+  const std::unique_ptr<SensorExtrinsics> extrinsics_;
   cv::Mat static_mask_;
 };
 

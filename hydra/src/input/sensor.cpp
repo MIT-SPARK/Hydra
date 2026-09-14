@@ -56,8 +56,6 @@
 #include <iomanip>
 #include <opencv2/imgcodecs.hpp>
 
-#include "hydra/common/config_utilities.h"
-
 namespace hydra {
 
 Sensor::Sensor(const Config& config, const std::string& name)
@@ -77,7 +75,26 @@ Sensor::Sensor(const Config& config, const std::string& name)
   }
 }
 
-YAML::Node Sensor::dump() const { return config::toYaml(config); }
+const cv::Mat& Sensor::getStaticMask() const { return static_mask_; }
+
+Sensor::Ptr Sensor::fromRecord(const YAML::Node& node,
+                               const std::string& name,
+                               const cv::Mat& static_mask) {
+  const auto cfg = config::fromYaml<config::VirtualConfig<Sensor>>(node);
+  if (!cfg || !config::isValid(cfg)) {
+    return nullptr;
+  }
+
+  auto sensor = cfg.create(name);
+  if (!sensor) {
+    return nullptr;  // this technically shouldn't happen
+  }
+
+  sensor->setStaticMask(static_mask);
+  return sensor;
+}
+
+void Sensor::setStaticMask(const cv::Mat& mask) { static_mask_ = mask.clone(); }
 
 void declare_config(Sensor::Config& config) {
   using namespace config;
