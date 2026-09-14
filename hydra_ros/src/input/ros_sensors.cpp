@@ -49,8 +49,43 @@
 #include "hydra_ros/utils/tf_lookup.h"
 
 namespace hydra {
+namespace {
+
+static const auto extrinsics_reg =
+    config::RegistrationWithConfig<SensorExtrinsics,
+                                   RosExtrinsics,
+                                   RosExtrinsics::Config>("ros");
+
+static const auto intrinsics_reg =
+    config::RegistrationWithConfig<Sensor, RosCamera, RosCamera::Config>("camera_info");
+
+}  // namespace
 
 using sensor_msgs::msg::CameraInfo;
+
+InvalidSensor::InvalidSensor() : Sensor(Sensor::Config(), "") {}
+
+float InvalidSensor::getPointDepth(const Eigen::Vector3f&) const { return 0.0; }
+
+float InvalidSensor::computeRayDensity(float, float) const { return 0.0; }
+
+bool InvalidSensor::finalizeRepresentations(InputData&, bool) const { return false; }
+
+bool InvalidSensor::projectPointToImagePlane(const Eigen::Vector3f&,
+                                             float&,
+                                             float&) const {
+  return false;
+}
+
+bool InvalidSensor::projectPointToImagePlane(const Eigen::Vector3f&, int&, int&) const {
+  return false;
+}
+
+bool InvalidSensor::pointIsInViewFrustum(const Eigen::Vector3f&, float) const {
+  return false;
+};
+
+YAML::Node InvalidSensor::dump() const { return {}; }
 
 struct TempCameraConfig : Camera::Config {};
 

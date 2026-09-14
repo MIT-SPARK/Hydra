@@ -35,6 +35,7 @@
 #pragma once
 
 #include <Eigen/Geometry>
+#include <filesystem>
 #include <limits>
 #include <opencv2/core/mat.hpp>
 
@@ -47,6 +48,19 @@ namespace hydra {
 struct InputData {
   using Ptr = std::shared_ptr<InputData>;
   using ConstPtr = std::shared_ptr<const InputData>;
+
+  struct SaveOptions {
+    //! Compression type to apply to exr images
+    enum class FloatCompression {
+      NONE,
+      RLE,
+      ZIP
+    } float_compression = FloatCompression::NONE;
+    //! PNG compression level in [0, 9]
+    int png_compression = 1;
+    //! Amount of compression to apply to input data archive
+    int archive_compression = -1;
+  };
 
   // Types of the stored image data.
   using ColorType = cv::Vec3b;
@@ -65,6 +79,22 @@ struct InputData {
   explicit InputData(Sensor::ConstPtr sensor);
 
   virtual ~InputData() = default;
+
+  //! Deep-copy input data, sharing the immutable sensor and its static mask.
+  Ptr clone() const;
+
+  /**
+   * @brief Save a self-contained ZIP snapshot
+   * @throws std::runtime_error on failure.
+   */
+  void save(const std::filesystem::path& filepath) const;
+  void save(const std::filesystem::path& filepath, const SaveOptions& options) const;
+
+  /**
+   * @brief Restore a snapshot without finalizing or changing representations.
+   * @throws std::runtime_error on invalid or incomplete archives.
+   */
+  static Ptr load(const std::filesystem::path& filepath);
 
   //! Get the sensor that captured this data.
   const Sensor& getSensor() const;
@@ -117,7 +147,9 @@ struct InputData {
   float max_range = std::numeric_limits<float>::infinity();
 
  private:
-  Sensor::ConstPtr sensor_;
+  const Sensor::ConstPtr sensor_;
 };
+
+void declare_config(InputData::SaveOptions& config);
 
 };  // namespace hydra

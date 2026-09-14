@@ -39,20 +39,15 @@
 namespace hydra {
 
 struct InvalidSensor : Sensor {
-  InvalidSensor() : Sensor(Sensor::Config(), "") {}
+  InvalidSensor();
   virtual ~InvalidSensor() = default;
-  float getPointDepth(const Eigen::Vector3f&) const override { return 0.0; }
-  float computeRayDensity(float, float) const override { return 0.0; }
-  bool finalizeRepresentations(InputData&, bool) const override { return false; }
-  bool projectPointToImagePlane(const Eigen::Vector3f&, float&, float&) const override {
-    return false;
-  }
-  bool projectPointToImagePlane(const Eigen::Vector3f&, int&, int&) const override {
-    return false;
-  }
-  bool pointIsInViewFrustum(const Eigen::Vector3f&, float) const override {
-    return false;
-  };
+  float getPointDepth(const Eigen::Vector3f&) const override;
+  float computeRayDensity(float, float) const override;
+  bool finalizeRepresentations(InputData&, bool) const override;
+  bool projectPointToImagePlane(const Eigen::Vector3f&, float&, float&) const override;
+  bool projectPointToImagePlane(const Eigen::Vector3f&, int&, int&) const override;
+  bool pointIsInViewFrustum(const Eigen::Vector3f&, float) const override;
+  YAML::Node dump() const override;
 };
 
 struct RosExtrinsics : SensorExtrinsics {
@@ -72,10 +67,6 @@ struct RosExtrinsics : SensorExtrinsics {
   } const config;
 
   explicit RosExtrinsics(const Config& config);
-
- private:
-  inline static const auto r_ =
-      config::RegistrationWithConfig<SensorExtrinsics, RosExtrinsics, Config>("ros");
 };
 
 struct RosCamera : InvalidSensor {
@@ -92,10 +83,6 @@ struct RosCamera : InvalidSensor {
   } const config;
 
   explicit RosCamera(const Config& config);
-
- private:
-  inline static const auto r_ =
-      config::RegistrationWithConfig<Sensor, RosCamera, Config>("camera_info");
 };
 
 void declare_config(RosExtrinsics::Config& config);

@@ -34,12 +34,18 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/input/input_data.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/eigen_matrix.h>
+#include <config_utilities/types/enum.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 
 #include <opencv2/imgproc.hpp>
+#include <stdexcept>
 #include <utility>
 
 #include "hydra/common/global_info.h"
+#include "hydra/input/input_data_io.h"
 
 namespace hydra {
 namespace {
@@ -135,9 +141,37 @@ void convertVertexMap(InputData& data, bool in_world_frame) {
 
 }  // namespace
 
+void declare_config(InputData::SaveOptions& config) {
+  using namespace config;
+  name("InputData::SaveOptions");
+  enum_field(config.float_compression, "float_compression", {"none", "rle", "zip"});
+  field(config.png_compression, "png_compression");
+  field(config.archive_compression, "archive_compression");
+  checkInRange(config.png_compression, 0, 9, "png_compression");
+  checkInRange(config.archive_compression, -1, 9, "archive_compression");
+}
+
 InputData::InputData(Sensor::ConstPtr sensor) : sensor_(std::move(sensor)) {}
 
-const Sensor& InputData::getSensor() const { return *sensor_; }
+InputData::Ptr InputData::clone() const {
+  auto copy = std::make_shared<InputData>(*this);
+  copy->color_image = color_image.clone();
+  copy->color_mask = color_mask.clone();
+  copy->depth_image = depth_image.clone();
+  copy->range_image = range_image.clone();
+  copy->label_image = label_image.clone();
+  copy->instance_image = instance_image.clone();
+  copy->vertex_map = vertex_map.clone();
+  copy->traversability_image = traversability_image.clone();
+  return copy;
+}
+
+const Sensor& InputData::getSensor() const {
+  if (!sensor_) {
+    throw std::runtime_error("InputData has no sensor");
+  }
+  return *sensor_;
+}
 
 Eigen::Isometry3d InputData::getSensorPose() const {
   return world_T_body * sensor_->body_T_sensor();
@@ -183,6 +217,28 @@ bool InputData::finalize(bool vertices_in_world_frame, bool normalize_labels) {
 
   convertVertexMap(*this, vertices_in_world_frame);
   return true;
+}
+
+void InputData::save(const std::filesystem::path& filepath) const {
+  save(filepath, SaveOptions{});
+}
+
+void InputData::save(const std::filesystem::path& filepath,
+                     const SaveOptions& options) const {
+  const io::ArchiveOptions archive{options.archive_compression};
+  io::writeArchive(
+      filepath,
+      [this, &options](const auto& write) {
+        input::writeInputData(*this, write, options);
+      },
+      archive);
+}
+
+InputData::Ptr InputData::load(const std::filesystem::path& filepath) {
+  InputData::Ptr input;
+  io::readArchive(filepath,
+                  [&input](const auto& read) { input = input::readInputData(read); });
+  return input;
 }
 
 }  // namespace hydra

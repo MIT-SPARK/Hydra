@@ -28,6 +28,7 @@ add_executable(
   frontend/test_mesh_segmenter.cpp
   frontend/test_view_selector.cpp
   input/test_camera.cpp
+  input/test_input_data_io.cpp
   input/test_lidar.cpp
   input/test_sensor.cpp
   loop_closure/test_descriptor_matching.cpp
