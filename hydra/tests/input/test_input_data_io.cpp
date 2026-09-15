@@ -36,6 +36,7 @@
 #include <hydra/input/camera.h>
 #include <hydra/input/input_data_io.h>
 #include <hydra/input/lidar.h>
+#include <hydra/utils/zip_archive.h>
 #include <unistd.h>
 #include <yaml-cpp/yaml.h>
 
@@ -230,6 +231,71 @@ TEST_F(InputDataIo, LidarArchiveRoundTrip) {
   EXPECT_EQ(result.horizontal_resolution, result.horizontal_resolution);
   EXPECT_EQ(result.vertical_resolution, result.vertical_resolution);
   EXPECT_EQ(result.is_asymmetric, result.is_asymmetric);
+}
+
+TEST_F(InputDataIo, EmptyArchiveRoundTrip) {
+  const auto path = directory / "empty.zip";
+  ASSERT_NO_THROW(io::writeArchive(path, [](const auto&) {}));
+  EXPECT_GT(std::filesystem::file_size(path), 0);
+  EXPECT_NO_THROW(io::readArchive(path, [](const auto&) {}));
+}
+
+TEST_F(InputDataIo, EmptyArchiveReplacesExistingArchive) {
+  const auto path = directory / "empty.zip";
+  io::writeArchive(path, [](const auto& write) { write("previous", {1, 2, 3}); });
+
+  ASSERT_NO_THROW(io::writeArchive(path, [](const auto&) {}));
+  EXPECT_NO_THROW(io::readArchive(path, [](const auto& read) {
+    EXPECT_THROW(read("previous"), std::runtime_error);
+  }));
+  EXPECT_EQ(std::distance(std::filesystem::directory_iterator(directory),
+                          std::filesystem::directory_iterator()),
+            1);
+}
+
+TEST_F(InputDataIo, ArchiveOwnsEntryBuffers) {
+  const auto path = directory / "buffers.zip";
+  for (const auto level : {-1, 0, 1, 9}) {
+    io::ArchiveOptions options;
+    options.compression_level = level;
+    io::writeArchive(
+        path,
+        [](const auto& write) {
+          auto bytes = io::Bytes(1024 * 1024 + 1, 42);
+          write("labels.tiff", bytes);
+          bytes.assign(100, 7);
+          write("color.png", bytes);
+          write("empty", {});
+        },
+        options);
+    io::readArchive(path, [](const auto& read) {
+      EXPECT_EQ(read("labels.tiff"), io::Bytes(1024 * 1024 + 1, 42));
+      EXPECT_EQ(read("color.png"), io::Bytes(100, 7));
+      EXPECT_TRUE(read("empty").empty());
+      EXPECT_THROW(read("missing"), std::runtime_error);
+    });
+  }
+}
+
+TEST_F(InputDataIo, FailedArchiveWritePreservesDestination) {
+  const auto path = directory / "frame.input.zip";
+  const auto camera = std::make_shared<Camera>(cameraConfig(), "camera");
+  const auto data = sampleInput(camera);
+  data.save(path);
+
+  EXPECT_THROW(io::writeArchive(path,
+                                [](const auto& write) {
+                                  write("metadata.yaml", {1, 2, 3});
+                                  throw std::runtime_error("interrupted write");
+                                }),
+               std::runtime_error);
+
+  const auto loaded = InputData::load(path);
+  ASSERT_TRUE(loaded);
+  expectInput(data, *loaded);
+  EXPECT_EQ(std::distance(std::filesystem::directory_iterator(directory),
+                          std::filesystem::directory_iterator()),
+            1);
 }
 
 }  // namespace hydra
