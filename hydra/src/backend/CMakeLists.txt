@@ -1,6 +1,8 @@
 target_sources(
   ${PROJECT_NAME}
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/association_strategies.cpp
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/graph_reconciler.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/graph_optimizer.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/association_strategies.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/backend_module.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/backend_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/deformation_interpolator.cpp

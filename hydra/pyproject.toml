@@ -6,15 +6,18 @@ build-backend = "scikit_build_core.build"
 name = "hydra_python"
 version = "0.0.1"
 description = "Python bindings for Hydra"
-readme = "README.md"
+readme = "python/README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.8"
 dependencies = [
     "click",
     "imageio",
+    "matplotlib",
     "numpy",
+    "pandas",
     "pyyaml",
     "scipy",
+    "seaborn",
 ]
 authors = [
   {name = "Nathan Hughes", email="na26933@mit.edu"},
@@ -28,7 +31,7 @@ classifiers = [
 Repository = "https://github.com/MIT-SPARK/Hydra"
 
 [project.scripts]
-hydra = "hydra_python.commands:main.cli"
+hydra = "hydra_python.commands.main:cli"
 
 [tool.scikit-build]
 cmake.source-dir = "python"

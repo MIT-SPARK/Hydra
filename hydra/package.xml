@@ -12,6 +12,7 @@
 
   <buildtool_depend>cmake</buildtool_depend>
   <depend>config_utilities</depend>
+  <depend>cli11</depend>
   <depend>eigen</depend>
   <depend>gtsam</depend>
   <depend>kimera_pgmo</depend>
@@ -24,12 +25,14 @@
   <build_depend>pkg-config</build_depend>
   <build_export_depend>pkg-config</build_export_depend>
   <depend>libpcl-all-dev</depend>
-  <!-- Optional dependencies for python bindings -->
+  <!-- Dependencies for python bindings -->
   <depend>python3-click</depend>
   <depend>python3-imageio</depend>
+  <depend>python3-matplotlib</depend>
   <depend>python3-numpy</depend>
   <depend>python3-pandas</depend>
   <depend>python3-scipy</depend>
+  <depend>python3-seaborn</depend>
   <depend>python3-tqdm</depend>
 
   <export>

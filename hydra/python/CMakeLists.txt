@@ -22,6 +22,7 @@ pybind11_add_module(
   bindings/src/depth_parser.cpp
   bindings/src/glog_utilities.cpp
   bindings/src/label_parser.cpp
+  bindings/src/python_evaluation.cpp
   bindings/src/python_image.cpp
   bindings/src/python_pipeline.cpp
   bindings/src/python_reconstruction.cpp
@@ -40,6 +41,8 @@ if(NOT DEFINED SKBUILD OR NOT "${SKBUILD}")
         ament_get_python_install_dir(PYTHON_INSTALL_PATH)
         set(PKG_PYTHON_INSTALL "${PYTHON_INSTALL_PATH}/${PROJECT_NAME}")
         set(PKG_PYTHON_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/hydra_python/")
+        install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../config/
+                DESTINATION ${PKG_PYTHON_INSTALL}/config)
         install(TARGETS _hydra_bindings DESTINATION ${PKG_PYTHON_INSTALL})
         install(DIRECTORY ${PKG_PYTHON_SRC} DESTINATION ${PKG_PYTHON_INSTALL})
     endif()
