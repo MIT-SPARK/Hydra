@@ -181,8 +181,8 @@ bool VMFFeatureSelector::select(const FeatureList& views,
   if (num_visible > 0) {
     const auto stats = computeVmfStats(attrs.semantic_feature, num_visible);
     attrs.semantic_feature = stats.mu;
-    // TODO(nathan) need to think about whether or not to combine concentration and
-    // feature or to add new attribute field
+    attrs.feature_concentration = Eigen::MatrixXf(1, 1);
+    attrs.feature_concentration(0, 0) = stats.kappa;
   }
 
   return num_visible > 0;
