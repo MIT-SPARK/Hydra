@@ -33,18 +33,6 @@ void clearRegions(SceneGraph& graph, const std::string& layer) {
   }
 }
 
-void fillFeatures(const SceneGraphLayer& places,
-                  AgglomerativeClustering::NodeEmbeddingMap& valid_features) {
-  for (const auto& [node_id, node] : places.nodes()) {
-    const auto attrs = node->tryAttributes<SemanticNodeAttributes>();
-    if (!attrs || attrs->semantic_feature.size() <= 1) {
-      continue;
-    }
-
-    valid_features[node_id] = attrs->semantic_feature.rightCols<1>();
-  }
-}
-
 }  // namespace
 
 using timing::ScopedTimer;
@@ -74,14 +62,7 @@ void IBRegionsUpdateFunctor::call(const SceneGraph&,
   const auto& places = graph.getLayer(config.source_layer);
   clearRegions(graph, config.target_layer);
 
-  AgglomerativeClustering::NodeEmbeddingMap valid_features;
-  fillFeatures(places, valid_features);
-  if (valid_features.empty()) {
-    MLOG(1) << "Need to have at least one valid place feature";
-    return;
-  }
-
-  const auto clusters = clustering_.cluster(places, valid_features);
+  const auto clusters = clustering_.cluster(places);
   MLOG(1) << "Got " << clusters.size() << " cluster(s)";
 
   std::set<NodeId> new_nodes;
@@ -89,9 +70,9 @@ void IBRegionsUpdateFunctor::call(const SceneGraph&,
     NodeSymbol new_node_id(config.id_prefix, i);
     auto attrs = std::make_unique<SemanticNodeAttributes>();
     attrs->semantic_label = 0;
-    attrs->name = clusters[i]->best_task_name;
+    attrs->name = clusters[i]->best_query_name;
     attrs->semantic_feature = clusters[i]->feature;
-    attrs->semantic_label = clusters[i]->best_task_index;
+    attrs->semantic_label = clusters[i]->best_query;
     graph.emplaceNode(config.target_layer, new_node_id, std::move(attrs));
 
     for (const auto node_id : clusters[i]->nodes) {
