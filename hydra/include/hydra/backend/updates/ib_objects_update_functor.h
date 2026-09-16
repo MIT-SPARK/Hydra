@@ -6,14 +6,14 @@
 
 #include "hydra/backend/update_functions.h"
 #include "hydra/common/node_matchers.h"
-#include "hydra/openset/clustering/agglomerative_clustering.h"
+#include "hydra/openset/clustering/agglomerative_ib_clustering.h"
 #include "hydra/utils/id_tracker.h"
 
 namespace hydra {
 
 struct ComponentInfo {
   using Ptr = std::unique_ptr<ComponentInfo>;
-  using Config = AgglomerativeClustering::ClusteringConfig;
+  using Config = AgglomerativeIBClustering::ClusteringConfig;
 
   ComponentInfo(const Config& config,
                 const EmbeddingGroup& tasks,
@@ -22,7 +22,7 @@ struct ComponentInfo {
                 const std::vector<spark_dsg::NodeId>& nodes,
                 double I_xy_full);
 
-  AgglomerativeClustering::Workspace ws;
+  AgglomerativeIBClustering::Workspace ws;
   std::vector<spark_dsg::NodeId> segments;
   std::vector<spark_dsg::NodeId> objects;
 };
@@ -37,7 +37,7 @@ class IBObjectsUpdateFunctor : public UpdateFunctor {
     double min_segment_score = 0.2;
     double min_object_score = 0.2;
     config::VirtualConfig<EmbeddingGroup> tasks;
-    AgglomerativeClustering::ClusteringConfig clustering;
+    AgglomerativeIBClustering::ClusteringConfig clustering;
     config::VirtualConfig<EmbeddingDistance> metric{CosineDistance::Config()};
     config::VirtualConfig<NodeMatcher> edge_checker{BBoxIntersectionMatcher::Config()};
   } const config;

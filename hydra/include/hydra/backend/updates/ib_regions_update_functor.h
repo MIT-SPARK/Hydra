@@ -1,17 +1,17 @@
 #pragma once
 #include "hydra/backend/update_functions.h"
-#include "hydra/openset/clustering/agglomerative_clustering.h"
+#include "hydra/openset/clustering/agglomerative_ib_clustering.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra {
 
 struct IBRegionsUpdateFunctor : public UpdateFunctor {
-  using Clusters = std::vector<AgglomerativeClustering::Cluster::Ptr>;
+  using Clusters = std::vector<AgglomerativeIBClustering::Cluster::Ptr>;
   struct Config : VerbosityConfig {
     char id_prefix = 'r';
     std::string source_layer = spark_dsg::DsgLayers::PLACES;
     std::string target_layer = spark_dsg::DsgLayers::ROOMS;
-    AgglomerativeClustering::Config clustering;
+    AgglomerativeIBClustering::Config clustering;
 
     Config();
   } const config;
@@ -23,7 +23,7 @@ struct IBRegionsUpdateFunctor : public UpdateFunctor {
             const UpdateInfo::ConstPtr& info) const override;
 
  private:
-  AgglomerativeClustering clustering_;
+  AgglomerativeIBClustering clustering_;
 };
 
 void declare_config(IBRegionsUpdateFunctor::Config& config);

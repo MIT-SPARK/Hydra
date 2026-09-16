@@ -1,4 +1,4 @@
-#include "hydra/openset/clustering/agglomerative_clustering.h"
+#include "hydra/openset/clustering/agglomerative_ib_clustering.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
@@ -15,9 +15,8 @@ namespace hydra {
 
 using namespace spark_dsg;
 
-using Clusters = AgglomerativeClustering::Clusters;
 using ClusterIds = std::vector<std::vector<NodeId>>;
-using ClusterWorkspace = AgglomerativeClustering::Workspace;
+using ClusterWorkspace = AgglomerativeIBClustering::Workspace;
 using EmbeddingMap = std::map<NodeId, Eigen::VectorXf>;
 using Indices = std::vector<std::pair<size_t, size_t>>;
 
@@ -89,7 +88,7 @@ Indices findTopKIndicesCols(const Eigen::MatrixXd& m, size_t top_k) {
 ClusterWorkspace::Workspace(const ClusteringConfig& config,
                             const EdgeContainer::Edges& edges_,
                             const NodeEmbeddings& node_embeddings,
-                            const EmbeddingGroup& tasks,
+                            const EmbeddingGroup& queries,
                             const EmbeddingDistance& metric)
     : config(config::checkValid(config)) {
   size_t index = 0;
@@ -115,7 +114,7 @@ ClusterWorkspace::Workspace(const ClusteringConfig& config,
   std::iota(assignments.begin(), assignments.end(), 0);
 
   const auto N = order.size();
-  const auto M = tasks.embeddings.size() + 1;
+  const auto M = queries.embeddings.size() + 1;
 
   // p(x) and p(y) are uniform
   px = Eigen::VectorXd::Constant(N, 1.0 / static_cast<double>(N));
@@ -123,7 +122,7 @@ ClusterWorkspace::Workspace(const ClusteringConfig& config,
   pz_x = Eigen::MatrixXd::Identity(N, N);  // p(z|x) is identity
   pz = px;                                 // p(z) = p(x) initially
 
-  py_x = compute_py_x(config, features, tasks, metric);
+  py_x = compute_py_x(config, features, queries, metric);
   py_z = py_x;  // p(y|z) = p(y|x) (as p(z) = p(x) and p(z|x) = I_n
 
   const auto fmt = getDefaultFormat();
@@ -176,9 +175,9 @@ double ClusterWorkspace::score(const EdgeKey& edge) const {
   return total * divergence;
 }
 
-bool AgglomerativeClustering::Workspace::merge(EdgeKey key,
-                                               std::list<EdgeKey>& updated,
-                                               bool force) {
+bool AgglomerativeIBClustering::Workspace::merge(EdgeKey key,
+                                                 std::list<EdgeKey>& updated,
+                                                 bool force) {
   // we merge target -> source
   const auto p_s = pz(key.k1);
   const auto p_t = pz(key.k2);
@@ -253,12 +252,12 @@ ClusterIds ClusterWorkspace::getClusters() const {
 
 Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
                                                const Features& features,
-                                               const EmbeddingGroup& tasks,
+                                               const EmbeddingGroup& queries,
                                                const EmbeddingDistance& metric) {
   const auto fmt = getDefaultFormat();
 
   size_t N = features.size();
-  size_t M = tasks.embeddings.size() + 1;
+  size_t M = queries.embeddings.size() + 1;
 
   Eigen::MatrixXd py_x = Eigen::MatrixXd::Ones(M, N) * 1e-12;
   Eigen::MatrixXd py_x_temp = Eigen::MatrixXd::Zero(M, N);
@@ -269,7 +268,7 @@ Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
   MLOG(3) << "----------------------------------------";
 
   for (size_t idx = 0; idx < features.size(); ++idx) {
-    const auto scores = tasks.getScores(metric, features[idx]);
+    const auto scores = queries.getScores(metric, features[idx]);
     MLOG(3) << "scores @ " << idx << ": " << scores.format(fmt);
     py_x_temp.block(1, idx, M - 1, 1) = scores.cast<double>();
   }
@@ -322,9 +321,9 @@ Eigen::MatrixXd ClusterWorkspace::compute_py_x(const ClusteringConfig& config,
   return py_x;
 }
 
-void declare_config(AgglomerativeClustering::ClusteringConfig& config) {
+void declare_config(AgglomerativeIBClustering::ClusteringConfig& config) {
   using namespace config;
-  name("AgglomerativeClustering::ClusteringConfig");
+  name("AgglomerativeIBClustering::ClusteringConfig");
   base<VerbosityConfig>(config);
   field(config.score_threshold, "score_threshold");
   field(config.top_k, "top_k");
@@ -336,29 +335,36 @@ void declare_config(AgglomerativeClustering::ClusteringConfig& config) {
   check(config.max_delta, GE, 0.0, "max_delta");
 }
 
-void declare_config(AgglomerativeClustering::Config& config) {
+void declare_config(AgglomerativeIBClustering::Config& config) {
   using namespace config;
-  name("AgglomerativeClustering::Config");
-  base<AgglomerativeClustering::ClusteringConfig>(config);
-  field(config.tasks, "tasks");
+  name("AgglomerativeIBClustering::Config");
+  base<AgglomerativeIBClustering::ClusteringConfig>(config);
   config.metric.setOptional();
   field(config.metric, "metric");
   field(config.filter_clusters, "filter_clusters");
 }
 
-AgglomerativeClustering::AgglomerativeClustering(const Config& config)
-    : config(config::checkValid(config)),
-      tasks_(config.tasks.create()),
-      metric_(config.metric.create()) {}
+AgglomerativeIBClustering::AgglomerativeIBClustering(const Config& config)
+    : LayerClustering(config), config(config::checkValid(config)) {}
 
-Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
-                                          const NodeEmbeddingMap& features) const {
-  if (tasks_->empty()) {
-    LOG_FIRST_N(ERROR, 5) << "No tasks present: cannot cluster";
+auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
+    -> Clusters {
+  if (!queries_ || queries_->empty()) {
+    LOG_FIRST_N(ERROR, 5) << "No queries present: cannot cluster";
     return {};
   }
 
-  Workspace ws(config, layer.edges(), features, *tasks_, *metric_);
+  Workspace::NodeEmbeddings features;
+  for (const auto& [node_id, node] : layer.nodes()) {
+    const auto attrs = node->tryAttributes<SemanticNodeAttributes>();
+    if (!attrs || attrs->semantic_feature.size() <= 1) {
+      continue;
+    }
+
+    features[node_id] = attrs->semantic_feature.rightCols<1>();
+  }
+
+  Workspace ws(config, layer.edges(), features, *queries_, *metric_);
   MLOG(1) << "starting clustering with " << ws.edges.size() << " edges";
   cluster(ws, config);
   MLOG(1) << ws.summary();
@@ -380,17 +386,17 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
 
     cluster->feature /= cluster->nodes.size();
 
-    const auto info = tasks_->getBestScore(*metric_, cluster->feature);
+    const auto info = queries_->getBestScore(*metric_, cluster->feature);
     if (config.filter_clusters && info.score < config.score_threshold) {
       continue;
     }
 
     cluster->score = info.score;
     if (info.score >= config.score_threshold) {
-      cluster->best_task_index = info.index;
-      cluster->best_task_name = tasks_->names.at(info.index);
+      cluster->best_query = info.index;
+      cluster->best_query_name = queries_->names.at(info.index);
     } else {
-      cluster->best_task_name = "";
+      cluster->best_query_name = "";
     }
 
     to_return.push_back(cluster);
@@ -400,7 +406,7 @@ Clusters AgglomerativeClustering::cluster(const SceneGraphLayer& layer,
   return to_return;
 }
 
-void AgglomerativeClustering::cluster(Workspace& ws, const VerbosityConfig& config) {
+void AgglomerativeIBClustering::cluster(Workspace& ws, const VerbosityConfig& config) {
   MLOG(3) << "-----------------------------------";
   MLOG(3) << "Scoring edges";
   MLOG(3) << "-----------------------------------";

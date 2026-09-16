@@ -191,7 +191,7 @@ ComponentInfo::ComponentInfo(const Config& config,
     : ws(config, layer.edges(), getLayerEmbeddings(layer, nodes), tasks, metric),
       segments(nodes) {
   ws.reweight(I_xy_full, static_cast<double>(nodes.size()) / layer.numNodes());
-  AgglomerativeClustering::cluster(ws);
+  AgglomerativeIBClustering::cluster(ws);
 }
 
 IBObjectsUpdateFunctor::IBObjectsUpdateFunctor(const Config& config)
@@ -293,7 +293,7 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
 
   const auto px_all = Eigen::VectorXd::Constant(N, 1.0 / static_cast<double>(N));
   const auto py_all = Eigen::VectorXd::Constant(M, 1.0 / static_cast<double>(M));
-  const auto py_x_all = AgglomerativeClustering::Workspace::compute_py_x(
+  const auto py_x_all = AgglomerativeIBClustering::Workspace::compute_py_x(
       config.clustering, all_features, *tasks_, *metric_);
 
   const auto I_xy_all = mutualInformation(py_all, px_all, py_x_all);

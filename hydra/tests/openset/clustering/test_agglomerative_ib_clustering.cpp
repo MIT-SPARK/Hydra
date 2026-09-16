@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <hydra/openset/clustering/agglomerative_clustering.h>
+#include <hydra/openset/clustering/agglomerative_ib_clustering.h>
 #include <hydra/utils/printing.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_attributes.h>
@@ -8,11 +8,11 @@
 namespace hydra {
 
 using namespace spark_dsg;
-using Cluster = AgglomerativeClustering::Cluster;
+using Cluster = AgglomerativeIBClustering::Cluster;
 using ClusterIds = std::vector<std::vector<NodeId>>;
-using ClusterConfig = AgglomerativeClustering::ClusteringConfig;
-using ClusteringWorkspace = AgglomerativeClustering::Workspace;
-using NodeEmbeddingMap = AgglomerativeClustering::NodeEmbeddingMap;
+using ClusterConfig = AgglomerativeIBClustering::ClusteringConfig;
+using ClusteringWorkspace = AgglomerativeIBClustering::Workspace;
+using NodeEmbeddingMap = ClusteringWorkspace::NodeEmbeddings;
 
 namespace {
 
@@ -71,7 +71,7 @@ std::string printVec(const std::vector<T>& values) {
   return ss.str();
 }
 
-std::string workspaceState(const AgglomerativeClustering::Workspace& ws) {
+std::string workspaceState(const AgglomerativeIBClustering::Workspace& ws) {
   std::stringstream ss;
   ss << "lookup: " << printMap(ws.node_lookup) << std::endl;
   ss << "order: " << printMap(ws.order) << std::endl;
@@ -102,7 +102,7 @@ ClusteringWorkspace makeWorkspace(const std::vector<EdgeKey>& keys,
 
 }  // namespace
 
-TEST(AgglomerativeClustering, WorkspaceInitCorrect) {
+TEST(AgglomerativeIBClustering, WorkspaceInitCorrect) {
   NodeEmbeddingMap map;
   for (size_t i = 0; i < 5; ++i) {
     map[2 * i] = getOneHot(i, 10);
@@ -160,7 +160,7 @@ TEST(AgglomerativeClustering, WorkspaceInitCorrect) {
   }
 }
 
-TEST(AgglomerativeClustering, WorkspaceMergeCorrect) {
+TEST(AgglomerativeIBClustering, WorkspaceMergeCorrect) {
   NodeEmbeddingMap map;
   for (size_t i = 0; i < 5; ++i) {
     map[2 * i] = getOneHot(i, 10);
@@ -212,7 +212,7 @@ TEST(AgglomerativeClustering, WorkspaceMergeCorrect) {
   EXPECT_EQ(ws.assignments, expected_assignments);
 }
 
-TEST(AgglomerativeClustering, SetupSimpleCorrect) {
+TEST(AgglomerativeIBClustering, SetupSimpleCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 5; ++i) {
     x_segments[2 * i] = getOneHot(i, 10);
@@ -255,7 +255,7 @@ TEST(AgglomerativeClustering, SetupSimpleCorrect) {
       << "expected: " << expected_py.format(fmt) << ", result: " << ws.py.format(fmt);
 }
 
-TEST(AgglomerativeClustering, SetupTopKCorrect) {
+TEST(AgglomerativeIBClustering, SetupTopKCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 5; ++i) {
     x_segments[2 * i] = getOneHot(i, 10);
@@ -277,7 +277,7 @@ TEST(AgglomerativeClustering, SetupTopKCorrect) {
       << ", result: " << ws.py_x.format(fmt);
 }
 
-TEST(AgglomerativeClustering, SetupCumulativeCorrect) {
+TEST(AgglomerativeIBClustering, SetupCumulativeCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 5; ++i) {
     x_segments[2 * i] = getOneHot(i, 10);
@@ -299,7 +299,7 @@ TEST(AgglomerativeClustering, SetupCumulativeCorrect) {
       << "diff:     " << (expected_py_x - ws.py_x).format(fmt);
 }
 
-TEST(AgglomerativeClustering, SetupNullPruneCorrect) {
+TEST(AgglomerativeIBClustering, SetupNullPruneCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 3; ++i) {
     x_segments[2 * i] = getOneHot(i, 10);
@@ -324,7 +324,7 @@ TEST(AgglomerativeClustering, SetupNullPruneCorrect) {
       << "diff:     " << (expected_py_x - ws.py_x).format(fmt);
 }
 
-TEST(AgglomerativeClustering, UpdateCorrect) {
+TEST(AgglomerativeIBClustering, UpdateCorrect) {
   NodeEmbeddingMap x_segments;
   for (size_t i = 0; i < 5; ++i) {
     x_segments[2 * i] = getOneHot(i, 10);
@@ -359,7 +359,7 @@ TEST(AgglomerativeClustering, UpdateCorrect) {
       << "p(y|z=1): " << ws.py_z.col(1).format(fmt);
 }
 
-TEST(AgglomerativeClustering, GetClustersCorrect) {
+TEST(AgglomerativeIBClustering, GetClustersCorrect) {
   NodeEmbeddingMap map;
   for (size_t i = 0; i < 5; ++i) {
     map[2 * i] = getOneHot(i, 10);
