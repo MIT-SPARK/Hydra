@@ -6,4 +6,5 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/layer_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/vmf_distance.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/clustering/agglomerative_ib_clustering.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/clustering/vmf_clustering.cpp
 )
