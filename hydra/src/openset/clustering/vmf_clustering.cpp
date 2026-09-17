@@ -32,18 +32,23 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
 #include "hydra/openset/clustering/vmf_clustering.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 
 using namespace spark_dsg;
 
 namespace hydra {
 namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<LayerClustering,
+                                   VmfClustering,
+                                   VmfClustering::Config>("VmfClustering");
 
 struct ScoreEntry {
   Eigen::VectorXf scores;
@@ -107,6 +112,39 @@ ScoreWorkspace propagateScores(const SceneGraphLayer& layer,
   return updated;
 }
 
+using Components = std::vector<std::vector<NodeId>>;
+
+VmfClustering::Clusters buildClusters(const SceneGraphLayer& layer,
+                                      const EmbeddingGroup& queries,
+                                      const EmbeddingDistance& metric,
+                                      const Components& components) {
+  VmfClustering::Clusters to_return;
+  for (const auto& nodes : components) {
+    auto cluster = std::make_shared<LayerClustering::Cluster>();
+    cluster->nodes.insert(nodes.begin(), nodes.end());
+
+    auto iter = cluster->nodes.begin();
+    cluster->feature =
+        layer.getNode(*iter).attributes<SemanticNodeAttributes>().semantic_feature;
+    ++iter;
+    while (iter != cluster->nodes.end()) {
+      cluster->feature += cluster->feature =
+          layer.getNode(*iter).attributes<SemanticNodeAttributes>().semantic_feature;
+      ++iter;
+    }
+
+    cluster->feature /= cluster->nodes.size();
+
+    const auto info = queries.getBestScore(metric, cluster->feature);
+    cluster->score = info.score;
+    cluster->best_query = info.index;
+    cluster->best_query_name = queries.names.at(info.index);
+    to_return.push_back(cluster);
+  }
+
+  return to_return;
+}
+
 }  // namespace
 
 void declare_config(VmfClustering::Config& config) {
@@ -151,6 +189,10 @@ auto VmfClustering::cluster(const spark_dsg::SceneGraphLayer& layer) const -> Cl
     kappas.push_back(kappa);
   }
 
+  if (scores.empty()) {
+    return {};
+  }
+
   // 2. Propagate scores as alpha_i * mean(k_n * <x_n, q_j>)
   const auto lambda = median(kappas);
   for (size_t i = 0; i < config.label_propagation_iterations; ++i) {
@@ -158,9 +200,31 @@ auto VmfClustering::cluster(const spark_dsg::SceneGraphLayer& layer) const -> Cl
   }
 
   // 3. Pick the best scoring label
+  // TODO(nathan) threshold background scores
+  std::unordered_map<spark_dsg::NodeId, Eigen::Index> labels;
+  for (const auto& [node_id, entry] : scores) {
+    Eigen::Index best_label;
+    entry.scores.maxCoeff(&best_label);
+    labels.emplace(node_id, best_label);
+  }
 
   // 4. Extract connected components as regions
-  return {};
+  const auto components = graph_utilities::getConnectedComponents(
+      layer,
+      [&](const auto& node) { return labels.count(node.id); },
+      [&](const auto& edge) {
+        const auto source = labels.find(edge.source);
+        const auto target = labels.find(edge.target);
+        if (source == labels.end() || target == labels.end()) {
+          return false;
+        }
+
+        return source->second == target->second;
+      });
+
+  const auto clusters = buildClusters(layer, *queries_, *metric_, components);
+  MLOG(1) << "finished clustering with " << clusters.size() << " cluster(s)";
+  return clusters;
 }
 
 }  // namespace hydra
