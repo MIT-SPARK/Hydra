@@ -16,6 +16,7 @@ dependencies = [
     "numpy",
     "pandas",
     "pyyaml",
+    "rich",
     "scipy",
     "seaborn",
 ]

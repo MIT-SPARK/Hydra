@@ -185,18 +185,6 @@ ros2 run ianvs play_rosbag path/to/rosbag --clock
 
 See [here](hydra/python/README.md) for information
 
-### Hydra Evaluation
-
-Room and place evaluation is available through `hydra_python.eval`. Create a
-`RoomEvaluator` or `PlaceEvaluator` with `from_file`, then reuse it with
-`eval(graph)` to obtain structured metrics. Place evaluation also accepts
-`layer_id` and `min_basis`. The `evaluate_rooms` and `evaluate_places` binaries
-and the separate `hydra_eval` package have been removed.
-
-Use `hydra timing show RESULTS` for timing summaries, or `hydra timing plot`,
-`timeline`, and `compare` for plots. Offline graph utilities always build;
-evaluation APIs are always part of the Hydra library.
-
 ## Filing Issues
 
 Please understand that this is research code maintained by busy graduate students, **which comes with some caveats**:

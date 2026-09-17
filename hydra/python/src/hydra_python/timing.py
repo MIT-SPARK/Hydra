@@ -19,12 +19,14 @@ def _get_time_array_from_log(filename):
     with pathlib.Path(filename).open() as stream:
         next(stream, None)
         rows = [line for line in stream if line.strip()]
+
     if not rows:
         return np.empty((0, 2))
 
     arr = np.loadtxt(rows, delimiter=",", ndmin=2)
     if arr.shape[1] != 2:
         raise ValueError(f"Expected timestamp(ns),elapsed(s) columns in {filename}")
+
     return arr
 
 
@@ -54,13 +56,14 @@ def _draw_realtime_threshold(ax, threshold, padding=0.022):
         ax.set_ylim([ax.get_ylim()[0], threshold + 0.01])
 
 
-def _get_longform_df(durations, filter_func=None):
+def _get_longform_df(durations, key=None):
     import pandas as pd
 
     names = []
     data = np.array([])
+    matcher = re.compile(key) if key is not None else None
     for name, info in durations.items():
-        if filter_func is not None and not filter_func(name):
+        if matcher is not None and not matcher.match(name):
             continue
 
         times = info[:, 1]
@@ -97,10 +100,9 @@ def collate_timers(info, timers, max_diff_ns=1000000):
             diff = np.abs(info[timer][:, 0] - stamp)
             idx = np.argmin(diff)
             if diff[idx] > max_diff_ns:
+                best_stamp = info[timer][idx][0]
                 logger.warning(f"could not find stamp @ {stamp} [ns] for timer {timer}")
-                logger.warning(
-                    f"best {info[timer][idx][0]} [ns] (diff {diff[idx]} [ns]"
-                )
+                logger.warning(f"best {best_stamp} [ns] (diff {diff[idx]} [ns]")
                 continue
 
             curr_elapsed.append(info[timer][idx, 1])
@@ -115,23 +117,34 @@ def collate_timers(info, timers, max_diff_ns=1000000):
 
 
 def show_timing_info(data, key_regex=None):
+    """Display table of timing information."""
+    from rich.console import Console
+    from rich.table import Table
+
     def _get_stat_str(stat):
         return rf"{1000 * stat:>.3f}"
-
-    import click
 
     sorted_keys = sorted(data)
     if key_regex is not None:
         matcher = re.compile(key_regex)
         sorted_keys = [x for x in sorted_keys if matcher.match(x)]
 
-    click.echo("Timer\tMean [ms]\tStd [ms]\tMin [ms]\tMax [ms]")
+    table = Table(title="Timing Information")
+    table.add_column("Timer")
+    table.add_column(r"μ \[ms]")
+    table.add_column(r"σ \[ms]")
+    table.add_column(r"Min \[ms]")
+    table.add_column(r"Max \[ms]")
+
     for key in sorted_keys:
         values = data[key][:, 1]
         if values.size == 0:
             continue
+
         stats = [np.mean(values), np.std(values), np.min(values), np.max(values)]
-        click.echo(key + "\t" + "\t".join(_get_stat_str(x) for x in stats))
+        table.add_row(key, *(_get_stat_str(x) for x in stats))
+
+    Console().print(table)
 
 
 def plot_durations(durations, keys):
@@ -142,9 +155,8 @@ def plot_durations(durations, keys):
     fig, ax = plt.subplots(len(keys), 1, squeeze=False)
 
     for idx, key in enumerate(keys):
-        matcher = re.compile(key)
         ax[idx][0].set_title(f"{key} Timing Distributions")
-        df = _get_longform_df(durations, lambda x: matcher.match(x))
+        df = _get_longform_df(durations, key=key)
         if df is None:
             continue
 

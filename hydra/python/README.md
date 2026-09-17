@@ -23,15 +23,6 @@ pip install /path/to/colcon_ws/src/spark_dsg
 pip install /path/to/colcon_ws/src/hydra/hydra
 ```
 
-The Hydra and Spark DSG extensions must use compatible pybind11 versions to
-exchange graph objects. When using Spark DSG built by colcon with the system
-pybind11, select that same CMake package for the Hydra wheel, for example:
-
-```bash
-pip install /path/to/colcon_ws/src/hydra/hydra \
-  --config-settings=cmake.define.pybind11_DIR=/usr/lib/cmake/pybind11
-```
-
 ### Running on MP3D Image Dataset
 
 Point Hydra at the scene(s) you want to run:
@@ -116,37 +107,15 @@ Set up habitat via [conda](https://github.com/facebookresearch/habitat-sim#insta
 }
 ```
 
-### Evaluation and timing
+### Timing
 
-Evaluation is part of the main package. Ground truth is prepared once and reused:
-
-```python
-import spark_dsg
-from hydra_python.eval import PlaceEvaluator, RoomEvaluator, RoomEvaluatorConfig
-
-graph = spark_dsg.SceneGraph.load("graph.json")
-places = PlaceEvaluator.from_file("gvd.yaml", "map.tsdf", max_distance_m=4.5)
-place_metrics = places.eval(graph, min_basis=1, layer_id="places")
-rooms = RoomEvaluator.from_file(RoomEvaluatorConfig(), "rooms.yaml", "map.tsdf")
-room_metrics = rooms.eval(graph)
+After running hydra, you can evaluate the timing performance of various components by
 ```
-
-File paths are strings. A missing TSDF returns `None`; malformed inputs can raise
-exceptions. `min_basis` counts extra GVD basis points. An empty reference GVD
-produces an invalid place result. Room metrics use zero scores for empty
-comparisons and mark a comparison invalid if both room collections are absent.
-Returned room overlap rows and columns follow sorted ground-truth and estimated
-room IDs, respectively. Room configuration retains the C++ defaults, including
-`only_labeled=False`; set it explicitly when reproducing older CLI results.
-
-Use `hydra timing show RESULTS` to summarize recorder CSV files. For plotting,
-use `hydra timing plot RESULTS`,
-`hydra timing timeline RESULTS`, or `hydra timing compare RESULTS1 RESULTS2`.
-Timing commands require a working Hydra bindings installation. CSV timestamps remain in
-nanoseconds for matching and are converted to seconds for timeline plots.
-
-The separate `hydra_eval` package, experiment collection commands, and
-`evaluate_rooms` / `evaluate_places` executables have been removed. Offline
-utility binaries use CLI11 with hyphenated option names. These utilities always
-build; evaluation
-APIs are always included in the library.
+# -t will plot the elapsed time against dataset time, omitting it will show distributions
+hydra-python timing plot /path/to/results [-t]
+```
+or
+```
+hydra-python timing show /path/to/results
+```
+will show (a very coarse) breakdown of timing by layer.

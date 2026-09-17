@@ -43,7 +43,6 @@
 #include <spark_dsg/scene_graph.h>
 
 #include <CLI/CLI.hpp>
-#include <algorithm>
 #include <filesystem>
 
 namespace hydra {
@@ -108,16 +107,7 @@ int main(int argc, char** argv) {
   hydra::AppArgs args;
   args.add_to_app(app);
 
-  // The config context consumes --help; handle utility help before parsing it.
-  const auto help_requested = std::any_of(argv + 1, argv + argc, [](const char* arg) {
-    const std::string value(arg);
-    return value == "--help" || value == "-h";
-  });
-  if (help_requested) {
-    std::cout << app.help();
-    return 0;
-  }
-
+  // TODO(nathan) fix help flag behavior for config_utilities (forward help here)
   config::initContext(argc, argv, true);
   config::setConfigSettingsFromContext();
 
