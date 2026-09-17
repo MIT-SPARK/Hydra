@@ -20,7 +20,7 @@ source /path/to/hydra/environment/bin/activate
 
 # note that you may want to install a different version of spark_dsg than is installed automatically by the bindings
 pip install /path/to/colcon_ws/src/spark_dsg
-pip install /path/to/colcon_ws/src/hydra
+pip install /path/to/colcon_ws/src/hydra/hydra
 ```
 
 ### Running on MP3D Image Dataset
@@ -106,3 +106,16 @@ Set up habitat via [conda](https://github.com/facebookresearch/habitat-sim#insta
     }
 }
 ```
+
+### Timing
+
+After running hydra, you can evaluate the timing performance of various components by
+```
+# -t will plot the elapsed time against dataset time, omitting it will show distributions
+hydra-python timing plot /path/to/results [-t]
+```
+or
+```
+hydra-python timing show /path/to/results
+```
+will show (a very coarse) breakdown of timing by layer.

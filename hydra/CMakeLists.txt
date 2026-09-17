@@ -20,7 +20,6 @@ if(NOT CMAKE_INTERPROCEDURAL_OPTIMIZATION)
 endif()
 
 option(BUILD_SHARED_LIBS "Build shared libs" ON)
-option(HYDRA_ENABLE_EVAL "Build evaluation code" ON)
 option(HYDRA_ENABLE_GNN "Build GNN interface" OFF)
 option(HYDRA_ENABLE_PYTHON "Build Hydra python bindings" OFF)
 option(HYDRA_ENABLE_ROS_INSTALL_LAYOUT "Install binaries to ROS location" ON)
@@ -74,9 +73,8 @@ if(HYDRA_ENABLE_GNN)
   target_link_libraries(${PROJECT_NAME} PRIVATE ort::ort)
 endif()
 
-if(HYDRA_ENABLE_EVAL)
-  add_subdirectory(eval)
-endif()
+include(GNUInstallDirs)
+add_subdirectory(tools)
 
 if(HYDRA_ENABLE_PYTHON)
   add_subdirectory(python)
@@ -87,8 +85,6 @@ if(BUILD_TESTING)
   enable_testing()
   add_subdirectory(tests)
 endif()
-
-include(GNUInstallDirs)
 
 install(
   TARGETS ${PROJECT_NAME}

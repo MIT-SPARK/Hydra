@@ -1,0 +1,59 @@
+/* -----------------------------------------------------------------------------
+ * Copyright 2022 Massachusetts Institute of Technology.
+ * All Rights Reserved
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Research was sponsored by the United States Air Force Research Laboratory and
+ * the United States Air Force Artificial Intelligence Accelerator and was
+ * accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views
+ * and conclusions contained in this document are those of the authors and should
+ * not be interpreted as representing the official policies, either expressed or
+ * implied, of the United States Air Force or the U.S. Government. The U.S.
+ * Government is authorized to reproduce and distribute reprints for Government
+ * purposes notwithstanding any copyright notation herein.
+ * -------------------------------------------------------------------------- */
+#include <spark_dsg/scene_graph.h>
+
+#include <CLI/CLI.hpp>
+#include <iostream>
+
+#include "hydra/utils/graph_utilities.h"
+
+int main(int argc, char* argv[]) {
+  CLI::App app("Combine unpartitioned scene graph topology with new node IDs");
+  std::string output_path;
+  std::vector<std::string> input_paths;
+  app.add_option("output", output_path)->required();
+  app.add_option("inputs", input_paths)->required()->check(CLI::ExistingFile);
+  CLI11_PARSE(app, argc, argv);
+
+  std::vector<spark_dsg::SceneGraph::Ptr> input_graphs;
+  for (const auto& filename : input_paths) {
+    std::cout << "Merging " << filename << std::endl;
+    input_graphs.push_back(spark_dsg::SceneGraph::load(filename));
+  }
+
+  auto output_graph = hydra::mergeGraphs(input_graphs);
+  output_graph->save(output_path);
+  return 0;
+}

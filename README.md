@@ -185,10 +185,6 @@ ros2 run ianvs play_rosbag path/to/rosbag --clock
 
 See [here](hydra/python/README.md) for information
 
-### Hydra Evaluation
-
-See [here](hydra/eval/README.md) for information
-
 ## Filing Issues
 
 Please understand that this is research code maintained by busy graduate students, **which comes with some caveats**:
