@@ -39,8 +39,9 @@ backend:
     objects: {type: UpdateObjectsFunctor}
     places: {type: UpdateRegionGrowingTraversabilityFunctor, layer: PLACES}
     regions:
-      type: IBRegionsUpdateFunctor
+      type: OpenVocabRegionsUpdateFunctor
       clustering:
+        type: AgglomerativeIBClustering
         verbosity: 1
         max_delta: 0.02
         score_threshold: 0.21

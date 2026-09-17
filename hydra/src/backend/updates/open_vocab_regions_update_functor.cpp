@@ -1,4 +1,4 @@
-#include "hydra/backend/updates/ib_regions_update_functor.h"
+#include "hydra/backend/updates/open_vocab_regions_update_functor.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
@@ -18,9 +18,9 @@ namespace {
 
 static const auto functor_reg =
     config::RegistrationWithConfig<UpdateFunctor,
-                                   IBRegionsUpdateFunctor,
-                                   IBRegionsUpdateFunctor::Config>(
-        "IBRegionsUpdateFunctor");
+                                   OpenVocabRegionsUpdateFunctor,
+                                   OpenVocabRegionsUpdateFunctor::Config>(
+        "OpenVocabRegionsUpdateFunctor");
 
 void clearRegions(SceneGraph& graph, const std::string& layer) {
   std::vector<NodeId> prev_regions;
@@ -38,7 +38,7 @@ void clearRegions(SceneGraph& graph, const std::string& layer) {
 using timing::ScopedTimer;
 using namespace spark_dsg;
 
-void declare_config(IBRegionsUpdateFunctor::Config& config) {
+void declare_config(OpenVocabRegionsUpdateFunctor::Config& config) {
   using namespace config;
   name("RegionUpdateFunctorConfig::Config");
   base<VerbosityConfig>(config);
@@ -48,21 +48,21 @@ void declare_config(IBRegionsUpdateFunctor::Config& config) {
   field(config.clustering, "clustering");
 }
 
-IBRegionsUpdateFunctor::Config::Config() : VerbosityConfig("[IB Regions] ") {}
+OpenVocabRegionsUpdateFunctor::Config::Config() : VerbosityConfig("[IB Regions] ") {}
 
-IBRegionsUpdateFunctor::IBRegionsUpdateFunctor(const Config& config)
-    : config(config::checkValid(config)), clustering_(config.clustering) {}
+OpenVocabRegionsUpdateFunctor::OpenVocabRegionsUpdateFunctor(const Config& config)
+    : config(config::checkValid(config)), clustering_(config.clustering.create()) {}
 
-void IBRegionsUpdateFunctor::call(const SceneGraph&,
-                                  SharedDsgInfo& dsg,
-                                  const UpdateInfo::ConstPtr& info) const {
+void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
+                                         SharedDsgInfo& dsg,
+                                         const UpdateInfo::ConstPtr& info) const {
   ScopedTimer timer("backend/region_clustering", info->timestamp_ns);
 
   auto& graph = *dsg.graph;
   const auto& places = graph.getLayer(config.source_layer);
   clearRegions(graph, config.target_layer);
 
-  const auto clusters = clustering_.cluster(places);
+  const auto clusters = clustering_->cluster(places);
   MLOG(1) << "Got " << clusters.size() << " cluster(s)";
 
   std::set<NodeId> new_nodes;

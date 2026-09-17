@@ -11,16 +11,21 @@
 #include "hydra/utils/printing.h"
 #include "hydra/utils/probability_utilities.h"
 
-namespace hydra {
-
 using namespace spark_dsg;
 
 using ClusterIds = std::vector<std::vector<NodeId>>;
-using ClusterWorkspace = AgglomerativeIBClustering::Workspace;
+using ClusterWorkspace = hydra::AgglomerativeIBClustering::Workspace;
 using EmbeddingMap = std::map<NodeId, Eigen::VectorXf>;
 using Indices = std::vector<std::pair<size_t, size_t>>;
 
+namespace hydra {
 namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<LayerClustering,
+                                   AgglomerativeIBClustering,
+                                   AgglomerativeIBClustering::Config>(
+        "AgglomerativeIBClustering");
 
 bool keysIntersect(EdgeKey key1, EdgeKey key2) {
   return key1.k1 == key2.k1 || key1.k1 == key2.k2 || key1.k2 == key2.k1 ||
