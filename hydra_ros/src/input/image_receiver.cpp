@@ -50,6 +50,8 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+#include "hydra_ros/input/message_sync_queue.h"
+
 using semantic_inference_msgs::msg::FeatureImage;
 using semantic_inference_msgs::msg::FeatureVectorStamped;
 using sensor_msgs::msg::Image;
@@ -281,37 +283,6 @@ struct OpenSetAdapter {
 };
 
 template <bool enabled>
-struct FeatureAdapter;
-
-template <>
-struct FeatureAdapter<false> {
-  template <typename RecvT>
-  FeatureAdapter(ianvs::NodeHandle, const std::string&, const rclcpp::QoS&, RecvT&) {}
-};
-
-template <>
-struct FeatureAdapter<true> {
-  using MsgType = FeatureVectorStamped;
-
-  template <typename RecvT>
-  FeatureAdapter(ianvs::NodeHandle nh,
-                 const std::string& topic,
-                 const rclcpp::QoS& qos,
-                 RecvT& receiver)
-      : sub(nh.create_subscription<MsgType>(
-            topic, qos, [&receiver](const MsgType::ConstSharedPtr& msg) {
-              receiver.sync.template add<RecvT::Info::feature_offset>(msg);
-            })) {}
-
-  static void fill(const MsgType& msg, ImageInputPacket& packet) {
-    const auto& vec = msg.feature.data;
-    packet.input_feature = Eigen::Map<const FeatureVector>(vec.data(), vec.size());
-  }
-
-  rclcpp::Subscription<MsgType>::SharedPtr sub;
-};
-
-template <bool enabled>
 struct TraversabilityAdapter;
 
 template <>
@@ -377,28 +348,9 @@ struct policy_type<false> {
   using policy_from_tuple = approx_policy_from_tuple<Args...>::value;
 };
 
-template <bool _with_feature, bool _with_traversability, bool exact>
+template <bool _with_traversability, bool exact>
 struct ReceiverType : policy_type<exact> {
-  static constexpr bool with_feature = _with_feature;
   static constexpr bool with_traversability = _with_traversability;
-};
-
-struct PacketBuilderBase {
-  using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
-  using Queue = MessageQueue<SensorInputPacket::Ptr>;
-
-  explicit PacketBuilderBase(Queue& queue) : queue(queue) {}
-
-  ImagePacketPtr make_packet(const Image::ConstSharedPtr& color,
-                             const Image::ConstSharedPtr& depth) const {
-    const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
-    auto packet = std::make_shared<ImageInputPacket>(timestamp_ns);
-    packet->color = parseColor(*color);
-    packet->depth = parseDepth(*depth);
-    return packet;
-  }
-
-  Queue& queue;
 };
 
 template <typename... AdapterT>
@@ -416,19 +368,37 @@ void fillPacket(ImageInputPacket& packet,
   fillPacket<OtherT...>(packet, others...);
 }
 
+struct PacketBuilderBase {
+  using ImagePacketPtr = std::shared_ptr<ImageInputPacket>;
+  using Callback = std::function<void(SensorInputPacket::Ptr)>;
+
+  explicit PacketBuilderBase(const Callback& push) : push(push) {}
+
+  ImagePacketPtr make_packet(const Image::ConstSharedPtr& color,
+                             const Image::ConstSharedPtr& depth) const {
+    const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
+    auto packet = std::make_shared<ImageInputPacket>(timestamp_ns);
+    packet->color = parseColor(*color);
+    packet->depth = parseDepth(*depth);
+    return packet;
+  }
+
+  const Callback push;
+};
+
 template <typename T>
 struct PacketBuilder;
 
 template <template <typename...> typename List, typename... AdapterT>
 struct PacketBuilder<List<AdapterT...>> : PacketBuilderBase {
-  PacketBuilder(Queue& queue) : PacketBuilderBase(queue) {}
+  PacketBuilder(const Callback& callback) : PacketBuilderBase(callback) {}
 
   void callback(const Image::ConstSharedPtr& color,
                 const Image::ConstSharedPtr& depth,
                 const typename AdapterT::MsgType::ConstSharedPtr&... others) {
     auto packet = make_packet(color, depth);
     fillPacket<AdapterT...>(*packet, others...);
-    queue.push(packet);
+    push(packet);
   }
 };
 
@@ -439,24 +409,16 @@ template <typename T, typename R>
 struct ReceiverInfo {
   static constexpr bool is_null = std::is_same_v<T, NullAdapter>;
   static constexpr size_t traversability_offset = is_null ? 2 : 3;
-  static constexpr size_t feature_offset =
-      R::with_traversability ? traversability_offset + 1 : traversability_offset;
 
-  using vec = FeatureVectorStamped;
   using msg = typename T::MsgType;
 
-  using adapters = add_type_v<add_type_v<add_type_v<type_list<>, T, !is_null>,
-                                         TraversabilityAdapter<true>,
-                                         R::with_traversability>,
-                              FeatureAdapter<true>,
-                              R::with_feature>;
+  using adapters = add_type_v<add_type_v<type_list<>, T, !is_null>,
+                              TraversabilityAdapter<true>,
+                              R::with_traversability>;
 
-  using types =
-      add_type_v<add_type_v<add_type_v<type_list<Image, Image>, msg, !is_null>,
-                            Image,
-                            R::with_traversability>,
-                 FeatureVectorStamped,
-                 R::with_feature>;
+  using types = add_type_v<add_type_v<type_list<Image, Image>, msg, !is_null>,
+                           Image,
+                           R::with_traversability>;
 
   using policy = R::template policy_from_tuple<types>;
   using builder = PacketBuilder<adapters>;
@@ -466,26 +428,32 @@ struct ImageReceiverBase {
   virtual ~ImageReceiverBase() = default;
 };
 
+using PacketQueue = MessageQueue<ImageInputPacket::Ptr>;
+
 template <typename AdapterT, typename TypeT>
 struct ImageReceiverImpl : public ImageReceiverBase {
-  using Queue = PacketBuilderBase::Queue;
   using ImgPtr = Image::ConstSharedPtr;
 
   using Info = ReceiverInfo<AdapterT, TypeT>;
   using Sync = Synchronizer<typename Info::policy>;
+  using FeatureQueue = MessageSyncQueue<FeatureVectorStamped>;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
                     const rclcpp::QoS& qos,
                     size_t queue_size,
-                    Queue& queue);
+                    bool with_feature,
+                    PacketQueue& queue);
+
+  void push(ImageInputPacket::Ptr packet);
 
   Sync sync;
+  PacketQueue& queue;
   Info::builder builder;
 
   rclcpp::Subscription<Image>::SharedPtr color;
   rclcpp::Subscription<Image>::SharedPtr depth;
   AdapterT semantics;
-  FeatureAdapter<TypeT::with_feature> feature;
+  std::unique_ptr<FeatureQueue> features;
   TraversabilityAdapter<TypeT::with_traversability> traversability;
 };
 
@@ -493,9 +461,11 @@ template <typename AdapterT, typename TypeT>
 ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
                                                       const rclcpp::QoS& qos,
                                                       size_t queue_size,
-                                                      Queue& queue)
+                                                      bool with_feature,
+                                                      PacketQueue& queue)
     : sync(queue_size),
-      builder(queue),
+      queue(queue),
+      builder([this](auto packet) { push(packet); }),
       color(nh.create_subscription<Image>(
           "rgb/image_raw",
           qos,
@@ -505,38 +475,54 @@ ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
           qos,
           [this](const ImgPtr& msg) { sync.template add<1>(msg); })),
       semantics(nh, "semantic/image_raw", qos, *this),
-      feature(nh, "semantic/feature", qos, *this),
       traversability(nh, "traversability/image_raw", qos, *this) {
   sync.registerCallback(&Info::builder::callback, &builder);
+  if (with_feature) {
+    MessageSyncQueueConfig feature_config{queue_size, qos};
+    features = std::make_unique<FeatureQueue>(feature_config, nh, "semantic/feature");
+  }
 }
 
-template <typename T, bool feature, bool traversability>
-using ExactRecv = ImageReceiverImpl<T, ReceiverType<feature, traversability, true>>;
+template <typename AdapterT, typename TypeT>
+void ImageReceiverImpl<AdapterT, TypeT>::push(ImageInputPacket::Ptr packet) {
+  if (!packet) {
+    return;
+  }
 
-template <typename T, bool feature, bool traversability>
-using ApproxRecv = ImageReceiverImpl<T, ReceiverType<feature, traversability, false>>;
+  if (features) {
+    auto msg = features->sync(packet->timestamp_ns);
+    if (msg) {
+      const auto& vec = msg->feature.data;
+      packet->input_feature = Eigen::Map<const FeatureVector>(vec.data(), vec.size());
+    }
+  }
 
-template <typename T, template <typename, bool, bool> typename RecvT>
+  queue.push(packet);
+}
+
+template <typename T, bool traversability>
+using ExactRecv = ImageReceiverImpl<T, ReceiverType<traversability, true>>;
+
+template <typename T, bool traversability>
+using ApproxRecv = ImageReceiverImpl<T, ReceiverType<traversability, false>>;
+
+template <typename T, template <typename, bool> typename RecvT>
 std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
                                                 ianvs::NodeHandle nh,
-                                                PacketBuilderBase::Queue& queue) {
+                                                PacketQueue& queue) {
   const auto qos = config.qos;
-  const auto queue_size = config.queue_size;
-  if (config.with_feature && config.with_traversability) {
-    return std::make_unique<RecvT<T, true, true>>(nh, qos, queue_size, queue);
-  } else if (config.with_feature) {
-    return std::make_unique<RecvT<T, true, false>>(nh, qos, queue_size, queue);
-  } else if (config.with_traversability) {
-    return std::make_unique<RecvT<T, false, true>>(nh, qos, queue_size, queue);
+  const auto size = config.queue_size;
+  if (config.with_traversability) {
+    return std::make_unique<RecvT<T, true>>(nh, qos, size, config.with_feature, queue);
   } else {
-    return std::make_unique<RecvT<T, false, false>>(nh, qos, queue_size, queue);
+    return std::make_unique<RecvT<T, false>>(nh, qos, size, config.with_feature, queue);
   }
 }
 
 template <typename T>
 std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
                                                 ianvs::NodeHandle nh,
-                                                PacketBuilderBase::Queue& queue) {
+                                                PacketQueue& queue) {
   if (config.use_exact) {
     return makeReceiver<T, ExactRecv>(config, nh, queue);
   } else {
@@ -547,7 +533,7 @@ std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& con
 struct ImageReceiver::Impl {
   explicit Impl(const ImageReceiver::Config& config,
                 ianvs::NodeHandle nh,
-                PacketBuilderBase::Queue& queue) {
+                PacketQueue& queue) {
     switch (config.semantics_type) {
       case ImageReceiver::Config::SemanticsType::NONE:
         recv = makeReceiver<NullAdapter>(config, nh, queue);
