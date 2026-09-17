@@ -15,6 +15,8 @@ void declare_config(LayerClustering::Config& config) {
 }
 
 LayerClustering::LayerClustering(const Config& config)
-    : config(config::checkValid(config)) {}
+    : config(config::checkValid(config)),
+      queries_(config.queries.create()),
+      metric_(config.metric.create()) {}
 
 }  // namespace hydra

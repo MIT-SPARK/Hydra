@@ -344,6 +344,7 @@ void declare_config(AgglomerativeIBClustering::Config& config) {
   using namespace config;
   name("AgglomerativeIBClustering::Config");
   base<AgglomerativeIBClustering::ClusteringConfig>(config);
+  base<LayerClustering::Config>(config);
   config.metric.setOptional();
   field(config.metric, "metric");
   field(config.filter_clusters, "filter_clusters");
@@ -355,7 +356,7 @@ AgglomerativeIBClustering::AgglomerativeIBClustering(const Config& config)
 auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
     -> Clusters {
   if (!queries_ || queries_->empty()) {
-    LOG_FIRST_N(ERROR, 5) << "No queries present: cannot cluster";
+    LOG_FIRST_N(ERROR, 1) << "No queries present: cannot cluster";
     return {};
   }
 

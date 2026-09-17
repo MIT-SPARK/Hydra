@@ -89,6 +89,7 @@ void declare_config(KeyframeSelector::Config& config) {
   base<VerbosityConfig>(config);
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
+  config.feature_selector.setOptional();
   field(config.feature_selector, "feature_selector");
   field(config.layers, "layers");
   field(config.sinks, "sinks");
