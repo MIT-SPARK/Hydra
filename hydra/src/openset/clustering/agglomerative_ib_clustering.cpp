@@ -402,7 +402,7 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
       cluster->best_query = info.index;
       cluster->best_query_name = queries_->names.at(info.index);
     } else {
-      cluster->best_query_name = "";
+      cluster->best_query_name = "unknown";
     }
 
     to_return.push_back(cluster);

@@ -10,6 +10,7 @@ struct OpenVocabRegionsUpdateFunctor : public UpdateFunctor {
     char id_prefix = 'r';
     std::string source_layer = spark_dsg::DsgLayers::PLACES;
     std::string target_layer = spark_dsg::DsgLayers::ROOMS;
+    size_t min_num_nodes = 5;
     config::VirtualConfig<LayerClustering> clustering;
 
     Config();
