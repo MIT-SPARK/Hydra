@@ -45,6 +45,7 @@ void declare_config(OpenVocabRegionsUpdateFunctor::Config& config) {
   field<CharConversion>(config.id_prefix, "id_prefix");
   field(config.source_layer, "source_layer");
   field(config.target_layer, "target_layer");
+  field(config.min_num_nodes, "min_num_nodes");
   field(config.clustering, "clustering");
 }
 
@@ -67,6 +68,11 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
 
   std::set<NodeId> new_nodes;
   for (size_t i = 0; i < clusters.size(); ++i) {
+    if (clusters[i]->nodes.size() < config.min_num_nodes) {
+      MLOG(3) << "Dropping cluster of " << clusters[i]->nodes.size() << " node(s)";
+      continue;
+    }
+
     NodeSymbol new_node_id(config.id_prefix, i);
     auto attrs = std::make_unique<SemanticNodeAttributes>();
     attrs->semantic_label = 0;
