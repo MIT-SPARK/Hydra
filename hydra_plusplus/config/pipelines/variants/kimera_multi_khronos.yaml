@@ -52,4 +52,4 @@ active_window:
         sensors:
           rgbd: {}
           velodyne16: {height_scale: 32.0}
-frontend: {enable_mesh_objects: false}
+frontend: {objects: {type: ''}}

@@ -59,12 +59,12 @@ class ObjectVisualizer : public MeshSegmenter::Sink {
   std::string printInfo() const override;
 
   void call(uint64_t timestamp_ns,
-            const kimera_pgmo::MeshDelta& delta,
+            const spark_dsg::Mesh& mesh,
             const LabelIndices& label_indices,
             const MeshSegmenter::LabelClusters& clusters) const override;
 
  protected:
-  void fillMarkerFromCloud(const kimera_pgmo::MeshDelta& delta,
+  void fillMarkerFromCloud(const spark_dsg::Mesh& mesh,
                            const std::vector<size_t>& indices,
                            visualization_msgs::msg::Marker& marker) const;
 

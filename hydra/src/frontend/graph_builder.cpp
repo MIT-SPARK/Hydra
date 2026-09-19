@@ -48,7 +48,6 @@
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/keyframe_selector.h"
 #include "hydra/frontend/mesh_compression.h"
-#include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
@@ -75,13 +74,13 @@ void declare_config(GraphBuilder::Config& config) {
 
   field(config.no_packet_collation, "no_packet_collation");
   field(config.clear_object_meshes, "clear_object_meshes");
-  field(config.enable_mesh_objects, "enable_mesh_objects");
-  field(config.mesh_compression, "mesh_compression");
 
+  field(config.mesh_compression, "mesh_compression");
   field(config.graph_updater, "graph_updater");
   field(config.graph_connector, "graph_connector");
 
-  field(config.object_config, "objects");
+  config.objects.setOptional();
+  field(config.objects, "objects");
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
 
@@ -122,10 +121,6 @@ GraphBuilder::GraphBuilder(const Config& config,
           GlobalInfo::instance().labelspace().surface_places_labels)),
       sinks_(Sink::instantiate(config.sinks)) {
   const auto& global_info = GlobalInfo::instance();
-  if (config.enable_mesh_objects) {
-    segmenter_ = std::make_unique<MeshSegmenter>(
-        config.object_config, global_info.labelspace().object_labels);
-  }
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
@@ -134,6 +129,7 @@ GraphBuilder::GraphBuilder(const Config& config,
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
 
   // TODO(nathan) this needs to be pushed to an actual config at some point
+  functors_.emplace("objects", config.objects.create());
   functors_.emplace("keyframe_selector", config.keyframe_selector.create());
   functors_.emplace("deformation_graph_builder",
                     config.deformation_graph_builder.create());
@@ -148,8 +144,6 @@ GraphBuilder::GraphBuilder(const Config& config,
     });
   }
 
-  addPostMeshCallback(
-      std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
   addPostMeshCallback(
       std::bind(&GraphBuilder::updatePlaces2d, this, std::placeholders::_1));
 }
@@ -352,6 +346,13 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     launchCallbacks(callbacks_, msg);
   }
 
+  // All input callbacks have finished; resolve connections before graph consumers.
+  for (const auto& [name, functor] : functors_) {
+    if (functor) {
+      functor->callMeshUpdate(*dsg_, *curr_output_, mesh_update_info_);
+    }
+  }
+
   {  // start timing scope
     ScopedTimer timer("frontend/interlayer_edges", msg->timestamp_ns, true, 1, false);
     graph_connector_.connect(*dsg_->graph);
@@ -368,33 +369,16 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     last_mesh_update_ = mesh_compression_->update(input, map_window_.get());
+    mesh_update_info_.correspondence = &mesh_compression_->correspondence();
   }
 
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
+    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_update_info_.offsets);
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
   launchCallbacks(post_mesh_callbacks_, input);
-}
-
-void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
-  if (!segmenter_) {
-    return;
-  }
-
-  if (!last_mesh_update_) {
-    LOG(ERROR) << "Cannot detect objects without valid mesh";
-    return;
-  }
-
-  const auto stamp = input.timestamp_ns;
-  const auto clusters = segmenter_->detect(stamp, *last_mesh_update_, mesh_offsets_);
-  {  // start dsg critical section
-    std::unique_lock<std::mutex> lock(dsg_->mutex);
-    segmenter_->updateGraph(stamp, mesh_offsets_, clusters, *dsg_->graph);
-  }  // end dsg critical section
 }
 
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
@@ -408,11 +392,11 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   }
 
   ScopedTimer timer("frontend/places_2d", input.timestamp_ns, true, 1, false);
-  surface_places_->detect(input, *last_mesh_update_, mesh_offsets_);
+  surface_places_->detect(input, *last_mesh_update_, mesh_update_info_.offsets);
 
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-  surface_places_->updateGraph(input, mesh_offsets_, *dsg_->graph);
+  surface_places_->updateGraph(input, mesh_update_info_.offsets, *dsg_->graph);
 }
 
 }  // namespace hydra
