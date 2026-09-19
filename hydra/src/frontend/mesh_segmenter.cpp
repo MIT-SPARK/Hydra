@@ -174,7 +174,8 @@ void MeshSegmenter::updateConnections(const Object& object,
     }
   };
   for (const auto& ref : object.vertices) {
-    const auto index = correspondence.find(ref.block->pos(ref.vertex));
+    const auto index =
+        correspondence.find(ref.block->index, ref.vertex, ref.block->pos(ref.vertex));
     if (index) {
       current.insert(info.offsets.toGlobalVertex(*index));
     } else {

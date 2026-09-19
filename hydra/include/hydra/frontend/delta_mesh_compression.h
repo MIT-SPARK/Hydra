@@ -55,14 +55,8 @@ class DeltaMeshCompression : public MeshCompressor {
   const MeshCorrespondence& correspondence() const override { return correspondence_; }
 
  private:
-  class Compression : public kimera_pgmo::DeltaCompression {
-   public:
-    using kimera_pgmo::DeltaCompression::DeltaCompression;
-    void fillCorrespondence(const kimera_pgmo::MeshDelta& delta,
-                            MeshCorrespondence& result) const;
-  };
-
-  Compression compression_;
+  kimera_pgmo::DeltaCompression compression_;
+  size_t previous_archived_vertices_ = 0;
   MeshCorrespondence correspondence_;
 };
 

@@ -63,7 +63,9 @@ void declare_config(DeltaMeshCompression::Config& config) {
 DeltaMeshCompression::DeltaMeshCompression(const Config& config)
     : config(config::checkValid(config)),
       compression_(config.resolution),
-      correspondence_(config.resolution) {}
+      correspondence_(config.resolution) {
+  correspondence_.sources.emplace();
+}
 
 auto DeltaMeshCompression::update(const ActiveWindowOutput& input,
                                   const VolumetricWindow*) -> MeshDeltaPtr {
@@ -71,20 +73,39 @@ auto DeltaMeshCompression::update(const ActiveWindowOutput& input,
   const IndexSet archived(input.archived.begin(), input.archived.end());
   compression_.archiveBlocks(
       [&](const auto& index, const auto&) { return archived.count(index); });
-  auto delta = compression_.update(wrapper, input.timestamp_ns);
-  compression_.fillCorrespondence(*delta, correspondence_);
-  return delta;
-}
+  kimera_pgmo::HashedIndexMapping updated;
+  auto delta = compression_.update(wrapper, input.timestamp_ns, &updated);
+  auto& sources = *correspondence_.sources;
+  for (const auto& index : archived) {
+    sources.erase(index);
+  }
+  for (const auto& [index, mapping] : updated) {
+    sources.erase(index);
+  }
+  for (auto& [block, mapping] : sources) {
+    for (auto it = mapping.begin(); it != mapping.end();) {
+      // PGMO keys the previous mapping relative to its active vertices, while
+      // correspondence indices include the previous delta's archived prefix.
+      const auto previous = it->second;
+      const auto& remapping = *delta->info.prev_to_curr;
+      const auto next = remapping.find(previous - previous_archived_vertices_);
+      if (previous < previous_archived_vertices_ || next == remapping.end()) {
+        it = mapping.erase(it);
+        continue;
+      }
+      it->second = next->second;
+      ++it;
+    }
+  }
+  sources.merge(updated);
+  previous_archived_vertices_ = delta->getNumArchivedVertices();
 
-void DeltaMeshCompression::Compression::fillCorrespondence(
-    const kimera_pgmo::MeshDelta& delta, MeshCorrespondence& result) const {
-  result.clear();
-  for (size_t i = 0; i < delta.getNumVertices(); ++i) {
-    result.retained[grid_.toIndex(delta.getVertex(i).pos)].push_back(i);
+  correspondence_.retained.clear();
+  for (size_t i = 0; i < delta->getNumVertices(); ++i) {
+    const auto cell = correspondence_.grid.toIndex(delta->getVertex(i).pos);
+    correspondence_.retained[cell].push_back(i);
   }
-  for (const auto& [cell, vertex] : vertices_map_) {
-    result.active[cell] = vertex.mesh_index;
-  }
+  return delta;
 }
 
 }  // namespace hydra

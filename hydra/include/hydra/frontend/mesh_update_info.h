@@ -1,5 +1,6 @@
 #pragma once
 
+#include <kimera_pgmo/hashing.h>
 #include <kimera_pgmo/mesh_offset_info.h>
 #include <spatial_hash/grid.h>
 #include <spatial_hash/hash.h>
@@ -15,6 +16,9 @@ struct MeshCorrespondence {
   explicit MeshCorrespondence(double resolution) : grid(resolution) {}
 
   void clear() {
+    if (sources) {
+      sources->clear();
+    }
     active.clear();
     retained.clear();
   }
@@ -24,6 +28,24 @@ struct MeshCorrespondence {
     return it == active.end() ? std::nullopt : std::optional<size_t>(it->second);
   }
 
+  std::optional<size_t> find(const spatial_hash::BlockIndex& block,
+                             size_t vertex,
+                             const Eigen::Vector3f& point) const {
+    if (!sources) {
+      return find(point);
+    }
+    const auto block_it = sources->find(block);
+    if (block_it == sources->end()) {
+      return std::nullopt;
+    }
+    const auto it = block_it->second.find(vertex);
+    return it == block_it->second.end() ? std::nullopt
+                                        : std::optional<size_t>(it->second);
+  }
+
+  //! Source identity correspondence when provided by the compressor. Otherwise,
+  //! the voxel compressor resolves current support through compression cells.
+  std::optional<kimera_pgmo::HashedIndexMapping> sources;
   spatial_hash::Grid<spatial_hash::LongIndex> grid;
   //! Current vertex for each compression cell, including unchanged support.
   spatial_hash::LongIndexHashMap<size_t> active;

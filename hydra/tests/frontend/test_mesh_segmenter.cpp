@@ -207,16 +207,19 @@ TEST(GraphBuilder, MeshUpdateFinishesBeforePostUpdateConsumers) {
       ++mesh_calls;
       if (output.timestamp_ns == 1) {
         ASSERT_NE(info.correspondence, nullptr);
-        EXPECT_EQ(info.correspondence->active.size(), 8u);
+        ASSERT_TRUE(info.correspondence->sources);
+        EXPECT_EQ(info.correspondence->sources->at({0, 0, 0}).size(), 8u);
         EXPECT_EQ(info.offsets.archived_vertices, 0u);
         const auto sample = box({0, 0, 0}, {0, 0, 0});
-        for (const auto& point : sample->points) {
-          const auto index = info.correspondence->find(point);
+        for (size_t i = 0; i < sample->numVertices(); ++i) {
+          const auto& point = sample->pos(i);
+          const auto index = info.correspondence->find(sample->index, i, point);
           ASSERT_TRUE(index);
           EXPECT_EQ(dsg.graph->mesh()->pos(info.offsets.toGlobalVertex(*index)), point);
         }
       } else {
-        EXPECT_TRUE(info.correspondence->active.empty());
+        ASSERT_TRUE(info.correspondence->sources);
+        EXPECT_TRUE(info.correspondence->sources->empty());
         EXPECT_EQ(info.offsets.archived_vertices, 8u);
       }
     }
@@ -261,6 +264,45 @@ TEST(GraphBuilder, MeshUpdateFinishesBeforePostUpdateConsumers) {
     builder.checkCalls();
   }
   GlobalInfo::reset();
+}
+
+TEST(DeltaMeshCompression, SourceMappingsFollowReplacementAndArchivedOffsets) {
+  DeltaMeshCompression compression({});
+  const auto a = box({0, 0, 0}, {0, 0, 0});
+  const auto b = box({1, 0, 0}, {1, 0, 0});
+  const auto check = [&](const kimera_pgmo::MeshDelta& delta, const MeshBlock& source) {
+    const auto& correspondence = compression.correspondence();
+    ASSERT_TRUE(correspondence.sources);
+    ASSERT_EQ(correspondence.sources->at(source.index).size(), source.numVertices());
+    for (size_t i = 0; i < source.numVertices(); ++i) {
+      // Source identity takes precedence over a spatial lookup.
+      const auto index = correspondence.find(source.index, i, {100, 100, 100});
+      ASSERT_TRUE(index);
+      EXPECT_EQ(delta.getVertex(*index).pos, source.pos(i));
+    }
+    EXPECT_FALSE(
+        correspondence.find(source.index, source.numVertices(), source.pos(0)));
+  };
+  auto delta = compression.update(output(1, {a, b}), nullptr);
+  check(*delta, *a);
+  check(*delta, *b);
+  delta = compression.update(output(2, {}, {a->index}), nullptr);
+  ASSERT_EQ(delta->getNumArchivedVertices(), a->numVertices());
+  EXPECT_EQ(compression.correspondence().sources->count(a->index), 0u);
+  check(*delta, *b);
+  delta = compression.update(output(3, {}), nullptr);
+  check(*delta, *b);  // Previous local indices included an archived prefix.
+
+  const auto replacement = block(b->index, {b->pos(7), b->pos(0)});
+  delta = compression.update(output(4, {replacement}), nullptr);
+  check(*delta, *replacement);
+  delta = compression.update(output(5, {a}, {b->index}), nullptr);
+  check(*delta, *a);
+  EXPECT_EQ(compression.correspondence().sources->count(b->index), 0u);
+  delta = compression.update(output(6, {}), nullptr);
+  check(*delta, *a);
+  delta = compression.update(output(7, {block(a->index, {})}), nullptr);
+  EXPECT_TRUE(compression.correspondence().sources->at(a->index).empty());
 }
 
 TEST(MeshSegmenter, BothCompressorsResolveUnchangedSupportAndArchive) {
