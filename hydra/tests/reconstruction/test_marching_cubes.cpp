@@ -35,6 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/reconstruction/marching_cubes.h>
 #include <hydra/reconstruction/mesh_integrator.h>
+#include <hydra/reconstruction/volumetric_map.h>
 
 #include <set>
 
@@ -147,6 +148,136 @@ TEST(MarchingCubes, FaceCounts) {
   }
 
   EXPECT_EQ(counts, (std::set<size_t>{0, 1, 2, 3, 4, 5}));
+}
+
+TEST(MarchingCubes, IndexedFacesPreserveAllConfigurations) {
+  PointMatrix positions;
+  positions << 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1;
+  // Include tiny triangles, coincident intersections at zero, and the midpoint
+  // fallback for small SDF differences.
+  for (const auto& magnitudes : {std::pair{1.0f, 1.0f},
+                                 std::pair{1.0e-8f, 1.0f},
+                                 std::pair{1.0f, 0.0f},
+                                 std::pair{1.0e-8f, 1.0e-8f}}) {
+    for (size_t config = 0; config < 256; ++config) {
+      SCOPED_TRACE(config);
+      SCOPED_TRACE(::testing::PrintToString(magnitudes));
+      SdfMatrix distances;
+      for (size_t corner = 0; corner < distances.size(); ++corner) {
+        distances[corner] =
+            config & (1u << corner) ? -magnitudes.first : magnitudes.second;
+      }
+      MarchingCubes::SdfPoints points;
+      fillPointsFromMatrices(positions, distances, points);
+      Mesh original;
+      Mesh indexed;
+      MarchingCubes::EdgeCache cache(1);
+      const auto expected = MarchingCubes::meshCube(points, original);
+      EXPECT_EQ(MarchingCubes::meshCube(points, indexed, true, &cache), expected);
+      ASSERT_EQ(indexed.numFaces(), original.numFaces());
+      for (size_t i = 0; i < indexed.numFaces(); ++i) {
+        const auto& face = indexed.faces[i];
+        EXPECT_NE(face[0], face[1]);
+        EXPECT_NE(face[0], face[2]);
+        EXPECT_NE(face[1], face[2]);
+        for (size_t j = 0; j < 3; ++j) {
+          EXPECT_TRUE(
+              indexed.pos(face[j]).isApprox(original.pos(original.faces[i][j])));
+        }
+      }
+      std::set<int> edges;
+      size_t entries = 0;
+      while (MarchingCubes::kTriangleTable[config][entries] != -1) {
+        edges.insert(MarchingCubes::kTriangleTable[config][entries]);
+        ++entries;
+      }
+      EXPECT_EQ(indexed.numFaces(), entries / 3);
+      EXPECT_EQ(indexed.numVertices(), edges.size());
+    }
+  }
+}
+
+TEST(MeshIntegrator, SharesInteriorAndBoundaryEdgesWithoutDroppingFaces) {
+  for (int axis = 0; axis < 3; ++axis) {
+    SCOPED_TRACE(axis);
+    VolumetricMap::Config map_config;
+    map_config.voxel_size = 1.0f;
+    map_config.voxels_per_side = 2;
+    map_config.with_semantics = true;
+    map_config.with_tracking = true;
+    VolumetricMap map(map_config);
+    for (int x = -1; x <= 0; ++x) {
+      for (int y = -1; y <= 0; ++y) {
+        for (int z = -1; z <= 0; ++z) {
+          const BlockIndex index(x, y, z);
+          map.allocateBlock(index);
+          auto block = map.getBlock(index);
+          for (size_t i = 0; i < block.tsdf->numVoxels(); ++i) {
+            auto& voxel = block.tsdf->getVoxel(i);
+            voxel.distance = block.tsdf->getVoxelPosition(i)[axis] + 1.0f;
+            voxel.weight = 1.0f;
+            voxel.color = voxel.distance < 0 ? spark_dsg::Color(0, 0, 0)
+                                             : spark_dsg::Color(100, 100, 100);
+            auto& semantic = block.semantic->getVoxel(i);
+            semantic.empty = false;
+            semantic.semantic_label = voxel.distance < 0 ? 1 : 2;
+            auto& tracking = block.tracking->getVoxel(i);
+            tracking.first_observed = voxel.distance < 0 ? 10 : 20;
+            tracking.last_observed = voxel.distance < 0 ? 30 : 40;
+          }
+        }
+      }
+    }
+    MeshIntegrator::Config config;
+    config.integrator_threads = 2;
+    MeshIntegrator integrator(config);
+    const BlockIndex index(-1, -1, -1);
+    integrator.generateMesh(map, false, false);
+    const auto indexed = map.getMeshLayer().getBlock(index);
+    ASSERT_EQ(indexed.numVertices(), 9u);
+    ASSERT_EQ(indexed.numFaces(), 8u);
+    ASSERT_EQ(indexed.face_voxels.size(), 8u);
+    for (size_t i = 0; i < indexed.numVertices(); ++i) {
+      EXPECT_EQ(indexed.labels[i], 2u);  // Equal weights: positive-axis endpoint wins.
+      EXPECT_EQ(indexed.colors[i], spark_dsg::Color(50, 50, 50));
+      EXPECT_EQ(indexed.first_seen_stamps[i], 10u);
+      EXPECT_EQ(indexed.stamps[i], 40u);
+    }
+
+    // Reconstruct the same cells without a cache to compare winding, attributes,
+    // and face provenance independently of the vertex numbering.
+    auto& original = map.getMeshLayer().getBlock(index);
+    original.clear();
+    integrator.meshBlockInterior(index, VoxelIndex::Zero(), map);
+    for (int x = 0; x < 2; ++x) {
+      for (int y = 0; y < 2; ++y) {
+        for (int z = 0; z < 2; ++z) {
+          if (x || y || z) {
+            integrator.meshBlockExterior(index, VoxelIndex(x, y, z), map);
+          }
+        }
+      }
+    }
+    ASSERT_EQ(original.numFaces(), indexed.numFaces());
+    for (size_t i = 0; i < indexed.numFaces(); ++i) {
+      size_t matches = 0;
+      for (size_t j = 0; j < original.numFaces(); ++j) {
+        if (indexed.face_voxels[i] != original.face_voxels[j]) {
+          continue;
+        }
+        bool same = true;
+        for (size_t k = 0; k < 3; ++k) {
+          same &= indexed.pos(indexed.faces[i][k])
+                      .isApprox(original.pos(original.faces[j][k]));
+        }
+        matches += same;
+      }
+      EXPECT_EQ(matches, 1u);
+    }
+    integrator.generateMesh(map, false, false);
+    EXPECT_EQ(original.faces, indexed.faces);
+    EXPECT_EQ(original.numVertices(), indexed.numVertices());
+  }
 }
 
 }  // namespace hydra

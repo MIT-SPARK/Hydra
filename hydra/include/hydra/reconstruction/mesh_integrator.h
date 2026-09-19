@@ -35,6 +35,7 @@
 #pragma once
 
 #include "hydra/reconstruction/index_getter.h"
+#include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
@@ -66,21 +67,19 @@ class MeshIntegrator {
                       const BlockIndices& blocks,
                       int verbosity) const;
 
-  void launchThreads(const BlockIndices& blocks,
-                     bool interior_pass,
-                     VolumetricMap& map) const;
+  void launchThreads(const BlockIndices& blocks, VolumetricMap& map) const;
 
-  void processInterior(VolumetricMap* map, BlockIndexGetter* index_getter) const;
-
-  void processExterior(VolumetricMap* map, BlockIndexGetter* index_getter) const;
+  void processBlocks(VolumetricMap* map, BlockIndexGetter* index_getter) const;
 
   virtual void meshBlockInterior(const BlockIndex& block_index,
                                  const VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
+                                 VolumetricMap& map,
+                                 MarchingCubes::EdgeCache* cache = nullptr) const;
 
   virtual void meshBlockExterior(const BlockIndex& block_index,
                                  const VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
+                                 VolumetricMap& map,
+                                 MarchingCubes::EdgeCache* cache = nullptr) const;
 
   static BlockIndex getNeighborIndex(const BlockIndex& block_idx,
                                      int voxels_per_side,

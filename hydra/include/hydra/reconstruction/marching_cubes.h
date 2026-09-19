@@ -38,7 +38,9 @@
 
 #include <Eigen/Dense>
 #include <array>
+#include <limits>
 #include <optional>
+#include <vector>
 
 #include "hydra/reconstruction/voxel_types.h"
 
@@ -60,17 +62,41 @@ class MarchingCubes {
   using EdgePoints = std::array<SdfPoint, 12>;
   using SdfPoints = std::array<SdfPoint, 8>;
 
+  // One index per lattice edge, including the positive boundary halo. Use only
+  // with a single output mesh and discard when that mesh is cleared.
+  class EdgeCache {
+   public:
+    explicit EdgeCache(size_t cubes_per_side);
+    size_t& index(const Eigen::Vector3i& cube, int edge);
+
+    static constexpr size_t kInvalid = std::numeric_limits<size_t>::max();
+
+   private:
+    size_t side_;
+    std::array<std::vector<size_t>, 3> indices_;
+  };
+
   static void interpolateEdges(const SdfPoints& points,
                                EdgePoints& edge_points,
                                float min_sdf_difference = 1.0e-6);
 
-  // Append the cube surface and return the number of faces added.
+  // Append every table triangle and return the number of faces added. With a
+  // cache, cube is the block-local integer origin; different lattice edges stay
+  // distinct even when their intersections coincide. Without a cache, append
+  // independent vertices for each face.
   static size_t meshCube(const SdfPoints& points,
                          spark_dsg::Mesh& mesh,
-                         bool compute_normals = true);
+                         bool compute_normals = true,
+                         EdgeCache* cache = nullptr,
+                         const Eigen::Vector3i& cube = Eigen::Vector3i::Zero());
 
   static const int kTriangleTable[256][16];
   static const int kEdgeIndexPairs[12][2];
+
+ private:
+  static SdfPoint interpolateEdge(const SdfPoints& points,
+                                  int edge,
+                                  float min_sdf_difference);
 };
 
 }  // namespace hydra

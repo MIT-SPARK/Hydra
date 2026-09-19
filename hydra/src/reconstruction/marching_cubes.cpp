@@ -44,6 +44,36 @@ namespace hydra {
 using spark_dsg::Color;
 using spark_dsg::Mesh;
 
+MarchingCubes::EdgeCache::EdgeCache(size_t cubes_per_side) : side_(cubes_per_side) {
+  CHECK_GT(side_, 0u);
+  for (auto& indices : indices_) {
+    indices.resize(side_ * (side_ + 1) * (side_ + 1), kInvalid);
+  }
+}
+
+size_t& MarchingCubes::EdgeCache::index(const Eigen::Vector3i& cube, int edge) {
+  // Lower endpoint and direction for each edge in kEdgeIndexPairs.
+  static constexpr int offsets[12][4] = {{0, 0, 0, 0},
+                                         {1, 0, 0, 1},
+                                         {0, 1, 0, 0},
+                                         {0, 0, 0, 1},
+                                         {0, 0, 1, 0},
+                                         {1, 0, 1, 1},
+                                         {0, 1, 1, 0},
+                                         {0, 0, 1, 1},
+                                         {0, 0, 0, 2},
+                                         {1, 0, 0, 2},
+                                         {1, 1, 0, 2},
+                                         {0, 1, 0, 2}};
+  const auto axis = offsets[edge][3];
+  const auto a = (axis + 1) % 3;
+  const auto b = (axis + 2) % 3;
+  const size_t along = cube[axis] + offsets[edge][axis];
+  const size_t across = cube[a] + offsets[edge][a];
+  const size_t above = cube[b] + offsets[edge][b];
+  return indices_[axis].at(along + side_ * (across + (side_ + 1) * above));
+}
+
 std::ostream& operator<<(std::ostream& out, const SdfPoint& point) {
   out << "<";
   out << "d=" << point.distance;
@@ -94,35 +124,45 @@ void MarchingCubes::interpolateEdges(const SdfPoints& points,
       continue;  // zero-crossing must be present
     }
 
-    const auto& point0 = points[edge0];
-    const auto& point1 = points[edge1];
+    edge_point = interpolateEdge(points, i, min_sdf_difference);
+  }
+}
 
-    // TODO(nathan): this rarely triggers / should never tigger
-    // this case corresponds to a plane nearly parallel to the face containing the two
-    // corners intersecting at some point through the edge between the two corners.
-    const float sdf_diff = sdf0 - sdf1;
-    if (std::abs(sdf_diff) <= min_sdf_difference) {
-      // force interpolation to occur exactly in the middle
-      edge_point.pos = 0.5f * (point0.pos + point1.pos);
-      edge_point.color = interpColor(point0, point1, 0.5);
-      edge_point.label = interpLabel(point0, point1, 0.5);
+SdfPoint MarchingCubes::interpolateEdge(const SdfPoints& points,
+                                        int edge,
+                                        float min_sdf_difference) {
+  const auto& point0 = points[kEdgeIndexPairs[edge][0]];
+  const auto& point1 = points[kEdgeIndexPairs[edge][1]];
+  const auto sdf0 = point0.distance;
+  const auto sdf1 = point1.distance;
+  SdfPoint edge_point{};
 
-      VLOG(15) << "- t=n/a" << ", v0=" << point0.pos.transpose()
-               << ", v1=" << point1.pos.transpose()
-               << ", coord: " << edge_point.pos.transpose();
-      continue;
-    }
+  // TODO(nathan): this rarely triggers / should never tigger
+  // this case corresponds to a plane nearly parallel to the face containing the two
+  // corners intersecting at some point through the edge between the two corners.
+  const float sdf_diff = sdf0 - sdf1;
+  if (std::abs(sdf_diff) <= min_sdf_difference) {
+    // force interpolation to occur exactly in the middle
+    edge_point.pos = 0.5f * (point0.pos + point1.pos);
+    edge_point.color = interpColor(point0, point1, 0.5);
+    edge_point.label = interpLabel(point0, point1, 0.5);
 
-    // t \in [-1, 1] (as 0 \in [sdf0, sdf1])
-    const float t = sdf0 / sdf_diff;
-    edge_point.pos = point0.pos + t * (point1.pos - point0.pos);
-    edge_point.color = interpColor(point0, point1, t);
-    edge_point.label = interpLabel(point0, point1, t);
-
-    VLOG(15) << "- t=" << t << ", v0=" << point0.pos.transpose()
+    VLOG(15) << "- t=n/a" << ", v0=" << point0.pos.transpose()
              << ", v1=" << point1.pos.transpose()
              << ", coord: " << edge_point.pos.transpose();
+    return edge_point;
   }
+
+  // t \in [-1, 1] (as 0 \in [sdf0, sdf1])
+  const float t = sdf0 / sdf_diff;
+  edge_point.pos = point0.pos + t * (point1.pos - point0.pos);
+  edge_point.color = interpColor(point0, point1, t);
+  edge_point.label = interpLabel(point0, point1, t);
+
+  VLOG(15) << "- t=" << t << ", v0=" << point0.pos.transpose()
+           << ", v1=" << point1.pos.transpose()
+           << ", coord: " << edge_point.pos.transpose();
+  return edge_point;
 }
 
 inline int calculateVertexConfig(const MarchingCubes::SdfPoints& points) {
@@ -168,7 +208,9 @@ inline void addStamps(Mesh& mesh,
 
 size_t MarchingCubes::meshCube(const SdfPoints& points,
                                Mesh& mesh,
-                               bool compute_normals) {
+                               bool compute_normals,
+                               EdgeCache* cache,
+                               const Eigen::Vector3i& cube) {
   if (VLOG_IS_ON(15)) {
     VLOG(15) << "[mesh] points: ";
     for (size_t i = 0; i < 8; ++i) {
@@ -183,44 +225,38 @@ size_t MarchingCubes::meshCube(const SdfPoints& points,
     return 0;  // no surface crossing in sdf cube
   }
 
-  // TODO(nathan) augment edge points
-  EdgePoints edge_points;
-  interpolateEdges(points, edge_points);
-
   const int* table_row = MarchingCubes::kTriangleTable[index];
 
   int table_col = 0;
-  uint32_t next_index = mesh.numVertices();
   while (table_row[table_col] != -1) {
-    const auto& v1 = edge_points[table_row[table_col + 2]];
-    const auto& v2 = edge_points[table_row[table_col + 1]];
-    const auto& v3 = edge_points[table_row[table_col]];
-    mesh.points.emplace_back(v1.pos);
-    mesh.points.emplace_back(v2.pos);
-    mesh.points.emplace_back(v3.pos);
-    mesh.colors.emplace_back(v1.color);
-    mesh.colors.emplace_back(v2.color);
-    mesh.colors.emplace_back(v3.color);
-    if (mesh.has_labels) {
-      mesh.labels.push_back(v1.label.value_or(std::numeric_limits<uint32_t>::max()));
-      mesh.labels.push_back(v2.label.value_or(std::numeric_limits<uint32_t>::max()));
-      mesh.labels.push_back(v3.label.value_or(std::numeric_limits<uint32_t>::max()));
-    }
-    if (mesh.has_timestamps && mesh.has_first_seen_stamps) {
-      // TODO(nathan) this is kinda janky and could use the point interpolation as well,
-      // but that's more than I want to touch at the moment
-      addStamps(mesh, table_row[table_col + 2], points);
-      addStamps(mesh, table_row[table_col + 1], points);
-      addStamps(mesh, table_row[table_col], points);
+    Mesh::Face face;
+    for (int corner = 0; corner < 3; ++corner) {
+      const auto edge = table_row[table_col + 2 - corner];
+      auto uncached = EdgeCache::kInvalid;
+      auto& vertex = cache ? cache->index(cube, edge) : uncached;
+      if (vertex == EdgeCache::kInvalid) {
+        const auto point = interpolateEdge(points, edge, 1.0e-6f);
+        vertex = mesh.numVertices();
+        mesh.points.push_back(point.pos);
+        mesh.colors.push_back(point.color);
+        if (mesh.has_labels) {
+          mesh.labels.push_back(
+              point.label.value_or(std::numeric_limits<uint32_t>::max()));
+        }
+        if (mesh.has_timestamps && mesh.has_first_seen_stamps) {
+          addStamps(mesh, edge, points);
+        }
+      }
+      face[corner] = vertex;
     }
 
-    mesh.faces.push_back({next_index, next_index + 1, next_index + 2});
+    // Distinct lattice edges retain distinct indices, even at coincident positions.
+    mesh.faces.push_back(face);
     if (compute_normals) {
       // NOTE(lschmid): Spark DSG meshes currently don't have normals, disabled for now.
       // computeNormal(mesh.points, mesh.faces.back());
     }
 
-    next_index += 3;
     table_col += 3;
   }
 
@@ -489,15 +525,16 @@ const int MarchingCubes::kTriangleTable[256][16] = {
     {0, 3, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};
 
-// Lookup table from the 12 cube edge indices to their corresponding corner indices.
+// Lookup table from cube edges to corners, ordered along the positive lattice axis
+// so interpolation and midpoint label ties agree between neighboring cubes.
 const int MarchingCubes::kEdgeIndexPairs[12][2] = {{0, 1},
                                                    {1, 2},
-                                                   {2, 3},
-                                                   {3, 0},
+                                                   {3, 2},
+                                                   {0, 3},
                                                    {4, 5},
                                                    {5, 6},
-                                                   {6, 7},
-                                                   {7, 4},
+                                                   {7, 6},
+                                                   {4, 7},
                                                    {0, 4},
                                                    {1, 5},
                                                    {2, 6},
