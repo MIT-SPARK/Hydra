@@ -173,7 +173,7 @@ TEST(MarchingCubes, IndexedFacesPreserveAllConfigurations) {
       Mesh indexed;
       MarchingCubes::EdgeCache cache(1);
       const auto expected = MarchingCubes::meshCube(points, original);
-      EXPECT_EQ(MarchingCubes::meshCube(points, indexed, true, &cache), expected);
+      EXPECT_EQ(MarchingCubes::meshCube(points, indexed, &cache), expected);
       ASSERT_EQ(indexed.numFaces(), original.numFaces());
       for (size_t i = 0; i < indexed.numFaces(); ++i) {
         const auto& face = indexed.faces[i];

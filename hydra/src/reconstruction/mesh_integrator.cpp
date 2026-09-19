@@ -71,8 +71,10 @@ void appendMeshCell(const MarchingCubes::SdfPoints& points,
                     const VoxelIndex& idx,
                     size_t voxels_per_side,
                     MeshBlock& mesh,
-                    MarchingCubes::EdgeCache* cache) {
-  const auto new_faces = MarchingCubes::meshCube(points, mesh, true, cache, idx);
+                    MarchingCubes::EdgeCache* cache,
+                    bool compute_normals) {
+  const auto new_faces =
+      MarchingCubes::meshCube(points, mesh, cache, idx, compute_normals);
   if (!new_faces) {
     return;
   }
@@ -97,6 +99,7 @@ void declare_config(MeshIntegrator::Config& config) {
   using namespace config;
   name("MeshIntegratorConfig");
   field(config.min_weight, "min_weight");
+  field(config.compute_normals, "compute_normals");
   field<ThreadNumConversion>(config.integrator_threads, "integrator_threads");
   check(config.min_weight, GT, 0.0f, "min_weight");
   check(config.integrator_threads, GT, 0, "integrator_threads");
@@ -267,7 +270,13 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
     }
   }
 
-  appendMeshCell(points, block_index, index, map.config.voxels_per_side, *mesh, cache);
+  appendMeshCell(points,
+                 block_index,
+                 index,
+                 map.config.voxels_per_side,
+                 *mesh,
+                 cache,
+                 config.compute_normals);
 }
 
 BlockIndex MeshIntegrator::getNeighborIndex(const BlockIndex& block_idx,
@@ -352,7 +361,13 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
     }
   }
 
-  appendMeshCell(points, block_index, index, map.config.voxels_per_side, *mesh, cache);
+  appendMeshCell(points,
+                 block_index,
+                 index,
+                 map.config.voxels_per_side,
+                 *mesh,
+                 cache,
+                 config.compute_normals);
 }
 
 }  // namespace hydra

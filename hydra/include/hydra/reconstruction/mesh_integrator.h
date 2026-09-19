@@ -51,6 +51,8 @@ class MeshIntegrator {
 
     float min_weight = 1.0e-4f;
     int integrator_threads;
+    //! Request normals; currently unsupported by spark_dsg::Mesh.
+    bool compute_normals = true;
   } const config;
 
   explicit MeshIntegrator(const Config& config);

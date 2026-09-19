@@ -52,7 +52,11 @@ MarchingCubes::EdgeCache::EdgeCache(size_t cubes_per_side) : side_(cubes_per_sid
 }
 
 size_t& MarchingCubes::EdgeCache::index(const Eigen::Vector3i& cube, int edge) {
-  // Lower endpoint and direction for each edge in kEdgeIndexPairs.
+  // Each row corresponds to kEdgeIndexPairs[edge] and stores {dx, dy, dz, axis}.
+  // The first three entries locate the edge's lower endpoint relative to the
+  // cube origin; axis is 0, 1, or 2 for an edge along +X, +Y, or +Z. Adding cube
+  // gives a block-local lattice coordinate, so neighboring cubes referencing
+  // the same edge select the same slot, regardless of their local edge numbers.
   static constexpr int offsets[12][4] = {{0, 0, 0, 0},
                                          {1, 0, 0, 1},
                                          {0, 1, 0, 0},
@@ -66,11 +70,19 @@ size_t& MarchingCubes::EdgeCache::index(const Eigen::Vector3i& cube, int edge) {
                                          {1, 1, 0, 2},
                                          {0, 1, 0, 2}};
   const auto axis = offsets[edge][3];
+  // Each direction has its own array. Rotate coordinates to (along, across,
+  // above): (x,y,z) for X edges, (y,z,x) for Y edges, and (z,x,y) for Z edges.
+  // With n = side_, lower endpoints range over [0,n) along the edge and [0,n]
+  // across both perpendicular axes. The latter include the positive halo used
+  // by boundary cubes, giving n*(n+1)*(n+1) slots per direction.
   const auto a = (axis + 1) % 3;
   const auto b = (axis + 2) % 3;
   const size_t along = cube[axis] + offsets[edge][axis];
   const size_t across = cube[a] + offsets[edge][a];
   const size_t above = cube[b] + offsets[edge][b];
+  // Flatten with along varying fastest: strides are 1, n, and n*(n+1).
+  // Slots contain mesh vertex indices, not positions; coincident intersections
+  // on different lattice edges remain distinct. kInvalid means not yet emitted.
   return indices_[axis].at(along + side_ * (across + (side_ + 1) * above));
 }
 
@@ -208,9 +220,9 @@ inline void addStamps(Mesh& mesh,
 
 size_t MarchingCubes::meshCube(const SdfPoints& points,
                                Mesh& mesh,
-                               bool compute_normals,
                                EdgeCache* cache,
-                               const Eigen::Vector3i& cube) {
+                               const Eigen::Vector3i& cube,
+                               bool compute_normals) {
   if (VLOG_IS_ON(15)) {
     VLOG(15) << "[mesh] points: ";
     for (size_t i = 0; i < 8; ++i) {

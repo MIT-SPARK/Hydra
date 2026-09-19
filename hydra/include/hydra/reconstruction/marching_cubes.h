@@ -67,8 +67,10 @@ class MarchingCubes {
   class EdgeCache {
    public:
     explicit EdgeCache(size_t cubes_per_side);
+    // Returns the slot for this lattice edge; assign its mesh vertex index on a miss.
     size_t& index(const Eigen::Vector3i& cube, int edge);
 
+    // Sentinel retained here for compact storage and a single lookup on insertion.
     static constexpr size_t kInvalid = std::numeric_limits<size_t>::max();
 
    private:
@@ -83,12 +85,13 @@ class MarchingCubes {
   // Append every table triangle and return the number of faces added. With a
   // cache, cube is the block-local integer origin; different lattice edges stay
   // distinct even when their intersections coincide. Without a cache, append
-  // independent vertices for each face.
+  // independent vertices for each face. Normal computation is currently disabled
+  // because spark_dsg::Mesh does not store normals.
   static size_t meshCube(const SdfPoints& points,
                          spark_dsg::Mesh& mesh,
-                         bool compute_normals = true,
                          EdgeCache* cache = nullptr,
-                         const Eigen::Vector3i& cube = Eigen::Vector3i::Zero());
+                         const Eigen::Vector3i& cube = Eigen::Vector3i::Zero(),
+                         bool compute_normals = true);
 
   static const int kTriangleTable[256][16];
   static const int kEdgeIndexPairs[12][2];
