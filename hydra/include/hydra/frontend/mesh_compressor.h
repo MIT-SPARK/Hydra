@@ -44,10 +44,13 @@ namespace hydra {
 
 struct ActiveWindowOutput;
 struct VolumetricWindow;
+struct MeshCorrespondence;
 
 struct MeshCompressor {
   using MeshDeltaPtr = std::shared_ptr<kimera_pgmo::MeshDelta>;
   virtual ~MeshCompressor() = default;
+
+  virtual const MeshCorrespondence& correspondence() const = 0;
 
   virtual MeshDeltaPtr update(const ActiveWindowOutput& input,
                               const VolumetricWindow* window) = 0;

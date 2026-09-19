@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "hydra/frontend/mesh_compressor.h"
+#include "hydra/frontend/mesh_update_info.h"
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
@@ -73,6 +74,8 @@ class MeshCompression : public MeshCompressor {
 
   MeshDeltaPtr update(const ActiveWindowOutput& input,
                       const VolumetricWindow* window) override;
+
+  const MeshCorrespondence& correspondence() const override { return correspondence_; }
 
   const float min_clearance;
   const float inv_resolution;
@@ -120,6 +123,7 @@ class MeshCompression : public MeshCompressor {
                                         uint64_t timestamp_ns,
                                         const ArchivePredicate& archive);
 
+  MeshCorrespondence correspondence_;
   std::vector<Entry> vertices_;
   std::vector<FaceEntry> faces_;
   kimera_pgmo::MeshDelta::TrackingInfo tracking_;

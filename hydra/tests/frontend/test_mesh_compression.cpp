@@ -88,7 +88,8 @@ class MeshCompressionTest : public testing::Test {
  protected:
   void update(const VolumetricMap& map,
               const MeshCompression::ArchivePredicate& archive = {}) {
-    delta = compression.update(map, ++stamp, archive);
+    ++stamp;
+    delta = compression.update(map, stamp, archive);
     delta->updateMesh(mesh, offsets);
     checkMesh(mesh);
   }
@@ -376,6 +377,18 @@ TEST_F(MeshCompressionTest, FrozenEndpoints) {
     ASSERT_EQ(mesh.numFaces(), 2u);
     EXPECT_EQ(mesh.faces[0], face);
     EXPECT_EQ(mesh.points[face[2]], endpoint);
+    const auto& correspondence = compression.correspondence();
+    const auto active = correspondence.find(mesh_block.points.front());
+    ASSERT_TRUE(active);
+    EXPECT_NE(offsets.toGlobalVertex(*active), face[2]);
+    if (face[2] >= offsets.prev_archived_vertices) {
+      const auto& candidates =
+          correspondence.retained.at(correspondence.grid.toIndex(endpoint));
+      EXPECT_NE(
+          std::find(
+              candidates.begin(), candidates.end(), offsets.toLocalVertex(face[2])),
+          candidates.end());
+    }
   }
 
   auto cleared = makeMap();

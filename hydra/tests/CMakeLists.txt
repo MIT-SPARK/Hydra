@@ -29,6 +29,7 @@ add_executable(
   frontend/test_mesh_compression.cpp
   frontend/test_mesh_segmenter.cpp
   frontend/test_view_selector.cpp
+  frontend/test_mesh_clustering.cpp
   input/test_camera.cpp
   input/test_input_data_io.cpp
   input/test_lidar.cpp

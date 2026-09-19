@@ -37,6 +37,7 @@
 #include <kimera_pgmo/compression/delta_compression.h>
 
 #include "hydra/frontend/mesh_compressor.h"
+#include "hydra/frontend/mesh_update_info.h"
 
 namespace hydra {
 
@@ -51,8 +52,18 @@ class DeltaMeshCompression : public MeshCompressor {
   MeshDeltaPtr update(const ActiveWindowOutput& input,
                       const VolumetricWindow* window) override;
 
+  const MeshCorrespondence& correspondence() const override { return correspondence_; }
+
  private:
-  kimera_pgmo::DeltaCompression compression_;
+  class Compression : public kimera_pgmo::DeltaCompression {
+   public:
+    using kimera_pgmo::DeltaCompression::DeltaCompression;
+    void fillCorrespondence(const kimera_pgmo::MeshDelta& delta,
+                            MeshCorrespondence& result) const;
+  };
+
+  Compression compression_;
+  MeshCorrespondence correspondence_;
 };
 
 void declare_config(DeltaMeshCompression::Config& config);
