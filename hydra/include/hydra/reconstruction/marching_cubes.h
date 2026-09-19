@@ -38,7 +38,9 @@
 
 #include <Eigen/Dense>
 #include <array>
+#include <limits>
 #include <optional>
+#include <vector>
 
 #include "hydra/reconstruction/voxel_types.h"
 
@@ -60,17 +62,46 @@ class MarchingCubes {
   using EdgePoints = std::array<SdfPoint, 12>;
   using SdfPoints = std::array<SdfPoint, 8>;
 
+  class EdgeCache {
+   public:
+    //! Construct a mapping between zero-crossings and vertex indices for a voxel block
+    explicit EdgeCache(size_t cubes_per_side);
+    //! Returns the vertex index for the zero crossing (or kInvalid if it doesn't exist)
+    size_t& index(const Eigen::Vector3i& cube, int edge);
+
+    static constexpr size_t kInvalid = std::numeric_limits<size_t>::max();
+
+   private:
+    size_t side_;
+    std::array<std::vector<size_t>, 3> indices_;
+  };
+
   static void interpolateEdges(const SdfPoints& points,
                                EdgePoints& edge_points,
                                float min_sdf_difference = 1.0e-6);
 
-  // Append the cube surface and return the number of faces added.
+  /**
+   * @brief Generate faces and vertices for a cube of TSDF values
+   * @param points TSDF voxel values
+   * @param mesh Output mesh
+   * @param cube_index Lower corner voxel index for TSDF cube
+   * @param cache Optional vertex index cache
+   * @param compute_normals Compute normals for the cube (currently no-op)
+   * @returns Number of faces added for the cube
+   */
   static size_t meshCube(const SdfPoints& points,
                          spark_dsg::Mesh& mesh,
+                         const VoxelIndex& cube_index,
+                         EdgeCache* cache = nullptr,
                          bool compute_normals = true);
 
   static const int kTriangleTable[256][16];
   static const int kEdgeIndexPairs[12][2];
+
+ private:
+  static SdfPoint interpolateEdge(const SdfPoints& points,
+                                  int edge,
+                                  float min_sdf_difference);
 };
 
 }  // namespace hydra

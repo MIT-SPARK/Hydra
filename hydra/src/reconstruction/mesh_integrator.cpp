@@ -70,8 +70,10 @@ void appendMeshCell(const MarchingCubes::SdfPoints& points,
                     const BlockIndex& block_idx,
                     const VoxelIndex& idx,
                     size_t voxels_per_side,
-                    MeshBlock& mesh) {
-  const auto new_faces = MarchingCubes::meshCube(points, mesh);
+                    MeshBlock& mesh,
+                    MarchingCubes::EdgeCache* cache,
+                    bool add_normals) {
+  const auto new_faces = MarchingCubes::meshCube(points, mesh, idx, cache, add_normals);
   if (!new_faces) {
     return;
   }
@@ -96,6 +98,7 @@ void declare_config(MeshIntegrator::Config& config) {
   using namespace config;
   name("MeshIntegratorConfig");
   field(config.min_weight, "min_weight");
+  field(config.compute_normals, "compute_normals");
   field<ThreadNumConversion>(config.integrator_threads, "integrator_threads");
   check(config.min_weight, GT, 0.0f, "min_weight");
   check(config.integrator_threads, GT, 0, "integrator_threads");
@@ -148,9 +151,7 @@ void MeshIntegrator::generateMesh(VolumetricMap& map,
 
   allocateBlocks(blocks, map);
 
-  // interior then exterior, but order shouldn't matter too much...
-  launchThreads(blocks, true, map);
-  launchThreads(blocks, false, map);
+  launchThreads(blocks, map);
   showUpdateInfo(map, blocks, 5);
 
   for (const auto& block_idx : blocks) {
@@ -167,16 +168,11 @@ void MeshIntegrator::generateMesh(VolumetricMap& map,
 }
 
 void MeshIntegrator::launchThreads(const BlockIndices& blocks,
-                                   bool interior_pass,
                                    VolumetricMap& map) const {
   BlockIndexGetter index_getter(blocks);
   std::list<std::thread> threads;
   for (int i = 0; i < config.integrator_threads; ++i) {
-    if (interior_pass) {
-      threads.emplace_back(&MeshIntegrator::processInterior, this, &map, &index_getter);
-    } else {
-      threads.emplace_back(&MeshIntegrator::processExterior, this, &map, &index_getter);
-    }
+    threads.emplace_back(&MeshIntegrator::processBlocks, this, &map, &index_getter);
   }
 
   for (std::thread& thread : threads) {
@@ -184,11 +180,12 @@ void MeshIntegrator::launchThreads(const BlockIndices& blocks,
   }
 }
 
-void MeshIntegrator::processInterior(VolumetricMap* map,
-                                     BlockIndexGetter* index_getter) const {
+void MeshIntegrator::processBlocks(VolumetricMap* map,
+                                   BlockIndexGetter* index_getter) const {
   BlockIndex block_index;
 
   while (index_getter->getNextIndex(block_index)) {
+    MarchingCubes::EdgeCache cache(map->config.voxels_per_side);
     VLOG(10) << "Extracting interior for block: " << showIndex(block_index);
 
     VoxelIndex v_idx;
@@ -196,27 +193,19 @@ void MeshIntegrator::processInterior(VolumetricMap* map,
     for (v_idx.x() = 0; v_idx.x() < limit; ++v_idx.x()) {
       for (v_idx.y() = 0; v_idx.y() < limit; ++v_idx.y()) {
         for (v_idx.z() = 0; v_idx.z() < limit; ++v_idx.z()) {
-          meshBlockInterior(block_index, v_idx, *map);
+          meshBlockInterior(block_index, v_idx, *map, &cache);
         }
       }
     }
-  }
-}
-
-void MeshIntegrator::processExterior(VolumetricMap* map,
-                                     BlockIndexGetter* index_getter) const {
-  BlockIndex block_index;
-  while (index_getter->getNextIndex(block_index)) {
     VLOG(10) << "Extracting exterior for block: " << showIndex(block_index);
     const auto vps = static_cast<int>(map->config.voxels_per_side);
-    VoxelIndex v_idx;
 
     // Max X plane
     // takes care of edge (x_max, y_max, z), takes care of edge (x_max, y, z_max).
     v_idx.x() = vps - 1;
     for (v_idx.z() = 0; v_idx.z() < vps; v_idx.z()++) {
       for (v_idx.y() = 0; v_idx.y() < vps; v_idx.y()++) {
-        meshBlockExterior(block_index, v_idx, *map);
+        meshBlockExterior(block_index, v_idx, *map, &cache);
       }
     }
 
@@ -225,7 +214,7 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
     v_idx.y() = vps - 1;
     for (v_idx.z() = 0; v_idx.z() < vps; v_idx.z()++) {
       for (v_idx.x() = 0; v_idx.x() < vps - 1; v_idx.x()++) {
-        meshBlockExterior(block_index, v_idx, *map);
+        meshBlockExterior(block_index, v_idx, *map, &cache);
       }
     }
 
@@ -233,7 +222,7 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
     v_idx.z() = vps - 1;
     for (v_idx.y() = 0; v_idx.y() < vps - 1; v_idx.y()++) {
       for (v_idx.x() = 0; v_idx.x() < vps - 1; v_idx.x()++) {
-        meshBlockExterior(block_index, v_idx, *map);
+        meshBlockExterior(block_index, v_idx, *map, &cache);
       }
     }
   }
@@ -241,7 +230,8 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
 
 void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
-                                       VolumetricMap& map) const {
+                                       VolumetricMap& map,
+                                       MarchingCubes::EdgeCache* cache) const {
   VLOG(15) << "[mesh] processing interior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
@@ -279,7 +269,13 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
     }
   }
 
-  appendMeshCell(points, block_index, index, map.config.voxels_per_side, *mesh);
+  appendMeshCell(points,
+                 block_index,
+                 index,
+                 map.config.voxels_per_side,
+                 *mesh,
+                 cache,
+                 config.compute_normals);
 }
 
 BlockIndex MeshIntegrator::getNeighborIndex(const BlockIndex& block_idx,
@@ -301,7 +297,8 @@ BlockIndex MeshIntegrator::getNeighborIndex(const BlockIndex& block_idx,
 
 void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
-                                       VolumetricMap& map) const {
+                                       VolumetricMap& map,
+                                       MarchingCubes::EdgeCache* cache) const {
   VLOG(15) << "[mesh] processing exterior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
@@ -363,7 +360,13 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
     }
   }
 
-  appendMeshCell(points, block_index, index, map.config.voxels_per_side, *mesh);
+  appendMeshCell(points,
+                 block_index,
+                 index,
+                 map.config.voxels_per_side,
+                 *mesh,
+                 cache,
+                 config.compute_normals);
 }
 
 }  // namespace hydra

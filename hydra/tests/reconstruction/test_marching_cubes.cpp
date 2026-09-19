@@ -35,6 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/reconstruction/marching_cubes.h>
 #include <hydra/reconstruction/mesh_integrator.h>
+#include <hydra/reconstruction/volumetric_map.h>
 
 #include <set>
 
@@ -105,7 +106,7 @@ TEST(MarchingCubes, EdgeInterpolation) {
       << "8: " << result8.transpose();
 }
 
-TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
+TEST(MarchingCubes, NearestVertexIndexCorrect) {
   // add zero-crossings at just the bottom right? corner
   SdfMatrix sdf_values{-1.0, 1.0, 10.0, 2.0, 3.0, 10.0, 10.0, 10.0};
 
@@ -120,7 +121,7 @@ TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
   fillPointsFromMatrices(vertex_coordinates, sdf_values, sdf_points);
 
   Mesh mesh;
-  MarchingCubes::meshCube(sdf_points, mesh);
+  MarchingCubes::meshCube(sdf_points, mesh, VoxelIndex::Zero());
   EXPECT_EQ(3u, mesh.numVertices());
 }
 
@@ -141,12 +142,66 @@ TEST(MarchingCubes, FaceCounts) {
     MarchingCubes::SdfPoints points;
     fillPointsFromMatrices(positions, distances, points);
     const auto previous_faces = mesh.numFaces();
-    const auto added = MarchingCubes::meshCube(points, mesh);
+    const auto added = MarchingCubes::meshCube(points, mesh, VoxelIndex::Zero());
     EXPECT_EQ(added, mesh.numFaces() - previous_faces);
     counts.insert(added);
   }
 
   EXPECT_EQ(counts, (std::set<size_t>{0, 1, 2, 3, 4, 5}));
+}
+
+TEST(MarchingCubes, IndexedFacesPreserveAllConfigurations) {
+  PointMatrix positions;
+  positions << 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1;
+  // Include tiny triangles, coincident intersections at zero, and the midpoint
+  // fallback for small SDF differences.
+  std::vector<std::pair<float, float>> test_values{std::pair{1.0f, 1.0f},
+                                                   std::pair{1.0e-8f, 1.0f},
+                                                   std::pair{1.0f, 0.0f},
+                                                   std::pair{1.0e-8f, 1.0e-8f}};
+  for (const auto& magnitudes : test_values) {
+    for (size_t config = 0; config < 256; ++config) {
+      SCOPED_TRACE(config);
+      SCOPED_TRACE(::testing::PrintToString(magnitudes));
+      SdfMatrix distances;
+      for (size_t corner = 0; corner < distances.size(); ++corner) {
+        distances[corner] =
+            config & (1u << corner) ? -magnitudes.first : magnitudes.second;
+      }
+
+      MarchingCubes::SdfPoints points;
+      fillPointsFromMatrices(positions, distances, points);
+      Mesh original;
+      Mesh indexed;
+      MarchingCubes::EdgeCache cache(1);
+      const auto expected =
+          MarchingCubes::meshCube(points, original, VoxelIndex::Zero());
+      EXPECT_EQ(MarchingCubes::meshCube(points, indexed, VoxelIndex::Zero(), &cache),
+                expected);
+      ASSERT_EQ(indexed.numFaces(), original.numFaces());
+
+      for (size_t i = 0; i < indexed.numFaces(); ++i) {
+        const auto& face = indexed.faces[i];
+        EXPECT_NE(face[0], face[1]);
+        EXPECT_NE(face[0], face[2]);
+        EXPECT_NE(face[1], face[2]);
+        for (size_t j = 0; j < 3; ++j) {
+          EXPECT_TRUE(
+              indexed.pos(face[j]).isApprox(original.pos(original.faces[i][j])));
+        }
+      }
+
+      std::set<int> edges;
+      size_t entries = 0;
+      while (MarchingCubes::kTriangleTable[config][entries] != -1) {
+        edges.insert(MarchingCubes::kTriangleTable[config][entries]);
+        ++entries;
+      }
+
+      EXPECT_EQ(indexed.numFaces(), entries / 3);
+      EXPECT_EQ(indexed.numVertices(), edges.size());
+    }
+  }
 }
 
 }  // namespace hydra
