@@ -62,15 +62,13 @@ class MarchingCubes {
   using EdgePoints = std::array<SdfPoint, 12>;
   using SdfPoints = std::array<SdfPoint, 8>;
 
-  // One index per lattice edge, including the positive boundary halo. Use only
-  // with a single output mesh and discard when that mesh is cleared.
   class EdgeCache {
    public:
+    //! Construct a mapping between zero-crossings and vertex indices for a voxel block
     explicit EdgeCache(size_t cubes_per_side);
-    // Returns the slot for this lattice edge; assign its mesh vertex index on a miss.
+    //! Returns the vertex index for the zero crossing (or kInvalid if it doesn't exist)
     size_t& index(const Eigen::Vector3i& cube, int edge);
 
-    // Sentinel retained here for compact storage and a single lookup on insertion.
     static constexpr size_t kInvalid = std::numeric_limits<size_t>::max();
 
    private:
@@ -82,15 +80,19 @@ class MarchingCubes {
                                EdgePoints& edge_points,
                                float min_sdf_difference = 1.0e-6);
 
-  // Append every table triangle and return the number of faces added. With a
-  // cache, cube is the block-local integer origin; different lattice edges stay
-  // distinct even when their intersections coincide. Without a cache, append
-  // independent vertices for each face. Normal computation is currently disabled
-  // because spark_dsg::Mesh does not store normals.
+  /**
+   * @brief Generate faces and vertices for a cube of TSDF values
+   * @param points TSDF voxel values
+   * @param mesh Output mesh
+   * @param cube_index Lower corner voxel index for TSDF cube
+   * @param cache Optional vertex index cache
+   * @param compute_normals Compute normals for the cube (currently no-op)
+   * @returns Number of faces added for the cube
+   */
   static size_t meshCube(const SdfPoints& points,
                          spark_dsg::Mesh& mesh,
+                         const VoxelIndex& cube_index,
                          EdgeCache* cache = nullptr,
-                         const Eigen::Vector3i& cube = Eigen::Vector3i::Zero(),
                          bool compute_normals = true);
 
   static const int kTriangleTable[256][16];

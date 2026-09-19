@@ -51,11 +51,11 @@ MarchingCubes::EdgeCache::EdgeCache(size_t cubes_per_side) : side_(cubes_per_sid
   }
 }
 
-size_t& MarchingCubes::EdgeCache::index(const Eigen::Vector3i& cube, int edge) {
+size_t& MarchingCubes::EdgeCache::index(const Eigen::Vector3i& cube_index, int edge) {
   // Each row corresponds to kEdgeIndexPairs[edge] and stores {dx, dy, dz, axis}.
   // The first three entries locate the edge's lower endpoint relative to the
-  // cube origin; axis is 0, 1, or 2 for an edge along +X, +Y, or +Z. Adding cube
-  // gives a block-local lattice coordinate, so neighboring cubes referencing
+  // cube origin; axis is 0, 1, or 2 for an edge along +X, +Y, or +Z. Adding cube_index
+  // gives a block-local zero-crossing coordinate, so neighboring cubes referencing
   // the same edge select the same slot, regardless of their local edge numbers.
   static constexpr int offsets[12][4] = {{0, 0, 0, 0},
                                          {1, 0, 0, 1},
@@ -73,16 +73,15 @@ size_t& MarchingCubes::EdgeCache::index(const Eigen::Vector3i& cube, int edge) {
   // Each direction has its own array. Rotate coordinates to (along, across,
   // above): (x,y,z) for X edges, (y,z,x) for Y edges, and (z,x,y) for Z edges.
   // With n = side_, lower endpoints range over [0,n) along the edge and [0,n]
-  // across both perpendicular axes. The latter include the positive halo used
-  // by boundary cubes, giving n*(n+1)*(n+1) slots per direction.
+  // across both perpendicular axes, giving n*(n+1)*(n+1) slots per direction.
   const auto a = (axis + 1) % 3;
   const auto b = (axis + 2) % 3;
-  const size_t along = cube[axis] + offsets[edge][axis];
-  const size_t across = cube[a] + offsets[edge][a];
-  const size_t above = cube[b] + offsets[edge][b];
+  const size_t along = cube_index[axis] + offsets[edge][axis];
+  const size_t across = cube_index[a] + offsets[edge][a];
+  const size_t above = cube_index[b] + offsets[edge][b];
   // Flatten with along varying fastest: strides are 1, n, and n*(n+1).
   // Slots contain mesh vertex indices, not positions; coincident intersections
-  // on different lattice edges remain distinct. kInvalid means not yet emitted.
+  // on different zero-crossings remain distinct. kInvalid means not yet emitted.
   return indices_[axis].at(along + side_ * (across + (side_ + 1) * above));
 }
 
@@ -220,9 +219,10 @@ inline void addStamps(Mesh& mesh,
 
 size_t MarchingCubes::meshCube(const SdfPoints& points,
                                Mesh& mesh,
+                               const VoxelIndex& cube_index,
                                EdgeCache* cache,
-                               const Eigen::Vector3i& cube,
                                bool compute_normals) {
+  static constexpr auto NO_LABEL = std::numeric_limits<uint32_t>::max();
   if (VLOG_IS_ON(15)) {
     VLOG(15) << "[mesh] points: ";
     for (size_t i = 0; i < 8; ++i) {
@@ -245,15 +245,14 @@ size_t MarchingCubes::meshCube(const SdfPoints& points,
     for (int corner = 0; corner < 3; ++corner) {
       const auto edge = table_row[table_col + 2 - corner];
       auto uncached = EdgeCache::kInvalid;
-      auto& vertex = cache ? cache->index(cube, edge) : uncached;
+      auto& vertex = cache ? cache->index(cube_index, edge) : uncached;
       if (vertex == EdgeCache::kInvalid) {
         const auto point = interpolateEdge(points, edge, 1.0e-6f);
         vertex = mesh.numVertices();
         mesh.points.push_back(point.pos);
         mesh.colors.push_back(point.color);
         if (mesh.has_labels) {
-          mesh.labels.push_back(
-              point.label.value_or(std::numeric_limits<uint32_t>::max()));
+          mesh.labels.push_back(point.label.value_or(NO_LABEL));
         }
         if (mesh.has_timestamps && mesh.has_first_seen_stamps) {
           addStamps(mesh, edge, points);
@@ -262,7 +261,6 @@ size_t MarchingCubes::meshCube(const SdfPoints& points,
       face[corner] = vertex;
     }
 
-    // Distinct lattice edges retain distinct indices, even at coincident positions.
     mesh.faces.push_back(face);
     if (compute_normals) {
       // NOTE(lschmid): Spark DSG meshes currently don't have normals, disabled for now.

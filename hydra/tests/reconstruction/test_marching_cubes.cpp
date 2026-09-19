@@ -121,7 +121,7 @@ TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
   fillPointsFromMatrices(vertex_coordinates, sdf_values, sdf_points);
 
   Mesh mesh;
-  MarchingCubes::meshCube(sdf_points, mesh);
+  MarchingCubes::meshCube(sdf_points, mesh, VoxelIndex::Zero());
   EXPECT_EQ(3u, mesh.numVertices());
 }
 
@@ -142,7 +142,7 @@ TEST(MarchingCubes, FaceCounts) {
     MarchingCubes::SdfPoints points;
     fillPointsFromMatrices(positions, distances, points);
     const auto previous_faces = mesh.numFaces();
-    const auto added = MarchingCubes::meshCube(points, mesh);
+    const auto added = MarchingCubes::meshCube(points, mesh, VoxelIndex::Zero());
     EXPECT_EQ(added, mesh.numFaces() - previous_faces);
     counts.insert(added);
   }
@@ -172,8 +172,10 @@ TEST(MarchingCubes, IndexedFacesPreserveAllConfigurations) {
       Mesh original;
       Mesh indexed;
       MarchingCubes::EdgeCache cache(1);
-      const auto expected = MarchingCubes::meshCube(points, original);
-      EXPECT_EQ(MarchingCubes::meshCube(points, indexed, &cache), expected);
+      const auto expected =
+          MarchingCubes::meshCube(points, original, VoxelIndex::Zero());
+      EXPECT_EQ(MarchingCubes::meshCube(points, indexed, VoxelIndex::Zero(), &cache),
+                expected);
       ASSERT_EQ(indexed.numFaces(), original.numFaces());
       for (size_t i = 0; i < indexed.numFaces(); ++i) {
         const auto& face = indexed.faces[i];

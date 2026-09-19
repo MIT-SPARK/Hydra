@@ -72,9 +72,8 @@ void appendMeshCell(const MarchingCubes::SdfPoints& points,
                     size_t voxels_per_side,
                     MeshBlock& mesh,
                     MarchingCubes::EdgeCache* cache,
-                    bool compute_normals) {
-  const auto new_faces =
-      MarchingCubes::meshCube(points, mesh, cache, idx, compute_normals);
+                    bool add_normals) {
+  const auto new_faces = MarchingCubes::meshCube(points, mesh, idx, cache, add_normals);
   if (!new_faces) {
     return;
   }
