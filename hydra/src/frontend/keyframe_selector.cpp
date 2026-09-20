@@ -156,7 +156,6 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
   auto iter = keyframes_.begin();
   while (iter != keyframes_.end()) {
     const auto& frame = *iter;
-
     const Eigen::Vector3d pos = frame->world_T_body.translation();
     const auto stamp = frame->timestamp_ns;
 

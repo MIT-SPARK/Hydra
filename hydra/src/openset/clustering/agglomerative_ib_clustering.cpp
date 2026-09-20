@@ -367,7 +367,12 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
       continue;
     }
 
-    features[node_id] = attrs->semantic_feature.rightCols<1>();
+    features[node_id] = attrs->semantic_feature;
+  }
+
+  if (features.empty()) {
+    MLOG(1) << "No nodes with features to cluster";
+    return {};
   }
 
   Workspace ws(config, layer.edges(), features, *queries_, *metric_);

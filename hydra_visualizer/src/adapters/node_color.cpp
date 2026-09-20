@@ -304,7 +304,7 @@ Color LabelDistributionAdapter::getColor(const SceneGraph&,
   auto attrs = node.tryAttributes<SemanticNodeAttributes>();
   if (attrs && attrs->hasFeature()) {
     Eigen::Index max_idx;
-    attrs->semantic_feature.col(0).maxCoeff(&max_idx);
+    attrs->semantic_feature.maxCoeff(&max_idx);
     label = static_cast<SemanticLabel>(max_idx);
   }
 
