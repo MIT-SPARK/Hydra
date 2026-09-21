@@ -64,6 +64,7 @@ class MessageSyncQueue {
 
  protected:
   MessageQueue<MsgPtr> messages_;
+  rclcpp::CallbackGroup::SharedPtr group_;
   rclcpp::Subscription<MsgT>::SharedPtr sub_;
 };
 
@@ -73,8 +74,13 @@ MessageSyncQueue<MsgT>::MessageSyncQueue(const Config& config,
                                          const std::string& topic)
     : config(config::checkValid(config)),
       messages_(config.queue_size),
+      group_(nh.as<rclcpp::node_interfaces::NodeBaseInterface>()->create_callback_group(
+          rclcpp::CallbackGroupType::MutuallyExclusive)),
       sub_(nh.create_subscription<MsgT>(
-          topic, config.qos, [this](const MsgPtr& msg) { messages_.push(msg); })) {}
+          topic,
+          config.qos,
+          [this](const MsgPtr& msg) { messages_.push(msg); },
+          group_)) {}
 
 template <typename MsgT>
 auto MessageSyncQueue<MsgT>::sync(uint64_t timestamp_ns) -> MsgPtr {

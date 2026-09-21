@@ -38,6 +38,7 @@
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <hydra/utils/timing_utilities.h>
 #include <ianvs/node_handle.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -59,9 +60,12 @@ using sensor_msgs::msg::Image;
 using message_filters::Synchronizer;
 using message_filters::sync_policies::ApproximateTime;
 using message_filters::sync_policies::ExactTime;
+using rclcpp::node_interfaces::NodeBaseInterface;
 
 namespace hydra {
 namespace {
+
+static constexpr auto MutexGroup = rclcpp::CallbackGroupType::MutuallyExclusive;
 
 #define MAKE_VARIADIC(Policy, Underlying)                                           \
   template <typename... MsgT>                                                       \
@@ -209,15 +213,20 @@ struct ClosedSetAdapter {
                    const std::string& topic,
                    const rclcpp::QoS& qos,
                    RecvT& receiver)
-      : sub(nh.create_subscription<Image>(
-            topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
+      : group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
+        sub(nh.create_subscription<Image>(
+            topic,
+            qos,
+            [&receiver](const Image::ConstSharedPtr& msg) {
               receiver.sync.template add<2>(msg);
-            })) {}
+            },
+            group)) {}
 
   static void fill(const Image& msg, ImageInputPacket& packet) {
     packet.labels = parseImage(msg);
   }
 
+  rclcpp::CallbackGroup::SharedPtr group;
   rclcpp::Subscription<Image>::SharedPtr sub;
 };
 
@@ -229,10 +238,14 @@ struct InstanceAdapter {
                   const std::string& topic,
                   const rclcpp::QoS& qos,
                   RecvT& receiver)
-      : sub(nh.create_subscription<Image>(
-            topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
+      : group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
+        sub(nh.create_subscription<Image>(
+            topic,
+            qos,
+            [&receiver](const Image::ConstSharedPtr& msg) {
               receiver.sync.template add<2>(msg);
-            })) {}
+            },
+            group)) {}
 
   static void fill(const Image& msg, ImageInputPacket& packet) {
     const auto mat = parseImage(msg);
@@ -252,6 +265,7 @@ struct InstanceAdapter {
     }
   }
 
+  rclcpp::CallbackGroup::SharedPtr group;
   rclcpp::Subscription<Image>::SharedPtr sub;
 };
 
@@ -263,10 +277,14 @@ struct OpenSetAdapter {
                  const std::string& topic,
                  const rclcpp::QoS& qos,
                  RecvT& receiver)
-      : sub(nh.create_subscription<FeatureImage>(
-            topic, qos, [&receiver](const FeatureImage::ConstSharedPtr& msg) {
+      : group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
+        sub(nh.create_subscription<FeatureImage>(
+            topic,
+            qos,
+            [&receiver](const FeatureImage::ConstSharedPtr& msg) {
               receiver.sync.template add<2>(msg);
-            })) {}
+            },
+            group)) {}
 
   static void fill(const FeatureImage& msg, ImageInputPacket& packet) {
     packet.instances = parseImage(msg.image);
@@ -279,6 +297,7 @@ struct OpenSetAdapter {
     }
   }
 
+  rclcpp::CallbackGroup::SharedPtr group;
   rclcpp::Subscription<FeatureImage>::SharedPtr sub;
 };
 
@@ -303,15 +322,20 @@ struct TraversabilityAdapter<true> {
                         const std::string& topic,
                         const rclcpp::QoS& qos,
                         RecvT& receiver)
-      : sub(nh.create_subscription<Image>(
-            topic, qos, [&receiver](const Image::ConstSharedPtr& msg) {
+      : group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
+        sub(nh.create_subscription<Image>(
+            topic,
+            qos,
+            [&receiver](const Image::ConstSharedPtr& msg) {
               receiver.sync.template add<RecvT::Info::traversability_offset>(msg);
-            })) {}
+            },
+            group)) {}
 
   static void fill(const Image& msg, ImageInputPacket& packet) {
     packet.traversability = parseImage(msg);
   }
 
+  rclcpp::CallbackGroup::SharedPtr group;
   rclcpp::Subscription<Image>::SharedPtr sub;
 };
 
@@ -396,6 +420,9 @@ struct PacketBuilder<List<AdapterT...>> : PacketBuilderBase {
   void callback(const Image::ConstSharedPtr& color,
                 const Image::ConstSharedPtr& depth,
                 const typename AdapterT::MsgType::ConstSharedPtr&... others) {
+    const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
+    timing::ScopedTimer timer("input/packet_creation", timestamp_ns);
+
     auto packet = make_packet(color, depth);
     fillPacket<AdapterT...>(*packet, others...);
     push(packet);
@@ -450,8 +477,12 @@ struct ImageReceiverImpl : public ImageReceiverBase {
   PacketQueue& queue;
   Info::builder builder;
 
+  rclcpp::CallbackGroup::SharedPtr color_group;
   rclcpp::Subscription<Image>::SharedPtr color;
+
+  rclcpp::CallbackGroup::SharedPtr depth_group;
   rclcpp::Subscription<Image>::SharedPtr depth;
+
   AdapterT semantics;
   std::unique_ptr<FeatureQueue> features;
   TraversabilityAdapter<TypeT::with_traversability> traversability;
@@ -466,14 +497,18 @@ ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
     : sync(queue_size),
       queue(queue),
       builder([this](auto packet) { push(packet); }),
+      color_group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
       color(nh.create_subscription<Image>(
           "rgb/image_raw",
           qos,
-          [this](const ImgPtr& msg) { sync.template add<0>(msg); })),
+          [this](const ImgPtr& msg) { sync.template add<0>(msg); },
+          color_group)),
+      depth_group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
       depth(nh.create_subscription<Image>(
           "depth_registered/image_rect",
           qos,
-          [this](const ImgPtr& msg) { sync.template add<1>(msg); })),
+          [this](const ImgPtr& msg) { sync.template add<1>(msg); },
+          depth_group)),
       semantics(nh, "semantic/image_raw", qos, *this),
       traversability(nh, "traversability/image_raw", qos, *this) {
   sync.registerCallback(&Info::builder::callback, &builder);
