@@ -35,6 +35,7 @@
 #include "hydra/backend/graph_optimizer.h"
 
 #include <config_utilities/parsing/yaml.h>
+#include <glog/logging.h>
 
 #include <stdexcept>
 
@@ -42,6 +43,7 @@
 #include "hydra/common/global_info.h"
 
 namespace hydra {
+
 void optimize_graph(const OptimizationConfig& info) {
   if (!info) {
     throw std::invalid_argument("Invalid graph optimization paths");
