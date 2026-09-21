@@ -158,6 +158,24 @@ struct MessageQueue {
   }
 
   /**
+   * @brief Push a new element to the queue, evicting oldest if max size is violated
+   *
+   * @param input New element for queue
+   * @returns Evicted element
+   */
+  std::optional<T> push_evict(T input) {
+    std::unique_lock<std::mutex> lock(mutex);
+    queue.push_back(std::move(input));
+    if (!max_size || queue.size() < max_size) {
+      return std::nullopt;
+    }
+
+    T value = std::move(queue.front());
+    queue.pop_front();
+    return value;
+  }
+
+  /**
    * @brief Get the first element from the queue
    *
    * This will notify any other threads attempting to modify the queue

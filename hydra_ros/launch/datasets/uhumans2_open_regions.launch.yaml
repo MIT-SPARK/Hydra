@@ -19,8 +19,6 @@ launch:
       - set_remap: {from: color/image_raw, to: rgb/image_raw}
       - include:
           file: $(find-pkg-share semantic_inference_ros)/launch/image_embedding_node.launch.yaml
-          arg:
-            - {name: min_period_s, value: '0.2'}
   - node:
       pkg: hydra_ros
       exec: hydra_ros_node

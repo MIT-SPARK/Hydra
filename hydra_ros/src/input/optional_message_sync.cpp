@@ -32,75 +32,17 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/validation.h>
-#include <hydra/common/message_queue.h>
-#include <ianvs/node_handle.h>
+#include "hydra_ros/input/optional_message_sync.h"
 
-#include "hydra_ros/utils/qos_config.h"
+#include <config_utilities/config.h>
 
 namespace hydra {
 
-struct MessageSyncQueueConfig {
-  //! Max queue depth
-  size_t queue_size = 10;
-  //! QoS settings for subscribers
-  QoSConfig qos = rclcpp::SensorDataQoS();
-};
-
-template <typename MsgT>
-class MessageSyncQueue {
- public:
-  using Config = MessageSyncQueueConfig;
-  using MsgPtr = typename MsgT::ConstPtr;
-
-  MessageSyncQueue(const Config& config,
-                   ianvs::NodeHandle nh,
-                   const std::string& topic);
-
-  MsgPtr sync(uint64_t timestamp_ns);
-
-  const Config config;
-
- protected:
-  MessageQueue<MsgPtr> messages_;
-  rclcpp::CallbackGroup::SharedPtr group_;
-  rclcpp::Subscription<MsgT>::SharedPtr sub_;
-};
-
-template <typename MsgT>
-MessageSyncQueue<MsgT>::MessageSyncQueue(const Config& config,
-                                         ianvs::NodeHandle nh,
-                                         const std::string& topic)
-    : config(config::checkValid(config)),
-      messages_(config.queue_size),
-      group_(nh.as<rclcpp::node_interfaces::NodeBaseInterface>()->create_callback_group(
-          rclcpp::CallbackGroupType::MutuallyExclusive)),
-      sub_(nh.create_subscription<MsgT>(
-          topic,
-          config.qos,
-          [this](const MsgPtr& msg) { messages_.push(msg); },
-          group_)) {}
-
-template <typename MsgT>
-auto MessageSyncQueue<MsgT>::sync(uint64_t timestamp_ns) -> MsgPtr {
-  const auto pending = messages_.size();
-  for (size_t i = 0; i < pending; ++i) {
-    const rclcpp::Time stamp(messages_.front()->header.stamp);
-    const uint64_t stamp_ns = stamp.nanoseconds();
-    if (stamp_ns > timestamp_ns) {
-      return nullptr;
-    }
-
-    const auto curr_msg = messages_.pop();
-    if (stamp_ns == timestamp_ns) {
-      return curr_msg;
-    }
-  }
-
-  return nullptr;
+void declare_config(OptionalMessageSyncConfig& config) {
+  using namespace config;
+  name("OptionalMessageSyncConfig");
+  field(config.queue_size, "queue_size");
+  field(config.qos, "qos");
 }
-
-void declare_config(MessageSyncQueueConfig& config);
 
 }  // namespace hydra

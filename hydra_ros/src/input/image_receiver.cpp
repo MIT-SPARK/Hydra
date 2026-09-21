@@ -51,7 +51,7 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
-#include "hydra_ros/input/message_sync_queue.h"
+#include "hydra_ros/input/optional_message_sync.h"
 
 using semantic_inference_msgs::msg::FeatureImage;
 using semantic_inference_msgs::msg::FeatureVectorStamped;
@@ -463,13 +463,17 @@ struct ImageReceiverImpl : public ImageReceiverBase {
 
   using Info = ReceiverInfo<AdapterT, TypeT>;
   using Sync = Synchronizer<typename Info::policy>;
-  using FeatureQueue = MessageSyncQueue<FeatureVectorStamped>;
+  using FeatureQueue = OptionalMessageSync<ImageInputPacket, FeatureVectorStamped>;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
                     const rclcpp::QoS& qos,
                     size_t queue_size,
                     bool with_feature,
                     PacketQueue& queue);
+
+  virtual ~ImageReceiverImpl() {
+    features.reset();  // stop feature sync if enabled first
+  }
 
   void push(ImageInputPacket::Ptr packet);
 
@@ -493,9 +497,9 @@ ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
                                                       const rclcpp::QoS& qos,
                                                       size_t queue_size,
                                                       bool with_feature,
-                                                      PacketQueue& queue)
+                                                      PacketQueue& _queue)
     : sync(queue_size),
-      queue(queue),
+      queue(_queue),
       builder([this](auto packet) { push(packet); }),
       color_group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
       color(nh.create_subscription<Image>(
@@ -513,8 +517,19 @@ ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
       traversability(nh, "traversability/image_raw", qos, *this) {
   sync.registerCallback(&Info::builder::callback, &builder);
   if (with_feature) {
-    MessageSyncQueueConfig feature_config{queue_size, qos};
-    features = std::make_unique<FeatureQueue>(feature_config, nh, "semantic/feature");
+    OptionalMessageSyncConfig feature_config{queue_size, qos};
+    features = std::make_unique<FeatureQueue>(
+        feature_config,
+        nh,
+        "semantic/feature",
+        [this](const auto& packet, const auto& feature) {
+          if (feature) {
+            const auto& vec = feature->feature.data;
+            packet->input_feature =
+                Eigen::Map<const FeatureVector>(vec.data(), vec.size());
+          }
+          queue.push(packet);
+        });
   }
 }
 
@@ -525,14 +540,10 @@ void ImageReceiverImpl<AdapterT, TypeT>::push(ImageInputPacket::Ptr packet) {
   }
 
   if (features) {
-    auto msg = features->sync(packet->timestamp_ns);
-    if (msg) {
-      const auto& vec = msg->feature.data;
-      packet->input_feature = Eigen::Map<const FeatureVector>(vec.data(), vec.size());
-    }
+    features->push(packet);
+  } else {
+    queue.push(packet);
   }
-
-  queue.push(packet);
 }
 
 template <typename T, bool traversability>
