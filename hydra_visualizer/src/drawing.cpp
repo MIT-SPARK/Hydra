@@ -384,6 +384,21 @@ kimera_pgmo_msgs::msg::Mesh makeMeshMsg(const std_msgs::msg::Header& header,
   for (size_t i = 0; i < mesh.points.size(); ++i) {
     auto& vertex = msg.vertices[i];
     tf2::convert(mesh.points[i].cast<double>().eval(), vertex.pos);
+    vertex.has_label = mesh.has_labels;
+    if (mesh.has_labels) {
+      vertex.label = mesh.label(i);
+    }
+
+    vertex.has_stamp = mesh.has_timestamps;
+    if (mesh.has_timestamps) {
+      vertex.stamp = mesh.timestamp(i);
+    }
+
+    vertex.has_first_seen_stamp = mesh.has_first_seen_stamps;
+    if (mesh.has_first_seen_stamps) {
+      vertex.first_seen_stamp = mesh.first_seen_stamps[i];
+    }
+
     vertex.has_color = true;
     vertex.color = visualizer::makeColorMsg(adapter.getVertexColor(i));
   }

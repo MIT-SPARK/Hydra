@@ -92,6 +92,7 @@ if(BUILD_TESTING)
       tests/main.cpp
       tests/test_ear_clipping.cpp
       tests/test_layer_key_selector.cpp
+      tests/test_mesh_message.cpp
   )
   target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME})
 endif()
