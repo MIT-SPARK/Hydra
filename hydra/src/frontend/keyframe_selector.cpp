@@ -41,8 +41,6 @@
 #include <spark_dsg/printing.h>
 
 #include "hydra/active_window/volumetric_window.h"
-#include "hydra/common/global_info.h"
-#include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -51,7 +49,12 @@ using namespace spark_dsg;
 namespace hydra {
 namespace {
 
-static const auto registration =
+static const auto policy_registration =
+    config::RegistrationWithConfig<KeyframePolicy,
+                                   DistancePolicy,
+                                   DistancePolicy::Config>("DistancePolicy");
+
+static const auto functor_registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    KeyframeSelector,
                                    KeyframeSelector::Config>("KeyframeSelector");
@@ -79,16 +82,94 @@ std::string showVec(const Eigen::MatrixXf& vec, size_t max_length = 100) {
   return ss.str();
 }
 
+bool isVisible(const FeatureSelector& selector,
+               const FeatureView& view,
+               const LayerView& nodes) {
+  for (const auto& node : nodes) {
+    auto attrs = node.tryAttributes<SemanticNodeAttributes>();
+    if (!attrs) {
+      continue;
+    }
+
+    if (selector.nodeInView(view, *attrs)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 }  // namespace
 
 using hydra::timing::ScopedTimer;
+
+void declare_config(DistancePolicy::Config& config) {
+  using namespace config;
+  name<DistancePolicy::Config>();
+  field(config.min_pose_separation, "min_pose_separation");
+  field(config.rotation_separation_weight, "rotation_separation_weight");
+  field(config.min_time_separation_s, "min_time_separation_s");
+  check(config.min_pose_separation, GE, 0.0, "rotation_separation_weight");
+  check(config.rotation_separation_weight, GE, 0.0, "rotation_separation_weight");
+  check(config.min_time_separation_s, GE, 0.0, "rotation_separation_weight");
+}
+
+bool KeyframePolicy::shouldAdd(const InputData::ConstPtr& candidate,
+                               const std::list<InputData::ConstPtr>& keyframes,
+                               std::string& reason) const {
+  if (!candidate) {
+    return false;
+  }
+
+  if (keyframes.empty()) {
+    return true;
+  }
+
+  return shouldAddImpl(*candidate, keyframes, reason);
+}
+
+DistancePolicy::DistancePolicy(const Config& config)
+    : config(config::checkValid(config)) {}
+
+bool DistancePolicy::shouldAddImpl(const InputData& candidate,
+                                   const std::list<InputData::ConstPtr>& keyframes,
+                                   std::string& reason) const {
+  const auto& to_check = *keyframes.back();
+  using std::chrono::duration_cast;
+  const auto curr_stamp = std::chrono::nanoseconds(candidate.timestamp_ns);
+  const auto last_stamp = std::chrono::nanoseconds(to_check.timestamp_ns);
+
+  const auto diff_ns = curr_stamp - last_stamp;
+  const auto diff_s = duration_cast<std::chrono::duration<double>>(diff_ns);
+  if (config.min_time_separation_s && diff_s.count() < config.min_time_separation_s) {
+    reason = std::format("Dropped candidate @ {} [ns] with time diff {} < {} [s]",
+                         candidate.timestamp_ns,
+                         diff_s.count(),
+                         config.min_time_separation_s);
+    return false;
+  }
+
+  const Eigen::Isometry3d pose_diff =
+      candidate.world_T_body.inverse() * to_check.world_T_body;
+  const auto diff_t = pose_diff.translation().norm();
+  const auto diff_r = pose_diff.rotation().norm();
+  const auto diff_p = diff_t + config.rotation_separation_weight * diff_r;
+  if (config.min_pose_separation && diff_p < config.min_pose_separation) {
+    reason = std::format("Dropped candidate @ {} [ns] with pose diff {} < {}",
+                         candidate.timestamp_ns,
+                         diff_p,
+                         config.min_pose_separation);
+    return false;
+  }
+
+  return true;
+}
 
 void declare_config(KeyframeSelector::Config& config) {
   using namespace config;
   name("KeyframeSelector::Config");
   base<VerbosityConfig>(config);
-  config.pose_graph_tracker.setOptional();
-  field(config.pose_graph_tracker, "pose_graph_tracker");
+  field(config.keyframe_policy, "keyframe_policy");
   config.feature_selector.setOptional();
   field(config.feature_selector, "feature_selector");
   field(config.layers, "layers");
@@ -97,12 +178,12 @@ void declare_config(KeyframeSelector::Config& config) {
 
 KeyframeSelector::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("keyframes")),
-      pose_graph_tracker(PoseGraphFromOdom::Config()) {}
+      keyframe_policy(DistancePolicy::Config()) {}
 
 KeyframeSelector::KeyframeSelector(const Config& config)
     : config(config::checkValid(config)),
       sinks_(Sink::instantiate(config.sinks)),
-      tracker_(config.pose_graph_tracker.create()),
+      policy_(config.keyframe_policy.create()),
       feature_selector_(config.feature_selector.create()) {
   for (const auto& layer : config.layers) {
     active_window_.emplace(layer, ActiveWindowTracker());
@@ -110,39 +191,25 @@ KeyframeSelector::KeyframeSelector(const Config& config)
 }
 
 void KeyframeSelector::call(const ActiveWindowOutput& input,
-                            SharedDsgInfo& dsg,
-                            FrontendOutput& output,
+                            SharedDsgInfo&,
+                            FrontendOutput&,
                             const VolumetricWindow* window) {
-  if (!tracker_) {
-    LOG_FIRST_N(WARNING, 1) << "pose graph tracking disabled";
-    return;
-  }
-
-  ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
+  ScopedTimer timer("frontend/update_keyframes", input.timestamp_ns);
 
   size_t num_added = 0;
-  PoseGraphPacket packet;
   for (const auto& data : input.sensor_data) {
-    const auto curr_packet = tracker_->update(data->timestamp_ns, data->world_T_body);
-    packet.updateFrom(curr_packet);
-    if (!curr_packet.pose_graphs.empty()) {
+    std::string reason;
+    if (policy_->shouldAdd(data, keyframes_, reason)) {
       keyframes_.push_back(data);
       ++num_added;
+    } else if (!reason.empty()) {
+      MLOG(2) << reason;
     }
   }
 
+  // TODO(nathan) add saving keyframes to disk (could be sink)
+
   MLOG(2) << "Got " << num_added << " new views!";
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-
-  {  // critical section for updating graph and output
-    std::lock_guard<std::mutex> lock(dsg.mutex);
-    const auto new_node_ids = packet.addToGraph(*dsg.graph, prefix.id);
-    output.agent_updates = packet;
-    output.new_agent_nodes = new_node_ids;
-  }
-
-  // TODO(nathan) actually do keyframing
-
   if (window) {
     archiveKeyframes(input, *window);
   }
@@ -173,10 +240,42 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
   }
 }
 
+void KeyframeSelector::cleanInactive(const SceneGraph& graph) {
+  // drop keyframes that no longer observe any inactive nodes
+  auto iter = to_archive_.begin();
+  while (iter != to_archive_.end()) {
+    bool visible = false;
+    const FeatureView view(**iter);
+    for (auto& [name, tracker] : active_window_) {
+      auto layer = graph.findLayer(name);
+      if (!layer) {
+        continue;
+      }
+
+      visible = isVisible(*feature_selector_, view, tracker.view(*layer));
+      if (visible) {
+        break;
+      }
+    }
+
+    if (!visible) {
+      iter = to_archive_.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+}
+
 void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
   if (!feature_selector_) {
     return;
   }
+
+  for (auto& [name, tracker] : active_window_) {
+    tracker.clear();
+  }
+
+  cleanInactive(*dsg.graph);
 
   const auto num_frames = keyframes_.size() + to_archive_.size();
   if (!num_frames) {
@@ -192,40 +291,8 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
     views.emplace_back(*frame);
   }
 
-  auto iter = to_archive_.begin();
-  while (iter != to_archive_.end()) {
-    bool visible = false;
-    const FeatureView view(**iter);
-    for (auto& [name, tracker] : active_window_) {
-      auto layer = dsg.graph->findLayer(name);
-      if (!layer) {
-        continue;
-      }
-
-      tracker.clear();
-      if (visible) {
-        continue;
-      }
-
-      for (const auto& node : tracker.view(*layer)) {
-        auto attrs = node.tryAttributes<SemanticNodeAttributes>();
-        if (!attrs) {
-          continue;
-        }
-
-        if (feature_selector_->nodeInView(view, *attrs)) {
-          visible = true;
-          break;
-        }
-      }
-    }
-
-    if (!visible) {
-      iter = to_archive_.erase(iter);
-    } else {
-      views.push_back(view);
-      ++iter;
-    }
+  for (const auto& frame : to_archive_) {
+    views.emplace_back(*frame);
   }
 
   for (auto& [name, layer_tracker] : active_window_) {

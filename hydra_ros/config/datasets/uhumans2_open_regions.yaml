@@ -16,6 +16,7 @@ active_window:
       mesh_coloring: {type: UniformMeshColoring, color: [255, 0, 0]}
 frontend:
   keyframe_selector:
+    type: KeyframeSelector
     verbosity: 1
     max_range_difference_m: 0.5
     feature_selector: {type: average}

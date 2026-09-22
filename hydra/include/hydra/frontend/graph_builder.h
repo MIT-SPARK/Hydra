@@ -89,8 +89,9 @@ class GraphBuilder : public Module {
     MeshSegmenter::Config object_config;
     config::VirtualConfig<SurfacePlaceExtractor> surface_places;
 
-    config::VirtualConfig<GraphBuilderFunctor> keyframe_selector;
+    config::VirtualConfig<GraphBuilderFunctor> pose_graph_tracker;
     config::VirtualConfig<GraphBuilderFunctor> deformation_graph_builder;
+    config::VirtualConfig<GraphBuilderFunctor> keyframe_selector;
     config::VirtualConfig<GraphBuilderFunctor> freespace_places;
     config::VirtualConfig<GraphBuilderFunctor> traversability_places;
     config::VirtualConfig<GraphBuilderFunctor> frontier_places;

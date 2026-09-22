@@ -45,6 +45,39 @@
 
 namespace hydra {
 
+class KeyframePolicy {
+ public:
+  virtual ~KeyframePolicy() = default;
+  bool shouldAdd(const InputData::ConstPtr& candidate,
+                 const std::list<InputData::ConstPtr>& keyframes,
+                 std::string& reason) const;
+
+ protected:
+  virtual bool shouldAddImpl(const InputData& candidate,
+                             const std::list<InputData::ConstPtr>& keyframes,
+                             std::string& reason) const = 0;
+};
+
+class DistancePolicy : public KeyframePolicy {
+ public:
+  struct Config {
+    //! @brief Minimum between pose norm to add new keyframe
+    double min_pose_separation = 1.0;
+    //! @brief Weighting between rotation (frobenius) norm and translation (l2) norm
+    double rotation_separation_weight = 0.1;
+    //! @brief Minimum time separation to add new keyframe
+    double min_time_separation_s = 0.5;
+  } const config;
+
+  explicit DistancePolicy(const Config& config);
+  virtual ~DistancePolicy() = default;
+
+ protected:
+  bool shouldAddImpl(const InputData& candidate,
+                     const std::list<InputData::ConstPtr>& keyframes,
+                     std::string& reason) const override;
+};
+
 class KeyframeSelector : public GraphBuilderFunctor {
  public:
   using Keyframes = std::list<InputData::ConstPtr>;
@@ -53,8 +86,8 @@ class KeyframeSelector : public GraphBuilderFunctor {
   struct Config : public VerbosityConfig {
     Config();
 
-    //! Method for extracting pose graph from incoming poses
-    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
+    //! Method for extracting keyframes from incoming data
+    config::VirtualConfig<KeyframePolicy> keyframe_policy;
     //! Method to control mapping from views to resulting feature for a node
     config::VirtualConfig<FeatureSelector> feature_selector;
     //! Layers to assign views for
@@ -77,8 +110,10 @@ class KeyframeSelector : public GraphBuilderFunctor {
   void archiveKeyframes(const ActiveWindowOutput& output,
                         const VolumetricWindow& window);
 
+  void cleanInactive(const spark_dsg::SceneGraph& graph);
+
   Sink::List sinks_;
-  std::unique_ptr<PoseGraphTracker> tracker_;
+  std::unique_ptr<KeyframePolicy> policy_;
   std::unique_ptr<FeatureSelector> feature_selector_;
 
   std::list<InputData::ConstPtr> keyframes_;

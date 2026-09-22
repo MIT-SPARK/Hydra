@@ -45,13 +45,12 @@ namespace hydra {
 namespace {
 
 static const auto registration =
-    config::RegistrationWithConfig<PoseGraphTracker,
+    config::RegistrationWithConfig<GraphBuilderFunctor,
                                    PoseGraphFromOdom,
                                    PoseGraphFromOdom::Config>("PoseGraphFromOdom");
 
-}
-
 using pose_graph_tools::PoseGraph;
+using StampedPose = PoseGraphFromOdom::StampedPose;
 
 void addNode(PoseGraph& graph, const StampedPose& stamped_pose, size_t index) {
   auto& node = graph.nodes.emplace_back();
@@ -90,11 +89,25 @@ PoseGraph makePoseGraph(const StampedPose& curr_pose,
   return graph;
 }
 
-PoseGraphFromOdom::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("pose_graph_tracker")) {}
+}  // namespace
+
+// TODO(nathan) this may get expanded with covariances...
+void declare_config(PoseGraphFromOdom::Config& config) {
+  using namespace config;
+  name("PoseGraphFromOdom::Config");
+  base<VerbosityConfig>(config);
+  field(config.min_pose_separation, "min_pose_separation");
+  field(config.rotation_separation_weight, "rotation_separation_weight");
+  field(config.min_time_separation_s, "min_time_separation_s");
+  check(config.min_pose_separation, GE, 0.0, "rotation_separation_weight");
+  check(config.rotation_separation_weight, GE, 0.0, "rotation_separation_weight");
+  check(config.min_time_separation_s, GE, 0.0, "rotation_separation_weight");
+}
 
 PoseGraphFromOdom::PoseGraphFromOdom(const PoseGraphFromOdom::Config& config)
-    : config(config::checkValid(config)), num_poses_received_(0) {}
+    : PoseGraphTracker(config),
+      config(config::checkValid(config)),
+      num_poses_received_(0) {}
 
 PoseGraphPacket PoseGraphFromOdom::update(uint64_t timestamp_ns,
                                           const Eigen::Isometry3d& world_T_body) {
@@ -129,19 +142,6 @@ PoseGraphPacket PoseGraphFromOdom::update(uint64_t timestamp_ns,
   prev_pose_ = curr_pose;
   ++num_poses_received_;
   return packet;
-}
-
-// TODO(nathan) this may get expanded with covariances...
-void declare_config(PoseGraphFromOdom::Config& config) {
-  using namespace config;
-  name("PoseGraphFromOdom::Config");
-  base<VerbosityConfig>(config);
-  field(config.min_pose_separation, "min_pose_separation");
-  field(config.rotation_separation_weight, "rotation_separation_weight");
-  field(config.min_time_separation_s, "min_time_separation_s");
-  check(config.min_pose_separation, GE, 0.0, "rotation_separation_weight");
-  check(config.rotation_separation_weight, GE, 0.0, "rotation_separation_weight");
-  check(config.min_time_separation_s, GE, 0.0, "rotation_separation_weight");
 }
 
 }  // namespace hydra

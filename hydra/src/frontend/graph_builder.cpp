@@ -46,9 +46,9 @@
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/deformation_graph_builder.h"
-#include "hydra/frontend/keyframe_selector.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
@@ -85,10 +85,12 @@ void declare_config(GraphBuilder::Config& config) {
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
 
+  config.pose_graph_tracker.setOptional();
+  field(config.pose_graph_tracker, "pose_graph_tracker");
   config.keyframe_selector.setOptional();
   field(config.keyframe_selector, "keyframe_selector");
-  config.deformation_graph_builder.setOptional();
-  field(config.deformation_graph_builder, "deformation_graph_builder");
+  config.keyframe_selector.setOptional();
+  field(config.keyframe_selector, "keyframe_selector");
   config.freespace_places.setOptional();
   field(config.freespace_places, "freespace_places");
   config.traversability_places.setOptional();
@@ -103,7 +105,7 @@ GraphBuilder::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")),
       mesh_compression(MeshCompression::Config{0.005}),
       graph_updater({{DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}),
-      keyframe_selector(KeyframeSelector::Config()),
+      pose_graph_tracker(PoseGraphFromOdom::Config()),
       deformation_graph_builder(DeformationGraphBuilder::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
@@ -134,9 +136,10 @@ GraphBuilder::GraphBuilder(const Config& config,
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
 
   // TODO(nathan) this needs to be pushed to an actual config at some point
-  functors_.emplace("keyframe_selector", config.keyframe_selector.create());
+  functors_.emplace("pose_graph_tracker", config.pose_graph_tracker.create());
   functors_.emplace("deformation_graph_builder",
                     config.deformation_graph_builder.create());
+  functors_.emplace("keyframe_selector", config.keyframe_selector.create());
   functors_.emplace("freespace_places", config.freespace_places.create());
   functors_.emplace("traversability_places", config.traversability_places.create());
   functors_.emplace("frontier_places", config.frontier_places.create());

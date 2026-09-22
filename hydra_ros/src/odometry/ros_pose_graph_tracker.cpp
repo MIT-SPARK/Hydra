@@ -48,11 +48,20 @@
 #include "hydra_ros/odometry/ros_pose_graph_tracker.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <ianvs/node_handle.h>
 
 namespace hydra {
+namespace {
+
+inline static const auto registration_ =
+    config::RegistrationWithConfig<GraphBuilderFunctor,
+                                   RosPoseGraphTracker,
+                                   RosPoseGraphTracker::Config>("RosPoseGraphs");
+
+}
 
 using pose_graph_tools::PoseGraph;
 
@@ -64,7 +73,7 @@ void declare_config(RosPoseGraphTracker::Config& config) {
 }
 
 RosPoseGraphTracker::RosPoseGraphTracker(const Config& config)
-    : config(config::checkValid(config)) {
+    : PoseGraphTracker(config), config(config::checkValid(config)) {
   using pose_graph_tools::PoseGraphTypeAdapter;
   auto nh = ianvs::NodeHandle::this_node(config.ns);
   odom_sub_ = nh.create_subscription<PoseGraphTypeAdapter>(

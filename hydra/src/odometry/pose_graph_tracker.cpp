@@ -34,83 +34,52 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/odometry/pose_graph_tracker.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
-#include "hydra/common/robot_prefix_config.h"
+#include "hydra/common/global_info.h"
+#include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;
 
 namespace hydra {
 
-std::vector<NodeId> PoseGraphPacket::addToGraph(SceneGraph& graph,
-                                                std::optional<int> robot_id) const {
-  std::vector<NodeId> new_nodes;
+using hydra::timing::ScopedTimer;
 
-  for (const auto& pose_graph : pose_graphs) {
-    for (const auto& node : pose_graph.nodes) {
-      if (robot_id && node.robot_id != robot_id.value()) {
-        VLOG(1) << "Dropping node for other robot: " << node;
-        continue;
-      }
-
-      const auto node_prefix = RobotPrefixConfig(node.robot_id);
-      const NodeSymbol node_id(node_prefix.key, node.key);
-      if (graph.hasNode(node_id)) {
-        continue;
-      }
-
-      const std::chrono::nanoseconds stamp(node.stamp_ns);
-      const Eigen::Vector3d pos = node.pose.translation();
-      const Eigen::Quaterniond rot(node.pose.linear());
-      VLOG(5) << "Adding agent " << node_id.str() << " @ " << stamp.count() << " [ns]";
-
-      auto attrs = std::make_unique<AgentNodeAttributes>(stamp, rot, pos, node_id);
-      const auto key = graph.getLayerKey(DsgLayers::AGENTS);
-      if (!key) {
-        LOG(ERROR) << "No layer named '" << DsgLayers::AGENTS << "' in graph!";
-        continue;
-      }
-
-      if (!graph.emplaceNode(key->layer, node_id, std::move(attrs), node_prefix.key)) {
-        VLOG(1) << "Failed to add node @ " << stamp.count() << "[ns]";
-        continue;
-      }
-
-      new_nodes.push_back(node_id);
-    }
-  }
-
-  // TODO(nathan) technically we could do a single loop, but this ensures
-  // that we get *most* edges if something external messages up
-  for (const auto& pose_graph : pose_graphs) {
-    for (const auto& edge : pose_graph.edges) {
-      if (robot_id &&
-          (edge.robot_from != robot_id.value() || edge.robot_to != robot_id.value())) {
-        VLOG(1) << "Dropping edge for other robot: " << edge;
-        continue;
-      }
-
-      const auto from_prefix = RobotPrefixConfig(edge.robot_from);
-      const auto to_prefix = RobotPrefixConfig(edge.robot_to);
-      const NodeSymbol from_id(from_prefix.key, edge.key_from);
-      const NodeSymbol to_id(to_prefix.key, edge.key_to);
-      // TODO(nathan) save actual info once we add attributes to spark_dsg or somewhere
-      // else
-      graph.insertEdge(from_id, to_id);
-    }
-  }
-
-  return new_nodes;
+void declare_config(PoseGraphTracker::Config& config) {
+  using namespace config;
+  name("PoseGraphTracker::Config");
+  base<VerbosityConfig>(config);
 }
 
-void PoseGraphPacket::updateFrom(const PoseGraphPacket& other) {
-  timestamp_ns = other.timestamp_ns;
-  pose_graphs.insert(
-      pose_graphs.end(), other.pose_graphs.begin(), other.pose_graphs.end());
-  // TODO(nathan) this is technically bad, but we'll get to it
-  external_priors = other.external_priors;
+PoseGraphTracker::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("pose_graph")) {}
+
+PoseGraphTracker::PoseGraphTracker(const Config& config)
+    : config(config::checkValid(config)) {}
+
+void PoseGraphTracker::call(const ActiveWindowOutput& input,
+                            SharedDsgInfo& dsg,
+                            FrontendOutput& output,
+                            const VolumetricWindow*) {
+  ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
+
+  PoseGraphPacket packet;
+  for (const auto& data : input.sensor_data) {
+    const auto curr_packet = update(data->timestamp_ns, data->world_T_body);
+    packet.updateFrom(curr_packet);
+  }
+
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+
+  // critical section for updating graph and output
+  std::lock_guard<std::mutex> lock(dsg.mutex);
+  const auto new_node_ids = packet.addToGraph(*dsg.graph, prefix.id);
+  output.agent_updates = packet;
+  output.new_agent_nodes = new_node_ids;
 }
 
 }  // namespace hydra

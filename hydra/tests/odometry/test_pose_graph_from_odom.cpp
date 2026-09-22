@@ -38,8 +38,16 @@
 #include "hydra_test/config_guard.h"
 
 namespace hydra {
+namespace {
 
-using pose_graph_tools::PoseGraph;
+struct TestablePoseGraphFromOdom : public PoseGraphFromOdom {
+  explicit TestablePoseGraphFromOdom(const PoseGraphFromOdom::Config& config)
+      : PoseGraphFromOdom(config) {}
+  virtual ~TestablePoseGraphFromOdom() = default;
+  using PoseGraphFromOdom::update;
+};
+
+}  // namespace
 
 TEST(PoseGraphFromOdom, GraphBuildingCorrect) {
   test::ConfigGuard guard;
@@ -47,7 +55,7 @@ TEST(PoseGraphFromOdom, GraphBuildingCorrect) {
   PoseGraphFromOdom::Config config;
   config.min_pose_separation = 0.0;
   config.min_time_separation_s = 0.0;
-  PoseGraphFromOdom tracker(config);
+  TestablePoseGraphFromOdom tracker(config);
 
   Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
 

@@ -36,7 +36,7 @@
 #include <memory>
 
 #include "hydra/common/robot_prefix_config.h"
-#include "hydra/odometry/pose_graph_tracker.h"
+#include "hydra/odometry/pose_graph_packet.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
