@@ -27,6 +27,7 @@ static const auto vmf_reg =
 
 }  // namespace
 
+using spark_dsg::NodeAttributes;
 using spark_dsg::SemanticNodeAttributes;
 
 FeatureView::FeatureView(const InputData& data)
@@ -73,6 +74,14 @@ void declare_config(FeatureSelector::Config& config) {
   check(config.max_range_difference_m, GT, 0.0, "max_range_difference_m");
 }
 
+FeatureSelector::FeatureSelector(const Config& config)
+    : config(config::checkValid(config)) {}
+
+bool FeatureSelector::nodeInView(const FeatureView& view,
+                                 const NodeAttributes& attrs) const {
+  return view.pointInView(attrs.position, config.max_range_difference_m);
+}
+
 void declare_config(ClosestFeatureSelector::Config& config) {
   using namespace config;
   name("ClosestFeatureSelector::Config");
@@ -80,7 +89,7 @@ void declare_config(ClosestFeatureSelector::Config& config) {
 }
 
 ClosestFeatureSelector::ClosestFeatureSelector(const Config& config)
-    : config(config::checkValid(config)) {}
+    : FeatureSelector(config), config(config::checkValid(config)) {}
 
 bool ClosestFeatureSelector::select(const FeatureList& views,
                                     SemanticNodeAttributes& attrs) const {
@@ -118,7 +127,7 @@ void declare_config(AverageFeatureSelector::Config& config) {
 }
 
 AverageFeatureSelector::AverageFeatureSelector(const Config& config)
-    : config(config::checkValid(config)) {}
+    : FeatureSelector(config), config(config::checkValid(config)) {}
 
 bool AverageFeatureSelector::select(const FeatureList& views,
                                     SemanticNodeAttributes& attrs) const {
@@ -156,7 +165,7 @@ void declare_config(VMFFeatureSelector::Config& config) {
 }
 
 VMFFeatureSelector::VMFFeatureSelector(const Config& config)
-    : config(config::checkValid(config)) {}
+    : FeatureSelector(config), config(config::checkValid(config)) {}
 
 bool VMFFeatureSelector::select(const FeatureList& views,
                                 SemanticNodeAttributes& attrs) const {

@@ -30,9 +30,14 @@ struct FeatureSelector {
   struct Config {
     //! Max range beyond range image
     double max_range_difference_m = 0.1;
-  };
+  } const config;
 
+  FeatureSelector(const Config& config);
   virtual ~FeatureSelector() = default;
+
+  bool nodeInView(const FeatureView& view,
+                  const spark_dsg::NodeAttributes& attrs) const;
+
   virtual bool select(const FeatureList& views,
                       spark_dsg::SemanticNodeAttributes& attrs) const = 0;
 };

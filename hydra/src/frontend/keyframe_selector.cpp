@@ -137,7 +137,6 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
   {  // critical section for updating graph and output
     std::lock_guard<std::mutex> lock(dsg.mutex);
     const auto new_node_ids = packet.addToGraph(*dsg.graph, prefix.id);
-
     output.agent_updates = packet;
     output.new_agent_nodes = new_node_ids;
   }
@@ -164,7 +163,8 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
             << msg.world_T_body().translation().format(fmt);
 
     if (!window.inBounds(msg.timestamp_ns, msg.world_T_body(), stamp, pos)) {
-      MLOG(3) << "Archived keyframe @ " << stamp << " [ns]";
+      MLOG(3) << "Archival candidate found @ " << stamp << " [ns]";
+      to_archive_.push_back(*iter);
       iter = keyframes_.erase(iter);
       continue;
     }
@@ -178,16 +178,54 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
     return;
   }
 
-  if (keyframes_.empty()) {
+  const auto num_frames = keyframes_.size() + to_archive_.size();
+  if (!num_frames) {
     MLOG(2) << "Skipping feature assignment without any active keyframes";
     return;
   }
 
-  MLOG(2) << "Assigning features with " << keyframes_.size() << " active keyframe(s)";
+  MLOG(2) << "Assigning features with " << num_frames << " active keyframe(s)";
+
   std::vector<FeatureView> views;
-  views.reserve(keyframes_.size());
+  views.reserve(num_frames);
   for (const auto& frame : keyframes_) {
     views.emplace_back(*frame);
+  }
+
+  auto iter = to_archive_.begin();
+  while (iter != to_archive_.end()) {
+    bool visible = false;
+    const FeatureView view(**iter);
+    for (auto& [name, tracker] : active_window_) {
+      auto layer = dsg.graph->findLayer(name);
+      if (!layer) {
+        continue;
+      }
+
+      tracker.clear();
+      if (visible) {
+        continue;
+      }
+
+      for (const auto& node : tracker.view(*layer)) {
+        auto attrs = node.tryAttributes<SemanticNodeAttributes>();
+        if (!attrs) {
+          continue;
+        }
+
+        if (feature_selector_->nodeInView(view, *attrs)) {
+          visible = true;
+          break;
+        }
+      }
+    }
+
+    if (!visible) {
+      iter = to_archive_.erase(iter);
+    } else {
+      views.push_back(view);
+      ++iter;
+    }
   }
 
   for (auto& [name, layer_tracker] : active_window_) {
@@ -199,9 +237,7 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
 
     size_t num_seen = 0;
     size_t num_assigned = 0;
-    layer_tracker.clear();
-    const auto layer_view = layer_tracker.view(*layer);
-    for (const auto& node : layer_view) {
+    for (const auto& node : layer_tracker.view(*layer)) {
       auto attrs = node.tryAttributes<SemanticNodeAttributes>();
       if (!attrs) {
         LOG(ERROR) << config.prefix << "Invalid node " << NodeSymbol(node.id).str();

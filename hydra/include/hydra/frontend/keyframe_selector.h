@@ -82,6 +82,7 @@ class KeyframeSelector : public GraphBuilderFunctor {
   std::unique_ptr<FeatureSelector> feature_selector_;
 
   std::list<InputData::ConstPtr> keyframes_;
+  std::list<InputData::ConstPtr> to_archive_;
   mutable std::map<std::string, ActiveWindowTracker> active_window_;
 };
 
