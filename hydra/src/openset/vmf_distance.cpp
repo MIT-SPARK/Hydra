@@ -32,36 +32,69 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <Eigen/Geometry>
-#include <memory>
+#include "hydra/openset/vmf_distance.h"
 
-#include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/odometry/pose_graph_packet.h"
-#include "hydra/utils/logging.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 namespace hydra {
 
-class PoseGraphTracker : public GraphBuilderFunctor {
- public:
-  struct Config : public VerbosityConfig {
-    Config();
-  } const config;
+float estimateVmfKappa(float r_bar, size_t d, uint32_t n, float kappa_max) {
+  if (n <= 1) {
+    return kappa_max;
+  }
 
-  using Ptr = std::unique_ptr<PoseGraphTracker>;
-  explicit PoseGraphTracker(const Config& config);
-  virtual ~PoseGraphTracker() = default;
+  const auto denom = 1.0f - r_bar * r_bar;
+  if (denom < 1.0e-12f) {
+    return kappa_max;
+  }
 
-  void call(const ActiveWindowOutput& msg,
-            SharedDsgInfo& dsg,
-            FrontendOutput& output,
-            const VolumetricWindow* window) override;
+  const auto k = r_bar * (d - r_bar * r_bar) / denom;
+  return std::clamp(k, 0.0f, kappa_max);
+}
 
- protected:
-  virtual PoseGraphPacket update(uint64_t timestamp_ns,
-                                 const Eigen::Isometry3d& world_T_body) = 0;
-};
+VmfStats computeVmfStats(const Eigen::VectorXf& feature_sum,
+                         size_t observation_count,
+                         float kappa_max) {
+  VmfStats s;
+  s.n = observation_count;
+  if (observation_count == 0u || feature_sum.size() == 0) {
+    return s;
+  }
 
-void declare_config(PoseGraphTracker::Config& config);
+  const float norm = feature_sum.norm();
+  if (norm < 1.0e-12f) {
+    return s;
+  }
+
+  s.mu = feature_sum / norm;
+  s.r_bar = std::min(norm / observation_count, 1.0f);
+  s.kappa = estimateVmfKappa(s.r_bar, feature_sum.size(), observation_count, kappa_max);
+  s.valid = true;
+  return s;
+}
+
+float vmfDistance(const VmfStats& a, const VmfStats& b) {
+  if (!a.valid || !b.valid) {
+    return 0.0f;
+  }
+
+  if (a.mu.size() != b.mu.size()) {
+    return 0.0f;
+  }
+
+  const auto kappa_sum = a.kappa + b.kappa;
+  if (kappa_sum < 1.0e-12f) {
+    return 0.0f;
+  }
+
+  const float norm = (a.kappa * a.mu + b.kappa * b.mu).norm();
+  return std::max(1.0f - norm / kappa_sum, 0.0f);
+}
+
+float vmfScore(const VmfStats& a, const VmfStats& b) {
+  return 1.0f - vmfDistance(a, b);
+}
 
 }  // namespace hydra

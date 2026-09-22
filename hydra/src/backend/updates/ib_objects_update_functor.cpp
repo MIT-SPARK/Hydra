@@ -76,14 +76,11 @@ NodeAttributes::Ptr getMergedAttributes(const SceneGraph& graph,
 
   auto attrs_ptr = node.attributes().clone();
   auto& attrs = *CHECK_NOTNULL(dynamic_cast<KhronosObjectAttributes*>(attrs_ptr.get()));
-  attrs.semantic_feature = attrs.semantic_feature.rowwise().mean().eval();
-
   while (iter != nodes.end()) {
     const auto& other = graph.getNode(*iter);
     const auto& other_attrs = other.attributes<KhronosObjectAttributes>();
     attrs.position += other_attrs.position;
-    attrs.semantic_feature += other_attrs.semantic_feature.rowwise().mean();
-    // TODO(nathan) update khronos to add the attribute merging somewhere convenient
+    attrs.semantic_feature += other_attrs.semantic_feature;
     mergeObjectAttributes(other_attrs, attrs);
     ++iter;
   }
@@ -139,7 +136,7 @@ FeatureMap<NodeId> getLayerEmbeddings(const SceneGraphLayer& layer,
       continue;
     }
 
-    features[node_id] = attrs->semantic_feature.rowwise().mean();
+    features[node_id] = attrs->semantic_feature;
   }
 
   return features;
@@ -154,7 +151,7 @@ std::vector<FeatureVector> getAllFeatures(const SceneGraphLayer& layer) {
       continue;
     }
 
-    features.push_back(attrs->semantic_feature.rowwise().mean());
+    features.push_back(attrs->semantic_feature);
   }
 
   return features;
@@ -191,7 +188,7 @@ ComponentInfo::ComponentInfo(const Config& config,
     : ws(config, layer.edges(), getLayerEmbeddings(layer, nodes), tasks, metric),
       segments(nodes) {
   ws.reweight(I_xy_full, static_cast<double>(nodes.size()) / layer.numNodes());
-  AgglomerativeClustering::cluster(ws);
+  AgglomerativeIBClustering::cluster(ws);
 }
 
 IBObjectsUpdateFunctor::IBObjectsUpdateFunctor(const Config& config)
@@ -255,8 +252,7 @@ std::set<size_t> IBObjectsUpdateFunctor::addSegmentEdges(SceneGraph& graph) cons
     }
 
     auto& attrs = node->attributes<SemanticNodeAttributes>();
-    const Eigen::VectorXf feature = attrs.semantic_feature.rowwise().mean();
-    const auto result = tasks_->getBestScore(*metric_, feature);
+    const auto result = tasks_->getBestScore(*metric_, attrs.semantic_feature);
     if (result.score < config.min_segment_score) {
       MLOG(1) << "Skipping segment with score: " << result.score;
       ignored_.insert(node_id);
@@ -293,7 +289,7 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
 
   const auto px_all = Eigen::VectorXd::Constant(N, 1.0 / static_cast<double>(N));
   const auto py_all = Eigen::VectorXd::Constant(M, 1.0 / static_cast<double>(M));
-  const auto py_x_all = AgglomerativeClustering::Workspace::compute_py_x(
+  const auto py_x_all = AgglomerativeIBClustering::Workspace::compute_py_x(
       config.clustering, all_features, *tasks_, *metric_);
 
   const auto I_xy_all = mutualInformation(py_all, px_all, py_x_all);
@@ -329,10 +325,8 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
         continue;
       }
 
-      const auto& feature =
-          CHECK_NOTNULL(dynamic_cast<SemanticNodeAttributes*>(attrs.get()))
-              ->semantic_feature;
-      const auto result = tasks_->getBestScore(*metric_, feature);
+      const auto derived = dynamic_cast<SemanticNodeAttributes*>(attrs.get());
+      const auto result = tasks_->getBestScore(*metric_, derived->semantic_feature);
       if (result.score < config.min_object_score) {
         VLOG(1) << "Skipping object with score: " << result.score;
         continue;

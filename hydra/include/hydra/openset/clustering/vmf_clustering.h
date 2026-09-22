@@ -33,35 +33,27 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Geometry>
-#include <memory>
-
-#include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/odometry/pose_graph_packet.h"
+#include "hydra/openset/layer_clustering.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra {
 
-class PoseGraphTracker : public GraphBuilderFunctor {
+class VmfClustering : public LayerClustering {
  public:
-  struct Config : public VerbosityConfig {
-    Config();
+  struct Config : LayerClustering::Config, VerbosityConfig {
+    //! Assigns zero query score to nodes without features instead of dropping them
+    bool allow_empty_scores = true;
+    //! Max number of iterations of label propagation to perform
+    size_t label_propagation_iterations = 20;
+    //! Max change in any score before label propagation has converged
+    float convergence_threshold = 1.0e-4f;
   } const config;
 
-  using Ptr = std::unique_ptr<PoseGraphTracker>;
-  explicit PoseGraphTracker(const Config& config);
-  virtual ~PoseGraphTracker() = default;
+  VmfClustering(const Config& config);
 
-  void call(const ActiveWindowOutput& msg,
-            SharedDsgInfo& dsg,
-            FrontendOutput& output,
-            const VolumetricWindow* window) override;
-
- protected:
-  virtual PoseGraphPacket update(uint64_t timestamp_ns,
-                                 const Eigen::Isometry3d& world_T_body) = 0;
+  Clusters cluster(const spark_dsg::SceneGraphLayer& layer) const override;
 };
 
-void declare_config(PoseGraphTracker::Config& config);
+void declare_config(VmfClustering::Config& config);
 
 }  // namespace hydra

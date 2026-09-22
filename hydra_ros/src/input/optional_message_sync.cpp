@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  * Copyright 2022 Massachusetts Institute of Technology.
- * all rights reserved
+ * All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,68 +32,17 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
-#include <gtest/gtest.h>
-#include <hydra/frontend/view_selector.h>
+#include "hydra_ros/input/optional_message_sync.h"
 
-#include "hydra/input/camera.h"
-#include "hydra/input/input_data.h"
+#include <config_utilities/config.h>
 
 namespace hydra {
-namespace {
 
-Eigen::VectorXf getOneHot(size_t i, size_t dim) {
-  Eigen::VectorXf p = Eigen::VectorXf::Zero(dim);
-  p(i) = 1.0;
-  return p;
-}
-
-std::shared_ptr<Camera> createCamera(double vfov,
-                                     double hfov,
-                                     std::pair<double, double> range,
-                                     std::pair<int, int> dims = {640, 480}) {
-  Camera::Config config;
-  config.min_range = range.first;
-  config.max_range = range.second;
-  config.width = dims.first;
-  config.height = dims.second;
-  config.cx = config.width / 2.0f;
-  config.cy = config.height / 2.0f;
-  config.fx = config.width / (2.0 * std::tan(hfov * M_PI / 360.0));
-  config.fy = config.height / (2.0 * std::tan(vfov * M_PI / 360.0));
-  config.extrinsics = ParamSensorExtrinsics::Config();
-  return std::make_unique<Camera>(config, "test_camera");
-}
-
-}  // namespace
-
-TEST(ViewSelector, ProjectionCorrect) {
-  const auto camera = createCamera(60.0, 90.0, {1.0, 5.0});
-  cv::Mat range_image(480, 640, CV_32FC1);
-  range_image = 1.0;
-
-  InputData data(camera);
-  data.range_image = range_image;
-  data.feature = getOneHot(1, 10);
-  data.world_T_body = Eigen::Isometry3d::Identity();
-
-  {  // identity pose makes test points easy
-    FeatureView view(data);
-    EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.0, 0.0, -1.0), 0.5));
-    EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 0.3), 0.5));
-    EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 1.3), 0.5));
-    EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 1.9), 0.5));
-  }
-
-  data.world_T_body = Eigen::Translation<double, 3>(Eigen::Vector3d(0.0, 0.0, 1.0));
-
-  {  // non-identity pose
-    FeatureView view(data);
-    EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 0.1), 0.5));
-    EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 1.3), 0.5));
-    EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 2.3), 0.5));
-    EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 2.9), 0.5));
-  }
+void declare_config(OptionalMessageSyncConfig& config) {
+  using namespace config;
+  name("OptionalMessageSyncConfig");
+  field(config.queue_size, "queue_size");
+  field(config.qos, "qos");
 }
 
 }  // namespace hydra

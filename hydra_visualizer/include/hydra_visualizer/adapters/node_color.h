@@ -226,8 +226,14 @@ struct LastUpdatedFunctor : ValueFunctor {
               const spark_dsg::SceneGraphNode& node) const override;
 };
 
+struct VmfKappaFunctor : ValueFunctor {
+  double eval(const spark_dsg::SceneGraph& graph,
+              const spark_dsg::SceneGraphNode& node) const override;
+};
+
 struct ValueColorAdapter : NodeColorAdapter {
   struct Config {
+    spark_dsg::Color default_color;
     visualizer::RangeColormap::Config colormap;
     std::string value_functor{"place_distance"};
   } const config;

@@ -32,36 +32,42 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+/* -----------------------------------------------------------------------------
+ * von Mises-Fisher distance utilities for per-place CLIP feature distributions.
+ *
+ * Sufficient statistics: feature_sum (sum of unit vectors) and observation_count.
+ * Derived quantities (mu, r_bar, kappa) are computed on demand by computeVmfStats.
+ *
+ * Distance:  d(i, j) = 1 - || k_i * mu_i + k_j * mu_j || / (k_i + k_j)
+ *   In [0, 1], Dijkstra-safe, concentration-weighted.
+ *
+ * Kappa MLE (Banerjee et al. 2005, "Clustering on the Unit Hypersphere using
+ * von Mises-Fisher Distributions"):
+ *   kappa ~= r_bar * (D - r_bar^2) / (1 - r_bar^2)
+ * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Geometry>
-#include <memory>
 
-#include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/odometry/pose_graph_packet.h"
-#include "hydra/utils/logging.h"
+#include <Eigen/Dense>
+#include <cstdint>
 
 namespace hydra {
 
-class PoseGraphTracker : public GraphBuilderFunctor {
- public:
-  struct Config : public VerbosityConfig {
-    Config();
-  } const config;
-
-  using Ptr = std::unique_ptr<PoseGraphTracker>;
-  explicit PoseGraphTracker(const Config& config);
-  virtual ~PoseGraphTracker() = default;
-
-  void call(const ActiveWindowOutput& msg,
-            SharedDsgInfo& dsg,
-            FrontendOutput& output,
-            const VolumetricWindow* window) override;
-
- protected:
-  virtual PoseGraphPacket update(uint64_t timestamp_ns,
-                                 const Eigen::Isometry3d& world_T_body) = 0;
+struct VmfStats {
+  Eigen::VectorXf mu;
+  float r_bar = 0.0f;
+  float kappa = 0.0f;
+  uint32_t n = 0u;
+  bool valid = false;
 };
 
-void declare_config(PoseGraphTracker::Config& config);
+float estimateVmfKappa(float r_bar, size_t d, uint32_t n, float kappa_max = 500.0f);
+
+VmfStats computeVmfStats(const Eigen::VectorXf& feature_sum,
+                         size_t observation_count,
+                         float kappa_max = 500.0f);
+
+float vmfDistance(const VmfStats& a, const VmfStats& b);
+
+float vmfScore(const VmfStats& a, const VmfStats& b);
 
 }  // namespace hydra

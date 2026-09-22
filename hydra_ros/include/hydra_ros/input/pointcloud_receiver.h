@@ -52,7 +52,8 @@ class PointcloudReceiver : public RosDataReceiver {
     //! Whether or not to mask colors with 0 alpha values
     bool discard_transparent_color = false;
     //! Subscription QoS settings (defaults to best effort with depth 5)
-    QoSConfig qos = rclcpp::SensorDataQoS();
+    QoSConfig qos =
+        rclcpp::SensorDataQoS().reliability(rclcpp::ReliabilityPolicy::Reliable);
   } const config;
 
   PointcloudReceiver(const Config& config,

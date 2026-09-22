@@ -33,35 +33,32 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Geometry>
-#include <memory>
+#include <pose_graph_tools/pose_graph.h>
+#include <spark_dsg/scene_graph.h>
 
-#include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/odometry/pose_graph_packet.h"
-#include "hydra/utils/logging.h"
+#include <memory>
+#include <optional>
+#include <vector>
 
 namespace hydra {
 
-class PoseGraphTracker : public GraphBuilderFunctor {
- public:
-  struct Config : public VerbosityConfig {
-    Config();
-  } const config;
+struct PoseGraphPacket {
+  using Ptr = std::shared_ptr<PoseGraphPacket>;
+  using NodeList = std::vector<spark_dsg::NodeId>;
 
-  using Ptr = std::unique_ptr<PoseGraphTracker>;
-  explicit PoseGraphTracker(const Config& config);
-  virtual ~PoseGraphTracker() = default;
+  //! current update
+  uint64_t timestamp_ns;
+  //! pose graph updates
+  std::vector<pose_graph_tools::PoseGraph> pose_graphs;
+  //! external optimization priors
+  pose_graph_tools::PoseGraph::ConstPtr external_priors;
 
-  void call(const ActiveWindowOutput& msg,
-            SharedDsgInfo& dsg,
-            FrontendOutput& output,
-            const VolumetricWindow* window) override;
+  //! Merge two update packets
+  void updateFrom(const PoseGraphPacket& other);
 
- protected:
-  virtual PoseGraphPacket update(uint64_t timestamp_ns,
-                                 const Eigen::Isometry3d& world_T_body) = 0;
+  //! Add all pose graph nodes and edges to graph
+  NodeList addToGraph(spark_dsg::SceneGraph& graph,
+                      std::optional<int> robot_id = std::nullopt) const;
 };
-
-void declare_config(PoseGraphTracker::Config& config);
 
 }  // namespace hydra

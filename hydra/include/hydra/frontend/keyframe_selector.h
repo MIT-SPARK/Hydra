@@ -38,12 +38,45 @@
 #include <memory>
 
 #include "hydra/common/output_sink.h"
+#include "hydra/frontend/feature_selector.h"
 #include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/frontend/view_selector.h"
 #include "hydra/utils/active_window_tracker.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra {
+
+class KeyframePolicy {
+ public:
+  virtual ~KeyframePolicy() = default;
+  bool shouldAdd(const InputData::ConstPtr& candidate,
+                 const std::list<InputData::ConstPtr>& keyframes,
+                 std::string& reason) const;
+
+ protected:
+  virtual bool shouldAddImpl(const InputData& candidate,
+                             const std::list<InputData::ConstPtr>& keyframes,
+                             std::string& reason) const = 0;
+};
+
+class DistancePolicy : public KeyframePolicy {
+ public:
+  struct Config {
+    //! @brief Minimum between pose norm to add new keyframe
+    double min_pose_separation = 1.0;
+    //! @brief Weighting between rotation (frobenius) norm and translation (l2) norm
+    double rotation_separation_weight = 0.1;
+    //! @brief Minimum time separation to add new keyframe
+    double min_time_separation_s = 0.5;
+  } const config;
+
+  explicit DistancePolicy(const Config& config);
+  virtual ~DistancePolicy() = default;
+
+ protected:
+  bool shouldAddImpl(const InputData& candidate,
+                     const std::list<InputData::ConstPtr>& keyframes,
+                     std::string& reason) const override;
+};
 
 class KeyframeSelector : public GraphBuilderFunctor {
  public:
@@ -53,12 +86,10 @@ class KeyframeSelector : public GraphBuilderFunctor {
   struct Config : public VerbosityConfig {
     Config();
 
-    //! Method for extracting pose graph from incoming poses
-    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker;
-    //! Method to control mapping from views to resulting feature
-    std::string view_selection_method = "average";
-    //! Max range beyond range image
-    double max_range_difference_m = 0.1;
+    //! Method for extracting keyframes from incoming data
+    config::VirtualConfig<KeyframePolicy> keyframe_policy;
+    //! Method to control mapping from views to resulting feature for a node
+    config::VirtualConfig<FeatureSelector> feature_selector;
     //! Layers to assign views for
     std::vector<std::string> layers{spark_dsg::DsgLayers::PLACES,
                                     spark_dsg::DsgLayers::MESH_PLACES};
@@ -79,11 +110,14 @@ class KeyframeSelector : public GraphBuilderFunctor {
   void archiveKeyframes(const ActiveWindowOutput& output,
                         const VolumetricWindow& window);
 
+  void cleanInactive(const spark_dsg::SceneGraph& graph);
+
   Sink::List sinks_;
-  std::unique_ptr<PoseGraphTracker> tracker_;
-  std::unique_ptr<ViewSelector> view_selector_;
+  std::unique_ptr<KeyframePolicy> policy_;
+  std::unique_ptr<FeatureSelector> feature_selector_;
 
   std::list<InputData::ConstPtr> keyframes_;
+  std::list<InputData::ConstPtr> to_archive_;
   mutable std::map<std::string, ActiveWindowTracker> active_window_;
 };
 

@@ -229,41 +229,42 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
   while (merged) {
     merged = false;
     for (auto it = regions_.begin(); it != regions_.end(); ++it) {
-      Region& region = it->second;
-      // Only active regions.
+      auto& region = it->second;
       if (!region.is_active) {
-        continue;
+        continue;  // Only active regions.
       }
+
       for (auto n_it = region.neighbors.begin(); n_it != region.neighbors.end();) {
         const auto [neighbor_id, num_connecting_voxels] = *n_it;
         auto neighbor_it = regions_.find(neighbor_id);
         if (neighbor_it == regions_.end()) {
-          // Stale neighbor: its region was already merged away. Drop it in place.
-          n_it = region.neighbors.erase(n_it);
+          n_it = region.neighbors.erase(n_it);  // drop stale neighbor
           continue;
         }
-        Region& neighbor_region = neighbor_it->second;
-        if (!neighbor_region.is_active) {
+
+        auto& neighbor = neighbor_it->second;
+        if (!neighbor.is_active) {
           ++n_it;
           continue;
         }
 
         // Check size constraint.
         const Eigen::Vector2i combined_min =
-            region.min_coordinates.cwiseMin(neighbor_region.min_coordinates);
+            region.min_coordinates.cwiseMin(neighbor.min_coordinates);
         const Eigen::Vector2i combined_max =
-            region.max_coordinates.cwiseMax(neighbor_region.max_coordinates);
+            region.max_coordinates.cwiseMax(neighbor.max_coordinates);
         if ((combined_max - combined_min).maxCoeff() <= max_region_size_) {
-          // Merge neighbor into this region and then cleanup.
-          region.merge(neighbor_region);
+          region.merge(neighbor);
           regions_.erase(neighbor_it);
           graph.removeNode(neighbor_id);
           n_it = region.neighbors.erase(n_it);
           merged = true;
           break;
         }
+
         ++n_it;
       }
+
       if (merged) {
         break;
       }

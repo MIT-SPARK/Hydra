@@ -1,31 +1,31 @@
 #pragma once
 #include "hydra/backend/update_functions.h"
-#include "hydra/openset/clustering/agglomerative_clustering.h"
+#include "hydra/openset/layer_clustering.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra {
 
-struct IBRegionsUpdateFunctor : public UpdateFunctor {
-  using Clusters = std::vector<AgglomerativeClustering::Cluster::Ptr>;
+struct OpenVocabRegionsUpdateFunctor : public UpdateFunctor {
   struct Config : VerbosityConfig {
     char id_prefix = 'r';
     std::string source_layer = spark_dsg::DsgLayers::PLACES;
     std::string target_layer = spark_dsg::DsgLayers::ROOMS;
-    AgglomerativeClustering::Config clustering;
+    size_t min_num_nodes = 5;
+    config::VirtualConfig<LayerClustering> clustering;
 
     Config();
   } const config;
 
-  explicit IBRegionsUpdateFunctor(const Config& config);
+  explicit OpenVocabRegionsUpdateFunctor(const Config& config);
 
   void call(const spark_dsg::SceneGraph& unmmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
 
  private:
-  AgglomerativeClustering clustering_;
+  std::unique_ptr<LayerClustering> clustering_;
 };
 
-void declare_config(IBRegionsUpdateFunctor::Config& config);
+void declare_config(OpenVocabRegionsUpdateFunctor::Config& config);
 
 }  // namespace hydra

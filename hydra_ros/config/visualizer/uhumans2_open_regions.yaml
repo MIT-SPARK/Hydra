@@ -15,13 +15,19 @@ renderer:
     3:
       z_offset_scale: 3.0
       visualize: true
-      nodes: {scale: 0.4, color: {type: ParentColorAdapter, colormap: {palette: {type: colorbrewer}}}, alpha: 0.9, use_sphere: true}
+      nodes:
+        scale: 0.4
+        alpha: 0.9
+        use_sphere: true
+        color:
+          type: ParentColorAdapter
+          colormap: {palette: {type: colorbrewer}}
       edges: {scale: 0.01, alpha: 0.5}
     4:
       z_offset_scale: 4.2
       visualize: true
       nodes: {scale: 0.6, color: {type: IdColorAdapter, colormap: {palette: {type: colorbrewer}}}, alpha: 0.8}
-      text: {draw: true, height: 1.25, scale: 1.0}
+      text: {draw: true, height: 1.25, scale: 1.0, adapter: {type: NameIdTextAdapter}}
       edges: {scale: 0.1, alpha: 0.2}
     2p*:
       z_offset_scale: 0.0

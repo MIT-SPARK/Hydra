@@ -16,10 +16,12 @@ active_window:
       mesh_coloring: {type: UniformMeshColoring, color: [255, 0, 0]}
 frontend:
   keyframe_selector:
-    verbosity: 2
+    type: KeyframeSelector
+    verbosity: 1
     max_range_difference_m: 0.5
+    feature_selector: {type: vmf, kappa_max: 1.0e7}
     sinks:
-      - {type: KeyframeVisualizer}
+      - {type: KeyframeVisualizer, image_plane_alpha: 0.2, line_width: 0.02, color: [0, 255, 0]}
   objects:
     min_cluster_size: 40
     cluster_tolerance: 0.25
@@ -39,18 +41,20 @@ backend:
     objects: {type: UpdateObjectsFunctor}
     places: {type: UpdateRegionGrowingTraversabilityFunctor, layer: PLACES}
     regions:
-      type: IBRegionsUpdateFunctor
+      type: OpenVocabRegionsUpdateFunctor
       clustering:
-        max_delta: 0.010
+        type: AgglomerativeIBClustering
+        verbosity: 1
+        max_delta: 0.02
         score_threshold: 0.21
         top_k: 2
         cumulative: true
         null_task_preprune: true
-        tasks:
+        queries:
           type: RosEmbeddingGroup
           ns: ~/regions
           verbosity: 1
-          prompts: [an image of a cubicle group, an image of a hallway, an image of a bathroom, an image of a conference room, an image of a reception area, an image of an office]
+          prompts: [hallway, bathroom, conference room, office, cubicle group]
   pgmo:
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 3

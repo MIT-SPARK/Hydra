@@ -33,35 +33,41 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Geometry>
-#include <memory>
+#include <config_utilities/virtual_config.h>
+#include <spark_dsg/scene_graph_layer.h>
 
-#include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/odometry/pose_graph_packet.h"
-#include "hydra/utils/logging.h"
+#include <Eigen/Dense>
+
+#include "hydra/openset/embedding_distances.h"
 
 namespace hydra {
 
-class PoseGraphTracker : public GraphBuilderFunctor {
+class LayerClustering {
  public:
-  struct Config : public VerbosityConfig {
-    Config();
+  struct Config {
+    config::VirtualConfig<EmbeddingGroup> queries;
+    config::VirtualConfig<EmbeddingDistance> metric{CosineDistance::Config()};
   } const config;
 
-  using Ptr = std::unique_ptr<PoseGraphTracker>;
-  explicit PoseGraphTracker(const Config& config);
-  virtual ~PoseGraphTracker() = default;
+  struct Cluster {
+    using Ptr = std::shared_ptr<Cluster>;
+    std::set<spark_dsg::NodeId> nodes;
+    double score;
+    FeatureVector feature;
+    size_t best_query;
+    std::string best_query_name;
+  };
+  using Clusters = std::vector<Cluster::Ptr>;
 
-  void call(const ActiveWindowOutput& msg,
-            SharedDsgInfo& dsg,
-            FrontendOutput& output,
-            const VolumetricWindow* window) override;
+  LayerClustering(const Config& config);
+
+  virtual Clusters cluster(const spark_dsg::SceneGraphLayer& layer) const = 0;
 
  protected:
-  virtual PoseGraphPacket update(uint64_t timestamp_ns,
-                                 const Eigen::Isometry3d& world_T_body) = 0;
+  EmbeddingGroup::Ptr queries_;
+  std::unique_ptr<EmbeddingDistance> metric_;
 };
 
-void declare_config(PoseGraphTracker::Config& config);
+void declare_config(LayerClustering::Config& config);
 
 }  // namespace hydra

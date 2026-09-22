@@ -28,7 +28,7 @@ add_executable(
   frontend/test_graph_connector.cpp
   frontend/test_mesh_compression.cpp
   frontend/test_mesh_segmenter.cpp
-  frontend/test_view_selector.cpp
+  frontend/test_feature_selector.cpp
   input/test_camera.cpp
   input/test_input_data_io.cpp
   input/test_lidar.cpp
@@ -40,7 +40,8 @@ add_executable(
   loop_closure/test_subgraph_extraction.cpp
   odometry/test_pose_graph_from_odom.cpp
   openset/test_embedding_distances.cpp
-  openset/clustering/test_agglomerative_clustering.cpp
+  openset/test_vmf_distance.cpp
+  openset/clustering/test_agglomerative_ib_clustering.cpp
   places/gvd_places/test_graph_extractor.cpp
   places/gvd_places/test_graph_extractor_utilities.cpp
   places/gvd_places/test_gvd_graph.cpp

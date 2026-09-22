@@ -44,6 +44,8 @@
 #include <ianvs/node_init.h>
 #include <ianvs/spin_functions.h>
 
+#include <rclcpp/executors/multi_threaded_executor.hpp>
+
 #include "hydra_ros/hydra_ros_pipeline.h"
 #include "hydra_ros/utils/node_plugins.h"
 
@@ -59,6 +61,7 @@ struct RunSettings {
   bool forward_glog_to_ros = true;
   int glog_level = 0;
   int glog_verbosity = 0;
+  bool use_multithread_executor = true;
   std::filesystem::path log_path;
   hydra::DataDirectory::Config output;
   std::vector<config::VirtualConfig<AppPlugin, true>> node_plugins = {
@@ -77,6 +80,7 @@ void declare_config(RunSettings& config) {
   field(config.forward_glog_to_ros, "forward_glog_to_ros");
   field(config.glog_level, "glog_level");
   field(config.glog_verbosity, "glog_verbosity");
+  field(config.use_multithread_executor, "use_multithread_executor");
   field<Path::Absolute>(config.log_path, "log_path");
   field(config.output, "output");
   field(config.node_plugins, "node_plugins");
@@ -146,6 +150,7 @@ int main(int argc, char* argv[]) {
 
   [[maybe_unused]] const auto plugins = config::loadExternalFactories(settings.paths);
 
+  rclcpp::executors::MultiThreadedExecutor executor;
   {  // start hydra scope
     std::vector<std::unique_ptr<hydra::AppPlugin>> node_plugins;
     for (const auto& plugin : settings.node_plugins) {
@@ -157,7 +162,9 @@ int main(int argc, char* argv[]) {
     hydra.init();
 
     hydra.start();
-    ianvs::spinAndWait(nh, settings.exit_after_clock);
+    ianvs::spinAndWait(nh,
+                       settings.exit_after_clock,
+                       settings.use_multithread_executor ? &executor : nullptr);
     hydra.stop();
 
     const hydra::DataDirectory output(settings.log_path, settings.output);

@@ -47,7 +47,6 @@
 
 #pragma once
 
-#include <config_utilities/factory.h>
 #include <hydra/odometry/pose_graph_tracker.h>
 #include <pose_graph_tools_ros/conversions.h>
 
@@ -61,7 +60,7 @@ namespace hydra {
  */
 class RosPoseGraphTracker : public PoseGraphTracker {
  public:
-  struct Config {
+  struct Config : PoseGraphTracker::Config {
     //! ROS namespace
     std::string ns = "~";
     //! Size of the odometry subscriber queue.
@@ -71,11 +70,12 @@ class RosPoseGraphTracker : public PoseGraphTracker {
   explicit RosPoseGraphTracker(const Config& config);
   virtual ~RosPoseGraphTracker() = default;
 
+ protected:
   PoseGraphPacket update(uint64_t timestamp,
                          const Eigen::Isometry3d& world_T_body) override;
 
- protected:
   void odomCallback(const pose_graph_tools::PoseGraph& pose_graph);
+
   void priorCallback(const pose_graph_tools::PoseGraph& pose_graph);
 
   pose_graph_tools::PoseGraphSubscription odom_sub_;
@@ -84,11 +84,6 @@ class RosPoseGraphTracker : public PoseGraphTracker {
   std::mutex mutex_;
   std::vector<pose_graph_tools::PoseGraph> pose_graphs_;
   pose_graph_tools::PoseGraph::ConstPtr external_priors_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<PoseGraphTracker,
-                                     RosPoseGraphTracker,
-                                     RosPoseGraphTracker::Config>("RosPoseGraphs");
 };
 
 void declare_config(RosPoseGraphTracker::Config& config);

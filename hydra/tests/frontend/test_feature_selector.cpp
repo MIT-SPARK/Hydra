@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  * Copyright 2022 Massachusetts Institute of Technology.
- * All Rights Reserved
+ * all rights reserved
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,41 +32,67 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/graph_optimizer.h"
-
-#include <config_utilities/parsing/yaml.h>
 #include <glog/logging.h>
+#include <gtest/gtest.h>
 
-#include <stdexcept>
-
-#include "hydra/backend/backend_module.h"
-#include "hydra/common/global_info.h"
+#include "hydra/frontend/feature_selector.h"
+#include "hydra/input/camera.h"
+#include "hydra/input/input_data.h"
 
 namespace hydra {
+namespace {
 
-void optimize_graph(const OptimizationConfig& info) {
-  if (!info) {
-    throw std::invalid_argument("Invalid graph optimization paths");
+Eigen::VectorXf getOneHot(size_t i, size_t dim) {
+  Eigen::VectorXf p = Eigen::VectorXf::Zero(dim);
+  p(i) = 1.0;
+  return p;
+}
+
+std::shared_ptr<Camera> createCamera(double vfov,
+                                     double hfov,
+                                     std::pair<double, double> range,
+                                     std::pair<int, int> dims = {640, 480}) {
+  Camera::Config config;
+  config.min_range = range.first;
+  config.max_range = range.second;
+  config.width = dims.first;
+  config.height = dims.second;
+  config.cx = config.width / 2.0f;
+  config.cy = config.height / 2.0f;
+  config.fx = config.width / (2.0 * std::tan(hfov * M_PI / 360.0));
+  config.fy = config.height / (2.0 * std::tan(vfov * M_PI / 360.0));
+  config.extrinsics = ParamSensorExtrinsics::Config();
+  return std::make_unique<Camera>(config, "test_camera");
+}
+
+}  // namespace
+
+TEST(ViewSelector, ProjectionCorrect) {
+  const auto camera = createCamera(60.0, 90.0, {1.0, 5.0});
+  cv::Mat range_image(480, 640, CV_32FC1);
+  range_image = 1.0;
+
+  InputData data(camera);
+  data.range_image = range_image;
+  data.feature = getOneHot(1, 10);
+  data.world_T_body = Eigen::Isometry3d::Identity();
+
+  {  // identity pose makes test points easy
+    FeatureView view(data);
+    EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.0, 0.0, -1.0), 0.5));
+    EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 0.3), 0.5));
+    EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 1.3), 0.5));
+    EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 1.9), 0.5));
   }
 
-  // TODO(nathan) maybe pull robot id from somewhere
-  const PipelineConfig global_config;
-  GlobalInfo::init(global_config, 0);
-  SharedModuleState::Ptr state(new SharedModuleState());
-  state->backend_graph = GlobalInfo::instance().createSharedDsg();
-  state->backend_graph->graph = spark_dsg::SceneGraph::load(info.graph);
+  data.world_T_body = Eigen::Translation<double, 3>(Eigen::Vector3d(0.0, 0.0, 1.0));
 
-  auto dsg = state->backend_graph->clone();
-  const auto config = config::fromYamlFile<BackendModule::Config>(info.config_path);
-  BackendModule backend(config, dsg, state);
-  LOG(INFO) << "Loading backend state!";
-  backend.loadState(info.graph, info.deformation_graph);
-  LOG(INFO) << "Loaded backend state!";
-
-  backend.step(true);  // forces optimization even if no loop closures set
-  if (!info.output.empty()) {
-    LOG(INFO) << "Saving optimized graph to " << info.output;
-    dsg->graph->save(info.output);
+  {  // non-identity pose
+    FeatureView view(data);
+    EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 0.1), 0.5));
+    EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 1.3), 0.5));
+    EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 2.3), 0.5));
+    EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.0, 0.0, 2.9), 0.5));
   }
 }
 

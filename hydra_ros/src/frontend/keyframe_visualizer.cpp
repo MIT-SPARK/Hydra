@@ -90,7 +90,10 @@ Corners getFrustumCorners(const Sensor& sensor, double depth) {
   return corners;
 }
 
-void fillEdges(const Corners& corners, const Eigen::Vector3d& origin, Marker& edges) {
+void fillEdges(const Corners& corners,
+               const Eigen::Vector3d& origin,
+               Marker& edges,
+               const std_msgs::msg::ColorRGBA& color) {
   // outline of image plane
   tf2::convert(corners[0], edges.points.emplace_back());
   tf2::convert(corners[1], edges.points.emplace_back());
@@ -109,9 +112,15 @@ void fillEdges(const Corners& corners, const Eigen::Vector3d& origin, Marker& ed
   tf2::convert(corners[2], edges.points.emplace_back());
   tf2::convert(origin, edges.points.emplace_back());
   tf2::convert(corners[3], edges.points.emplace_back());
+  for (size_t i = 0; i < 16; ++i) {
+    edges.colors.push_back(color);
+  }
 }
 
-void fillPlanes(const Corners& corners, Marker& planes, bool both_sides) {
+void fillPlanes(const Corners& corners,
+                Marker& planes,
+                bool both_sides,
+                const std_msgs::msg::ColorRGBA& color) {
   // first side
   tf2::convert(corners[0], planes.points.emplace_back());
   tf2::convert(corners[1], planes.points.emplace_back());
@@ -126,6 +135,11 @@ void fillPlanes(const Corners& corners, Marker& planes, bool both_sides) {
     tf2::convert(corners[2], planes.points.emplace_back());
     tf2::convert(corners[1], planes.points.emplace_back());
     tf2::convert(corners[0], planes.points.emplace_back());
+  }
+
+  const size_t num_points = both_sides ? 6 : 12;
+  for (size_t i = 0; i < num_points; ++i) {
+    planes.colors.push_back(color);
   }
 }
 
@@ -143,9 +157,9 @@ MarkerArray drawCameraFrustums(const KeyframeVisualizer::Config& config,
   edges.id = 0;
   edges.type = Marker::LINE_LIST;
   edges.action = Marker::ADD;
-  edges.color = visualizer::makeColorMsg(config.color, 1.0);
   edges.scale.x = config.line_width;
   edges.points.reserve(16 * frames.size());
+  edges.colors.reserve(16 * frames.size());
 
   Marker* planes = nullptr;
   if (with_image_plane) {
@@ -155,11 +169,12 @@ MarkerArray drawCameraFrustums(const KeyframeVisualizer::Config& config,
     planes->id = 0;
     planes->type = Marker::TRIANGLE_LIST;
     planes->action = Marker::ADD;
-    planes->color = visualizer::makeColorMsg(config.color, config.image_plane_alpha);
     planes->scale.x = 1.0;
     planes->scale.y = 1.0;
     planes->scale.z = 1.0;
+    planes->color.a = config.image_plane_alpha;
     planes->points.reserve(num_points * frames.size());
+    planes->colors.reserve(num_points * frames.size());
   }
 
   for (const auto& frame : frames) {
@@ -172,9 +187,13 @@ MarkerArray drawCameraFrustums(const KeyframeVisualizer::Config& config,
     curr_corners[2] = pose * corners[2];
     curr_corners[3] = pose * corners[3];
 
-    fillEdges(curr_corners, pose.translation().cast<double>(), edges);
+    const auto has_feature = frame->feature.size() > 0;
+    const auto color = has_feature ? config.color : spark_dsg::Color::black();
+    const auto edge_color = visualizer::makeColorMsg(color, 1.0);
+    fillEdges(curr_corners, pose.translation().cast<double>(), edges, edge_color);
     if (planes) {
-      fillPlanes(curr_corners, *planes, config.draw_both_image_plane_sides);
+      const auto fcolor = visualizer::makeColorMsg(color, config.image_plane_alpha);
+      fillPlanes(curr_corners, *planes, config.draw_both_image_plane_sides, fcolor);
     }
   }
 

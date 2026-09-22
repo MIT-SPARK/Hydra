@@ -57,7 +57,8 @@ class ImageReceiver : public RosDataReceiver {
     //! Queue depth for synchronization
     size_t queue_size = 10;
     //! QoS settings for subscribers
-    QoSConfig qos = rclcpp::SensorDataQoS();
+    QoSConfig qos =
+        rclcpp::SensorDataQoS().reliability(rclcpp::ReliabilityPolicy::Reliable);
   } const config;
 
   ImageReceiver(const Config& config,
