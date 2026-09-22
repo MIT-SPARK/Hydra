@@ -19,9 +19,9 @@ frontend:
     type: KeyframeSelector
     verbosity: 1
     max_range_difference_m: 0.5
-    feature_selector: {type: average}
+    feature_selector: {type: vmf, kappa_max: 1.0e7}
     sinks:
-      - {type: KeyframeVisualizer}
+      - {type: KeyframeVisualizer, image_plane_alpha: 0.2, line_width: 0.02, color: [0, 255, 0]}
   objects:
     min_cluster_size: 40
     cluster_tolerance: 0.25
@@ -54,7 +54,7 @@ backend:
           type: RosEmbeddingGroup
           ns: ~/regions
           verbosity: 1
-          prompts: [an image of a hallway, an image of a bathroom, an image of a conference room, an image of an office]
+          prompts: [hallway, bathroom, conference room, office, cubicle group]
   pgmo:
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 3

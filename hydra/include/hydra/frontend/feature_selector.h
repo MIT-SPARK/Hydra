@@ -71,7 +71,7 @@ void declare_config(AverageFeatureSelector::Config& config);
 //! Fits a von-mises fischer distribution to features of views the place is visible from
 struct VMFFeatureSelector : FeatureSelector {
   struct Config : FeatureSelector::Config {
-    float kappa_max = 500.0f;
+    float kappa_max = 1.0e6;
   } const config;
 
   explicit VMFFeatureSelector(const Config& config);

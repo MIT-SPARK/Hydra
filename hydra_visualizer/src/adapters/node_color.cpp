@@ -75,6 +75,9 @@ static const auto place_distance_reg =
 static const auto last_updated_reg =
     config::Registration<ValueFunctor, LastUpdatedFunctor>("last_updated");
 
+static const auto vmf_reg =
+    config::Registration<ValueFunctor, VmfKappaFunctor>("vmf_kappa");
+
 #undef REGISTER_COLOR_ADAPTER
 
 }  // namespace
@@ -256,6 +259,16 @@ double LastUpdatedFunctor::eval(const SceneGraph&, const SceneGraphNode& node) c
   return node.attributes().last_update_time_ns;
 }
 
+double VmfKappaFunctor::eval(const SceneGraph&, const SceneGraphNode& node) const {
+  auto attrs = node.tryAttributes<SemanticNodeAttributes>();
+  if (!attrs || attrs->feature_concentration.size() != 1) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+
+  const auto kappa = attrs->feature_concentration(0, 0);
+  return std::log(kappa);
+}
+
 ValueColorAdapter::ValueColorAdapter(const Config& config)
     : config(config),
       min_value_(0.0),
@@ -272,6 +285,10 @@ void ValueColorAdapter::setGraph(const SceneGraph& graph, LayerKey layer_key) {
   const auto& layer = graph.getLayer(layer_key.layer, layer_key.partition);
   for (const auto& [node_id, node] : layer.nodes()) {
     const auto value = functor_->eval(graph, *node);
+    if (!std::isfinite(value)) {
+      continue;
+    }
+
     if (is_first) {
       min_value_ = value;
       max_value_ = value;
@@ -285,12 +302,18 @@ void ValueColorAdapter::setGraph(const SceneGraph& graph, LayerKey layer_key) {
 
 Color ValueColorAdapter::getColor(const SceneGraph& graph,
                                   const SceneGraphNode& node) const {
-  return colormap_.getColor(functor_->eval(graph, node), min_value_, max_value_);
+  const auto value = functor_->eval(graph, node);
+  if (!std::isfinite(value)) {
+    return config.default_color;
+  }
+
+  return colormap_.getColor(value, min_value_, max_value_);
 }
 
 void declare_config(ValueColorAdapter::Config& config) {
   using namespace config;
   name("ValueColorAdapter::Config");
+  field(config.default_color, "default_color");
   field(config.colormap, "colormap");
   field(config.value_functor, "value_functor");
 }

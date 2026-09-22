@@ -172,6 +172,7 @@ MarkerArray drawCameraFrustums(const KeyframeVisualizer::Config& config,
     planes->scale.x = 1.0;
     planes->scale.y = 1.0;
     planes->scale.z = 1.0;
+    planes->color.a = config.image_plane_alpha;
     planes->points.reserve(num_points * frames.size());
     planes->colors.reserve(num_points * frames.size());
   }

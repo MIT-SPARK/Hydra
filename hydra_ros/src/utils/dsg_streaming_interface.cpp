@@ -98,7 +98,7 @@ DsgSender::DsgSender(ianvs::NodeHandle nh,
 
 void DsgSender::sendGraph(const SceneGraph& graph, const rclcpp::Time& stamp) const {
   const uint64_t timestamp_ns = stamp.nanoseconds();
-  timing::ScopedTimer timer(config.timer_name, timestamp_ns);
+  timing::ScopedTimer timer(config.timer_name + "/publish", timestamp_ns);
 
   publishGraph(graph, timestamp_ns);
   publishMesh(graph, timestamp_ns);

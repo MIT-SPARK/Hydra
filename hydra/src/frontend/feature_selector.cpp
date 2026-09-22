@@ -169,7 +169,8 @@ VMFFeatureSelector::VMFFeatureSelector(const Config& config)
 
 bool VMFFeatureSelector::select(const FeatureList& views,
                                 SemanticNodeAttributes& attrs) const {
-  size_t num_visible = 0;
+  size_t visible = 0;
+  auto& feature = attrs.semantic_feature;
   for (const auto& view : views) {
     if (view.feature.size() == 0) {
       continue;
@@ -179,22 +180,22 @@ bool VMFFeatureSelector::select(const FeatureList& views,
       continue;
     }
 
-    if (!num_visible) {
-      attrs.semantic_feature = view.feature.normalized();
+    if (!visible) {
+      feature = view.feature.normalized();
     } else {
-      attrs.semantic_feature += view.feature.normalized();
+      feature += view.feature.normalized();
     }
-    ++num_visible;
+    ++visible;
   }
 
-  if (num_visible > 0) {
-    const auto stats = computeVmfStats(attrs.semantic_feature, num_visible);
+  if (visible > 0) {
+    const auto stats = computeVmfStats(feature, visible, config.kappa_max);
     attrs.semantic_feature = stats.mu;
     attrs.feature_concentration = Eigen::MatrixXf(1, 1);
     attrs.feature_concentration(0, 0) = stats.kappa;
   }
 
-  return num_visible > 0;
+  return visible > 0;
 }
 
 }  // namespace hydra
