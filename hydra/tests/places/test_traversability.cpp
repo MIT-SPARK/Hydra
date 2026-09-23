@@ -33,11 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/active_window/active_window_output.h>
+#include <hydra/input/camera.h>
 #include <hydra/places/block_traversability_clustering.h>
+#include <hydra/places/traversability_projective_integrator.h>
 
 namespace hydra::places {
 
 using Range = BlockTraversabilityClustering::Range;
+using spark_dsg::TraversabilityState;
 
 TEST(TraversabilityPlaces, Indexing) {
   // Linear indexing.
@@ -90,5 +94,89 @@ TEST(TraversabilityPlaces, RangeProjection) {
   EXPECT_EQ(range.projectToNextBlock(2, 10, 3), Range(2, 0, 4, 2));  // top
   EXPECT_EQ(range.projectToNextBlock(3, 10, 3), Range(0, 3, 2, 5));  // right
 };
+
+TEST(TraversabilityPlaces, ResetGeometryKeepsSemantics) {
+  TraversabilityBlock block(1.0f, {0, 0, 0}, 2);
+  for (auto& voxel : block.voxels) {
+    voxel.traversability = 0.5f;
+    voxel.confidence = 0.7f;
+    voxel.height = 1.5f;
+    voxel.state = TraversabilityState::TRAVERSABLE;
+    voxel.debug_value = 3.0f;
+    voxel.semantic.traversable_count = 3;
+    voxel.semantic.intraversable_count = 1;
+    voxel.semantic.traversability = 0.75f;
+    voxel.semantic.confidence = 0.8f;
+  }
+
+  resetGeometry(block);
+  for (const auto& voxel : block.voxels) {
+    EXPECT_EQ(voxel.traversability, 0.0f);
+    EXPECT_EQ(voxel.confidence, 0.0f);
+    EXPECT_FALSE(voxel.height);
+    EXPECT_EQ(voxel.state, TraversabilityState::UNKNOWN);
+    EXPECT_EQ(voxel.debug_value, -1.0f);
+    EXPECT_EQ(voxel.semantic.traversable_count, 3u);
+    EXPECT_EQ(voxel.semantic.intraversable_count, 1u);
+    EXPECT_EQ(voxel.semantic.traversability, 0.75f);
+    EXPECT_EQ(voxel.semantic.confidence, 0.8f);
+  }
+}
+
+TEST(TraversabilityPlaces, ProjectiveIntegratorAccumulates) {
+  // Camera at the world origin looking along +z (identity body pose and extrinsics).
+  Camera::Config camera_config;
+  camera_config.min_range = 0.1;
+  camera_config.max_range = 10.0;
+  camera_config.width = 640;
+  camera_config.height = 480;
+  camera_config.cx = 320.0f;
+  camera_config.cy = 240.0f;
+  camera_config.fx = 320.0f;
+  camera_config.fy = 320.0f;
+  camera_config.extrinsics = ParamSensorExtrinsics::Config();
+  auto camera = std::make_shared<Camera>(camera_config, "camera");
+
+  // Voxel (0, 0) is centered at (0.05, 0.05) and sits on a surface at z = 2.
+  const float visible_range = Eigen::Vector3f(0.05f, 0.05f, 2.0f).norm();
+  auto data = std::make_shared<InputData>(camera);
+  data->world_T_body = Eigen::Isometry3d::Identity();
+  data->range_image =
+      cv::Mat(480, 640, InputData::RangeMatType, cv::Scalar(visible_range));
+  data->label_image = cv::Mat(480, 640, InputData::LabelMatType, cv::Scalar(1));
+  const ActiveWindowOutput msg(data);
+
+  TraversabilityProjectiveIntegrator::Config config;
+  config.interpolation_method =
+      config::VirtualConfig<ProjectionInterpolator>(InterpolatorNearest::Config{});
+  config.confidence_saturation_count = 4;
+  TraversabilityProjectiveIntegrator integrator(config);
+
+  TraversabilityLayer layer(0.1f, 10);
+  auto& block = layer.allocateBlock(BlockIndex(0, 0, 0), 10);
+  const auto set_heights = [&block]() {
+    block.voxel(0, 0).height = 2.0f;  // visible
+    block.voxel(1, 0).height = 3.0f;  // behind the observed surface
+  };
+
+  set_heights();
+  integrator.apply(layer, msg);
+
+  // Emulate the estimator recomputing the block between updates.
+  resetGeometry(block);
+  set_heights();
+  integrator.apply(layer, msg);
+
+  const auto& visible = block.voxel(0, 0).semantic;
+  EXPECT_EQ(visible.traversable_count, 2u);
+  EXPECT_EQ(visible.intraversable_count, 0u);
+  EXPECT_FLOAT_EQ(visible.traversability, 1.0f);
+  EXPECT_FLOAT_EQ(visible.confidence, 0.5f);
+
+  // Occluded and height-less cells get no evidence.
+  EXPECT_EQ(block.voxel(1, 0).semantic.total(), 0u);
+  EXPECT_EQ(block.voxel(0, 1).semantic.total(), 0u);
+  EXPECT_LT(block.voxel(0, 1).semantic.traversability, 0.0f);
+}
 
 }  // namespace hydra::places

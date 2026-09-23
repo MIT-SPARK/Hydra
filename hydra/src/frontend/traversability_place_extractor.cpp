@@ -90,7 +90,23 @@ void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
   // expensive though.
   Timer timer("traversability/postprocessing", msg.timestamp_ns);
   auto layer = estimator_->getTraversabilityLayer();
-  postprocessing_.apply(layer);
+  postprocessing_.apply(layer, msg);
+
+  // Semantic evidence accumulates across updates, so carry it back to the estimator's
+  // persistent layer. Everything else the postprocessing changed stays on this copy.
+  auto persistent_layer = estimator_->mutableTraversabilityLayer();
+  if (persistent_layer) {
+    for (const auto& block : layer) {
+      auto persistent_block = persistent_layer->getBlockPtr(block.index);
+      if (!persistent_block) {
+        continue;
+      }
+
+      for (size_t i = 0; i < block.voxels.size(); ++i) {
+        persistent_block->voxels[i].semantic = block.voxels[i].semantic;
+      }
+    }
+  }
 
   timer.reset("traversability/clustering");
   clustering_->updateGraph(layer, msg, graph, config.layer);
