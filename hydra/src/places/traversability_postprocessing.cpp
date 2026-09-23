@@ -57,9 +57,10 @@ TraversabilityProcessors::TraversabilityProcessors(const Config& config) {
   }
 }
 
-void TraversabilityProcessors::apply(TraversabilityLayer& layer) const {
+void TraversabilityProcessors::apply(TraversabilityLayer& layer,
+                                     const ActiveWindowOutput& msg) const {
   for (const auto& processor : processors_) {
-    processor->apply(layer);
+    processor->apply(layer, msg);
   }
 }
 
@@ -79,7 +80,8 @@ struct Updates : public spatial_hash::Block, Index2DSet {
 };
 using UpdatesLayer = spatial_hash::BlockLayer<Updates>;
 
-void ErosionDilation::apply(TraversabilityLayer& layer) {
+void ErosionDilation::apply(TraversabilityLayer& layer,
+                            const ActiveWindowOutput& /* msg */) {
   // NOTE(lschmid): Naive implementation for now.
   UpdatesLayer updates(layer.blockSize());
   for (const auto& block : layer) {

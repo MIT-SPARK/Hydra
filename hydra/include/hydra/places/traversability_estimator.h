@@ -119,6 +119,15 @@ class TraversabilityEstimator {
   }
 
   /**
+   * @brief Mutable access to the persistent traversability layer, e.g. for integrators
+   * that accumulate evidence across updates.
+   * @returns The layer or nullptr if no update has been processed yet.
+   */
+  TraversabilityLayer* mutableTraversabilityLayer() {
+    return traversability_layer_.get();
+  }
+
+  /**
    * @brief Classify a traversability voxel based on its confidence and traversability.
    * @note Default implementation uses min_confidence_, min_traversability_, and
    * pessimistic_ set by derived class constructors. Subclasses may override for custom

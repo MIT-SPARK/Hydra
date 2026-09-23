@@ -312,7 +312,7 @@ void HeightTraversabilityEstimator::computeTraversability(
     // Reset the traversability.
     auto& traversability_block =
         traversability_layer_->allocateBlock(block_idx_2d, voxels_per_side);
-    traversability_block.reset();
+    resetGeometry(traversability_block);
     traversability_block.updated = true;
     for (int block_z = min_height.first.z(); block_z <= max_height.first.z();
          ++block_z) {
@@ -462,7 +462,7 @@ void GradientTraversabilityEstimator::computeTraversability(
   const auto gradient_map = computeGradientMap(height_map, tsdf_layer_->voxel_size);
   for (auto& block_idx : updated) {
     auto& block = traversability_layer_->allocateBlock(block_idx, voxels_per_side);
-    block.reset();
+    resetGeometry(block);
     block.updated = true;
 
     for (int x = 0; x < voxels_per_side; ++x) {

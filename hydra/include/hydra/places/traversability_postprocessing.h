@@ -40,6 +40,12 @@
 
 #include "hydra/places/traversability_layer.h"
 
+namespace hydra {
+// Forward declared to keep volumetric_map.h / OpenCV out of this header; processors
+// only take it by reference.
+struct ActiveWindowOutput;
+}  // namespace hydra
+
 namespace hydra::places {
 
 /**
@@ -57,8 +63,10 @@ class TraversabilityProcessor {
   /**
    * @brief Apply the post processing to the traversability layer.
    * @param layer The traversability layer to process.
+   * @param msg The active window output the layer was computed from, providing access
+   * to the sensor data and volumetric map for this update.
    */
-  virtual void apply(TraversabilityLayer& layer) = 0;
+  virtual void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) = 0;
 };
 
 /**
@@ -71,8 +79,9 @@ struct TraversabilityProcessors {
 
   /** @brief Apply all processors to the traversability layer.
    * @param layer The traversability layer to process.
+   * @param msg The active window output the layer was computed from.
    */
-  void apply(TraversabilityLayer& layer) const;
+  void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) const;
 
  private:
   std::vector<TraversabilityProcessor::Ptr> processors_;
@@ -91,7 +100,7 @@ class ErosionDilation : public TraversabilityProcessor {
   ErosionDilation(const Config& config);
   ~ErosionDilation() override = default;
 
-  void apply(TraversabilityLayer& layer) override;
+  void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) override;
 
   const Config config;
 
