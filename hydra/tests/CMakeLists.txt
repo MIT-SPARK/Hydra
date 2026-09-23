@@ -50,6 +50,7 @@ add_executable(
   places/gvd_places/test_gvd_utilities.cpp
   places/test_traversability.cpp
   places/test_region_growing_traversability_clustering.cpp
+  places/test_semantic_traversability_integrator.cpp
   reconstruction/test_integration_masking.cpp
   reconstruction/test_marching_cubes.cpp
   reconstruction/test_mesh_integrator.cpp

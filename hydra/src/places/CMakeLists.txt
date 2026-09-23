@@ -11,6 +11,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/robot_footprint_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/block_traversability_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/region_growing_traversability_clustering.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/semantic_traversability_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/traversability_estimator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/traversability_postprocessing.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/2d_places/ellipsoid_math.cpp
