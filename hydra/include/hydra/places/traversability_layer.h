@@ -36,6 +36,8 @@
 
 #include <spark_dsg/node_attributes.h>
 
+#include <cstdint>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -43,6 +45,26 @@
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
+
+//! Semantic traversability evidence fused from projected label images. Unlike the
+//! geometric fields of TraversabilityVoxel, this accumulates across updates.
+struct SemanticTraversability {
+  //! Number of observations labeled traversable.
+  uint32_t traversable_count = 0;
+
+  //! Number of observations labeled intraversable.
+  uint32_t intraversable_count = 0;
+
+  //! Fraction of traversable observations in [0, 1]. Negative if never observed.
+  float traversability = -1.0f;
+
+  //! Confidence in [0, 1] based on the number of observations. 0 if never observed.
+  //! Independent of the value itself, so a cell can be high-confidence and undecided
+  //! (~0.5) when labels conflict.
+  float confidence = 0.0f;
+
+  uint32_t total() const { return traversable_count + intraversable_count; }
+};
 
 struct TraversabilityVoxel {
   //! The traversability value in the range [0, 1] (not traversable to fully).
@@ -60,6 +82,9 @@ struct TraversabilityVoxel {
   //! Arbitrary debug value that can be set for viualization.
   // TODO(lschmid): Remove this at some point.
   mutable float debug_value = -1.0f;
+
+  //! Semantic evidence. Preserved by resetGeometry().
+  SemanticTraversability semantic;
 
   bool operator==(const TraversabilityVoxel& other) const {
     return traversability == other.traversability && confidence == other.confidence &&
@@ -199,5 +224,15 @@ struct Layer2D : public spatial_hash::BlockLayer<Block2D<VoxelT>> {
 
 using TraversabilityBlock = Block2D<TraversabilityVoxel>;
 using TraversabilityLayer = Layer2D<TraversabilityVoxel>;
+
+//! Reset the geometric estimate of every voxel in the block but keep the fused
+//! semantic evidence, which accumulates across updates rather than being recomputed.
+inline void resetGeometry(TraversabilityBlock& block) {
+  for (auto& voxel : block.voxels) {
+    const auto semantic = voxel.semantic;
+    voxel = TraversabilityVoxel();
+    voxel.semantic = semantic;
+  }
+}
 
 }  // namespace hydra::places
