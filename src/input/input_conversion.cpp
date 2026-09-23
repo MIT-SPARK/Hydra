@@ -98,13 +98,24 @@ bool colorToLabels(cv::Mat& label_image, const cv::Mat& colors) {
   }
 
   cv::Mat new_label_image(colors.size(), CV_32SC1);
+  // NOTE: Label images consist of large uniform regions, so remember the last lookup instead of
+  // hashing the color of every pixel.
+  bool have_last = false;
+  cv::Vec3b last_pixel;
+  int32_t last_label = -1;
   for (int r = 0; r < colors.rows; ++r) {
+    const auto* row = colors.ptr<cv::Vec3b>(r);
+    auto* label_row = new_label_image.ptr<int32_t>(r);
     for (int c = 0; c < colors.cols; ++c) {
-      const auto& pixel = colors.at<cv::Vec3b>(r, c);
-      spark_dsg::Color color(pixel[0], pixel[1], pixel[2]);
-      // this is lazy, but works out to the same invalid label we normally use
-      new_label_image.at<int32_t>(r, c) =
-          colormap_ptr->getLabelFromColor(color).value_or(-1);
+      const auto& pixel = row[c];
+      if (!have_last || pixel != last_pixel) {
+        spark_dsg::Color color(pixel[0], pixel[1], pixel[2]);
+        // this is lazy, but works out to the same invalid label we normally use
+        last_label = colormap_ptr->getLabelFromColor(color).value_or(-1);
+        last_pixel = pixel;
+        have_last = true;
+      }
+      label_row[c] = last_label;
     }
   }
 
