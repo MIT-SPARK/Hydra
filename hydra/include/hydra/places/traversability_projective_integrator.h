@@ -57,9 +57,10 @@ namespace hydra::places {
  * range against the range image, interpolates the label image at that pixel, and counts
  * the observation in the voxel's `semantic` field.
  *
- * @note The semantic counts live on the voxels and persist across updates because the
- * estimators reset only the geometric fields (see resetGeometry()). This must therefore
- * run as an integrator on the persistent layer, not as a postprocessing step.
+ * @note The semantic counts live on the voxels and persist across updates: the
+ * extractor carries the semantic fields of the postprocessed layer back to the
+ * estimator's layer, and the estimators reset only the geometric fields (see
+ * resetGeometry()).
  *
  * @note The geometric `traversability`, `confidence` and `state` fields are left
  * untouched, so this can be enabled alongside any estimator without changing existing

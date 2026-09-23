@@ -57,7 +57,6 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
   name("TraversabilityPlaceExtractor::Config");
   field(config.layer, "layer");
   field(config.estimator, "estimator");
-  field(config.integrators, "integrators");
   field(config.postprocessing, "postprocessing");
   field(config.clustering, "clustering");
   field(config.sinks, "sinks");
@@ -66,7 +65,6 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
 TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
     : config(config::checkValid(config)),
       estimator_(config.estimator.create()),
-      integrators_(config.integrators),
       postprocessing_(config.postprocessing),
       clustering_(config.clustering.create()),
       sinks_(Sink::instantiate(config.sinks)) {}
@@ -84,13 +82,6 @@ void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
 void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
   estimator_->updateTraversability(msg);
-
-  // Integrators write into the persistent layer so their evidence accumulates.
-  auto layer = estimator_->mutableTraversabilityLayer();
-  if (layer) {
-    timer.reset("traversability/integrate");
-    integrators_.apply(*layer, msg);
-  }
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
@@ -100,6 +91,22 @@ void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
   Timer timer("traversability/postprocessing", msg.timestamp_ns);
   auto layer = estimator_->getTraversabilityLayer();
   postprocessing_.apply(layer, msg);
+
+  // Semantic evidence accumulates across updates, so carry it back to the estimator's
+  // persistent layer. Everything else the postprocessing changed stays on this copy.
+  auto persistent_layer = estimator_->mutableTraversabilityLayer();
+  if (persistent_layer) {
+    for (const auto& block : layer) {
+      auto persistent_block = persistent_layer->getBlockPtr(block.index);
+      if (!persistent_block) {
+        continue;
+      }
+
+      for (size_t i = 0; i < block.voxels.size(); ++i) {
+        persistent_block->voxels[i].semantic = block.voxels[i].semantic;
+      }
+    }
+  }
 
   timer.reset("traversability/clustering");
   clustering_->updateGraph(layer, msg, graph, config.layer);
