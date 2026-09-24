@@ -1,0 +1,85 @@
+---
+launch:
+  - arg: {name: model_name, default: /root/hydra_ws/.models/ade20k-efficientvit_seg_l2.onnx}
+  - arg: {name: model_config_path, default: $(find-pkg-share semantic_inference_ros)/config/models/ade20k-efficientvit_seg_l2.yaml}
+  - arg: {name: labelspace_name, default: ade20k_mit}
+  - arg: {name: traversability_model_name, default: ganav_rugd_group6, description: GA-Nav model exported by semantic_inference/exporting/export_ganav.py}
+  - arg: {name: zed_rgb_topic, default: /zed/zed_node/left/image_rect_color}
+  - arg: {name: zed_depth_topic, default: /zed/zed_node/depth/depth_registered}
+  - arg: {name: zed_camera_info_topic, default: /zed/zed_node/left/camera_info}
+  - arg: {name: use_zed, default: 'true', description: 'Launch the zed driver, disable for bags'}
+  - arg: {name: use_sim_time, default: 'false'}
+  - arg: {name: dataset, default: zed2i}
+  - arg: {name: extra_yaml, default: '{}', description: 'Extra hydra config, e.g. frame names for a bag'}
+  - arg: {name: start_visualizer, default: 'true'}
+
+  # zed
+  - include:
+      if: $(var use_zed)
+      file: $(find-pkg-share zed_wrapper)/launch/zed_camera.launch.py
+      arg:
+        - {name: camera_model, value: zed2i}
+        - {name: use_sim_time, value: $(var use_sim_time)}
+
+  # semantic inference
+  - node:
+      pkg: semantic_inference_ros
+      exec: closed_set_node
+      namespace: frontleft
+      name: segmentation
+      remap:
+        - {from: color/image_raw, to: $(var zed_rgb_topic)}
+        - {from: color/camera_info, to: $(var zed_camera_info_topic)}
+        - {from: depth/image_rect, to: $(var zed_depth_topic)}
+      args: >
+        --config-utilities-file $(var model_config_path)
+        --config-utilities-file $(find-pkg-share semantic_inference_ros)/config/label_groupings/$(var labelspace_name).yaml@output/recolor
+        --config-utilities-yaml {output: {recolor: {colormap_path: $(find-pkg-share semantic_inference_ros)/config/distinct_150_colors.csv}}}
+        --config-utilities-yaml {segmenter: {model: {model_file: $(var model_name)}}}
+        --config-utilities-yaml {worker: {max_queue_size: 1, image_separation_s: 0.0}}
+
+  # traversability inference (GA-Nav)
+  - node:
+      pkg: semantic_inference_ros
+      exec: closed_set_node
+      namespace: frontleft/ganav
+      name: segmentation
+      remap:
+        - {from: color/image_raw, to: $(var zed_rgb_topic)}
+      args: >
+        --config-utilities-file $(find-pkg-share semantic_inference_ros)/config/models/$(var traversability_model_name).yaml
+        --config-utilities-file $(find-pkg-share semantic_inference_ros)/config/label_groupings/ganav_group6.yaml@output/recolor
+        --config-utilities-yaml {output: {recolor: {colormap_path: $(find-pkg-share semantic_inference_ros)/config/ganav_group6_colors.csv}}}
+        --config-utilities-yaml {segmenter: {model: {model_file: $(var traversability_model_name).onnx}}}
+        --config-utilities-yaml {worker: {max_queue_size: 1, image_separation_s: 0.0}}
+        --config-utilities-yaml {status: {nickname: ganav}}
+
+  # hydra
+  - set_remap: {from: hydra/input/frontleft/rgb/image_raw, to: $(var zed_rgb_topic)}
+  - set_remap: {from: hydra/input/frontleft/depth_registered/image_rect, to: $(var zed_depth_topic)}
+  - set_remap: {from: hydra/input/frontleft/rgb/camera_info, to: $(var zed_camera_info_topic)}
+  - set_remap: {from: hydra/input/frontleft/semantic/image_raw, to: /frontleft/semantic/image_raw}
+  - set_remap: {from: hydra/input/frontleft/traversability/image_raw, to: /frontleft/ganav/semantic/image_raw}
+  - node:
+      pkg: hydra_ros
+      exec: hydra_ros_node
+      name: hydra
+      param:
+        - {name: use_sim_time, value: $(var use_sim_time)}
+      args: >-
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/input/$(var dataset).yaml
+        --config-utilities-file $(find-pkg-share hydra_ros)/config/traversability/ganav.yaml
+        --config-utilities-file $(find-pkg-share hydra)/config/label_spaces/$(var labelspace_name)_label_space.yaml
+        --config-utilities-yaml {print_missing: false, show_config: true, verbosity: 2}
+        --config-utilities-yaml {log_path: $(env HOME)/.hydra/$(var dataset)_ganav}
+        --config-utilities-yaml {glog_level: 0, glog_verbosity: 0}
+        --config-utilities-yaml $(var extra_yaml)
+
+  # hydra visualizer
+  - set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
+  - include:
+      if: $(var start_visualizer)
+      file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
+      arg:
+        - {name: visualizer_frame, value: map}
+        - {name: rviz_path, value: $(find-pkg-share hydra_ros)/hydra_visualizer/rviz/zed.rviz}

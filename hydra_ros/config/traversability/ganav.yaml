@@ -1,0 +1,27 @@
+---
+# Overlay that fuses GA-Nav traversability segmentation into the 2.5D traversability
+# places. Stack on top of an input config (e.g., input/zed2i.yaml); the sensor name
+# below must match the input config.
+#
+# GA-Nav groups: 0 background, 1 smooth, 2 rough, 3 bumpy, 4 forbidden, 5 obstacle
+input:
+  inputs:
+    frontleft:
+      receiver:
+        with_traversability: true
+frontend:
+  traversability_places:
+    type: traversability
+    estimator: {type: HeightTraversabilityEstimator, height_below: 0, height_above: 0.5, min_confidence: 1.0, min_traversability: 1.0, pessimistic: true}
+    postprocessing:
+      - type: TraversabilityProjectiveIntegrator
+        input_image: traversability
+        traversable_labels: [1, 2, 3]
+        intraversable_labels: [4, 5]
+        write_debug_value: true
+    clustering: {type: RegionGrowingTraversabilityClustering, max_radius: 2.0, num_orientation_bins: 20}
+    sinks:
+      - {type: TraversabilityVisualizer}
+backend:
+  update_functors:
+    traversability: {type: UpdateRegionGrowingTraversabilityFunctor}

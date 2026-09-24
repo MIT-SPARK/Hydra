@@ -35,7 +35,9 @@
 #include "hydra/places/traversability_projective_integrator.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 
 #include <algorithm>
 #include <cmath>
@@ -54,13 +56,22 @@ static const auto registration =
                                    TraversabilityProjectiveIntegrator::Config>(
         "TraversabilityProjectiveIntegrator");
 
+inline bool contains(const std::vector<int>& labels, int label) {
+  return std::find(labels.begin(), labels.end(), label) != labels.end();
+}
+
 }  // namespace
 
 void declare_config(TraversabilityProjectiveIntegrator::Config& config) {
   using namespace config;
   name("TraversabilityProjectiveIntegrator::Config");
-  field(config.traversable_label, "traversable_label");
-  field(config.intraversable_label, "intraversable_label");
+  enum_field(config.input_image,
+             "input_image",
+             {{TraversabilityProjectiveIntegrator::InputImage::TRAVERSABILITY,
+               "traversability"},
+              {TraversabilityProjectiveIntegrator::InputImage::LABEL, "label"}});
+  field(config.traversable_labels, "traversable_labels");
+  field(config.intraversable_labels, "intraversable_labels");
   field(config.confidence_saturation_count, "confidence_saturation_count");
   field(config.max_range_error,
         "max_range_error",
@@ -72,8 +83,13 @@ void declare_config(TraversabilityProjectiveIntegrator::Config& config) {
   check(config.confidence_saturation_count, GT, 0, "confidence_saturation_count");
   check(config.max_range_error, NE, 0.0f, "max_range_error");
   check(config.debug_value_scale, GT, 0.0f, "debug_value_scale");
-  checkCondition(config.traversable_label != config.intraversable_label,
-                 "traversable_label must differ from intraversable_label");
+  checkCondition(!config.traversable_labels.empty(), "traversable_labels is empty");
+  checkCondition(std::none_of(config.traversable_labels.begin(),
+                              config.traversable_labels.end(),
+                              [&config](int label) {
+                                return contains(config.intraversable_labels, label);
+                              }),
+                 "traversable_labels and intraversable_labels must be disjoint");
 }
 
 TraversabilityProjectiveIntegrator::TraversabilityProjectiveIntegrator(
@@ -85,7 +101,15 @@ void TraversabilityProjectiveIntegrator::apply(TraversabilityLayer& layer,
                                                const ActiveWindowOutput& msg) {
   // A collated message can carry several frames; each is an independent observation.
   for (const auto& data : msg.sensor_data) {
-    if (!data || data->label_image.empty() || data->range_image.empty()) {
+    if (!data || labelImage(*data).empty() || data->range_image.empty()) {
+      continue;
+    }
+
+    // Labels are read as int32. InputData::finalize() normalizes integer
+    // traversability images, and label images when the map has semantics.
+    if (labelImage(*data).type() != InputData::LabelMatType) {
+      LOG_FIRST_N(ERROR, 1) << "[TraversabilityProjectiveIntegrator] Label image must "
+                               "be CV_32SC1 (is the input normalized?)";
       continue;
     }
 
@@ -106,6 +130,12 @@ void TraversabilityProjectiveIntegrator::apply(TraversabilityLayer& layer,
   }
 }
 
+const cv::Mat& TraversabilityProjectiveIntegrator::labelImage(
+    const InputData& data) const {
+  return config.input_image == InputImage::LABEL ? data.label_image
+                                                 : data.traversability_image;
+}
+
 void TraversabilityProjectiveIntegrator::integrateFrame(TraversabilityLayer& layer,
                                                         const InputData& data) const {
   // getSensorPose() is world_T_body * body_T_sensor, i.e. world_T_sensor.
@@ -115,6 +145,7 @@ void TraversabilityProjectiveIntegrator::integrateFrame(TraversabilityLayer& lay
                                     ? -config.max_range_error * layer.voxel_size
                                     : config.max_range_error;
   const auto saturation = static_cast<float>(config.confidence_saturation_count);
+  const auto& labels = labelImage(data);
 
   // NOTE(aryannav): deliberately does not set `block.updated`. The clusterings iterate
   // `layer.updatedBlocks()`, so flagging blocks the estimator did not recompute would
@@ -161,11 +192,11 @@ void TraversabilityProjectiveIntegrator::integrateFrame(TraversabilityLayer& lay
           continue;
         }
 
-        const auto label = interpolator_->interpolateID(data.label_image, weights);
+        const auto label = interpolator_->interpolateID(labels, weights);
         auto& semantic = voxel.semantic;
-        if (label == config.traversable_label) {
+        if (contains(config.traversable_labels, label)) {
           ++semantic.traversable_count;
-        } else if (label == config.intraversable_label) {
+        } else if (contains(config.intraversable_labels, label)) {
           ++semantic.intraversable_count;
         } else {
           continue;  // unknown label: no evidence either way

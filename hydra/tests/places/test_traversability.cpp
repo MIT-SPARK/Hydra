@@ -123,8 +123,10 @@ TEST(TraversabilityPlaces, ResetGeometryKeepsSemantics) {
   }
 }
 
-TEST(TraversabilityPlaces, ProjectiveIntegratorAccumulates) {
-  // Camera at the world origin looking along +z (identity body pose and extrinsics).
+namespace {
+
+// Camera at the world origin looking along +z (identity body pose and extrinsics).
+std::shared_ptr<Camera> makeTestCamera() {
   Camera::Config camera_config;
   camera_config.min_range = 0.1;
   camera_config.max_range = 10.0;
@@ -135,22 +137,35 @@ TEST(TraversabilityPlaces, ProjectiveIntegratorAccumulates) {
   camera_config.fx = 320.0f;
   camera_config.fy = 320.0f;
   camera_config.extrinsics = ParamSensorExtrinsics::Config();
-  auto camera = std::make_shared<Camera>(camera_config, "camera");
+  return std::make_shared<Camera>(camera_config, "camera");
+}
 
-  // Voxel (0, 0) is centered at (0.05, 0.05) and sits on a surface at z = 2.
+// Input data where voxel (0, 0), centered at (0.05, 0.05), sits on a visible surface
+// at z = 2 and every pixel of the traversability image has the given label.
+std::shared_ptr<InputData> makeTestData(int label) {
   const float visible_range = Eigen::Vector3f(0.05f, 0.05f, 2.0f).norm();
-  auto data = std::make_shared<InputData>(camera);
+  auto data = std::make_shared<InputData>(makeTestCamera());
   data->world_T_body = Eigen::Isometry3d::Identity();
   data->range_image =
       cv::Mat(480, 640, InputData::RangeMatType, cv::Scalar(visible_range));
-  data->label_image = cv::Mat(480, 640, InputData::LabelMatType, cv::Scalar(1));
-  const ActiveWindowOutput msg(data);
+  data->traversability_image =
+      cv::Mat(480, 640, InputData::LabelMatType, cv::Scalar(label));
+  return data;
+}
 
+TraversabilityProjectiveIntegrator::Config makeTestConfig() {
   TraversabilityProjectiveIntegrator::Config config;
   config.interpolation_method =
       config::VirtualConfig<ProjectionInterpolator>(InterpolatorNearest::Config{});
   config.confidence_saturation_count = 4;
-  TraversabilityProjectiveIntegrator integrator(config);
+  return config;
+}
+
+}  // namespace
+
+TEST(TraversabilityPlaces, ProjectiveIntegratorAccumulates) {
+  const ActiveWindowOutput msg(makeTestData(1));
+  TraversabilityProjectiveIntegrator integrator(makeTestConfig());
 
   TraversabilityLayer layer(0.1f, 10);
   auto& block = layer.allocateBlock(BlockIndex(0, 0, 0), 10);
@@ -177,6 +192,66 @@ TEST(TraversabilityPlaces, ProjectiveIntegratorAccumulates) {
   EXPECT_EQ(block.voxel(1, 0).semantic.total(), 0u);
   EXPECT_EQ(block.voxel(0, 1).semantic.total(), 0u);
   EXPECT_LT(block.voxel(0, 1).semantic.traversability, 0.0f);
+}
+
+TEST(TraversabilityPlaces, ProjectiveIntegratorLabelSets) {
+  // GA-Nav style groups: smooth/rough/bumpy are traversable, forbidden/obstacle are
+  // not and background is no evidence.
+  auto config = makeTestConfig();
+  config.traversable_labels = {1, 2, 3};
+  config.intraversable_labels = {4, 5};
+  TraversabilityProjectiveIntegrator integrator(config);
+
+  TraversabilityLayer layer(0.1f, 10);
+  auto& block = layer.allocateBlock(BlockIndex(0, 0, 0), 10);
+  block.voxel(0, 0).height = 2.0f;
+  for (const auto label : {0, 1, 2, 3, 4, 5}) {
+    integrator.apply(layer, ActiveWindowOutput(makeTestData(label)));
+  }
+
+  const auto& semantic = block.voxel(0, 0).semantic;
+  EXPECT_EQ(semantic.traversable_count, 3u);
+  EXPECT_EQ(semantic.intraversable_count, 2u);
+  EXPECT_FLOAT_EQ(semantic.traversability, 0.6f);
+  EXPECT_FLOAT_EQ(semantic.confidence, 1.0f);
+}
+
+TEST(TraversabilityPlaces, ProjectiveIntegratorInputImage) {
+  // Traversability image says traversable, label image says intraversable.
+  auto data = makeTestData(1);
+  data->label_image = cv::Mat(480, 640, InputData::LabelMatType, cv::Scalar(0));
+  const ActiveWindowOutput msg(data);
+
+  for (const auto input_image :
+       {TraversabilityProjectiveIntegrator::InputImage::LABEL,
+        TraversabilityProjectiveIntegrator::InputImage::TRAVERSABILITY}) {
+    auto config = makeTestConfig();
+    config.input_image = input_image;
+    TraversabilityProjectiveIntegrator integrator(config);
+
+    TraversabilityLayer layer(0.1f, 10);
+    auto& block = layer.allocateBlock(BlockIndex(0, 0, 0), 10);
+    block.voxel(0, 0).height = 2.0f;
+    integrator.apply(layer, msg);
+
+    const bool use_labels =
+        input_image == TraversabilityProjectiveIntegrator::InputImage::LABEL;
+    const auto& semantic = block.voxel(0, 0).semantic;
+    EXPECT_EQ(semantic.traversable_count, use_labels ? 0u : 1u);
+    EXPECT_EQ(semantic.intraversable_count, use_labels ? 1u : 0u);
+  }
+}
+
+TEST(TraversabilityPlaces, ProjectiveIntegratorSkipsInvalidLabelType) {
+  auto data = makeTestData(1);
+  data->traversability_image = cv::Mat(480, 640, CV_16SC1, cv::Scalar(1));
+  TraversabilityProjectiveIntegrator integrator(makeTestConfig());
+
+  TraversabilityLayer layer(0.1f, 10);
+  auto& block = layer.allocateBlock(BlockIndex(0, 0, 0), 10);
+  block.voxel(0, 0).height = 2.0f;
+  integrator.apply(layer, ActiveWindowOutput(data));
+  EXPECT_EQ(block.voxel(0, 0).semantic.total(), 0u);
 }
 
 }  // namespace hydra::places

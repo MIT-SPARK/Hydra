@@ -204,6 +204,17 @@ bool InputData::finalize(bool vertices_in_world_frame, bool normalize_labels) {
     instance_image = instances;
   }
 
+  // Integer traversability images are class ids (e.g., from a traversability
+  // segmentation network) and are not in the semantic labelspace, so no remapping.
+  // Floating point images are continuous estimates and are left as is.
+  if (!traversability_image.empty() && traversability_image.channels() == 1 &&
+      traversability_image.depth() < CV_32F &&
+      traversability_image.type() != InputData::LabelMatType) {
+    cv::Mat traversability(traversability_image.size(), InputData::LabelMatType);
+    traversability_image.convertTo(traversability, InputData::LabelMatType);
+    traversability_image = traversability;
+  }
+
   if (!vertex_map.empty() && vertex_map.type() != InputData::VertexMatType) {
     LOG(ERROR) << "[Input Conversion] pointcloud must be CV_32FC3, not "
                << showTypeInfo(vertex_map);

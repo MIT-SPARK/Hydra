@@ -132,7 +132,8 @@ struct InputData {
   cv::Mat instance_image;
   //! 3D points of the range image in sensor or world frame.
   cv::Mat vertex_map;
-  //! Image of pixel-wise traversability estimates
+  //! Image of pixel-wise traversability estimates. Integer images (class ids) are
+  //! normalized to LabelMatType, floating point images are left unchanged.
   cv::Mat traversability_image;
   //! Feature associated with current input data
   FeatureVector feature;

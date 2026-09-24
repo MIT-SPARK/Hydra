@@ -208,6 +208,28 @@ TEST(Camera, FinalizeRepresentationsCorrect) {
   // TODO(nathan) test pointcloud is in world frame
 }
 
+TEST(Camera, FinalizeNormalizesTraversability) {
+  const auto camera = createCamera(90.0, 90.0, {1.0, 5.0}, {2, 1});
+
+  InputData msg(camera);
+  msg.depth_image = cv::Mat(1, 2, CV_32FC1, cv::Scalar(2.0f));
+  // integer class ids (e.g., 16SC1 from semantic_inference) are normalized
+  msg.traversability_image = cv::Mat(1, 2, CV_16SC1);
+  msg.traversability_image.at<int16_t>(0, 0) = 3;
+  msg.traversability_image.at<int16_t>(0, 1) = 5;
+  ASSERT_TRUE(msg.finalize(false, false));
+  ASSERT_EQ(msg.traversability_image.type(), InputData::LabelMatType);
+  EXPECT_EQ(msg.traversability_image.at<InputData::LabelType>(0, 0), 3);
+  EXPECT_EQ(msg.traversability_image.at<InputData::LabelType>(0, 1), 5);
+
+  // continuous estimates are left as is
+  InputData float_msg(camera);
+  float_msg.depth_image = cv::Mat(1, 2, CV_32FC1, cv::Scalar(2.0f));
+  float_msg.traversability_image = cv::Mat(1, 2, CV_32FC1, cv::Scalar(0.25f));
+  ASSERT_TRUE(float_msg.finalize(false, false));
+  EXPECT_EQ(float_msg.traversability_image.type(), CV_32FC1);
+}
+
 TEST(Camera, RangeImageFromPointsCorrect) {
   cv::Mat points(4, 3, InputData::VertexMatType);
   for (int r = 0; r < points.rows; ++r) {

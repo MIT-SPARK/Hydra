@@ -37,6 +37,8 @@
 #include <config_utilities/virtual_config.h>
 
 #include <memory>
+#include <opencv2/core/mat.hpp>
+#include <vector>
 
 #include "hydra/places/traversability_postprocessing.h"
 #include "hydra/reconstruction/projection_interpolators.h"
@@ -55,7 +57,9 @@ namespace hydra::places {
  * well-defined 3D position (x, y, height) that can be projected into the camera. This
  * integrator projects each such cell, checks it is actually visible by comparing its
  * range against the range image, interpolates the label image at that pixel, and counts
- * the observation in the voxel's `semantic` field.
+ * the observation in the voxel's `semantic` field. The labels are read from either the
+ * dedicated traversability image (e.g., from a traversability segmentation network
+ * such as GA-Nav) or the semantic label image.
  *
  * @note The semantic counts live on the voxels and persist across updates: the
  * extractor carries the semantic fields of the postprocessed layer back to the
@@ -73,13 +77,21 @@ namespace hydra::places {
  */
 class TraversabilityProjectiveIntegrator : public TraversabilityProcessor {
  public:
-  struct Config {
-    //! @brief Label treated as traversable evidence.
-    int traversable_label = 1;
+  enum class InputImage {
+    TRAVERSABILITY,  //!< InputData::traversability_image
+    LABEL,           //!< InputData::label_image
+  };
 
-    //! @brief Label treated as intraversable evidence. Any other label (e.g. an
+  struct Config {
+    //! @brief Which image of the input data to read the labels from.
+    InputImage input_image = InputImage::TRAVERSABILITY;
+
+    //! @brief Labels treated as traversable evidence.
+    std::vector<int> traversable_labels{1};
+
+    //! @brief Labels treated as intraversable evidence. Any other label (e.g. an
     //! "unknown" -1) is ignored rather than counted as evidence either way.
-    int intraversable_label = 0;
+    std::vector<int> intraversable_labels{0};
 
     //! @brief Number of observations at which semantic.confidence saturates to 1.
     int confidence_saturation_count = 5;
@@ -113,6 +125,9 @@ class TraversabilityProjectiveIntegrator : public TraversabilityProcessor {
 
  protected:
   std::unique_ptr<ProjectionInterpolator> interpolator_;
+
+  //! Get the configured label image of the input data.
+  const cv::Mat& labelImage(const InputData& data) const;
 
   //! Fuse one frame of sensor data into the layer.
   void integrateFrame(TraversabilityLayer& layer, const InputData& data) const;
