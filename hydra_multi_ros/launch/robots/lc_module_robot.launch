@@ -1,0 +1,22 @@
+<launch>
+    <arg name="robot_name"/>
+    <arg name="robot_id"/>
+
+    <arg name="load_visual_lc_session" default="false"/>
+    <arg name="visual_lc_session_dir" default=""/>
+
+    <!-- logging output for hydra -->
+    <arg name="output_dir" default="$(find hydra_multi)/output/"/>
+
+    <arg name="save_lcd_frames" default="false"/>
+    <arg name="save_lcd_output" default="$(arg output_dir)"/>
+
+    <include file="$(find kimera_centralized_pgmo)/launch/loop_closure_robot.launch" ns="$(arg robot_name)"
+        pass_all_args="true">
+        <arg name="comm_sleep_time" value="1"/>
+        <arg name="save_output" value="$(arg save_lcd_frames)"/>
+        <arg name="save_output_dir" value="$(arg save_lcd_output)"/>
+        <arg name="load_session" value="$(arg load_visual_lc_session)"/>
+        <arg name="load_dir" value="$(arg visual_lc_session_dir)"/>
+    </include>
+</launch>

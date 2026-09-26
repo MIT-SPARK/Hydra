@@ -1,0 +1,73 @@
+<launch>
+    <arg name="robot_name"/>
+    <arg name="robot_id"/>
+
+    <arg name="robot_frame" default="$(arg robot_name)/kimera_base"/>
+    <arg name="odom_frame" default="$(arg robot_name)/odom"/>
+    <arg name="sensor_frame" default="$(arg robot_name)/forward_color_optical_frame"/>
+    <arg name="map_frame" default="$(arg robot_name)/map"/>
+
+    <arg name="start_visual_lc" default="true"/>
+    <arg name="start_hydra" default="true"/>
+    <arg name="start_kimera_vio" default="true"/>
+
+    <arg name="load_visual_lc_session" default="false"/>
+    <arg name="visual_lc_session_dir" default=""/>
+
+    <!-- logging output for hydra -->
+    <arg name="output_dir" default="$(find hydra_multi)/output/"/>
+    <arg name="dsg_output_dir" default="$(arg output_dir)/$(arg robot_name)/"/>
+    <arg name="dsg_output_prefix" default="hydra"/>
+    <arg name="log_registration" default="false"/>
+    <arg name="log_timing_incrementally" default="false"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+    <arg name="start_logger" default="false"/>
+
+    <arg name="log_vio_output" default="false"/>
+    <arg name="vio_output_dir" default="$(arg output_dir)/$(arg robot_name)/"/>
+    <arg name="vio_output_prefix" default="vio"/>
+
+    <arg name="start_visualizer" default="false"/>
+    <arg name="use_gt_frame" default="false"/>
+    <arg name="should_use_sim_time" default="false"/>
+    <arg name="disable_kimera_visual_lcd" default="false"/>
+    <arg name="debug" default="false"/>
+    <arg name="sim_time_required" default="false"/>
+
+    <arg name="use_image_interface" default="false"/>
+    <arg name="use_gt_semantics" default="true"/>
+
+    <arg name="use_zmq_interface" default="false"/>
+
+    <arg name="rgb_info_topic" default="/$(arg robot_name)/azure/rgb/camera_info"/>
+    <arg name="rgb_topic" default="/$(arg robot_name)/azure/rgb/image_raw"/>
+    <arg name="depth_topic" default="/$(arg robot_name)/azure/depth_to_rgb/image_raw"/>
+    <arg name="label_topic" default="/$(arg robot_name)/semantic/image_raw"/>
+    <arg name="prerecorded_topic" default="$(arg robot_name)/oneformer/labels/image_raw"/>
+    <arg name="camera_ns" default="/$(arg robot_name)/azure"/>
+
+    <include file="$(find hydra_vio_configs)/launch/kinect_azure_vio.launch" ns="$(arg robot_name)"
+        pass_all_args="true" if="$(arg start_kimera_vio)">
+        <arg name="odom_frame_id" default="$(arg odom_frame)"/>
+        <arg name="base_link_frame_id" default="$(arg robot_frame)"/>
+        <arg name="map_frame_id"       default="$(arg map_frame)"/>
+        <arg name="left_cam_frame_id"  default="$(arg robot_name)/left_cam"/>
+        <arg name="right_cam_frame_id" default="$(arg robot_name)/right_cam"/>
+        <arg name="external_odom_topic" default="/$(arg robot_name)/camera/odom/sample"/>
+    </include>
+
+    <include file="$(find hydra_ros)/launch/datasets/sidpac.launch" ns="$(arg robot_name)"
+        pass_all_args="true" if="$(arg start_hydra)"/>
+
+    <include file="$(find kimera_centralized_pgmo)/launch/loop_closure_robot.launch" ns="$(arg robot_name)"
+        pass_all_args="true" if="$(arg start_visual_lc)">
+        <arg name="bow_skip_num" value="1"/>
+        <arg name="bow_batch_size" value="100" />
+        <arg name="vlc_batch_size" value="10"/>
+        <arg name="comm_sleep_time" value="1"/>
+        <arg name="save_output" value="$(arg save_lcd_frames)"/>
+        <arg name="save_output_dir" value="$(arg save_lcd_output)"/>
+        <arg name="load_session" value="$(arg load_visual_lc_session)"/>
+        <arg name="load_dir" value="$(arg visual_lc_session_dir)"/>
+    </include>
+</launch>

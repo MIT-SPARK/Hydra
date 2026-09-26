@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>hydra_multi_ros</name>
+  <version>2.0.0</version>
+  <description>Hydra-Multi ROS wrapper</description>
+
+  <maintainer email="yunchang@mit.edu">Yun Chang</maintainer>
+
+  <license>BSD</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <depend>config_utilities</depend>
+  <depend>hydra</depend>
+  <depend>hydra_multi</depend>
+  <depend>hydra_ros</depend>
+  <depend>kimera_pgmo</depend>
+  <depend>kimera_pgmo_msgs</depend>
+  <depend>kimera_pgmo_ros</depend>
+  <depend>pose_graph_tools_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>spark_dsg</depend>
+
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>kimera_pgmo_rviz</exec_depend>
+
+  <export>
+      <build_type>ament_cmake</build_type>
+  </export>
+</package>

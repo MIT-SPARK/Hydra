@@ -1,0 +1,25 @@
+---
+session_name: simmons-hydra-multi
+environment:
+  BAG0_PATH: /home/yunchang/Downloads/simmons/d2/sparkal1/kimera_test_2022-08-03-t2-updated_w_semantics.bag
+  BAG1_PATH: /home/yunchang/Downloads/simmons/d2/sparkal2/kimera_test_2022-08-03-t2-updated_w_semantics.bag
+  KIMERA_WS: /home/yunchang/catkin_ws
+  RATE: '1.0'
+  DSG_LCD: 'false'
+  BAG0_SKIP: '0'
+  BAG1_SKIP: '0'
+options:
+  default-command: /bin/bash
+windows:
+  - window_name: hydra_multi
+    focus: true
+    layout: tiled
+    shell_command_before: [source $KIMERA_WS/devel/setup.bash]
+    panes:
+      - roslaunch kimera_core hydra_vio_jackal.launch robot_name:=sparkal1 robot_id:=0
+      - roslaunch hydra_multi_ros simmons_robot.launch robot_name:=sparkal1 robot_id:=0
+      - roslaunch kimera_core hydra_vio_jackal.launch robot_name:=sparkal2 robot_id:=1
+      - roslaunch hydra_multi_ros simmons_robot.launch robot_name:=sparkal2 robot_id:=1
+      - sleep 5; rosbag play $BAG0_PATH -s $BAG0_SKIP
+      - sleep 5; rosbag play $BAG1_PATH -s $BAG1_SKIP
+      - roslaunch hydra_multi_ros hydra_multi_simmons.launch enable_dsg_lcd:=$DSG_LCD start_visualizer:=true

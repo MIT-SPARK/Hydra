@@ -1,0 +1,36 @@
+---
+launch:
+  # development arguments
+  - arg: {name: debug, default: 'false'}
+  - arg: {name: verbosity, default: '0'}
+  - arg: {name: glog_level, default: '0'}
+  - arg: {name: print_missing, default: 'false', description: have config utilities print all missing parameters when parsing configs}
+  # run behavior
+  - arg: {name: scene, default: office, description: uhumans2 scene name}
+  - arg: {name: log_path, default: '', description: directory to output to}
+  - arg: {name: exit_after_clock, default: 'false', description: shutdown hydra node after a rosbag finishes playing}
+  - arg: {name: world_frame, default: world, description: multi-robot common frame}
+  # configuration
+  - arg: {name: config_path, default: $(find-pkg-share hydra_multi)/config/datasets/uhumans2.yaml}
+  - arg: {name: input_config_path, default: $(find-pkg-share hydra_multi_ros)/config/input/uhumans2.yaml}
+  # output
+  - set_remap: {from: hydra_visualizer/dsg, to: hydra_multi/backend/dsg}
+  - node:
+      pkg: hydra_multi_ros
+      exec: hydra_multi_ros_node
+      name: hydra_multi
+      on_exit: shutdown
+      launch-prefix: $(if $(var debug) 'gdbserver localhost:3000')
+      env:
+        - {name: TERM, value: xterm-256color}
+      args: >
+        --config-utilities-file $(var config_path)
+        --config-utilities-file $(var input_config_path)
+        --config-utilities-yaml {world_frame: $(var world_frame)}
+        --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
+        --config-utilities-yaml {print_missing: $(var print_missing), glog_level: $(var glog_level), verbosity: $(var verbosity)}
+  - include:
+      file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
+      arg:
+        - {name: visualizer_frame, value: $(var world_frame)}
+        - {name: rviz_path, value: $(find-pkg-share hydra_multi_ros)/rviz/uhumans2.rviz}

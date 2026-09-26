@@ -1,0 +1,16 @@
+---
+exit_after_clock: $(arg exit_after_clock)
+log_path: $(arg log_path)
+log_timing_incrementally: $(arg log_timing_incrementally)
+disable_timer_output: $(arg disable_timer_output)
+timing_disabled: $(arg timing_disabled)
+enable_zmq_interface: $(arg enable_zmq_interface)
+world_frame: $(arg world_frame)
+publish_mesh: $(arg publish_mesh)
+backend:
+  zmq_sink:
+    url: $(arg zmq_send_url)
+    send_mesh: $(arg zmq_send_mesh)
+  update_functors:
+    zmq_labels:
+      url: $(arg zmq_recv_url)

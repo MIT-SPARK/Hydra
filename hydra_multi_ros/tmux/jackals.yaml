@@ -1,0 +1,35 @@
+---
+session_name: replay-jackals-hydra-multi
+environment:
+  BAG0_PATH: /media/yunchang/YUN_SanDisk_4/dcist_mit/acl_jackal_2023-09-28-16-46-06.bag
+  BAG1_PATH: /media/yunchang/YUN_SanDisk_4/dcist_mit/sparkal2_2023-09-28-16-46-05.bag
+  KIMERA_WS: /home/yunchang/catkin_ws
+  OUTPUT_PATH: /home/yunchang/logs/hydra_multi/dcist_mit
+  SENSOR_FRAME: foward_color_optical_frame
+  LABELSPACE: ade20k_mit
+  RATE: '1.0'
+  ROBOT0: acl_jackal
+  ROBOT0_ID: '0'
+  ROBOT1: sparkal2
+  ROBOT1_ID: '3'
+options:
+  default-command: /bin/bash
+windows:
+  - window_name: hydra_multi
+    focus: true
+    layout: tiled
+    shell_command_before: [source $KIMERA_WS/devel/setup.bash, cd $OUTPUT_PATH; rm -rf *; mkdir -p $OUTPUT_PATH/$ROBOT0; mkdir -p $OUTPUT_PATH/$ROBOT1]
+    panes:
+      - roslaunch kimera_core hydra_vio_jackal.launch robot_id:=$ROBOT0_ID robot_name:=$ROBOT0 use_lidar_external:=false
+      - roslaunch hydra_ros phoenix.launch robot_id:=$ROBOT0_ID robot_name:=$ROBOT0 sensor_frame:=$ROBOT0/$SENSOR_FRAME odom_frame:=$ROBOT0/odom labelspace_name:=$LABELSPACE semantic_map_file:=$LABELSPACE.csv
+        dsg_output_dir:=$OUTPUT_PATH/$ROBOT0 use_zmq_interface:=false
+      - roslaunch hydra_multi_ros lc_module_robot.launch robot_id:=$ROBOT0_ID robot_name:=$ROBOT0 save_lcd_frames:=true output_dir:=$OUTPUT_PATH/$ROBOT0
+      - roslaunch kimera_core hydra_vio_jackal.launch robot_id:=$ROBOT1_ID robot_name:=$ROBOT1 use_lidar_external:=false
+      - roslaunch hydra_ros phoenix.launch robot_id:=$ROBOT1_ID robot_name:=$ROBOT1 sensor_frame:=$ROBOT1/$SENSOR_FRAME odom_frame:=$ROBOT1/odom labelspace_name:=$LABELSPACE semantic_map_file:=$LABELSPACE.csv
+        dsg_output_dir:=$OUTPUT_PATH/$ROBOT1 use_zmq_interface:=false
+      - roslaunch hydra_multi_ros lc_module_robot.launch robot_id:=$ROBOT1_ID robot_name:=$ROBOT1 save_lcd_frames:=true output_dir:=$OUTPUT_PATH/$ROBOT1
+      - sleep 5; rosbag play $BAG0_PATH --topics /$ROBOT0/forward/color/image_raw/compressed /$ROBOT0/forward/color/image_rect_color/compressed /$ROBOT0/forward/color/camera_info /$ROBOT0/forward/depth/image_rect_raw
+        /$ROBOT0/forward/depth/camera_info /$ROBOT0/forward/imu /$ROBOT0/jackal_velocity_controller/odom /tf_static
+      - sleep 5; rosbag play $BAG1_PATH --topics /$ROBOT1/forward/color/image_raw/compressed /$ROBOT1/forward/color/image_rect_color/compressed /$ROBOT1/forward/color/camera_info /$ROBOT1/forward/depth/image_rect_raw
+        /$ROBOT1/forward/depth/camera_info /$ROBOT1/forward/imu /$ROBOT1/jackal_velocity_controller/odom /tf_static
+      - roslaunch hydra_multi_ros hydra_multi_dcist.launch enable_dsg_lcd:=false start_visualizer:=true output_dir:=$OUTPUT_PATH num_robots:=8

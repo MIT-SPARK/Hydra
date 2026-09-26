@@ -1,0 +1,29 @@
+---
+robots:
+  - type: RosUnitInterface
+    robot_id: 0
+    robot_name: acl_jackal2
+    robot_frame: acl_jackal2/odom
+    inputs:
+      dgraph:
+        type: RosDGraphInput
+      dsg:
+        type: RosDsgInput
+  - type: RosUnitInterface
+    robot_id: 3
+    robot_name: hathor
+    robot_frame: hathor/odom
+    inputs:
+      dgraph:
+        type: RosDGraphInput
+      dsg:
+        type: RosDsgInput
+  - type: RosUnitInterface
+    robot_id: 7
+    robot_name: thoth
+    robot_frame: thoth/odom
+    inputs:
+      dgraph:
+        type: RosDGraphInput
+      dsg:
+        type: RosDsgInput

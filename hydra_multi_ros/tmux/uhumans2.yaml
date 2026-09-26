@@ -1,0 +1,31 @@
+---
+session_name: uhumans2-hydra-multi
+environment:
+  BAG0_PATH: /home/yunchang/Downloads/uhumans2/office_multi/uHumans2_office_s1_00h.bag
+  BAG1_PATH: /home/yunchang/Downloads/uhumans2/office_multi/uHumans2_office_s2_00h.bag
+  BAG2_PATH: /home/yunchang/Downloads/uhumans2/office_multi/uHumans2_office_s3_00h.bag
+  KIMERA_WS: /home/yunchang/dcist_ws
+  OUTPUT_PATH: /home/yunchang/logs/hydra_multi/uhumans2
+  RATE: '1.0'
+  DSG_LCD: 'false'
+  BAG0_SKIP: '0'
+  BAG1_SKIP: '0'
+  BAG2_SKIP: '0'
+options:
+  default-command: /bin/bash
+windows:
+  - window_name: hydra_multi
+    focus: true
+    layout: tiled
+    shell_command_before: [source $KIMERA_WS/devel/setup.bash, cd $OUTPUT_PATH; rm -rf *; mkdir -p $OUTPUT_PATH/robot0; mkdir -p $OUTPUT_PATH/robot1; mkdir -p $OUTPUT_PATH/robot2]
+    panes:
+      - sleep 5; roslaunch kimera_core hydra_vio_uh2.launch robot_name:=robot0 robot_id:=0
+      - sleep 5; roslaunch hydra_multi_ros uhumans2_robot.launch robot_name:=robot0 robot_id:=0 output_dir:=$OUTPUT_PATH save_lcd_frames:=true
+      - sleep 5; roslaunch kimera_core hydra_vio_uh2.launch robot_name:=robot1 robot_id:=1
+      - sleep 5; roslaunch hydra_multi_ros uhumans2_robot.launch robot_name:=robot1 robot_id:=1 output_dir:=$OUTPUT_PATH save_lcd_frames:=true
+      - sleep 5; roslaunch kimera_core hydra_vio_uh2.launch robot_name:=robot2 robot_id:=2
+      - sleep 5; roslaunch hydra_multi_ros uhumans2_robot.launch robot_name:=robot2 robot_id:=2 output_dir:=$OUTPUT_PATH save_lcd_frames:=true
+      - sleep 10; rosbag play $BAG0_PATH --prefix robot0 -s $BAG0_SKIP
+      - sleep 10; rosbag play $BAG1_PATH --prefix robot1 -s $BAG1_SKIP
+      - sleep 10; rosbag play $BAG2_PATH --prefix robot2 -s $BAG2_SKIP
+      - roslaunch hydra_multi_ros hydra_multi_uhumans2.launch enable_dsg_lcd:=$DSG_LCD start_visualizer:=true output_dir:=$OUTPUT_PATH

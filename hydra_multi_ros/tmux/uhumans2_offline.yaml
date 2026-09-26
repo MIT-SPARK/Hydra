@@ -1,0 +1,29 @@
+---
+session_name: uhumans2-hydra-multi-load
+environment:
+  KIMERA_WS: /home/yunchang/catkin_ws
+  INPUT_PATH: /home/yunchang/logs/hydra_multi/uhumans2_prev
+  OUTPUT_PATH: /home/yunchang/logs/hydra_multi/uhumans2_offline
+  RATE: '1.0'
+  DSG_LCD: 'false'
+  BAG0_SKIP: '0'
+  BAG1_SKIP: '0'
+  BAG2_SKIP: '0'
+options:
+  default-command: /bin/bash
+windows:
+  - window_name: hydra_multi
+    focus: true
+    layout: tiled
+    shell_command_before: [source $KIMERA_WS/devel/setup.bash, cd $OUTPUT_PATH; rm -rf *; mkdir -p $OUTPUT_PATH/robot0; mkdir -p $OUTPUT_PATH/robot1; mkdir -p $OUTPUT_PATH/robot2]
+    panes:
+      - roslaunch hydra_multi_ros uhumans2_robot.launch robot_name:=robot0 robot_id:=0 output_dir:=$OUTPUT_PATH save_lcd_frames:=false start_hydra:=false bow_batch_size:=100 vlc_batch_size:=100 load_visual_lc_session:=true
+        visual_lc_session_dir:=$INPUT_PATH \
+      - rosrun hydra_multi_ros load_srv.py /hydra_multi_node/load 0 $INPUT_PATH/robot0/hydra
+      - roslaunch hydra_multi_ros uhumans2_robot.launch robot_name:=robot1 robot_id:=1 output_dir:=$OUTPUT_PATH save_lcd_frames:=false start_hydra:=false bow_batch_size:=100 vlc_batch_size:=100 load_visual_lc_session:=true
+        visual_lc_session_dir:=$INPUT_PATH \
+      - sleep 5; rosrun hydra_multi_ros load_srv.py /hydra_multi_node/load 1 $INPUT_PATH/robot1/hydra
+      - roslaunch hydra_multi_ros uhumans2_robot.launch robot_name:=robot2 robot_id:=2 output_dir:=$OUTPUT_PATH save_lcd_frames:=false start_hydra:=false bow_batch_size:=100 vlc_batch_size:=100 load_visual_lc_session:=true
+        visual_lc_session_dir:=$INPUT_PATH \
+      - sleep 10; rosrun hydra_multi_ros load_srv.py /hydra_multi_node/load 2 $INPUT_PATH/robot2/hydra
+      - roslaunch hydra_multi_ros hydra_multi_uhumans2.launch enable_dsg_lcd:=$DSG_LCD bow_batch_size:=100 vlc_batch_size:=100 start_visualizer:=true output_dir:=$OUTPUT_PATH

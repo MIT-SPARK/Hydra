@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Utility to publish multiple graphs with distinct colors."""
+
+import pathlib
+import signal
+import subprocess
+
+import click
+
+
+@click.command()
+@click.argument("graphs", nargs=-1, type=click.Path(exists=True))
+def main(graphs):
+    """Publish some graphs."""
+    # TODO(nathan) fix
+    colors = [[255, 0, 0], [0, 0, 255], [0, 255, 0]]
+    procs = []
+    for idx, graph in enumerate(graphs):
+        graph = pathlib.Path(graph).expanduser().absolute()
+
+        color_str = f"{colors[idx % len(colors)]}"
+        args = [
+            "roslaunch",
+            "hydra_multi_ros",
+            "static_visualizer.launch",
+            f"robot_name:=robot_{idx}",
+            f"scene_graph_path:={graph}",
+            f"color_value:={color_str}",
+        ]
+        if idx > 0:
+            args.append("--wait")
+        print(args)
+        # procs.append(subprocess.Popen(args, stdout=subprocess.DEVNULL))
+        procs.append(subprocess.Popen(args))
+
+    if len(procs) > 0:
+        rviz_config = (
+            pathlib.Path(__file__).absolute().parent.parent
+            / "rviz"
+            / "static_visualizer.rviz"
+        )
+        subprocess.run(["rviz", "-d", str(rviz_config)])
+
+    for proc in procs:
+        proc.send_signal(signal.SIGINT)
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,34 @@
+---
+plugins:
+  dsg_mesh:
+    type: MeshPlugin
+    use_color_adaptor: $(arg color_mesh_by_label)
+    coloring:
+      type: UniformMeshColoring
+      color: $(arg color_value)
+config:
+  layer2:
+    marker_color_mode: UniformColorAdaptor
+    color_settings:
+      color: $(arg color_value)
+  layer3:
+    marker_color_mode: UniformColorAdaptor
+    color_settings:
+      color: $(arg color_value)
+  layer4:
+    marker_color_mode: UniformColorAdaptor
+    color_settings:
+      color: $(arg color_value)
+  layer5:
+    marker_color_mode: UniformColorAdaptor
+    color_settings:
+      color: $(arg color_value)
+  layer20:
+    marker_color_mode: UniformColorAdaptor
+    color_settings:
+      color: $(arg color_value)
+dynamic_layers:
+  layer2:
+    node_color_mode: UniformColorAdaptor
+    color_settings:
+      color: $(arg color_value)

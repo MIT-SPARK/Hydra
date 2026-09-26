@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>hydra_multi</name>
+  <version>2.0.0</version>
+  <description>Hydra-Multi</description>
+
+  <maintainer email="yunchang@mit.edu">Yun Chang</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+
+  <depend>cli11</depend>
+  <depend>config_utilities</depend>
+  <depend>gtsam</depend>
+  <depend>hydra</depend>
+  <depend>kimera_pgmo</depend>
+  <depend>spark_dsg</depend>
+
+  <export>
+      <build_type>cmake</build_type>
+  </export>
+</package>

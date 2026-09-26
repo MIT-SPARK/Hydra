@@ -1,0 +1,8 @@
+---
+# ROS messages incoming
+- /$(arg robot_name)/kimera_vio_ros/bow_query
+- /$(arg robot_name)/lcd_agent/vlc_responses
+- /$(arg robot_name)/incremental_dsg_builder_node/frontend/dsg
+- /$(arg robot_name)/kimera_vio_ros/pose_graph_incremental
+- /$(arg robot_name)/incremental_dsg_builder_node/mesh_graph_incremental
+- /$(arg robot_name)/incremental_dsg_builder_node/full_mesh

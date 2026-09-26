@@ -1,0 +1,6 @@
+uint32 robot_id
+string dsg_file
+string dgrf_file
+string sparse_mapping_file
+---
+bool success

@@ -1,0 +1,23 @@
+---
+session_name: sidpac-hydra-multi
+environment:
+  BAG0_PATH: /home/yunchang/Downloads/sidpac/sidpac_floor1_3_attempt1.bag
+  BAG1_PATH: /home/yunchang/Downloads/sidpac/sidpac_floor3_4_attempt2.bag
+  KIMERA_WS: /home/yunchang/catkin_ws
+  RATE: '1.0'
+  DSG_LCD: 'false'
+  BAG0_SKIP: '0'
+  BAG1_SKIP: '0'
+options:
+  default-command: /bin/bash
+windows:
+  - window_name: hydra_multi
+    focus: true
+    layout: tiled
+    shell_command_before: [source $KIMERA_WS/devel/setup.bash]
+    panes:
+      - roslaunch hydra_multi_ros sidpac_robot.launch robot_name:=robot0 robot_id:=0
+      - roslaunch hydra_multi_ros sidpac_robot.launch robot_name:=robot1 robot_id:=1
+      - sleep 5; rosbag play $BAG0_PATH --prefix robot0 -s $BAG0_SKIP
+      - sleep 5; rosbag play $BAG1_PATH --prefix robot1 -s $BAG1_SKIP
+      - roslaunch hydra_multi_ros hydra_multi_sidpac.launch enable_dsg_lcd:=$DSG_LCD start_visualizer:=true
