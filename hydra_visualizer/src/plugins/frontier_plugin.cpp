@@ -81,8 +81,8 @@ void FrontierPlugin::draw(const std_msgs::msg::Header& header,
 
   size_t id = 0;
   MarkerArray markers;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<PlaceNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<PlaceNodeAttributes>();
     if (!attrs || attrs->real_place) {
       continue;
     }
@@ -101,7 +101,7 @@ void FrontierPlugin::draw(const std_msgs::msg::Header& header,
     tf2::convert(attrs->orientation, marker.pose.orientation);
 
     marker.pose.position.z += info.z_offset;
-    marker.color = makeColorMsg(info.node_color(*node), config.alpha);
+    marker.color = makeColorMsg(info.node_color(node), config.alpha);
     msg.markers.push_back(marker);
   }
 

@@ -110,19 +110,19 @@ void MeshPointPlugin::draw(const std_msgs::msg::Header& header,
 
   marker.points.reserve(layer.numNodes());
   marker.colors.reserve(layer.numNodes());
-  for (const auto& [node_id, node] : layer.nodes()) {
-    if (!info.valid(*node)) {
+  for (const auto& node : layer.nodes()) {
+    if (!info.valid(node)) {
       continue;
     }
 
-    const auto color = info.node_color(*node);
-    auto obj_attrs = node->tryAttributes<ObjectNodeAttributes>();
+    const auto color = info.node_color(node);
+    auto obj_attrs = node.tryAttributes<ObjectNodeAttributes>();
     if (obj_attrs) {
       fillMarker(config, info, *obj_attrs, *mesh, color, marker);
       continue;
     }
 
-    auto place_attrs = node->tryAttributes<Place2dNodeAttributes>();
+    auto place_attrs = node.tryAttributes<Place2dNodeAttributes>();
     if (place_attrs) {
       fillMarker(config, info, *place_attrs, *mesh, color, marker);
       continue;

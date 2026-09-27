@@ -129,17 +129,17 @@ void TraversabilityPlugin::drawBoundaries(const Config& config,
   marker.scale.x = config.line_width;
   marker.scale.y = config.line_width;
   marker.scale.z = config.line_width;
-  for (const auto& [node_id, node] : layer.nodes()) {
+  for (const auto& node : layer.nodes()) {
     // Reset the marker.
     marker.id = id++;
     marker.points.clear();
     marker.colors.clear();
 
-    auto block_attrs = node->tryAttributes<TraversabilityNodeAttributes>();
+    auto block_attrs = node.tryAttributes<TraversabilityNodeAttributes>();
     if (block_attrs) {
       drawBlockBoundary(config, *block_attrs, marker);
     } else {
-      auto region_attrs = node->tryAttributes<TravNodeAttributes>();
+      auto region_attrs = node.tryAttributes<TravNodeAttributes>();
       if (region_attrs) {
         drawRegionBoundary(config, *region_attrs, marker);
       }

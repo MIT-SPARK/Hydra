@@ -140,8 +140,8 @@ void BasisPointPlugin::draw(const std_msgs::msg::Header& header,
   bp_marker.scale.y = config.point_scale;
   bp_marker.scale.z = config.point_scale;
 
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<PlaceNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<PlaceNodeAttributes>();
     if (!attrs) {
       continue;
     }

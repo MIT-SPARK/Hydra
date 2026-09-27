@@ -98,18 +98,18 @@ void PosePlugin::draw(const std_msgs::msg::Header& header, const SceneGraph& gra
     return;
   }
 
-  for (const auto& [node_id, node] : layer->nodes()) {
+  for (const auto& node : layer->nodes()) {
     if (num_seen % every_n_nodes != 0) {
       ++num_seen;
       continue;
     }
 
     ++num_seen;
-    auto attrs = node->tryAttributes<AgentNodeAttributes>();
+    auto attrs = node.tryAttributes<AgentNodeAttributes>();
     if (!attrs) {
       RCLCPP_WARN_STREAM(
           nh_.logger(),
-          "Node " << NodeSymbol(node_id).str() << " does not have pose information!");
+          "Node " << NodeSymbol(node.id).str() << " does not have pose information!");
       continue;
     }
 

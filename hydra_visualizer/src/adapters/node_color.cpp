@@ -283,8 +283,8 @@ void ValueColorAdapter::setGraph(const SceneGraph& graph, LayerKey layer_key) {
 
   bool is_first = true;
   const auto& layer = graph.getLayer(layer_key.layer, layer_key.partition);
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto value = functor_->eval(graph, *node);
+  for (const auto& node : layer.nodes()) {
+    const auto value = functor_->eval(graph, node);
     if (!std::isfinite(value)) {
       continue;
     }
