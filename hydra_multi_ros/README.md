@@ -8,6 +8,7 @@
 >   - Open issues regarding this code asking for help getting this code working (they will be summarily closed)
 >   - Assume that API or code availability will remain the same
 >   - Assume that we plan on making a stable public release of Hydra-Multi at some point in the future
+>
 > Thank you for your understanding!
 
 This package contains code to build 3D scene graphs with teams of multiple robots and is based on the paper:
