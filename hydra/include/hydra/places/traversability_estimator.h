@@ -111,21 +111,12 @@ class TraversabilityEstimator {
    * @brief Update the traversability based on the active window output and mesh delta.
    * @param msg The active window output containing the latest sensor data and
    * volumetric map updates.
+   * @param layer The traversability layer to update. Estimators write the geometric
+   * fields and may allocate or remove blocks, but must preserve the semantic evidence
+   * of existing voxels (see resetGeometry()).
    */
-  virtual void updateTraversability(const ActiveWindowOutput& msg) = 0;
-
-  virtual const TraversabilityLayer& getTraversabilityLayer() const {
-    return *traversability_layer_;
-  }
-
-  /**
-   * @brief Mutable access to the persistent traversability layer, e.g. for integrators
-   * that accumulate evidence across updates.
-   * @returns The layer or nullptr if no update has been processed yet.
-   */
-  TraversabilityLayer* mutableTraversabilityLayer() {
-    return traversability_layer_.get();
-  }
+  virtual void updateTraversability(const ActiveWindowOutput& msg,
+                                    TraversabilityLayer& layer) = 0;
 
   /**
    * @brief Classify a traversability voxel based on its confidence and traversability.
@@ -134,9 +125,6 @@ class TraversabilityEstimator {
    * logic.
    */
   virtual void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
-
- protected:
-  std::unique_ptr<TraversabilityLayer> traversability_layer_;
 };
 
 void declare_config(TraversabilityEstimator::Config& config);
@@ -163,7 +151,8 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
   HeightTraversabilityEstimator(const Config& config);
   ~HeightTraversabilityEstimator() override = default;
 
-  void updateTraversability(const ActiveWindowOutput& msg) override;
+  void updateTraversability(const ActiveWindowOutput& msg,
+                            TraversabilityLayer& layer) override;
 
   const Config config;
 
@@ -171,8 +160,8 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
   TsdfLayer::Ptr tsdf_layer_;
 
   // Processing steps.
-  void updateTsdf(const ActiveWindowOutput& msg);
-  void computeTraversability(const ActiveWindowOutput& msg);
+  void updateTsdf(const ActiveWindowOutput& msg, TraversabilityLayer& layer);
+  void computeTraversability(const ActiveWindowOutput& msg, TraversabilityLayer& layer);
 
   // Helper functions.
   BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) const;
@@ -219,7 +208,8 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
   GradientTraversabilityEstimator(const Config& config);
   ~GradientTraversabilityEstimator() override = default;
 
-  void updateTraversability(const ActiveWindowOutput& msg) override;
+  void updateTraversability(const ActiveWindowOutput& msg,
+                            TraversabilityLayer& layer) override;
 
   const Config config;
   Sink::List sinks_;
@@ -228,8 +218,8 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
   TsdfLayer::Ptr tsdf_layer_;
 
   // Processing steps (reuse updateTsdf from HeightTraversabilityEstimator).
-  void updateTsdf(const ActiveWindowOutput& msg);
-  void computeTraversability(const ActiveWindowOutput& msg);
+  void updateTsdf(const ActiveWindowOutput& msg, TraversabilityLayer& layer);
+  void computeTraversability(const ActiveWindowOutput& msg, TraversabilityLayer& layer);
 };
 
 void declare_config(GradientTraversabilityEstimator::Config& config);

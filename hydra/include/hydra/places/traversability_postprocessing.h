@@ -67,21 +67,40 @@ class TraversabilityProcessor {
    * to the sensor data and volumetric map for this update.
    */
   virtual void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) = 0;
+
+  /**
+   * @brief Whether the processor accumulates state across updates.
+   * @returns True if the processor acts on the persistent traversability layer, so its
+   * changes carry over to later updates. False if it acts on a per-update copy that is
+   * only used for clustering and visualization.
+   */
+  virtual bool persistent() const { return false; }
 };
 
 /**
  * @brief Utility container for several processors.
+ * @note All persistent processors run before all transient ones, regardless of their
+ * order in the config. Within each group the config order is kept.
  */
 struct TraversabilityProcessors {
   using Config = std::vector<config::VirtualConfig<TraversabilityProcessor>>;
 
   explicit TraversabilityProcessors(const Config& config);
 
-  /** @brief Apply all processors to the traversability layer.
-   * @param layer The traversability layer to process.
+  /** @brief Apply all persistent processors to the traversability layer.
+   * @param layer The persistent traversability layer to process.
    * @param msg The active window output the layer was computed from.
    */
-  void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) const;
+  void applyPersistent(TraversabilityLayer& layer, const ActiveWindowOutput& msg) const;
+
+  /** @brief Apply all transient processors to the traversability layer.
+   * @param layer A per-update copy of the traversability layer to process.
+   * @param msg The active window output the layer was computed from.
+   */
+  void applyTransient(TraversabilityLayer& layer, const ActiveWindowOutput& msg) const;
+
+  //! @brief Whether any transient processors are configured.
+  bool hasTransient() const;
 
  private:
   std::vector<TraversabilityProcessor::Ptr> processors_;

@@ -57,11 +57,31 @@ TraversabilityProcessors::TraversabilityProcessors(const Config& config) {
   }
 }
 
-void TraversabilityProcessors::apply(TraversabilityLayer& layer,
-                                     const ActiveWindowOutput& msg) const {
+void TraversabilityProcessors::applyPersistent(TraversabilityLayer& layer,
+                                               const ActiveWindowOutput& msg) const {
   for (const auto& processor : processors_) {
-    processor->apply(layer, msg);
+    if (processor->persistent()) {
+      processor->apply(layer, msg);
+    }
   }
+}
+
+void TraversabilityProcessors::applyTransient(TraversabilityLayer& layer,
+                                              const ActiveWindowOutput& msg) const {
+  for (const auto& processor : processors_) {
+    if (!processor->persistent()) {
+      processor->apply(layer, msg);
+    }
+  }
+}
+
+bool TraversabilityProcessors::hasTransient() const {
+  for (const auto& processor : processors_) {
+    if (!processor->persistent()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void declare_config(ErosionDilation::Config& config) {

@@ -36,6 +36,7 @@
 #include <hydra/active_window/active_window_output.h>
 #include <hydra/input/camera.h>
 #include <hydra/places/block_traversability_clustering.h>
+#include <hydra/places/traversability_postprocessing.h>
 #include <hydra/places/traversability_projective_integrator.h>
 
 namespace hydra::places {
@@ -121,6 +122,40 @@ TEST(TraversabilityPlaces, ResetGeometryKeepsSemantics) {
     EXPECT_EQ(voxel.semantic.traversability, 0.75f);
     EXPECT_EQ(voxel.semantic.confidence, 0.8f);
   }
+}
+
+TEST(TraversabilityPlaces, CopyGeometryKeepsSemantics) {
+  TraversabilityVoxel from;
+  from.traversability = 0.5f;
+  from.confidence = 0.7f;
+  from.height = 1.5f;
+  from.state = TraversabilityState::TRAVERSABLE;
+  from.semantic.traversable_count = 1;
+
+  TraversabilityVoxel to;
+  to.semantic.traversable_count = 3;
+  to.semantic.intraversable_count = 1;
+  to.semantic.traversability = 0.75f;
+  to.semantic.confidence = 0.8f;
+
+  copyGeometry(from, to);
+  EXPECT_EQ(to.traversability, 0.5f);
+  EXPECT_EQ(to.confidence, 0.7f);
+  ASSERT_TRUE(to.height);
+  EXPECT_EQ(*to.height, 1.5f);
+  EXPECT_EQ(to.state, TraversabilityState::TRAVERSABLE);
+  EXPECT_EQ(to.semantic.traversable_count, 3u);
+  EXPECT_EQ(to.semantic.intraversable_count, 1u);
+  EXPECT_EQ(to.semantic.traversability, 0.75f);
+  EXPECT_EQ(to.semantic.confidence, 0.8f);
+}
+
+TEST(TraversabilityPlaces, ProcessorPersistence) {
+  const ErosionDilation dilation({});
+  EXPECT_FALSE(dilation.persistent());
+
+  const TraversabilityProjectiveIntegrator integrator({});
+  EXPECT_TRUE(integrator.persistent());
 }
 
 TEST(TraversabilityPlaces, ProjectiveIntegratorAccumulates) {

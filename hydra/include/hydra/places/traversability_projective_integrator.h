@@ -57,10 +57,9 @@ namespace hydra::places {
  * range against the range image, interpolates the label image at that pixel, and counts
  * the observation in the voxel's `semantic` field.
  *
- * @note The semantic counts live on the voxels and persist across updates: the
- * extractor carries the semantic fields of the postprocessed layer back to the
- * estimator's layer, and the estimators reset only the geometric fields (see
- * resetGeometry()).
+ * @note The semantic counts live on the voxels and persist across updates: this is a
+ * persistent processor, so it runs on the extractor's own layer, and the estimators
+ * reset only the geometric fields (see resetGeometry()).
  *
  * @note The geometric `traversability`, `confidence` and `state` fields are left
  * untouched, so this can be enabled alongside any estimator without changing existing
@@ -110,6 +109,8 @@ class TraversabilityProjectiveIntegrator : public TraversabilityProcessor {
   ~TraversabilityProjectiveIntegrator() override = default;
 
   void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) override;
+
+  bool persistent() const override { return true; }
 
  protected:
   std::unique_ptr<ProjectionInterpolator> interpolator_;

@@ -37,6 +37,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 
+#include <optional>
+
 #include "hydra/utils/timing_utilities.h"
 
 using Timer = hydra::timing::ScopedTimer;
@@ -81,32 +83,31 @@ void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
 
 void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
-  estimator_->updateTraversability(msg);
+  if (!layer_) {
+    const auto& map_config = msg.map().config;
+    layer_ = std::make_unique<TraversabilityLayer>(map_config.voxel_size,
+                                                   map_config.voxels_per_side);
+  }
+
+  estimator_->updateTraversability(msg, *layer_);
+  postprocessing_.applyPersistent(*layer_, msg);
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
                                                spark_dsg::SceneGraph& graph) {
-  // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
-  // expensive though.
-  Timer timer("traversability/postprocessing", msg.timestamp_ns);
-  auto layer = estimator_->getTraversabilityLayer();
-  postprocessing_.apply(layer, msg);
-
-  // Semantic evidence accumulates across updates, so carry it back to the estimator's
-  // persistent layer. Everything else the postprocessing changed stays on this copy.
-  auto persistent_layer = estimator_->mutableTraversabilityLayer();
-  if (persistent_layer) {
-    for (const auto& block : layer) {
-      auto persistent_block = persistent_layer->getBlockPtr(block.index);
-      if (!persistent_block) {
-        continue;
-      }
-
-      for (size_t i = 0; i < block.voxels.size(); ++i) {
-        persistent_block->voxels[i].semantic = block.voxels[i].semantic;
-      }
-    }
+  if (!layer_) {
+    return;
   }
+
+  // Transient processors modify the state and updated flags only for this update, so
+  // they act on a copy of the persistent layer.
+  Timer timer("traversability/postprocessing", msg.timestamp_ns);
+  std::optional<TraversabilityLayer> processed;
+  if (postprocessing_.hasTransient()) {
+    processed.emplace(*layer_);
+    postprocessing_.applyTransient(*processed, msg);
+  }
+  const auto& layer = processed ? *processed : *layer_;
 
   timer.reset("traversability/clustering");
   clustering_->updateGraph(layer, msg, graph, config.layer);
