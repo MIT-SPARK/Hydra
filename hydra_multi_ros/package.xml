@@ -8,19 +8,18 @@
 
   <license>BSD</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <depend>config_utilities</depend>
   <depend>hydra</depend>
+  <depend>hydra_msgs</depend>
   <depend>hydra_multi</depend>
   <depend>hydra_ros</depend>
   <depend>kimera_pgmo</depend>
   <depend>kimera_pgmo_msgs</depend>
   <depend>kimera_pgmo_ros</depend>
   <depend>pose_graph_tools_msgs</depend>
-  <depend>rclcpp</depend>
-  <depend>rclcpp_components</depend>
   <depend>spark_dsg</depend>
+  <depend>tf2_eigen</depend>
 
   <exec_depend>rviz2</exec_depend>
   <exec_depend>kimera_pgmo_rviz</exec_depend>

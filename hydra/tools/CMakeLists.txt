@@ -1,7 +1,8 @@
 find_package(CLI11 CONFIG REQUIRED)
 
 set(HYDRA_TOOL_INSTALL_DIR ${CMAKE_INSTALL_BINDIR})
-if(HYDRA_ENABLE_ROS_INSTALL_LAYOUT)
+find_package(ament_cmake_core QUIET)
+if (${ament_cmake_core_FOUND})
   set(HYDRA_TOOL_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/hydra)
 endif()
 
