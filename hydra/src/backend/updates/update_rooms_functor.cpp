@@ -72,8 +72,8 @@ void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
                                       SceneGraph& graph) const {
   std::vector<NodeId> to_remove;
   const auto& prev_rooms = graph.getLayer(DsgLayers::ROOMS);
-  for (const auto& id_node_pair : prev_rooms.nodes()) {
-    to_remove.push_back(id_node_pair.first);
+  for (const auto& node : prev_rooms.nodes()) {
+    to_remove.push_back(node.id);
   }
 
   for (const auto node_id : to_remove) {
@@ -84,8 +84,8 @@ void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
     return;
   }
 
-  for (auto&& [id, node] : new_rooms->nodes()) {
-    graph.emplaceNode(DsgLayers::ROOMS, id, node->attributes().clone());
+  for (const auto& node : new_rooms->nodes()) {
+    graph.emplaceNode(DsgLayers::ROOMS, node.id, node.attributes().clone());
   }
 
   for (const auto& id_edge_pair : new_rooms->edges()) {

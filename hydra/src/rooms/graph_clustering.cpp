@@ -83,18 +83,19 @@ ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
                                         double gamma) {
   std::map<NodeId, double> degrees;
   std::map<NodeId, std::map<NodeId, double>> neighbors;
-  for (const auto& id_node_pair : layer.nodes()) {
+  for (const auto& node : layer.nodes()) {
     double degree = 0.0;
-    neighbors[id_node_pair.first] = std::map<NodeId, double>();
-    for (const auto& sibling : id_node_pair.second->siblings()) {
-      double edge_weight = edge_weight_func(layer, id_node_pair.first, sibling);
+    neighbors[node.id] = std::map<NodeId, double>();
+    for (const auto& sibling : node.siblings()) {
+      double edge_weight = edge_weight_func(layer, node.id, sibling);
       // we should probably assert that this isn't happening, but it should be pretty
       // feasbile to not return negative weights
       edge_weight = edge_weight < 0.0 ? 0.0 : edge_weight;
       degree += edge_weight;
-      neighbors[id_node_pair.first][sibling] = edge_weight;
+      neighbors[node.id][sibling] = edge_weight;
     }
-    degrees[id_node_pair.first] = degree;
+
+    degrees[node.id] = degree;
   }
 
   const double m = layer.numEdges();
@@ -112,12 +113,12 @@ ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
   }
 
   std::set<NodeId> unlabeled_nodes;
-  for (const auto& id_node_pair : layer.nodes()) {
-    if (labels.count(id_node_pair.first)) {
+  for (const auto& node : layer.nodes()) {
+    if (labels.count(node.id)) {
       continue;
     }
 
-    unlabeled_nodes.insert(id_node_pair.first);
+    unlabeled_nodes.insert(node.id);
   }
 
   size_t iter;
@@ -206,18 +207,19 @@ ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
 
   // populate frontier from all room boundaries
   std::priority_queue<EdgeInfo> frontier;
-  for (auto&& [id, node] : layer.nodes()) {
-    if (labels.count(id)) {
+  for (const auto& node : layer.nodes()) {
+    if (labels.count(node.id)) {
       continue;
     }
 
-    for (const auto sibling : node->siblings()) {
+    for (const auto sibling : node.siblings()) {
       auto iter = labels.find(sibling);
       if (iter == labels.end()) {
         continue;
       }
 
-      frontier.push({id, iter->second, layer.getEdge(id, sibling).info->weight});
+      frontier.push(
+          {node.id, iter->second, layer.getEdge(node.id, sibling).info->weight});
     }
   }
 
@@ -256,21 +258,21 @@ ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
 
 ClusterResults clusterGraphByGt(const SceneGraphLayer& layer,
                                 const RoomExtents& room_extents) {
-  std::map<size_t, std::unordered_set<NodeId>> clusters;
   std::map<NodeId, size_t> labels;
-
-  for (const auto& id_node_pair : layer.nodes()) {
-    auto valid_room_idx =
-        room_extents.getRoomForPoint(id_node_pair.second->attributes().position);
+  std::map<size_t, std::unordered_set<NodeId>> clusters;
+  for (const auto& node : layer.nodes()) {
+    auto valid_room_idx = room_extents.getRoomForPoint(node.attributes().position);
     if (!valid_room_idx.valid) {
       continue;
     }
+
     size_t room_idx = valid_room_idx.index;
     if (!clusters.count(room_idx)) {
       clusters[room_idx] = std::unordered_set<NodeId>();
     }
-    clusters[room_idx].insert(id_node_pair.first);
-    labels[id_node_pair.first] = room_idx;
+
+    clusters[room_idx].insert(node.id);
+    labels[node.id] = room_idx;
   }
 
   return {clusters, labels, 0, true};

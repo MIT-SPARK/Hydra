@@ -85,10 +85,10 @@ void UpdateAgentsFunctor::call(const SceneGraph&,
   const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
   for (const auto& [prefix, layer] : graph.layer_partition(desired_layer)) {
     std::set<NodeId> missing_nodes;
-    for (const auto& [node_id, node] : layer->nodes()) {
-      auto& attrs = node->attributes<AgentNodeAttributes>();
+    for (const auto& node : layer->nodes()) {
+      auto& attrs = node.attributes<AgentNodeAttributes>();
       if (!info->pgmo_values->exists(attrs.external_key)) {
-        missing_nodes.insert(node->id);
+        missing_nodes.insert(node.id);
         continue;
       }
 
@@ -102,7 +102,7 @@ void UpdateAgentsFunctor::call(const SceneGraph&,
       const auto diff = prev_pose.between(pose);
       const auto q_diff = Eigen::Quaterniond(diff.rotation().matrix());
       const auto p_diff = diff.translation();
-      VLOG(10) << "Updating agent " << NodeSymbol(node->id).str() << " pose from "
+      VLOG(10) << "Updating agent " << NodeSymbol(node.id).str() << " pose from "
                << NodeSymbol(attrs.external_key).str() << ":"
                << "\n - original: " << toString(q_prev, p_prev)
                << "\n - new:      " << toString(attrs.world_R_body, attrs.position)

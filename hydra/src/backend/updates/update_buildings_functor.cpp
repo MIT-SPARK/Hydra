@@ -72,8 +72,8 @@ void UpdateBuildingsFunctor::call(const SceneGraph&,
   }
 
   Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-  for (const auto& id_node_pair : rooms.nodes()) {
-    centroid += id_node_pair.second->attributes().position;
+  for (const auto& node : rooms.nodes()) {
+    centroid += node.attributes().position;
   }
   centroid /= rooms.numNodes();
 
@@ -85,9 +85,9 @@ void UpdateBuildingsFunctor::call(const SceneGraph&,
     dsg.graph->getNode(building_id).attributes().position = centroid;
   }
 
-  for (const auto& id_node_pair : rooms.nodes()) {
+  for (const auto& node : rooms.nodes()) {
     // add an edge while enforcing single parent
-    dsg.graph->insertEdge(building_id, id_node_pair.first, nullptr, true);
+    dsg.graph->insertEdge(building_id, node.id, nullptr, true);
   }
 }
 

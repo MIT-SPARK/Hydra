@@ -161,9 +161,9 @@ void FrontierExtractor::call(const ActiveWindowOutput& msg,
   timing::ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
 
   NodeIdSet active_nodes;
-  for (const auto& [node_id, node] : dsg.graph->getLayer(DsgLayers::PLACES).nodes()) {
-    if (node->attributes().is_active) {
-      active_nodes.insert(node_id);
+  for (const auto& node : dsg.graph->getLayer(DsgLayers::PLACES).nodes()) {
+    if (node.attributes().is_active) {
+      active_nodes.insert(node.id);
     }
   }
 

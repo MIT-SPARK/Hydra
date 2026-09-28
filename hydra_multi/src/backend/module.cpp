@@ -82,10 +82,10 @@ void saveTrajectory(const SceneGraphLayer& layer,
                     const std::filesystem::path& output_path) {
   std::ofstream fout(output_path);
   fout << "#timestamp_kf,x,y,z,qw,qx,qy,qz\n";
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<AgentNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<AgentNodeAttributes>();
     if (!attrs) {
-      LOG(ERROR) << "Invalid agent layer, node " << NodeSymbol(node_id).str()
+      LOG(ERROR) << "Invalid agent layer, node " << NodeSymbol(node.id).str()
                  << " is not agent node";
       continue;
     }

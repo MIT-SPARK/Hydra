@@ -58,9 +58,8 @@ void FileDGraphInput::init() {
 
     for (const auto& [prefix, layer] : state_->dsg_->layer_partition(agent_layer_id)) {
       LOG(INFO) << "Found agent layer with " << layer->numNodes() << " poses";
-      for (const auto& [node_id, node] : layer->nodes()) {
-        stamps[id_].push_back(
-            node->attributes<AgentNodeAttributes>().timestamp.count());
+      for (const auto& node : layer->nodes()) {
+        stamps[id_].push_back(node.attributes<AgentNodeAttributes>().timestamp.count());
       }
     }
   } else {

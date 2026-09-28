@@ -82,15 +82,15 @@ void printCounts(spark_dsg::SceneGraph& graph) {
 
 void resetActive(spark_dsg::SceneGraph& graph) {
   for (const auto& [layer_id, layer] : graph.layers()) {
-    for (const auto& [node_id, node] : layer->nodes()) {
-      node->attributes().is_active = false;
+    for (const auto& node : layer->nodes()) {
+      node.attributes().is_active = false;
     }
   }
 
   for (const auto& [layer_id, partitions] : graph.layer_partitions()) {
     for (const auto& [key, layer] : partitions) {
-      for (const auto& [node_id, node] : layer->nodes()) {
-        node->attributes().is_active = false;
+      for (const auto& node : layer->nodes()) {
+        node.attributes().is_active = false;
       }
     }
   }

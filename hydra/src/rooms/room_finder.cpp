@@ -287,17 +287,22 @@ void RoomFinder::setupDistanceAdaptor(const SceneGraphLayer& places) {
   if (places.numNodes() == 0) {
     return;
   }
-  const auto& node = places.nodes().begin()->second;
-  const auto place_attrs = node->tryAttributes<spark_dsg::PlaceNodeAttributes>();
-  if (place_attrs) {
-    distance_adaptor_ = std::make_unique<DistanceAdaptor>();
-    return;
-  }
-  const auto trav_attrs =
-      node->tryAttributes<spark_dsg::TraversabilityNodeAttributes>();
-  if (trav_attrs) {
-    distance_adaptor_ = std::make_unique<TraversabilityDistanceAdaptor>(places);
-    return;
+
+  // TODO(nathan) fix this!
+  for (const auto& node : places.nodes()) {
+    const auto place_attrs = node.tryAttributes<PlaceNodeAttributes>();
+    if (place_attrs) {
+      distance_adaptor_ = std::make_unique<DistanceAdaptor>();
+      return;
+    }
+
+    const auto trav_attrs = node.tryAttributes<TraversabilityNodeAttributes>();
+    if (trav_attrs) {
+      distance_adaptor_ = std::make_unique<TraversabilityDistanceAdaptor>(places);
+      return;
+    }
+
+    break;
   }
 
   LOG(ERROR) << "[RoomFinder] Unknown place attributes to create distance adaptor.";
@@ -388,8 +393,8 @@ SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
 }
 
 void RoomFinder::addRoomPlaceEdges(SceneGraph& graph, const std::string& layer) const {
-  for (const auto& id_node_pair : graph.getLayer(layer).nodes()) {
-    const auto cluster = last_results_.labels.find(id_node_pair.first);
+  for (const auto& node : graph.getLayer(layer).nodes()) {
+    const auto cluster = last_results_.labels.find(node.id);
     if (cluster == last_results_.labels.end()) {
       continue;
     }
@@ -400,17 +405,15 @@ void RoomFinder::addRoomPlaceEdges(SceneGraph& graph, const std::string& layer) 
     }
 
     // add edge enforcing parent invariants
-    graph.insertEdge(room->second, id_node_pair.first, nullptr, true);
+    graph.insertEdge(room->second, node.id, nullptr, true);
   }
 }
 
 void RoomFinder::fillClusterMap(const SceneGraphLayer& places,
                                 ClusterMap& assignments) const {
   assignments.clear();
-  for (const auto& id_node_pair : places.nodes()) {
-    const auto place_id = id_node_pair.first;
-
-    const auto cluster = last_results_.labels.find(place_id);
+  for (const auto& node : places.nodes()) {
+    const auto cluster = last_results_.labels.find(node.id);
     if (cluster == last_results_.labels.end()) {
       continue;
     }
@@ -426,7 +429,7 @@ void RoomFinder::fillClusterMap(const SceneGraphLayer& places,
       assignment = assignments.emplace(room_id, std::vector<NodeId>()).first;
     }
 
-    assignment->second.push_back(place_id);
+    assignment->second.push_back(node.id);
   }
 }
 

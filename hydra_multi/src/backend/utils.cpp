@@ -31,14 +31,14 @@ template <typename Attrs>
 void remapLayerConnections(const SceneGraphLayer& layer,
                            const NodeIdRobotMap& node_to_robot,
                            const RobotIndexMap& mesh_offsets) {
-  for (const auto& [node_id, node] : layer.nodes()) {
-    auto attrs = node->template tryAttributes<Attrs>();
+  for (const auto& node : layer.nodes()) {
+    auto attrs = node.template tryAttributes<Attrs>();
     if (!attrs) {
       continue;
     }
 
     // all robots need a current offset
-    const auto robot_id = node_to_robot.at(node_id);
+    const auto robot_id = node_to_robot.at(node.id);
     auto iter = mesh_offsets.find(robot_id);
     if (iter == mesh_offsets.end()) {
       LOG(ERROR) << "Robot " << robot_id << " has no mesh offsets!";

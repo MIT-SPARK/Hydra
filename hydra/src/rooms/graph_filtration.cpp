@@ -167,12 +167,12 @@ void fillEntries(const SceneGraphLayer& layer,
     entries.push_back({get_distance(edge), edge.source, edge.target});
   }
 
-  for (auto&& [id, node] : layer.nodes()) {
-    const auto distance = get_distance(*node);
-    node_distances.emplace(id, distance);
+  for (const auto& node : layer.nodes()) {
+    const auto distance = get_distance(node);
+    node_distances.emplace(node.id, distance);
 
     if (include_nodes) {
-      entries.push_back({distance, id});
+      entries.push_back({distance, node.id});
     }
   }
 
@@ -296,9 +296,9 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
   UnusedEdgeMap unused_edges;
   if (!include_nodes) {
     // seed components with all nodes if we're not including nodes in the filtration
-    for (const auto& id_node_pair : layer.nodes()) {
+    for (const auto& node : layer.nodes()) {
       updateComponentsFromNode(
-          id_node_pair.first, components, tracker, unused_edges, node_distances);
+          node.id, components, tracker, unused_edges, node_distances);
     }
   }
 

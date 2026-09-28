@@ -82,9 +82,9 @@ PlaceMetrics scorePlaces(const SceneGraph& graph,
   metrics.is_valid = true;
   const PointNeighborSearch finder(gvd_positions);
 
-  for (auto&& [node_id, node] : places->nodes()) {
-    const auto& attrs = node->attributes<PlaceNodeAttributes>();
-    metrics.node_order.push_back(node_id);
+  for (const auto& node : places->nodes()) {
+    const auto& attrs = node.attributes<PlaceNodeAttributes>();
+    metrics.node_order.push_back(node.id);
 
     size_t idx = 0;
     float dist_squared = 0.0;

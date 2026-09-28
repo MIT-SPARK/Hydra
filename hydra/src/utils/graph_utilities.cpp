@@ -65,13 +65,13 @@ SceneGraph::Ptr mergeGraphs(const Graphs& graphs) {
         iter = layer_counts.emplace(layer_id, 0).first;
       }
 
-      for (const auto& [node_id, node] : layer->nodes()) {
-        const NodeSymbol prev_id(node_id);
+      for (const auto& node : layer->nodes()) {
+        const NodeSymbol prev_id(node.id);
         NodeSymbol new_id(prev_id.category(), iter->second);
         ++iter->second;
 
-        node_id_map[node_id] = new_id;
-        to_return->emplaceNode(layer_id, new_id, node->attributes().clone());
+        node_id_map[node.id] = new_id;
+        to_return->emplaceNode(layer_id, new_id, node.attributes().clone());
       }
     }
 

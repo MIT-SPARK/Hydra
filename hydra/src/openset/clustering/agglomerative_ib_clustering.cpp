@@ -361,13 +361,13 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
   }
 
   Workspace::NodeEmbeddings features;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<SemanticNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<SemanticNodeAttributes>();
     if (!attrs || attrs->semantic_feature.size() <= 1) {
       continue;
     }
 
-    features[node_id] = attrs->semantic_feature;
+    features[node.id] = attrs->semantic_feature;
   }
 
   if (features.empty()) {

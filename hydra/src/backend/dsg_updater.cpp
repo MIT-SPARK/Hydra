@@ -177,11 +177,11 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
   // active for at least one update
   std::vector<NodeId> active_nodes_to_restore;
   for (auto& [layer_id, layer] : source_graph_->layers()) {
-    for (auto& [node_id, node] : layer->nodes()) {
-      auto& attrs = node->attributes();
-      if (source_graph_->checkNode(node_id) == NodeStatus::NEW && !attrs.is_active) {
+    for (const auto& node : layer->nodes()) {
+      auto& attrs = node.attributes();
+      if (source_graph_->checkNode(node.id) == NodeStatus::NEW && !attrs.is_active) {
         attrs.is_active = true;
-        active_nodes_to_restore.push_back(node_id);
+        active_nodes_to_restore.push_back(node.id);
       }
     }
   }

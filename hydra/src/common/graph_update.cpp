@@ -125,14 +125,14 @@ void GraphUpdater::addNode(SceneGraph& graph,
                            const NodeUpdate& entry) {
   std::optional<NodeId> to_merge;
   const auto target_layer = graph.findLayer(target);
-  for (const auto& [node_id, node] : target_layer->nodes()) {
-    auto& attrs = node->attributes();
+  for (const auto& node : target_layer->nodes()) {
+    auto& attrs = node.attributes();
     if (!attrs.is_active) {
       continue;
     }
 
     if (tracker.matcher && tracker.matcher->match(*entry.attributes, attrs)) {
-      to_merge = node_id;
+      to_merge = node.id;
       break;
     }
   }

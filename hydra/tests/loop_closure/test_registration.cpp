@@ -239,12 +239,11 @@ TEST_F(LayerRegistrationTests, TestPairwiseRegistration) {
 
 TEST_F(LayerRegistrationTests, TestSemanticRegistration) {
   size_t count = 0;
-  for (const auto& id_node_pair : src_layer->nodes()) {
+  for (const auto& node : src_layer->nodes()) {
     uint8_t label = (count > (src_layer->numNodes() / 2)) ? 0 : 1;
-    id_node_pair.second->attributes<SemanticNodeAttributes>().semantic_label = label;
-    dest_layer->getNode(id_node_pair.first)
-        .attributes<SemanticNodeAttributes>()
-        .semantic_label = label;
+    node.attributes<SemanticNodeAttributes>().semantic_label = label;
+    dest_layer->getNode(node.id).attributes<SemanticNodeAttributes>().semantic_label =
+        label;
     count++;
   }
 

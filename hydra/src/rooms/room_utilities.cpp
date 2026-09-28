@@ -98,9 +98,8 @@ void addEdgesToRoomLayer(const SceneGraphLayer& places,
                          const std::map<NodeId, size_t>& labels,
                          const std::map<size_t, NodeId>& label_to_room_map,
                          SceneGraphLayer& rooms) {
-  for (const auto& id_node_pair : places.nodes()) {
-    const auto place = id_node_pair.first;
-    const auto label = labels.find(place);
+  for (const auto& node : places.nodes()) {
+    const auto label = labels.find(node.id);
     if (label == labels.end()) {
       continue;
     }
@@ -110,7 +109,7 @@ void addEdgesToRoomLayer(const SceneGraphLayer& places,
       continue;
     }
 
-    for (const auto& sibling : id_node_pair.second->siblings()) {
+    for (const auto& sibling : node.siblings()) {
       const auto sibling_label = labels.find(sibling);
       if (sibling_label == labels.end()) {
         continue;
