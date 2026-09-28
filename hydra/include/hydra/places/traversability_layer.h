@@ -235,4 +235,11 @@ inline void resetGeometry(TraversabilityBlock& block) {
   }
 }
 
+//! Copy the geometric estimate of a voxel but keep the target's semantic evidence.
+inline void copyGeometry(const TraversabilityVoxel& from, TraversabilityVoxel& to) {
+  const auto semantic = to.semantic;
+  to = from;
+  to.semantic = semantic;
+}
+
 }  // namespace hydra::places
