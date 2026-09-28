@@ -3,7 +3,7 @@
 > **:warning: Warning**<br>
 > This package is not officially released, and contains code that was derived from the original Hydra-Multi implementation that is not in a working state.
 > The original Hydra-Multi implementation was in ROS1, and several other papers have changed Hydra's code base significantly in the meantime as well.
-> As such, you should not:
+> As such, you should **NOT**:
 >   - Use this code for benchmarking purposes for a paper
 >   - Open issues regarding this code asking for help getting this code working (they will be summarily closed)
 >   - Assume that API or code availability will remain the same
