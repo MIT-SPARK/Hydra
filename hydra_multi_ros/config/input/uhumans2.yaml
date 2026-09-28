@@ -1,0 +1,29 @@
+---
+robots:
+  - type: RosUnitInterface
+    robot_id: 0
+    robot_name: robot0
+    robot_frame: robot0/odom
+    inputs:
+      dgraph:
+        type: RosDGraphInput
+      dsg:
+        type: RosDsgInput
+  - type: RosUnitInterface
+    robot_id: 1
+    robot_name: robot1
+    robot_frame: robot1/odom
+    inputs:
+      dgraph:
+        type: RosDGraphInput
+      dsg:
+        type: RosDsgInput
+  - type: RosUnitInterface
+    robot_id: 2
+    robot_name: robot2
+    robot_frame: robot2/odom
+    inputs:
+      dgraph:
+        type: RosDGraphInput
+      dsg:
+        type: RosDsgInput

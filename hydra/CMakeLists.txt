@@ -22,7 +22,6 @@ endif()
 option(BUILD_SHARED_LIBS "Build shared libs" ON)
 option(HYDRA_ENABLE_GNN "Build GNN interface" OFF)
 option(HYDRA_ENABLE_PYTHON "Build Hydra python bindings" OFF)
-option(HYDRA_ENABLE_ROS_INSTALL_LAYOUT "Install binaries to ROS location" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 

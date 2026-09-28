@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <config_utilities/config_utilities.h>
+#include <config_utilities/config.h>
 #include <config_utilities/external_registry.h>
 #include <config_utilities/formatting/asl.h>
 #include <config_utilities/logging/log_to_glog.h>

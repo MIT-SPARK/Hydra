@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_visualizer/plugins/basis_point_plugin.h"
 
-#include <config_utilities/config_utilities.h>
+#include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>

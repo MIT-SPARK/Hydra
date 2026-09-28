@@ -30,4 +30,4 @@ jobs:
         shell: bash
         run: |-
           source /opt/ros/jazzy/setup.bash
-          colcon test --packages-select hydra hydra_ros hydra_visualizer --return-code-on-test-failure --ctest-args --rerun-failed --output-on-failure --event-handlers console_cohesion+
+          colcon test --packages-select hydra hydra_multi hydra_ros hydra_visualizer --return-code-on-test-failure --ctest-args --rerun-failed --output-on-failure --event-handlers console_cohesion+

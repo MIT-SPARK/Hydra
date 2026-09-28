@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <config_utilities/config_utilities.h>
+#include <config_utilities/config.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/input/camera.h>

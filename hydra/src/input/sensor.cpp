@@ -47,7 +47,7 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/input/sensor.h"
 
-#include <config_utilities/config_utilities.h>
+#include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/types/path.h>

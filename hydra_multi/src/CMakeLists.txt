@@ -1,0 +1,5 @@
+add_subdirectory(backend)
+add_subdirectory(common)
+add_subdirectory(interface)
+add_subdirectory(input)
+add_subdirectory(operators)
