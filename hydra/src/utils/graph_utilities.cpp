@@ -85,8 +85,7 @@ SceneGraph::Ptr mergeGraphs(const Graphs& graphs) {
     }
 
     // interlayer edges
-    for (const auto& id_edge_pair : graph.interlayer_edges()) {
-      const auto& edge = id_edge_pair.second;
+    for (const auto& edge : graph.interlayer_edges()) {
       const auto source_id = node_id_map.at(edge.source);
       const auto target_id = node_id_map.at(edge.target);
       to_return->insertEdge(source_id, target_id, edge.info->clone());

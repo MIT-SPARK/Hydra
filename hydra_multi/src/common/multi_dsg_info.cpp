@@ -130,8 +130,7 @@ void MultiDsgInfo::remapAndAddLayers(size_t robot_id,
 
   // Add interlayer edges
   const auto& node_mapping = robot_node_map[robot_id];
-  for (const auto& id_edge_pair : dsg.interlayer_edges()) {
-    const auto& edge = id_edge_pair.second;
+  for (const auto& edge : dsg.interlayer_edges()) {
     const auto src_iter = node_mapping.find(edge.source);
     const auto tgt_iter = node_mapping.find(edge.target);
     if (src_iter == node_mapping.end() || tgt_iter == node_mapping.end()) {

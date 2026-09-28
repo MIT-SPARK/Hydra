@@ -272,7 +272,7 @@ void SceneGraphRenderer::drawInterlayerEdges(const std_msgs::msg::Header& header
                                              MarkerArray& msg) const {
   const std::string ns_prefix = "interlayer_edges_";
   std::map<std::pair<LayerKey, LayerKey>, InterlayerInfo> edge_info;
-  for (const auto& [key, edge] : graph.interlayer_edges()) {
+  for (const auto& edge : graph.interlayer_edges()) {
     const auto& source = graph.getNode(edge.source);
     const auto& target = graph.getNode(edge.target);
     const auto source_context = contexts_.at(source.layer);
