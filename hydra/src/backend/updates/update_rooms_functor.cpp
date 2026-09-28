@@ -88,8 +88,7 @@ void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
     graph.emplaceNode(DsgLayers::ROOMS, node.id, node.attributes().clone());
   }
 
-  for (const auto& id_edge_pair : new_rooms->edges()) {
-    const auto& edge = id_edge_pair.second;
+  for (const auto& edge : new_rooms->edges()) {
     graph.insertEdge(edge.source, edge.target, edge.info->clone());
   }
 }

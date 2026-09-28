@@ -92,7 +92,7 @@ void ValueEdgeColorAdapter::setGraph(const SceneGraph& graph, LayerKey layer_key
 
   bool is_first = true;
   const auto& layer = graph.getLayer(layer_key.layer, layer_key.partition);
-  for (const auto& [key, edge] : layer.edges()) {
+  for (const auto& edge : layer.edges()) {
     const auto value = functor_->eval(graph, edge);
     if (is_first) {
       min_value_ = value;
@@ -129,7 +129,7 @@ void TraversabilityEdgeColorAdapter::setGraph(const SceneGraph& graph, LayerKey 
   }
 
   bool is_first = true;
-  for (const auto& [key, edge] : layer->edges()) {
+  for (const auto& edge : layer->edges()) {
     const auto value = edge.attributes().weight;
     if (value < 0.0) {
       continue;

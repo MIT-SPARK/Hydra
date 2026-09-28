@@ -185,7 +185,7 @@ ComponentInfo::ComponentInfo(const Config& config,
                              const SceneGraphLayer& layer,
                              const std::vector<NodeId>& nodes,
                              double I_xy_full)
-    : ws(config, layer.edges(), getLayerEmbeddings(layer, nodes), tasks, metric),
+    : ws(config, layer, getLayerEmbeddings(layer, nodes), tasks, metric),
       segments(nodes) {
   ws.reweight(I_xy_full, static_cast<double>(nodes.size()) / layer.numNodes());
   AgglomerativeIBClustering::cluster(ws);

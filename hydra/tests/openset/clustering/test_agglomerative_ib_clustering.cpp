@@ -83,13 +83,6 @@ std::string workspaceState(const AgglomerativeIBClustering::Workspace& ws) {
 ClusteringWorkspace makeWorkspace(const std::vector<EdgeKey>& keys,
                                   const NodeEmbeddingMap& map,
                                   const ClusterConfig& config = {}) {
-  EdgeContainer::Edges edges;
-  for (const auto& [k1, k2] : keys) {
-    edges.emplace(std::piecewise_construct,
-                  std::forward_as_tuple(k1, k2),
-                  std::forward_as_tuple(k1, k2, nullptr));
-  }
-
   EmbeddingGroup y_tasks;
   for (size_t i = 0; i < 3; ++i) {
     y_tasks.embeddings.push_back(getOneHot(i, 10));
@@ -97,7 +90,7 @@ ClusteringWorkspace makeWorkspace(const std::vector<EdgeKey>& keys,
   }
 
   CosineDistance dist;
-  return ClusteringWorkspace(config, edges, map, y_tasks, dist);
+  return ClusteringWorkspace(config, keys, map, y_tasks, dist);
 }
 
 }  // namespace

@@ -113,7 +113,7 @@ void MultiDsgInfo::remapAndAddLayer(size_t robot_id,
     iter->second++;
   }
 
-  for (const auto& [key, edge] : layer.edges()) {
+  for (const auto& edge : layer.edges()) {
     const NodeSymbol new_source = node_map.at(edge.source);
     const NodeSymbol new_target = node_map.at(edge.target);
     graph->insertEdge(new_source, new_target, edge.info->clone());

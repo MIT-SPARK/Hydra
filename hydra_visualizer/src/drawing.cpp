@@ -293,7 +293,7 @@ Marker makeLayerEdgeMarkers(const std_msgs::msg::Header& header,
   }
 
   size_t num_seen = 0;
-  for (const auto& [key, edge] : layer.edges()) {
+  for (const auto& edge : layer.edges()) {
     const auto& source_node = layer.getNode(edge.source);
     const auto& target_node = layer.getNode(edge.target);
     if (!info.valid(source_node) || !info.valid(target_node)) {

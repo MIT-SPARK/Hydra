@@ -88,10 +88,27 @@ Indices findTopKIndicesCols(const Eigen::MatrixXd& m, size_t top_k) {
   return top_indices;
 }
 
+std::vector<EdgeKey> getKeys(const SceneGraphLayer& layer) {
+  std::vector<EdgeKey> edges;
+  edges.reserve(layer.numEdges());
+  for (const auto& edge : layer.edges()) {
+    edges.push_back(edge.key());
+  }
+
+  return edges;
+}
+
 }  // namespace
 
 ClusterWorkspace::Workspace(const ClusteringConfig& config,
-                            const EdgeContainer::Edges& edges_,
+                            const SceneGraphLayer& layer,
+                            const NodeEmbeddings& node_embeddings,
+                            const EmbeddingGroup& queries,
+                            const EmbeddingDistance& metric)
+    : Workspace(config, getKeys(layer), node_embeddings, queries, metric) {}
+
+ClusterWorkspace::Workspace(const ClusteringConfig& config,
+                            const std::vector<EdgeKey>& edges_,
                             const NodeEmbeddings& node_embeddings,
                             const EmbeddingGroup& queries,
                             const EmbeddingDistance& metric)
@@ -105,9 +122,9 @@ ClusterWorkspace::Workspace(const ClusteringConfig& config,
     ++index;
   }
 
-  for (const auto& [key, _] : edges_) {
-    const auto source = order.find(key.k1);
-    const auto target = order.find(key.k2);
+  for (const auto& edge : edges_) {
+    const auto source = order.find(edge.k1);
+    const auto target = order.find(edge.k2);
     if (source == order.end() || target == order.end()) {
       continue;
     }
@@ -375,7 +392,7 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
     return {};
   }
 
-  Workspace ws(config, layer.edges(), features, *queries_, *metric_);
+  Workspace ws(config, layer, features, *queries_, *metric_);
   MLOG(1) << "starting clustering with " << ws.edges.size() << " edges";
   cluster(ws, config);
   MLOG(1) << ws.summary();

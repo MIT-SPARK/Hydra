@@ -64,7 +64,13 @@ class AgglomerativeIBClustering : public LayerClustering {
     using ClusterIndices = std::vector<std::vector<spark_dsg::NodeId>>;
 
     Workspace(const ClusteringConfig& config,
-              const spark_dsg::EdgeContainer::Edges& edges,
+              const std::vector<spark_dsg::EdgeKey>& edges,
+              const NodeEmbeddings& node_embeddings,
+              const EmbeddingGroup& tasks,
+              const EmbeddingDistance& metric);
+
+    Workspace(const ClusteringConfig& config,
+              const spark_dsg::SceneGraphLayer& layer,
               const NodeEmbeddings& node_embeddings,
               const EmbeddingGroup& tasks,
               const EmbeddingDistance& metric);

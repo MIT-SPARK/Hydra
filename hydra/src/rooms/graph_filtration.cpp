@@ -160,10 +160,9 @@ void fillEntries(const SceneGraphLayer& layer,
                  std::unordered_map<NodeId, double>& node_distances,
                  bool include_nodes,
                  const DistanceAdaptor& get_distance) {
-  entries.reserve(layer.edges().size() + layer.nodes().size());
+  entries.reserve(layer.numEdges() + layer.numNodes());
 
-  for (const auto& id_edge_pair : layer.edges()) {
-    const auto& edge = id_edge_pair.second;
+  for (const auto& edge : layer.edges()) {
     entries.push_back({get_distance(edge), edge.source, edge.target});
   }
 

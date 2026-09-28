@@ -125,9 +125,9 @@ void UpdateRegionGrowingTraversabilityFunctor::updateDeformation(
 
 void UpdateRegionGrowingTraversabilityFunctor::resetAddedEdges(SceneGraph& dsg) const {
   EdgeSet to_remove;
-  for (const auto& [key, edge] : dsg.getLayer(config.layer).edges()) {
+  for (const auto& edge : dsg.getLayer(config.layer).edges()) {
     if (edge.attributes<EdgeAttributes>().weight < 0.0) {
-      to_remove.insert(key);
+      to_remove.insert(edge.key());
     }
   }
   for (const auto& edge_key : to_remove) {
@@ -183,22 +183,23 @@ void UpdateRegionGrowingTraversabilityFunctor::findActiveWindowEdges(
 void UpdateRegionGrowingTraversabilityFunctor::pruneActiveWindowEdges(
     SceneGraph& dsg) const {
   EdgeSet to_remove;
-  for (const auto& [edge_key, edge] : dsg.getLayer(config.layer).edges()) {
-    if (active_edges_.count(edge_key) || edge.attributes().weight != -1.0) {
+  for (const auto& edge : dsg.getLayer(config.layer).edges()) {
+    const auto key = edge.key();
+    if (active_edges_.count(key) || edge.attributes().weight != -1.0) {
       continue;
     }
     // Previously active edges to revisit
-    const auto& attrs_1 = dsg.getNode(edge_key.k1).attributes<TravNodeAttributes>();
-    const auto& attrs_2 = dsg.getNode(edge_key.k2).attributes<TravNodeAttributes>();
+    const auto& attrs_1 = dsg.getNode(key.k1).attributes<TravNodeAttributes>();
+    const auto& attrs_2 = dsg.getNode(key.k2).attributes<TravNodeAttributes>();
     if (!attrs_1.intersects(attrs_2)) {
-      to_remove.insert(edge_key);
+      to_remove.insert(key);
       continue;
     }
 
     if (!attrs_1.is_active && !attrs_2.is_active) {
       // Move to inactive edges.
-      dsg.getEdge(edge_key.k1, edge_key.k2).attributes().weight = -2.0;
-      merge_candidates_.insert(edge_key);
+      dsg.getEdge(key.k1, key.k2).attributes().weight = -2.0;
+      merge_candidates_.insert(key);
     }
   }
 
