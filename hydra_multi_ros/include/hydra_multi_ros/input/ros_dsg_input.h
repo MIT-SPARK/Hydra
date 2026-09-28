@@ -1,7 +1,6 @@
 #pragma once
-#include <config_utilities/config_utilities.h>
-#include <hydra_multi/operators/dynamic_scene_graph_operator.h>
 #include <hydra_multi/operators/mesh_operator.h>
+#include <hydra_multi/operators/scene_graph_operator.h>
 #include <ianvs/node_handle.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -82,15 +81,6 @@ class RosDsgInput : public Input {
   // Threading
   std::unique_ptr<std::thread> spin_thread_;
   std::mutex mutex_;
-
-  // Registration
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<Input,
-                                     RosDsgInput,
-                                     RosDsgInput::Config,
-                                     UnitInterfaceState::Ptr,
-                                     std::string,
-                                     size_t>("RosDsgInput");
 };
 
 void declare_config(RosDsgInput::Config& config);

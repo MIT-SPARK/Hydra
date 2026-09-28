@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/input/lidar.h"
 
-#include <config_utilities/config_utilities.h>
+#include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
 #include <glog/logging.h>

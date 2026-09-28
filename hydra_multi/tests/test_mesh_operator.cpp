@@ -28,7 +28,7 @@ inline MeshData makeMesh(size_t num_vertices,
                          Eigen::Vector3f offset = Eigen::Vector3f::Zero(),
                          Eigen::Vector3f original_offset = Eigen::Vector3f::Zero()) {
   MeshData mesh_data;
-  mesh_data.mesh.reset(new Mesh(true, true, false));
+  mesh_data.mesh.reset(new spark_dsg::Mesh(true, true, false));
   mesh_data.original_vertices.reset(new pcl::PointCloud<pcl::PointXYZ>);
   mesh_data.vertex_stamps.reset(new Timestamps);
   mesh_data.mesh->resizeVertices(num_vertices);

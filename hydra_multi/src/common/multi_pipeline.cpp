@@ -6,7 +6,6 @@
 #include <config_utilities/settings.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/config_utilities.h>
 #include <hydra/utils/timing_utilities.h>
 
 namespace hydra_multi {

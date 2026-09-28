@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
-#include <hydra_multi/operators/dynamic_scene_graph_operator.h>
+#include <hydra_multi/operators/scene_graph_operator.h>
 #include <spark_dsg/serialization/graph_binary_serialization.h>
-
-#include "hydra_multi/common/types.h"
 
 namespace hydra_multi {
 
-inline void fillDsg(DynamicSceneGraph& graph,
+using spark_dsg::LayerId;
+using spark_dsg::LayerKey;
+using spark_dsg::NodeAttributes;
+using spark_dsg::SceneGraph;
+
+inline void fillDsg(SceneGraph& graph,
                     size_t num_nodes,
                     size_t num_layers,
                     Eigen::Vector3d offset = Eigen::Vector3d::Zero()) {
@@ -34,19 +37,19 @@ inline void fillDsg(DynamicSceneGraph& graph,
 }
 
 TEST(DynamicSceneGraphOperatorTests, IncrementalAppend) {
-  auto data = std::make_shared<DynamicSceneGraph>();
-  DynamicSceneGraphOperator dsg_operator(data);
+  auto data = std::make_shared<SceneGraph>();
+  SceneGraphOperator dsg_operator(data);
 
-  DynamicSceneGraph dsg;
+  SceneGraph dsg;
   fillDsg(dsg, 10, 3);
   std::vector<uint8_t> buffer_1;
-  io::binary::writeGraph(dsg, buffer_1, false);
+  spark_dsg::io::binary::writeGraph(dsg, buffer_1, false);
   dsg_operator.incrementalAppend(buffer_1);
 
   EXPECT_EQ(10, data->numNodes());
 
   // Modify the dsg
-  DynamicSceneGraph dsg_mod;
+  SceneGraph dsg_mod;
   fillDsg(dsg_mod, 10, 3, {1, 2, 3});
 
   // Update the dsg
@@ -57,7 +60,7 @@ TEST(DynamicSceneGraphOperatorTests, IncrementalAppend) {
   pos10 << 10, 10, 10;
   dsg.emplaceNode(0, 10, std::make_unique<NodeAttributes>(pos10));
   std::vector<uint8_t> buffer_2;
-  io::binary::writeGraph(dsg, buffer_2, false);
+  spark_dsg::io::binary::writeGraph(dsg, buffer_2, false);
   EXPECT_TRUE(dsg_operator.incrementalAppend(buffer_2));
 
   Eigen::Vector3d pos10_mod;
@@ -67,26 +70,26 @@ TEST(DynamicSceneGraphOperatorTests, IncrementalAppend) {
 }
 
 TEST(DynamicSceneGraphOperatorTests, Merge) {
-  auto data = std::make_shared<DynamicSceneGraph>();
-  DynamicSceneGraphOperator dsg_operator(data);
+  auto data = std::make_shared<SceneGraph>();
+  SceneGraphOperator dsg_operator(data);
 
-  DynamicSceneGraph dsg;
+  SceneGraph dsg;
   fillDsg(dsg, 10, 3);
   std::vector<uint8_t> buffer_1;
-  io::binary::writeGraph(dsg, buffer_1, false);
+  spark_dsg::io::binary::writeGraph(dsg, buffer_1, false);
   dsg_operator.incrementalAppend(buffer_1);
 
   EXPECT_EQ(10, data->numNodes());
 
   // Modify the dsg
-  DynamicSceneGraph dsg_mod;
+  SceneGraph dsg_mod;
   fillDsg(dsg_mod, 10, 3, {1, 2, 3});
 
   // Update the dsg
   EXPECT_TRUE(dsg_operator(dsg_mod, OperationType::UPDATE));
 
   // Then merge to it, expect that the new parts consistent to update
-  DynamicSceneGraph dsg_2;
+  SceneGraph dsg_2;
   fillDsg(dsg_2, 12, 3);
 
   EXPECT_TRUE(dsg_operator(dsg_2, OperationType::MERGE));
@@ -97,19 +100,19 @@ TEST(DynamicSceneGraphOperatorTests, Merge) {
 }
 
 TEST(DynamicSceneGraphOperatorTests, Rebase) {
-  auto data = std::make_shared<DynamicSceneGraph>();
-  DynamicSceneGraphOperator dsg_operator(data);
+  auto data = std::make_shared<SceneGraph>();
+  SceneGraphOperator dsg_operator(data);
 
-  DynamicSceneGraph dsg;
+  SceneGraph dsg;
   fillDsg(dsg, 12, 3);
   std::vector<uint8_t> buffer_1;
-  io::binary::writeGraph(dsg, buffer_1, false);
+  spark_dsg::io::binary::writeGraph(dsg, buffer_1, false);
   dsg_operator.incrementalAppend(buffer_1);
 
   EXPECT_EQ(12, data->numNodes());
 
   // Then rebase on smaller graph, the non-overlapping parts consistent to rebase
-  DynamicSceneGraph dsg_2;
+  SceneGraph dsg_2;
   fillDsg(dsg_2, 9, 3, {1, 2, 3});
 
   EXPECT_TRUE(dsg_operator(dsg_2, OperationType::REBASE));
@@ -122,7 +125,7 @@ TEST(DynamicSceneGraphOperatorTests, Rebase) {
   pos12 << 12, 12, 12;
   dsg.emplaceNode(0, 12, std::make_unique<NodeAttributes>(pos12));
   std::vector<uint8_t> buffer_2;
-  io::binary::writeGraph(dsg, buffer_2, false);
+  spark_dsg::io::binary::writeGraph(dsg, buffer_2, false);
   EXPECT_TRUE(dsg_operator.incrementalAppend(buffer_2));
 
   EXPECT_EQ(13, data->numNodes());
@@ -132,19 +135,19 @@ TEST(DynamicSceneGraphOperatorTests, Rebase) {
 }
 
 TEST(DynamicSceneGraphOperatorTests, Update) {
-  auto data = std::make_shared<DynamicSceneGraph>();
-  DynamicSceneGraphOperator dsg_operator(data);
+  auto data = std::make_shared<SceneGraph>();
+  SceneGraphOperator dsg_operator(data);
 
-  DynamicSceneGraph dsg;
+  SceneGraph dsg;
   fillDsg(dsg, 10, 3);
   std::vector<uint8_t> buffer_1;
-  io::binary::writeGraph(dsg, buffer_1, false);
+  spark_dsg::io::binary::writeGraph(dsg, buffer_1, false);
   dsg_operator.incrementalAppend(buffer_1);
 
   EXPECT_EQ(10, data->numNodes());
 
   // Modify the dsg
-  DynamicSceneGraph dsg_1;
+  SceneGraph dsg_1;
   fillDsg(dsg_1, 10, 3, {1, 2, 3});
 
   // Update the dsg
@@ -153,9 +156,10 @@ TEST(DynamicSceneGraphOperatorTests, Update) {
   pos0 << 1, 2, 3;
   EXPECT_TRUE(data->getNode(0).attributes().position.isApprox(pos0));
 
-  DynamicSceneGraph dsg_2;
+  SceneGraph dsg_2;
   fillDsg(dsg_2, 5, 3);
 
   EXPECT_FALSE(dsg_operator(dsg_2, OperationType::UPDATE));
 }
+
 }  // namespace hydra_multi

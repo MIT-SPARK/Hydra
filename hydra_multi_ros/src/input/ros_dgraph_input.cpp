@@ -1,6 +1,7 @@
 #include "hydra_multi_ros/input/ros_dgraph_input.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <pose_graph_tools_ros/conversions.h>
@@ -10,6 +11,18 @@
 #include "hydra_multi_ros/common.h"
 
 namespace hydra_multi {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<Input,
+                                   RosDGraphInput,
+                                   RosDGraphInput::Config,
+                                   UnitInterfaceState::Ptr,
+                                   std::string,
+                                   size_t>("RosDGraphInput");
+
+}
+
 using pose_graph_tools::PoseGraphTypeAdapter;
 
 void declare_config(RosDGraphInput::Config& config) {

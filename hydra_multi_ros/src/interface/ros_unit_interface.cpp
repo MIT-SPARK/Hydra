@@ -1,6 +1,7 @@
 #include "hydra_multi_ros/interface/ros_unit_interface.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <glog/logging.h>
 #include <hydra_multi/common/multi_global_info.h>
 #include <pose_graph_tools_ros/conversions.h>
@@ -8,6 +9,14 @@
 #include "hydra_multi_ros/common.h"
 
 namespace hydra_multi {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<UnitInterface,
+                                   RosUnitInterface,
+                                   RosUnitInterface::Config>("RosUnitInterface");
+
+}
 
 void declare_config(RosUnitInterface::Config& config) {
   using namespace config;

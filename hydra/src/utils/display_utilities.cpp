@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/display_utilities.h"
 
+#include <iomanip>
+
 namespace hydra {
 
 std::string getHumanReadableMemoryString(size_t bytes) {

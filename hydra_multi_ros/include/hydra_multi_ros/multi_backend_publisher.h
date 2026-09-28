@@ -20,12 +20,12 @@ class MultiRosBackendPublisher : public MultiBackendModule::Sink {
   virtual ~MultiRosBackendPublisher() = default;
 
   void call(uint64_t timestamp_ns,
-            const DynamicSceneGraph& graph,
+            const spark_dsg::SceneGraph& graph,
             const kimera_pgmo::DeformationGraph& dgraph,
             const MultiBackendModuleStatus& status) const override;
 
  protected:
-  void publishPoseGraph(const DynamicSceneGraph& graph,
+  void publishPoseGraph(const spark_dsg::SceneGraph& graph,
                         const kimera_pgmo::DeformationGraph& dgraph) const;
 
   void publishDeformationGraphViz(const kimera_pgmo::DeformationGraph& dgraph,

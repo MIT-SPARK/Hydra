@@ -1,6 +1,7 @@
 #include "hydra_multi_ros/input/ros_dsg_input.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo_ros/conversion/mesh_delta.h>
@@ -11,6 +12,16 @@
 #include "hydra_multi_ros/common.h"
 
 namespace hydra_multi {
+namespace {
+
+static const auto registration = config::RegistrationWithConfig<Input,
+                                                                RosDsgInput,
+                                                                RosDsgInput::Config,
+                                                                UnitInterfaceState::Ptr,
+                                                                std::string,
+                                                                size_t>("RosDsgInput");
+
+}
 
 using BaseInterface = rclcpp::node_interfaces::NodeBaseInterface;
 using rclcpp::CallbackGroupType;

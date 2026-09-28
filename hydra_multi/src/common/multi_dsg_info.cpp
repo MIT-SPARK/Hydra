@@ -6,6 +6,11 @@
 
 namespace hydra_multi {
 
+using spark_dsg::LayerKey;
+using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraph;
+
 MultiDsgInfo::MultiDsgInfo(const hydra::SharedDsgInfo::Config& config)
     : hydra::SharedDsgInfo(config) {}
 
@@ -52,11 +57,11 @@ void MultiDsgInfo::clear() {
 }
 
 void MultiDsgInfo::addRobotGraph(size_t robot_id,
-                                 const DynamicSceneGraph& dsg,
+                                 const SceneGraph& dsg,
                                  Eigen::Isometry3d* transform) {
   if (!graph) {
     // Initialize Scene Graph
-    graph.reset(new DynamicSceneGraph(dsg.layer_keys(), dsg.layer_names()));
+    graph.reset(new SceneGraph(dsg.layer_keys(), dsg.layer_names()));
     // TODO(Yun) forgot to update node mapping
   }
 
@@ -78,7 +83,7 @@ void MultiDsgInfo::addRobotGraph(size_t robot_id,
 
 void MultiDsgInfo::remapAndAddLayer(size_t robot_id,
                                     LayerKey key,
-                                    const DynamicSceneGraph& dsg,
+                                    const SceneGraph& dsg,
                                     Eigen::Isometry3d* transform) {
   auto iter = layer_partition_next_node_idx.find(key);
   if (iter == layer_partition_next_node_idx.end()) {
@@ -116,7 +121,7 @@ void MultiDsgInfo::remapAndAddLayer(size_t robot_id,
 }
 
 void MultiDsgInfo::remapAndAddLayers(size_t robot_id,
-                                     const DynamicSceneGraph& dsg,
+                                     const SceneGraph& dsg,
                                      Eigen::Isometry3d* transform) {
   // Remap and add layers and partitions
   for (const auto& key : dsg.layer_keys()) {

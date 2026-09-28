@@ -7,6 +7,8 @@
 #include <hydra_multi/common/multi_global_info.h>
 #include <kimera_pgmo_ros/visualization_functions.h>
 #include <pose_graph_tools_ros/conversions.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/printing.h>
 
 #include <tf2_eigen/tf2_eigen.hpp>
 
@@ -24,6 +26,10 @@ inline MultiRosBackendPublisher::Config get_config() {
 
 using kimera_pgmo::DeformationGraph;
 using pose_graph_tools::PoseGraphTypeAdapter;
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::DsgLayers;
+using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraph;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
 
@@ -41,7 +47,7 @@ MultiRosBackendPublisher::MultiRosBackendPublisher(ianvs::NodeHandle nh)
       dsg_sender_(new hydra::DsgSender(config.dsg_sender, nh_)) {}
 
 void MultiRosBackendPublisher::call(uint64_t timestamp_ns,
-                                    const DynamicSceneGraph& graph,
+                                    const SceneGraph& graph,
                                     const DeformationGraph& dgraph,
                                     const MultiBackendModuleStatus&) const {
   const rclcpp::Time stamp(timestamp_ns);
@@ -56,7 +62,7 @@ void MultiRosBackendPublisher::call(uint64_t timestamp_ns,
   }
 }
 
-void MultiRosBackendPublisher::publishPoseGraph(const DynamicSceneGraph& graph,
+void MultiRosBackendPublisher::publishPoseGraph(const SceneGraph& graph,
                                                 const DeformationGraph& dgraph) const {
   std::map<size_t, std::vector<size_t>> id_timestamps;
   const auto agent_layer_id = graph.getLayerKey(DsgLayers::AGENTS)->layer;

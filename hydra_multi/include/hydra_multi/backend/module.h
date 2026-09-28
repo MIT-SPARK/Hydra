@@ -55,10 +55,10 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
  public:
   using Ptr = std::shared_ptr<MultiBackendModule>;
   using Sink = hydra::OutputSink<uint64_t,
-                                 const DynamicSceneGraph&,
+                                 const spark_dsg::SceneGraph&,
                                  const kimera_pgmo::DeformationGraph&,
                                  const MultiBackendModuleStatus&>;
-  using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
+  using NodeToRobotMap = std::unordered_map<spark_dsg::NodeId, size_t>;
 
   struct Config : hydra::DsgUpdater::Config {
     //! Actually perform PGO on every detected loop closure
@@ -166,7 +166,7 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
   std::mutex status_mutex_;
   MultiBackendModuleStatus status_;
   std::vector<MultiBackendModuleStatus> status_log_;
-  SceneGraphLogger backend_graph_logger_;
+  spark_dsg::SceneGraphLogger backend_graph_logger_;
 
   std::list<LoopClosureLog> loop_closures_;
   hydra::MessageQueue<pose_graph_tools::PoseGraph> lc_queue_;

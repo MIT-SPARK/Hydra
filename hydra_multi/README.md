@@ -26,5 +26,3 @@ If you find this code relevant for your work, please consider citing this paper.
   organization={IEEE}
 }
 ```
-
-

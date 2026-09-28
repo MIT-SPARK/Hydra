@@ -9,7 +9,6 @@
 #include <memory>
 #include <string>
 
-#include "hydra_multi/common/dsg_types.h"
 #include "hydra_multi/common/types.h"
 #include "hydra_multi/input/input.h"
 #include "hydra_multi/interface/interface_state.h"

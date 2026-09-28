@@ -1,19 +1,36 @@
 #include "hydra_multi/input/file_dsg_input.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/types/path.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_pgmo/utils/common_functions.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
 namespace hydra_multi {
 
 using config::Path;
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::DsgLayers;
+using spark_dsg::LayerKey;
+using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraph;
+using spark_dsg::SceneGraphLayer;
 
 namespace {
 
-inline void rewireRobotId(int new_id, DynamicSceneGraph& graph) {
+static const auto registration_ =
+    config::RegistrationWithConfig<Input,
+                                   FileDsgInput,
+                                   FileDsgInput::Config,
+                                   UnitInterfaceState::Ptr,
+                                   std::string,
+                                   size_t>("FileDsgInput");
+
+inline void rewireRobotId(int new_id, SceneGraph& graph) {
   const auto agent_key = graph.getLayerKey(DsgLayers::AGENTS).value();
   const SceneGraphLayer* prev_layer = nullptr;
   for (const auto& [prefix, layer] : graph.layer_partition(agent_key.layer)) {
@@ -85,7 +102,7 @@ FileDsgInput::FileDsgInput(const Config& config,
 void FileDsgInput::init() {
   std::lock_guard<std::mutex> state_lock(state_->mutex);
   // Load DSG and Mesh
-  state_->dsg_ = DynamicSceneGraph::load(config.dsg_json);
+  state_->dsg_ = SceneGraph::load(config.dsg_json);
   state_->mesh_data_->mesh = state_->dsg_->mesh();
   if (state_->dsg_->mesh()) {
     auto mesh = state_->dsg_->mesh();

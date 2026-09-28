@@ -47,11 +47,10 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/volumetric_map.h"
 
-#include <config_utilities/config_utilities.h>
+#include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
 #include <glog/logging.h>
 
-#include "hydra/utils/display_utilities.h"
 #include "hydra/utils/layer_io.h"
 
 namespace hydra {

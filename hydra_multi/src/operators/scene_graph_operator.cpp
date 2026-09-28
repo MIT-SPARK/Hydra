@@ -1,14 +1,18 @@
-#include "hydra_multi/operators/dynamic_scene_graph_operator.h"
+#include "hydra_multi/operators/scene_graph_operator.h"
 
 #include <spark_dsg/serialization/graph_binary_serialization.h>
 
 #include <queue>
 
 #include "hydra_multi/interface/utils.h"
+
 namespace hydra_multi {
+
+using spark_dsg::LayerId;
+using spark_dsg::SceneGraph;
 using GraphMergeConfig = spark_dsg::GraphMergeConfig;
-bool DynamicSceneGraphOperator::incrementalAppend(
-    const SceneGraphDelta& incremental_source) {
+
+bool SceneGraphOperator::incrementalAppend(const SceneGraphDelta& incremental_source) {
   // Appending scene graph nodes and edges from source to data_
   if (data_->empty()) {
     auto new_graph = spark_dsg::io::binary::readGraph(incremental_source);
@@ -21,7 +25,7 @@ bool DynamicSceneGraphOperator::incrementalAppend(
   return true;
 }
 
-bool DynamicSceneGraphOperator::update(const DynamicSceneGraph& source) {
+bool SceneGraphOperator::update(const SceneGraph& source) {
   // Updating the scene graph in data_ according to source
   // Returns an error if data_ node does not exist in source
   if (source.numNodes() < data_->numNodes()) {
@@ -41,7 +45,7 @@ bool DynamicSceneGraphOperator::update(const DynamicSceneGraph& source) {
   return data_->mergeGraph(source, config);
 }
 
-bool DynamicSceneGraphOperator::rebase(const DynamicSceneGraph& source) {
+bool SceneGraphOperator::rebase(const SceneGraph& source) {
   // Rebase by first adding and updating from source, then figure out transform to add
   // parts of data_ that does not exist in source
 
@@ -76,7 +80,7 @@ bool DynamicSceneGraphOperator::rebase(const DynamicSceneGraph& source) {
   return data_->mergeGraph(*orig, {}, &append_T_data_);
 }
 
-bool DynamicSceneGraphOperator::merge(const DynamicSceneGraph& source) {
+bool SceneGraphOperator::merge(const SceneGraph& source) {
   // To merge find the new parts of source and append
   // Don't need to update append_T but need to compute source_T_data
   if (data_->empty()) {
@@ -86,8 +90,8 @@ bool DynamicSceneGraphOperator::merge(const DynamicSceneGraph& source) {
   return data_->mergeGraph(source, {}, &source_T_data);
 }
 
-Eigen::Isometry3d DynamicSceneGraphOperator::computeSourceDataTransform(
-    const DynamicSceneGraph& source) {
+Eigen::Isometry3d SceneGraphOperator::computeSourceDataTransform(
+    const SceneGraph& source) {
   // Find transform from original to scene graph
   // Align with the agent nodes (or other layers?)
   // TODO(Yun) make this a config
@@ -122,7 +126,7 @@ Eigen::Isometry3d DynamicSceneGraphOperator::computeSourceDataTransform(
   return source_T_data;
 }
 
-void DynamicSceneGraphOperator::updateAppendTransform(const DynamicSceneGraph& source) {
+void SceneGraphOperator::updateAppendTransform(const SceneGraph& source) {
   append_T_data_ = computeSourceDataTransform(source).inverse();
 }
 

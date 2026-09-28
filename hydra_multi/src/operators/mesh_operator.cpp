@@ -8,9 +8,11 @@
 #include <queue>
 
 #include "hydra_multi/interface/utils.h"
+
 namespace hydra_multi {
 
 using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
+using spark_dsg::Mesh;
 
 bool MeshOperator::incrementalAppend(const MeshDelta& incremental_source) {
   // Appending new edges and nodes from source to data_

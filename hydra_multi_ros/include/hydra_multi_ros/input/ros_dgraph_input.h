@@ -1,5 +1,4 @@
 #pragma once
-#include <config_utilities/config_utilities.h>
 #include <hydra_multi/input/input.h>
 #include <pose_graph_tools_ros/conversions.h>
 
@@ -50,14 +49,6 @@ class RosDGraphInput : public Input {
  private:
   pose_graph_tools::PoseGraphSubscription mesh_graph_sub_;
   pose_graph_tools::PoseGraphSubscription pose_graph_sub_;
-
-  inline static const auto registration =
-      config::RegistrationWithConfig<Input,
-                                     RosDGraphInput,
-                                     RosDGraphInput::Config,
-                                     UnitInterfaceState::Ptr,
-                                     std::string,
-                                     size_t>("RosDGraphInput");
 };
 
 void declare_config(RosDGraphInput::Config& config);

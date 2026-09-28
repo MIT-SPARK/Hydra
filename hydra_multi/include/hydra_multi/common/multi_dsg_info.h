@@ -21,17 +21,17 @@ class MultiDsgInfo : public hydra::SharedDsgInfo {
   void clear();
 
   void addRobotGraph(size_t robot_id,
-                     const DynamicSceneGraph& dsg,
+                     const spark_dsg::SceneGraph& dsg,
                      Eigen::Isometry3d* transform = nullptr);
 
  private:
   void remapAndAddLayer(size_t robot_id,
-                        LayerKey layer_key,
-                        const DynamicSceneGraph& dsg,
+                        spark_dsg::LayerKey layer_key,
+                        const spark_dsg::SceneGraph& dsg,
                         Eigen::Isometry3d* transform = nullptr);
 
   void remapAndAddLayers(size_t robot_id,
-                         const DynamicSceneGraph& dsg,
+                         const spark_dsg::SceneGraph& dsg,
                          Eigen::Isometry3d* transform = nullptr);
 
  public:
@@ -40,7 +40,7 @@ class MultiDsgInfo : public hydra::SharedDsgInfo {
   NodeIdRobotMap node_robot_map;
   RobotIndexMap robot_vertex_offset;
   RobotIndexMap robot_num_vertices;
-  std::map<LayerKey, size_t> layer_partition_next_node_idx;
+  std::map<spark_dsg::LayerKey, size_t> layer_partition_next_node_idx;
 };
 
 }  // namespace hydra_multi

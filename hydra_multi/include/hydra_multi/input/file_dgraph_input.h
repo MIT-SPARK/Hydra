@@ -1,6 +1,4 @@
 #pragma once
-#include <config_utilities/factory.h>
-
 #include <filesystem>
 
 #include "hydra_multi/input/input.h"
@@ -26,15 +24,6 @@ class FileDGraphInput : public Input {
   void init() override;
 
   void stop() override;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<Input,
-                                     FileDGraphInput,
-                                     FileDGraphInput::Config,
-                                     UnitInterfaceState::Ptr,
-                                     std::string,
-                                     size_t>("FileDGraphInput");
 };
 
 void declare_config(FileDGraphInput::Config& config);

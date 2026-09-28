@@ -1,5 +1,4 @@
 #pragma once
-#include <config_utilities/config_utilities.h>
 
 #include "hydra_multi/input/input.h"
 
@@ -22,15 +21,8 @@ class FileDsgInput : public Input {
   void init() override;
 
   void stop() override;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<Input,
-                                     FileDsgInput,
-                                     FileDsgInput::Config,
-                                     UnitInterfaceState::Ptr,
-                                     std::string,
-                                     size_t>("FileDsgInput");
 };
+
 void declare_config(FileDsgInput::Config& config);
+
 }  // namespace hydra_multi

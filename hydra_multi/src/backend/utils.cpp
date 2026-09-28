@@ -3,8 +3,18 @@
 #include <glog/logging.h>
 #include <hydra/places/2d_places/index_remapping.h>
 #include <kimera_pgmo/utils/common_functions.h>
+#include <spark_dsg/node_symbol.h>
 
 namespace hydra_multi {
+
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::DsgLayers;
+using spark_dsg::NodeSymbol;
+using spark_dsg::ObjectNodeAttributes;
+using spark_dsg::Place2dNodeAttributes;
+using spark_dsg::SceneGraph;
+using spark_dsg::SceneGraphLayer;
+
 namespace {
 
 inline void updateIndices(ObjectNodeAttributes& attrs,
@@ -75,7 +85,7 @@ size_t findClosestStampIdx(const Timestamps& stamps, const Timestamp query_stamp
   return it - stamps.begin();
 }
 
-std::optional<Timestamp> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
+std::optional<Timestamp> getTimeNs(const SceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
   if (!graph.hasNode(node)) {
     LOG(ERROR) << "Missing node << " << node << "when getting time.";
@@ -84,7 +94,7 @@ std::optional<Timestamp> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol
   return graph.getNode(node).attributes<AgentNodeAttributes>().timestamp.count();
 }
 
-void reindexMeshConnections(DynamicSceneGraph& graph,
+void reindexMeshConnections(SceneGraph& graph,
                             const NodeIdRobotMap& node_to_robot,
                             const RobotIndexMap& mesh_offsets) {
   const auto objects = graph.findLayer(DsgLayers::OBJECTS);

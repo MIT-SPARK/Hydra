@@ -1,7 +1,5 @@
 #pragma once
 
-#include <map>
-
 #include "hydra_multi/common/types.h"
 #include "hydra_multi/operators/interface_operator.h"
 

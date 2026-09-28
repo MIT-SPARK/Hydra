@@ -3,10 +3,11 @@
 #include <glog/logging.h>
 
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 
 namespace hydra_multi {
+
+using spark_dsg::SceneGraph;
 
 UnitInterfaceState::UnitInterfaceState()
     : mesh_graph_(new pose_graph_tools::PoseGraph),
@@ -34,9 +35,9 @@ void UnitInterfaceState::save(const std::filesystem::path& log_dir) const {
   dsg_->save(log_dir / "dsg.json", false);
 }
 
-void UnitInterfaceState::initDsg(DynamicSceneGraph::Ptr dsg) {
+void UnitInterfaceState::initDsg(SceneGraph::Ptr dsg) {
   dsg_ = dsg;
-  dsg_operator_.reset(new DynamicSceneGraphOperator(dsg));
+  dsg_operator_.reset(new SceneGraphOperator(dsg));
 }
 
 }  // namespace hydra_multi

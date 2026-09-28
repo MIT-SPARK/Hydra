@@ -12,6 +12,8 @@
 #include <hydra/utils/timing_utilities.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <kimera_rpgo/utils/g2o.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 #include <ranges>
 
@@ -20,8 +22,16 @@
 #include "hydra_multi/common/multi_global_info.h"
 
 namespace hydra_multi {
+
 using hydra::DsgUpdater;
 using hydra::timing::ScopedTimer;
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::DsgLayers;
+using spark_dsg::Mesh;
+using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
+using spark_dsg::ObjectNodeAttributes;
+using spark_dsg::SceneGraphLayer;
 
 namespace {
 
@@ -517,10 +527,8 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
   }
 
   const auto& objects = unmerged_dsg_->graph->getLayer(DsgLayers::OBJECTS);
-  LayerView view = LayerView(objects);
-
-  for (const auto& obj : view) {
-    auto attrs = obj.tryAttributes<ObjectNodeAttributes>();
+  for (const auto& [node_id, node] : objects.nodes()) {
+    auto attrs = node->tryAttributes<ObjectNodeAttributes>();
     if (!attrs) {
       continue;  // not an object
     }
@@ -531,7 +539,7 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
     /*unmerged_dsg_->node_robot_map.at(obj.id),*/
     /*config.object_association_max_diff_s);*/
     if (!agent_node) {
-      LOG(ERROR) << "Failed to associated object " << NodeSymbol(obj.id)
+      LOG(ERROR) << "Failed to associated object " << NodeSymbol(node->id)
                  << " to agent node.";
       continue;
     }
@@ -550,10 +558,10 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
     // TODO(Yun) this is needed right now bc scene graph transformed to world frame
     // while dgraph not. Fix in next PR.
     gtsam::Pose3 Wrobot_T_obj =
-        curr_W_T_robot_.at(unmerged_dsg_->node_robot_map.at(obj.id)).between(W_T_obj);
-    deformation_graph_->processNewNode(obj.id, Wrobot_T_obj, false);
+        curr_W_T_robot_.at(unmerged_dsg_->node_robot_map.at(node->id)).between(W_T_obj);
+    deformation_graph_->processNewNode(node->id, Wrobot_T_obj, false);
     deformation_graph_->processNewBetween(
-        agent_attrs.external_key, obj.id, agent_T_obj, config.object_variance);
+        agent_attrs.external_key, node->id, agent_T_obj, config.object_variance);
   }
 }
 

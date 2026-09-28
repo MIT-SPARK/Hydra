@@ -11,12 +11,11 @@
 #include <kimera_pgmo/mesh_offset_info.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <spark_dsg/mesh.h>
 
 #include <map>
 #include <memory>
 #include <unordered_map>
-
-#include "hydra_multi/common/dsg_types.h"
 
 namespace hydra_multi {
 
@@ -25,8 +24,8 @@ using Timestamp = uint64_t;
 
 using RobotPrefixConfig = hydra::RobotPrefixConfig;
 
-using IdIdMap = std::unordered_map<NodeId, NodeId>;
-using NodeIdRobotMap = std::unordered_map<NodeId, RobotId>;
+using IdIdMap = std::unordered_map<spark_dsg::NodeId, spark_dsg::NodeId>;
+using NodeIdRobotMap = std::unordered_map<spark_dsg::NodeId, RobotId>;
 using RobotIndexMap = std::map<RobotId, kimera_pgmo::MeshOffsetInfo>;
 using RobotIdIdMap = std::unordered_map<RobotId, IdIdMap>;
 
@@ -42,7 +41,7 @@ struct MeshData {
 
   void transform(const Eigen::Isometry3d& tf);
 
-  Mesh::Ptr mesh;
+  spark_dsg::Mesh::Ptr mesh;
   kimera_pgmo::MeshOffsetInfo offsets;
   pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices;
   std::shared_ptr<Timestamps> vertex_stamps;

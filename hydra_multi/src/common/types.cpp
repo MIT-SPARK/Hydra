@@ -4,6 +4,8 @@
 
 namespace hydra_multi {
 
+using spark_dsg::Mesh;
+
 MeshData::MeshData()
     : mesh(new Mesh),
       original_vertices(new pcl::PointCloud<pcl::PointXYZ>),

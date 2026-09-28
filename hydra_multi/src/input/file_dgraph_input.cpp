@@ -1,14 +1,29 @@
 #include "hydra_multi/input/file_dgraph_input.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/types/path.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_pgmo/utils/common_functions.h>
+#include <spark_dsg/node_attributes.h>
 
 namespace hydra_multi {
+namespace {
+
+static const auto registration_ =
+    config::RegistrationWithConfig<Input,
+                                   FileDGraphInput,
+                                   FileDGraphInput::Config,
+                                   UnitInterfaceState::Ptr,
+                                   std::string,
+                                   size_t>("FileDGraphInput");
+
+}
 
 using config::Path;
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::DsgLayers;
 
 void declare_config(FileDGraphInput::Config& config) {
   using namespace config;
