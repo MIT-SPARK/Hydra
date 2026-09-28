@@ -527,8 +527,8 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
   }
 
   const auto& objects = unmerged_dsg_->graph->getLayer(DsgLayers::OBJECTS);
-  for (const auto& [node_id, node] : objects.nodes()) {
-    auto attrs = node->tryAttributes<ObjectNodeAttributes>();
+  for (const auto& node : objects.nodes()) {
+    auto attrs = node.tryAttributes<ObjectNodeAttributes>();
     if (!attrs) {
       continue;  // not an object
     }
@@ -539,7 +539,7 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
     /*unmerged_dsg_->node_robot_map.at(obj.id),*/
     /*config.object_association_max_diff_s);*/
     if (!agent_node) {
-      LOG(ERROR) << "Failed to associated object " << NodeSymbol(node->id)
+      LOG(ERROR) << "Failed to associated object " << NodeSymbol(node.id)
                  << " to agent node.";
       continue;
     }
@@ -558,10 +558,10 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
     // TODO(Yun) this is needed right now bc scene graph transformed to world frame
     // while dgraph not. Fix in next PR.
     gtsam::Pose3 Wrobot_T_obj =
-        curr_W_T_robot_.at(unmerged_dsg_->node_robot_map.at(node->id)).between(W_T_obj);
-    deformation_graph_->processNewNode(node->id, Wrobot_T_obj, false);
+        curr_W_T_robot_.at(unmerged_dsg_->node_robot_map.at(node.id)).between(W_T_obj);
+    deformation_graph_->processNewNode(node.id, Wrobot_T_obj, false);
     deformation_graph_->processNewBetween(
-        agent_attrs.external_key, node->id, agent_T_obj, config.object_variance);
+        agent_attrs.external_key, node.id, agent_T_obj, config.object_variance);
   }
 }
 
