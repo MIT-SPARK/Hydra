@@ -36,7 +36,6 @@
 #include <hydra/active_window/active_window_output.h>
 #include <hydra/input/camera.h>
 #include <hydra/places/block_traversability_clustering.h>
-#include <hydra/places/traversability_postprocessing.h>
 #include <hydra/places/traversability_projective_integrator.h>
 
 namespace hydra::places {
@@ -150,14 +149,6 @@ TEST(TraversabilityPlaces, CopyGeometryKeepsSemantics) {
   EXPECT_EQ(to.semantic.confidence, 0.8f);
 }
 
-TEST(TraversabilityPlaces, ProcessorPersistence) {
-  const ErosionDilation dilation({});
-  EXPECT_FALSE(dilation.persistent());
-
-  const TraversabilityProjectiveIntegrator integrator({});
-  EXPECT_TRUE(integrator.persistent());
-}
-
 TEST(TraversabilityPlaces, ProjectiveIntegratorAccumulates) {
   // Camera at the world origin looking along +z (identity body pose and extrinsics).
   Camera::Config camera_config;
@@ -195,12 +186,12 @@ TEST(TraversabilityPlaces, ProjectiveIntegratorAccumulates) {
   };
 
   set_heights();
-  integrator.apply(layer, msg);
+  integrator.integrate(layer, msg);
 
   // Emulate the estimator recomputing the block between updates.
   resetGeometry(block);
   set_heights();
-  integrator.apply(layer, msg);
+  integrator.integrate(layer, msg);
 
   const auto& visible = block.voxel(0, 0).semantic;
   EXPECT_EQ(visible.traversable_count, 2u);

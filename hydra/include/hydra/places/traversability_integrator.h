@@ -34,14 +34,12 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/virtual_config.h>
-
 #include <memory>
 
 #include "hydra/places/traversability_layer.h"
 
 namespace hydra {
-// Forward declared to keep volumetric_map.h / OpenCV out of this header; processors
+// Forward declared to keep volumetric_map.h / OpenCV out of this header; integrators
 // only take it by reference.
 struct ActiveWindowOutput;
 }  // namespace hydra
@@ -49,68 +47,24 @@ struct ActiveWindowOutput;
 namespace hydra::places {
 
 /**
- * @brief Interface for various traversability post processing functions that can be
- * applied to the traversability layer.
+ * @brief Interface for integrators that accumulate evidence into the persistent
+ * traversability layer. Integrators run after the estimator has updated the layer on
+ * every update, and their changes carry over to later updates.
  */
-class TraversabilityProcessor {
+class TraversabilityIntegrator {
  public:
-  using Ptr = std::shared_ptr<TraversabilityProcessor>;
-  using ConstPtr = std::shared_ptr<const TraversabilityProcessor>;
+  using Ptr = std::shared_ptr<TraversabilityIntegrator>;
+  using ConstPtr = std::shared_ptr<const TraversabilityIntegrator>;
 
-  TraversabilityProcessor() = default;
-  virtual ~TraversabilityProcessor() = default;
+  TraversabilityIntegrator() = default;
+  virtual ~TraversabilityIntegrator() = default;
 
   /**
-   * @brief Apply the post processing to the traversability layer.
-   * @param layer The traversability layer to process.
-   * @param msg The active window output the layer was computed from, providing access
-   * to the sensor data and volumetric map for this update.
+   * @brief Integrate the latest observations into the traversability layer.
+   * @param layer The persistent traversability layer, already updated by the estimator.
+   * @param msg The active window output providing the sensor data for this update.
    */
-  virtual void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) = 0;
+  virtual void integrate(TraversabilityLayer& layer, const ActiveWindowOutput& msg) = 0;
 };
-
-/**
- * @brief Utility container for several processors.
- */
-struct TraversabilityProcessors {
-  using Config = std::vector<config::VirtualConfig<TraversabilityProcessor>>;
-
-  explicit TraversabilityProcessors(const Config& config);
-
-  /** @brief Apply all processors to the traversability layer.
-   * @param layer The traversability layer to process.
-   * @param msg The active window output the layer was computed from.
-   */
-  void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) const;
-
-  //! @brief Whether no processors are configured.
-  bool empty() const { return processors_.empty(); }
-
- private:
-  std::vector<TraversabilityProcessor::Ptr> processors_;
-};
-
-/**
- * @brief Dilate intraversable space in the traversability layer.
- */
-class ErosionDilation : public TraversabilityProcessor {
- public:
-  struct Config {
-    //! @brief Number of dilation steps to apply.
-    size_t num_dilations = 1;
-  };
-
-  ErosionDilation(const Config& config);
-  ~ErosionDilation() override = default;
-
-  void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) override;
-
-  const Config config;
-
- protected:
-  static const std::array<Index2D, 4> offsets_;
-};
-
-void declare_config(ErosionDilation::Config& config);
 
 }  // namespace hydra::places

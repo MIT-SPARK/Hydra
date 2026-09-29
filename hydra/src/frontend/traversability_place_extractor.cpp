@@ -59,6 +59,8 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
   name("TraversabilityPlaceExtractor::Config");
   field(config.layer, "layer");
   field(config.estimator, "estimator");
+  config.integrator.setOptional();
+  field(config.integrator, "integrator");
   field(config.postprocessing, "postprocessing");
   field(config.clustering, "clustering");
   field(config.sinks, "sinks");
@@ -67,6 +69,7 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
 TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
     : config(config::checkValid(config)),
       estimator_(config.estimator.create()),
+      integrator_(config.integrator.create()),
       postprocessing_(config.postprocessing),
       clustering_(config.clustering.create()),
       sinks_(Sink::instantiate(config.sinks)) {}
@@ -90,7 +93,10 @@ void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   }
 
   estimator_->updateTraversability(msg, *layer_);
-  postprocessing_.applyPersistent(*layer_, msg);
+  if (integrator_) {
+    timer.reset("traversability/integrate");
+    integrator_->integrate(*layer_, msg);
+  }
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
@@ -99,13 +105,14 @@ void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
     return;
   }
 
-  // Transient processors modify the state and updated flags only for this update, so
-  // they act on a copy of the persistent layer.
+  // The estimator only recomputes the blocks touched by this update, the rest keep
+  // their previous state. Postprocessing (e.g. dilation) therefore acts on a copy,
+  // otherwise its changes would compound on the persistent layer with every update.
   Timer timer("traversability/postprocessing", msg.timestamp_ns);
   std::optional<TraversabilityLayer> processed;
-  if (postprocessing_.hasTransient()) {
+  if (!postprocessing_.empty()) {
     processed.emplace(*layer_);
-    postprocessing_.applyTransient(*processed, msg);
+    postprocessing_.apply(*processed, msg);
   }
   const auto& layer = processed ? *processed : *layer_;
 

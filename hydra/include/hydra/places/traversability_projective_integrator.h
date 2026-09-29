@@ -38,7 +38,7 @@
 
 #include <memory>
 
-#include "hydra/places/traversability_postprocessing.h"
+#include "hydra/places/traversability_integrator.h"
 #include "hydra/reconstruction/projection_interpolators.h"
 
 namespace hydra {
@@ -57,9 +57,9 @@ namespace hydra::places {
  * range against the range image, interpolates the label image at that pixel, and counts
  * the observation in the voxel's `semantic` field.
  *
- * @note The semantic counts live on the voxels and persist across updates: this is a
- * persistent processor, so it runs on the extractor's own layer, and the estimators
- * reset only the geometric fields (see resetGeometry()).
+ * @note The semantic counts live on the voxels and persist across updates: the
+ * extractor runs this on its persistent layer right after the estimator, and the
+ * estimators reset only the geometric fields (see resetGeometry()).
  *
  * @note The geometric `traversability`, `confidence` and `state` fields are left
  * untouched, so this can be enabled alongside any estimator without changing existing
@@ -70,7 +70,7 @@ namespace hydra::places {
  * depth-dependent measurement weight. What remains from projective integration is the
  * projection itself plus a visibility test.
  */
-class TraversabilityProjectiveIntegrator : public TraversabilityProcessor {
+class TraversabilityProjectiveIntegrator : public TraversabilityIntegrator {
  public:
   struct Config {
     //! @brief Label treated as traversable evidence.
@@ -108,9 +108,7 @@ class TraversabilityProjectiveIntegrator : public TraversabilityProcessor {
   explicit TraversabilityProjectiveIntegrator(const Config& config);
   ~TraversabilityProjectiveIntegrator() override = default;
 
-  void apply(TraversabilityLayer& layer, const ActiveWindowOutput& msg) override;
-
-  bool persistent() const override { return true; }
+  void integrate(TraversabilityLayer& layer, const ActiveWindowOutput& msg) override;
 
  protected:
   std::unique_ptr<ProjectionInterpolator> interpolator_;
