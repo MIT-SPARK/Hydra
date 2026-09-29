@@ -33,8 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/active_window/volumetric_window.h>
 #include <hydra/frontend/gvd_place_extractor.h>
 #include <spark_dsg/node_symbol.h>
+
+#include <limits>
 
 namespace hydra {
 namespace {
@@ -59,6 +62,9 @@ class TestGvdPlaceExtractor : public GvdPlaceExtractor {
     graph_extractor_ = std::make_unique<TestGraphExtractor>();
   }
 
+  using GvdPlaceExtractor::gvd_;
+  using GvdPlaceExtractor::tsdf_interpolator_;
+
   TestGraphExtractor& extractor() {
     return static_cast<TestGraphExtractor&>(*graph_extractor_);
   }
@@ -70,6 +76,16 @@ class TestGvdPlaceExtractor : public GvdPlaceExtractor {
     return config;
   }
 };
+
+ActiveWindowOutput makeInput(uint64_t timestamp_ns,
+                             const VolumetricMap::Config& config = {}) {
+  auto data = std::make_shared<InputData>(nullptr);
+  data->timestamp_ns = timestamp_ns;
+  data->world_T_body = Eigen::Isometry3d::Identity();
+  ActiveWindowOutput msg(data);
+  msg.setMap(std::make_shared<VolumetricMap>(config));
+  return msg;
+}
 
 }  // namespace
 
@@ -171,6 +187,121 @@ TEST(GvdPlaceExtractor, FiltersSmallPartialComponentsEvenWithHistoricalNeighbors
   EXPECT_TRUE(dsg.graph->hasNode(first));
   EXPECT_FALSE(dsg.graph->hasNode(boundary));
   EXPECT_FALSE(dsg.graph->hasNode(active));
+}
+
+TEST(GvdPlaceExtractor, InvalidAttributesPreserveInactiveRecordAndSkipEdges) {
+  TestGvdPlaceExtractor frontend;
+  auto& places = frontend.extractor().graph_;
+  SharedDsgInfo dsg({});
+  const NodeSymbol archived('p', 0);
+  const NodeSymbol active('p', 1);
+
+  places.add(0).distance = 2.0;
+  places.add(1);
+  frontend.updateGraph(1, *dsg.graph);
+  dsg.graph->getNode(archived).attributes().is_active = false;
+  places.at(0).distance = std::numeric_limits<double>::infinity();
+  places.add(0, 1);
+  frontend.updateGraph(2, *dsg.graph);
+
+  const auto& attrs =
+      dsg.graph->getNode(archived).attributes<spark_dsg::PlaceNodeAttributes>();
+  EXPECT_FALSE(attrs.is_active);
+  EXPECT_EQ(attrs.distance, 2.0);
+  EXPECT_FALSE(dsg.graph->hasEdge(archived, active));
+}
+
+TEST(GvdPlaceExtractor, InvalidActiveNodeIsRemoved) {
+  TestGvdPlaceExtractor frontend;
+  auto& places = frontend.extractor().graph_;
+  SharedDsgInfo dsg({});
+  const NodeSymbol node('p', 0);
+  places.add(0);
+  frontend.updateGraph(1, *dsg.graph);
+
+  places.at(0).position.x() = std::numeric_limits<double>::quiet_NaN();
+  frontend.updateGraph(2, *dsg.graph);
+  EXPECT_FALSE(dsg.graph->hasNode(node));
+}
+
+TEST(GvdPlaceExtractor, InvalidFirstInputDoesNotPublish) {
+  GvdPlaceExtractor frontend({});
+  VolumetricMap::Config config;
+  config.truncation_distance = 0.1f;
+  const auto msg = makeInput(1, config);
+  SharedDsgInfo dsg({});
+  FrontendOutput output(1, 0);
+
+  EXPECT_FALSE(frontend.detect(msg));
+  EXPECT_NO_THROW(frontend.call(msg, dsg, output, nullptr));
+  EXPECT_NO_THROW(frontend.updateGraph(1, *dsg.graph));
+  EXPECT_EQ(dsg.graph->numNodes(), 0u);
+}
+
+TEST(GvdPlaceExtractor, InvalidLaterInputDoesNotRepublishStalePlaces) {
+  TestGvdPlaceExtractor frontend;
+  SharedDsgInfo dsg({});
+  const NodeSymbol node('p', 0);
+  frontend.extractor().graph_.add(0);
+  frontend.updateGraph(1, *dsg.graph);
+
+  VolumetricMap::Config config;
+  config.truncation_distance = 0.1f;
+  const auto msg = makeInput(2, config);
+  FrontendOutput output(2, 0);
+  frontend.call(msg, dsg, output, nullptr);
+  EXPECT_EQ(dsg.graph->getNode(node).attributes().last_update_time_ns, 1u);
+}
+
+TEST(GvdPlaceExtractor, InterpolationFailureDoesNotFallBackToOriginalGrid) {
+  TestGvdPlaceExtractor frontend;
+  DownsampleTsdfInterpolator::Config config;
+  config.ratio = 16;  // Leaves only one voxel per side, which the interpolator rejects.
+  frontend.tsdf_interpolator_ = std::make_unique<DownsampleTsdfInterpolator>(config);
+
+  EXPECT_FALSE(frontend.detect(makeInput(1)));
+  EXPECT_FALSE(frontend.gvd_);
+}
+
+TEST(GvdPlaceExtractor, RejectsChangesToInitializedVoxelGrid) {
+  TestGvdPlaceExtractor frontend;
+  ASSERT_TRUE(frontend.detect(makeInput(1)));
+  const auto original = frontend.gvd_;
+
+  VolumetricMap::Config config;
+  config.voxel_size *= 2;
+  EXPECT_FALSE(frontend.detect(makeInput(2, config)));
+  EXPECT_EQ(frontend.gvd_, original);
+}
+
+TEST(GvdPlaceExtractor, TemporalWindowUsesLastBlockInputTime) {
+  TestGvdPlaceExtractor frontend;
+  TemporalWindowChecker window({1.0});
+  auto map = std::make_shared<VolumetricMap>(VolumetricMap::Config{});
+  map->allocateBlock({0, 0, 0});
+  auto msg = makeInput(10'000'000'000);
+  msg.setMap(map);
+
+  ASSERT_TRUE(frontend.detect(msg, &window));
+  ASSERT_EQ(frontend.gvd_->numBlocks(), 1u);
+  ASSERT_TRUE(frontend.detect(makeInput(10'500'000'000), &window));
+  EXPECT_EQ(frontend.gvd_->numBlocks(), 1u);
+  ASSERT_TRUE(frontend.detect(makeInput(11'500'000'000), &window));
+  EXPECT_EQ(frontend.gvd_->numBlocks(), 0u);
+}
+
+TEST(GvdPlaceExtractor, SpatialWindowArchivesOutsideBlocks) {
+  TestGvdPlaceExtractor frontend;
+  SpatialWindowChecker window({2.0});
+  auto map = std::make_shared<VolumetricMap>(VolumetricMap::Config{});
+  map->allocateBlock({0, 0, 0});
+  map->allocateBlock({4, 0, 0});
+  auto msg = makeInput(1);
+  msg.setMap(map);
+
+  ASSERT_TRUE(frontend.detect(msg, &window));
+  EXPECT_TRUE(frontend.gvd_->hasBlock(BlockIndex(0, 0, 0)));
+  EXPECT_FALSE(frontend.gvd_->hasBlock(BlockIndex(4, 0, 0)));
 }
 
 }  // namespace hydra

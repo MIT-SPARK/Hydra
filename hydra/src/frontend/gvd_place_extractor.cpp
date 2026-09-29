@@ -41,6 +41,8 @@
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/printing.h>
 
+#include <cmath>
+
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -54,8 +56,6 @@ using spark_dsg::PlaceNodeAttributes;
 using spark_dsg::SceneGraph;
 using timing::ScopedTimer;
 
-using PlacesGraph = PartialGraph<PlaceNodeAttributes>;
-
 namespace {
 
 static const auto registration =
@@ -64,17 +64,17 @@ static const auto registration =
                                    GvdPlaceExtractor::Config>("gvd");
 
 bool attributesInvalid(const PlaceNodeAttributes& attrs) {
-  if (std::isnan(attrs.distance)) {
+  if (!std::isfinite(attrs.distance)) {
     return true;
   }
 
-  if (attrs.position.hasNaN()) {
+  if (!attrs.position.allFinite()) {
     return true;
   }
 
   for (const auto& info : attrs.voxblox_mesh_connections) {
-    if (std::isnan(info.voxel_pos[0]) || std::isnan(info.voxel_pos[1]) ||
-        std::isnan(info.voxel_pos[2])) {
+    if (!std::isfinite(info.voxel_pos[0]) || !std::isfinite(info.voxel_pos[1]) ||
+        !std::isfinite(info.voxel_pos[2])) {
       return true;
     }
   }
@@ -115,13 +115,15 @@ void GvdPlaceExtractor::call(const ActiveWindowOutput& msg,
                              SharedDsgInfo& dsg,
                              FrontendOutput&,
                              const VolumetricWindow* window) {
-  detect(msg, window);
+  if (!detect(msg, window)) {
+    return;
+  }
 
   std::lock_guard<std::mutex> graph_lock(dsg.mutex);
   updateGraph(msg.timestamp_ns, *dsg.graph);
 }
 
-void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
+bool GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
                                const VolumetricWindow* window) {
   ScopedTimer timer("frontend/detect_gvd", msg.timestamp_ns, true, 2, false);
 
@@ -131,16 +133,26 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
                   "(currently "
                << config.gvd.min_distance_m << " vs. truncation distance "
                << map.config.truncation_distance << ")";
-    return;
+    return false;
   }
 
   TsdfLayer::Ptr downsampled_tsdf;
   if (tsdf_interpolator_) {
     ScopedTimer dtimer("frontend/downsample_tsdf", msg.timestamp_ns, true, 2, false);
     downsampled_tsdf = tsdf_interpolator_->interpolate(map.getTsdfLayer());
+    if (!downsampled_tsdf) {
+      LOG(ERROR) << "Could not interpolate TSDF for GVD places";
+      return false;
+    }
   }
 
   const auto& tsdf = downsampled_tsdf ? *downsampled_tsdf : map.getTsdfLayer();
+  if (gvd_ && (gvd_->voxel_size != tsdf.voxel_size ||
+               gvd_->voxels_per_side != tsdf.voxels_per_side)) {
+    LOG(ERROR) << "Cannot change the GVD voxel grid during extraction";
+    return false;
+  }
+
   const Eigen::Isometry3d world_T_body = msg.world_T_body();
 
   if (!gvd_) {
@@ -154,6 +166,10 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
   gvd_integrator_->updateFromTsdf(
       msg.timestamp_ns, tsdf, false, &map.getMeshLayer(), true);
 
+  for (const auto& block : tsdf) {
+    block_update_times_[block.index] = msg.timestamp_ns;
+  }
+
   places::VoxelIndexChanges changes;
   gvd_integrator_->updateGvd(msg.timestamp_ns, &changes);
   graph_extractor_->extract(
@@ -162,20 +178,29 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
   if (window) {
     BlockIndices to_archive;
     for (const auto& block : *gvd_) {
-      if (!window->inBounds(msg.timestamp_ns, world_T_body, block)) {
+      const VolumetricBlockInfo info(block, block_update_times_.at(block.index));
+      if (!window->inBounds(msg.timestamp_ns, world_T_body, info)) {
         to_archive.push_back(block.index);
       }
     }
 
     gvd_integrator_->archiveBlocks(to_archive, graph_extractor_.get());
+    for (const auto& index : to_archive) {
+      block_update_times_.erase(index);
+    }
   }
 
   graph_extractor_->updateArchivedNodes();
   Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, *graph_extractor_);
+  return true;
 }
 
 void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   ScopedTimer timer("frontend/update_gvd_places", timestamp_ns, true, 2, false);
+  if (!graph_extractor_) {
+    return;
+  }
+
   const auto& places = graph_extractor_->graph();
   MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
 
@@ -200,12 +225,17 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
     }
   }
 
+  std::unordered_set<uint64_t> published_nodes;
   for (const auto& [node_id, node] : places) {
     const NodeSymbol graph_id(config.node_prefix, node_id);
     const auto& attrs = node.attributes();
     if (attributesInvalid(attrs)) {
       LOG(ERROR) << "Invalid place node " << graph_id.str();
-      graph.removeNode(graph_id);
+      const auto previous = graph.findNode(graph_id);
+      if (previous && previous->attributes().is_active) {
+        graph.removeNode(graph_id);
+      }
+
       continue;
     }
 
@@ -226,10 +256,16 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
     auto new_attrs = attrs.clone();
     new_attrs->is_active = true;
     new_attrs->last_update_time_ns = timestamp_ns;
-    graph.addOrUpdateNode(config.layer, graph_id, std::move(new_attrs));
+    if (graph.addOrUpdateNode(config.layer, graph_id, std::move(new_attrs))) {
+      published_nodes.insert(node_id);
+    }
   }
 
   for (const auto& [key, info] : places.edges()) {
+    if (!published_nodes.count(key.k1) || !published_nodes.count(key.k2)) {
+      continue;
+    }
+
     graph.addOrUpdateEdge(NodeSymbol(config.node_prefix, key.k1),
                           NodeSymbol(config.node_prefix, key.k2),
                           info->clone());

@@ -80,7 +80,8 @@ class GvdPlaceExtractor : public GraphBuilderFunctor {
             FrontendOutput& output,
             const VolumetricWindow* window) override;
 
-  void detect(const ActiveWindowOutput& msg, const VolumetricWindow* window = nullptr);
+  //! Return false when the input cannot be integrated; callers must skip publication.
+  bool detect(const ActiveWindowOutput& msg, const VolumetricWindow* window = nullptr);
 
   void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
 
@@ -90,6 +91,8 @@ class GvdPlaceExtractor : public GraphBuilderFunctor {
   std::unique_ptr<places::GraphExtractor> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
   Sink::List sinks_;
+  //! Most recent input timestamp [ns] for each retained GVD block.
+  BlockIndexMap<uint64_t> block_update_times_;
 };
 
 void declare_config(GvdPlaceExtractor::Config& config);
