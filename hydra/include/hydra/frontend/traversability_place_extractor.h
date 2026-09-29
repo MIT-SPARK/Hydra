@@ -41,6 +41,7 @@
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/places/traversability_clustering.h"
 #include "hydra/places/traversability_estimator.h"
+#include "hydra/places/traversability_integrator.h"
 #include "hydra/places/traversability_postprocessing.h"
 
 namespace hydra::places {
@@ -54,9 +55,11 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
     std::string layer = spark_dsg::DsgLayers::TRAVERSABILITY;
     //! Estimator for maintaining traversability state
     config::VirtualConfig<TraversabilityEstimator> estimator;
-    //! Postprocessing filters for the traversability state (before clustering).
-    //! Persistent processors act on the extractor's layer and carry over to later
-    //! updates; all others act on a per-update copy.
+    //! Optional integrator that accumulates evidence into the traversability layer
+    //! after every estimator update
+    config::VirtualConfig<TraversabilityIntegrator> integrator;
+    //! Postprocessing filters for the traversability state (before clustering). These
+    //! act on a per-update copy of the layer.
     TraversabilityProcessors::Config postprocessing;
     //! Clustering that produces the places layer from the traversability state
     config::VirtualConfig<TraversabilityClustering> clustering;
@@ -81,6 +84,7 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
   TraversabilityEstimator::Ptr estimator_;
   //! Persistent traversability layer, allocated on the first update.
   std::unique_ptr<TraversabilityLayer> layer_;
+  TraversabilityIntegrator::Ptr integrator_;
   const TraversabilityProcessors postprocessing_;
   TraversabilityClustering::Ptr clustering_;
   Sink::List sinks_;

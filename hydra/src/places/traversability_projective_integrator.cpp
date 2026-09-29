@@ -49,7 +49,7 @@ namespace hydra::places {
 namespace {
 
 static const auto registration =
-    config::RegistrationWithConfig<TraversabilityProcessor,
+    config::RegistrationWithConfig<TraversabilityIntegrator,
                                    TraversabilityProjectiveIntegrator,
                                    TraversabilityProjectiveIntegrator::Config>(
         "TraversabilityProjectiveIntegrator");
@@ -81,8 +81,8 @@ TraversabilityProjectiveIntegrator::TraversabilityProjectiveIntegrator(
     : config(config::checkValid(config)),
       interpolator_(config.interpolation_method.create()) {}
 
-void TraversabilityProjectiveIntegrator::apply(TraversabilityLayer& layer,
-                                               const ActiveWindowOutput& msg) {
+void TraversabilityProjectiveIntegrator::integrate(TraversabilityLayer& layer,
+                                                   const ActiveWindowOutput& msg) {
   // A collated message can carry several frames; each is an independent observation.
   for (const auto& data : msg.sensor_data) {
     if (!data || data->label_image.empty() || data->range_image.empty()) {
