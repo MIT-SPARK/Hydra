@@ -75,6 +75,8 @@ class TestGraphExtractor : public GraphExtractor {
     tracker.add(voxel, index);
   }
 
+  using GraphExtractor::mergeNearbyNodes;
+
   GvdLayer gvd_layer;
   GvdParentTracker tracker;
 };
@@ -97,7 +99,7 @@ void checkNode(const GraphExtractor::LocalGraph& graph,
 size_t numArchived(const GraphExtractor::LocalGraph& graph) {
   size_t num_archived = 0;
   for (const auto& [node_id, node] : graph) {
-    if (!node.attributes().is_active) {
+    if (node.archived()) {
       ++num_archived;
     }
   }
@@ -210,6 +212,42 @@ TEST(GraphExtractor, VoxelArchival) {
   EXPECT_EQ(numArchived(places), 1u);
   EXPECT_EQ(gvd.compressed().size(), 2u);
   EXPECT_EQ(gvd.uncompressed().size(), 4u);
+}
+
+TEST(GraphExtractor, NearbyMergingPreservesArchivedEndpoints) {
+  GraphExtractor::Config config;
+  config.compression_distance_m = 0.05;
+  TestGraphExtractor extractor(config, 0.1);
+  extractor.addNode(0, 0, 0, 1.0, 3);
+  extractor.addNode(0, 0, 1, 1.0, 4);
+  extractor.archiveIndex({0, 0, 0});
+  extractor.update();
+
+  extractor.mergeNearbyNodes();
+  EXPECT_EQ(extractor.graph().num_nodes(), 2u);
+  EXPECT_TRUE(extractor.graph().archived(0));
+  EXPECT_FALSE(extractor.graph().archived(1));
+  EXPECT_TRUE(extractor.graph().deleted_nodes().empty());
+}
+
+TEST(GraphExtractor, DoesNotFinalizeNodesStillRetainedByGvd) {
+  GraphExtractor::Config config;
+  config.compression_distance_m = 0.05;
+  TestGraphExtractor extractor(config, 0.1);
+  extractor.addNode(0, 0, 0, 1.0, 3);
+  extractor.addNode(0, 0, 1, 1.0, 4);
+  extractor.update();
+  extractor.mergeNearbyNodes();
+  ASSERT_EQ(extractor.graph().num_nodes(), 1u);
+  ASSERT_TRUE(extractor.graph().has(1));
+
+  // Archival happens after contraction; the GVD still retains the active neighbor.
+  extractor.archiveIndex({0, 0, 1});
+  EXPECT_TRUE(extractor.prune().empty());
+  EXPECT_TRUE(extractor.graph().has(1));
+
+  extractor.archiveIndex({0, 0, 0});
+  EXPECT_EQ(extractor.prune(), (std::vector<uint64_t>{1}));
 }
 
 }  // namespace hydra::places

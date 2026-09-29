@@ -46,13 +46,15 @@ using TestGraph = PartialGraph<NodeAttributes>;
 TEST(PartialGraph, AddUpdateCorrect) {
   TestGraph graph;
   graph.add(5);
+  graph.add(6);
+  graph.add(7);
   graph.add(5, 6);
   graph.add(6, 7);
 
   EXPECT_TRUE(graph.has(5));
   EXPECT_TRUE(graph.has(6));
   EXPECT_TRUE(graph.has(7));
-  EXPECT_TRUE(graph.find(7));  // 7 added by edge
+  EXPECT_TRUE(graph.find(7));
   EXPECT_FALSE(graph.has(8));
 
   EXPECT_TRUE(graph.has(5, 6));
@@ -73,12 +75,15 @@ TEST(PartialGraph, AddUpdateCorrect) {
 
 TEST(PartialGraph, RemoveNodeCorrect) {
   TestGraph graph;
+  graph.add(5);
+  graph.add(6);
+  graph.add(7);
   graph.add(5, 6);
   graph.add(6, 7);
   EXPECT_TRUE(graph.deleted_nodes().empty());
   EXPECT_TRUE(graph.deleted_edges().empty());
 
-  graph.remove(6, true);
+  graph.remove(6);
   std::set<spark_dsg::NodeId> deleted_nodes{6};
   std::set<spark_dsg::EdgeKey> deleted_edges{{5, 6}, {6, 7}};
   EXPECT_EQ(graph.deleted_nodes(), deleted_nodes);
@@ -102,12 +107,15 @@ TEST(PartialGraph, RemoveNodeCorrect) {
 
 TEST(PartialGraph, RemoveEdgeCorrect) {
   TestGraph graph;
+  graph.add(5);
+  graph.add(6);
+  graph.add(7);
   graph.add(5, 6);
   graph.add(6, 7);
   EXPECT_TRUE(graph.deleted_nodes().empty());
   EXPECT_TRUE(graph.deleted_edges().empty());
 
-  graph.remove(6, 7, true);
+  graph.remove(6, 7);
   std::set<spark_dsg::EdgeKey> deleted_edges{{6, 7}};
   EXPECT_TRUE(graph.deleted_nodes().empty());
   EXPECT_EQ(graph.deleted_edges(), deleted_edges);
@@ -128,24 +136,39 @@ TEST(PartialGraph, RemoveEdgeCorrect) {
 
 TEST(PartialGraph, PruneGraphTrivial) {
   TestGraph graph;
+  graph.add(5);
+  graph.add(6);
+  graph.add(7);
   graph.add(5, 6);
   graph.add(6, 7);
+  graph.add(8);
   graph.add(7, 8);
-  graph.remove(7, 8, true);
+  graph.remove(7, 8);
 
   std::set<spark_dsg::EdgeKey> deleted_edges{{7, 8}};
   EXPECT_EQ(graph.deleted_edges(), deleted_edges);
 
+  graph.archive(5);
+  graph.archive(6);
+  graph.archive(7);
+  graph.archive(8);
   graph.prune();
   EXPECT_EQ(graph.num_nodes(), 0u);
   EXPECT_EQ(graph.num_edges(), 0u);
   EXPECT_TRUE(graph.deleted_nodes().empty());
+  EXPECT_EQ(graph.deleted_edges(), deleted_edges);
+  EXPECT_EQ(graph.finalized_nodes(), (std::set<NodeId>{5, 6, 7, 8}));
+
+  graph.acknowledgeChanges();
   EXPECT_TRUE(graph.deleted_edges().empty());
+  EXPECT_TRUE(graph.finalized_nodes().empty());
 }
 
 TEST(PartialGraph, PruneGraph) {
   TestGraph graph;
-  graph.add(5).is_active = true;
+  graph.add(5);
+  graph.add(6);
+  graph.add(7);
   graph.add(5, 6);
   graph.add(6, 7);
   graph.archive(6);
@@ -156,14 +179,19 @@ TEST(PartialGraph, PruneGraph) {
   EXPECT_EQ(pruned, expected);
   EXPECT_EQ(graph.num_nodes(), 2u);
   EXPECT_EQ(graph.num_edges(), 1u);
+  EXPECT_EQ(graph.finalized_nodes(), (std::set<NodeId>{7}));
   EXPECT_TRUE(graph.deleted_nodes().empty());
   EXPECT_TRUE(graph.deleted_edges().empty());
 }
 
 TEST(PartialGraph, ContractCorrect) {
   TestGraph graph;
+  graph.add(5);
+  graph.add(6);
+  graph.add(7);
   graph.add(5, 6);
   graph.add(6, 7);
+  graph.add(8);
   graph.add(7, 8);
 
   graph.contract(6, 7);
@@ -181,6 +209,67 @@ TEST(PartialGraph, ContractCorrect) {
   EXPECT_EQ(graph.neighbors(7), expected);
   expected = {7};
   EXPECT_EQ(graph.neighbors(8), expected);
+}
+
+TEST(PartialGraph, ArchiveStateIsIndependentOfAttributes) {
+  TestGraph graph;
+  graph.add(5).is_active = false;
+  EXPECT_TRUE(graph.prune().empty());
+
+  graph.archive(5);
+  graph.at(5).is_active = true;
+  EXPECT_EQ(graph.prune(), (std::vector<NodeId>{5}));
+}
+
+TEST(PartialGraph, ReaddingFinalizedNodeCancelsFinalization) {
+  TestGraph graph;
+  graph.add(5);
+  graph.archive(5);
+  graph.finalize(5);
+  ASSERT_EQ(graph.finalized_nodes(), (std::set<NodeId>{5}));
+
+  graph.add(5);
+  EXPECT_TRUE(graph.finalized_nodes().empty());
+  EXPECT_FALSE(graph.archived(5));
+}
+
+TEST(PartialGraph, DeletingArchivedNodeDeletesIncidentEdges) {
+  TestGraph graph;
+  graph.add(5);
+  graph.add(6);
+  graph.add(5, 6);
+  graph.archive(5);
+  EXPECT_THROW(graph.finalize(5), std::logic_error);
+
+  graph.remove(5);
+  EXPECT_EQ(graph.deleted_nodes(), (std::set<NodeId>{5}));
+  EXPECT_EQ(graph.deleted_edges(), (std::set<spark_dsg::EdgeKey>{{5, 6}}));
+  EXPECT_TRUE(graph.finalized_nodes().empty());
+  EXPECT_TRUE(graph.neighbors(6).empty());
+}
+
+TEST(PartialGraph, InvalidEdgesDoNotChangeNeighbors) {
+  TestGraph graph;
+  graph.add(5);
+  EXPECT_THROW(graph.add(5, 6), std::out_of_range);
+  EXPECT_THROW(graph.add(5, 5), std::invalid_argument);
+  EXPECT_TRUE(graph.neighbors(5).empty());
+  EXPECT_EQ(graph.num_nodes(), 1u);
+}
+
+TEST(PartialGraph, ContractionPreservesSelfAndArchivedEndpoints) {
+  TestGraph graph;
+  graph.add(5);
+  graph.add(6);
+  graph.add(5, 6);
+  graph.contract(5, 5);
+  EXPECT_TRUE(graph.has(5, 6));
+
+  graph.archive(5);
+  graph.contract(5, 6);
+  graph.contract(6, 5);
+  EXPECT_TRUE(graph.has(5, 6));
+  EXPECT_TRUE(graph.deleted_nodes().empty());
 }
 
 }  // namespace hydra

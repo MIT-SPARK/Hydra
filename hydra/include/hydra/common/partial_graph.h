@@ -36,7 +36,10 @@
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_attributes.h>
 
+#include <map>
+#include <memory>
 #include <set>
+#include <vector>
 
 namespace hydra {
 
@@ -54,13 +57,14 @@ class PartialGraph {
         : attrs_(attributes ? std::move(attributes) : std::make_unique<AttrT>()) {}
 
     std::set<NodeId> neighbors;
-    bool archived() const { return !attributes().is_active; }
+    bool archived() const { return archived_; }
 
     const NodeAttr& attributes() const { return *attrs_; }
     NodeAttr& attributes() { return *attrs_; }
 
    private:
     std::unique_ptr<NodeAttr> attrs_;
+    bool archived_ = false;
     friend class PartialGraph<AttrT>;
   };
 
@@ -71,13 +75,15 @@ class PartialGraph {
   NodeAttr& add(NodeId node_id, NodeAttrPtr&& attributes = nullptr);
   EdgeAttr& add(NodeId source, NodeId target, EdgeAttrPtr&& attributes = nullptr);
 
-  void remove(NodeId node_id, bool ignore_archive = false);
-  void remove(NodeId source, NodeId target, bool ignore_archive = false);
+  //! Delete locally and in the full graph, regardless of archive state.
+  void remove(NodeId node_id);
+  void remove(NodeId source, NodeId target);
 
-  typename Nodes::iterator erase(const typename Nodes::iterator& iter,
-                                 bool ignore_archive = false);
-  typename Edges::iterator erase(const typename Edges::iterator& iter,
-                                 bool ignore_archive = false);
+  //! Release an archived node with no active neighbors, preserving its full graph copy.
+  void finalize(NodeId node_id);
+
+  //! Clear pending changes only after applying them to the full graph.
+  void acknowledgeChanges();
 
   bool has(NodeId node) const;
   bool has(NodeId source, NodeId target) const;
@@ -92,11 +98,15 @@ class PartialGraph {
   EdgeAttr& at(NodeId source, NodeId target);
   const EdgeAttr& at(NodeId source, NodeId target) const;
 
+  //! Archive support locally; the full graph stays active until finalization.
   void archive(NodeId node_id);
+  bool archived(NodeId node_id) const;
 
   std::set<spark_dsg::NodeId> neighbors(NodeId node) const;
 
-  std::vector<uint64_t> prune();
+  //! Finalize eligible nodes after publishing their last attributes and edges.
+  //! Exclude nodes still retained by the source graph to prevent reintroducing them.
+  std::vector<uint64_t> prune(const std::set<NodeId>& retained_nodes = {});
 
   void contract(NodeId from, NodeId to);
 
@@ -104,6 +114,8 @@ class PartialGraph {
 
   const Nodes& nodes() const { return nodes_; }
   const Edges& edges() const { return edges_; }
+
+  const std::set<NodeId>& finalized_nodes() const { return finalized_nodes_; }
 
   const std::set<NodeId>& deleted_nodes() const { return deleted_nodes_; }
   const std::set<spark_dsg::EdgeKey>& deleted_edges() const { return deleted_edges_; }
@@ -118,12 +130,15 @@ class PartialGraph {
   typename Nodes::const_iterator end() const { return nodes_.end(); }
 
  private:
-  Node& allocate(NodeId node);
+  bool canFinalize(NodeId node) const;
+  void eraseNode(typename Nodes::iterator iter);
+  void eraseEdge(typename Edges::iterator iter);
 
   Nodes nodes_;
   Edges edges_;
 
   std::set<NodeId> deleted_nodes_;
+  std::set<NodeId> finalized_nodes_;
   std::set<spark_dsg::EdgeKey> deleted_edges_;
 };
 

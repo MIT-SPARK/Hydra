@@ -170,6 +170,7 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
     gvd_integrator_->archiveBlocks(to_archive, graph_extractor_.get());
   }
 
+  graph_extractor_->updateArchivedNodes();
   Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, *graph_extractor_);
 }
 
@@ -221,7 +222,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
       continue;
     }
 
-    // all nodes are consider considered active until fully archived
+    // Retained boundary nodes stay active until the partial graph releases them.
     auto new_attrs = attrs.clone();
     new_attrs->is_active = true;
     new_attrs->last_update_time_ns = timestamp_ns;
@@ -235,13 +236,15 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   }
 
   // flip all fully archived nodes to false
-  const auto archived_ids = graph_extractor_->prune();
-  for (const auto& node_id : archived_ids) {
+  graph_extractor_->prune();
+  for (const auto node_id : places.finalized_nodes()) {
     auto node = graph.findNode(NodeSymbol(config.node_prefix, node_id));
     if (node) {
       node->attributes().is_active = false;
     }
   }
+
+  graph_extractor_->acknowledgeChanges();
 }
 
 }  // namespace hydra

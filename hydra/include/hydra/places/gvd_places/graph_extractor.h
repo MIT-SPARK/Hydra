@@ -90,7 +90,12 @@ class GraphExtractor {
                const VoxelIndexChanges& changes,
                const GvdParentTracker& parents);
 
+  //! Propagate GVD archival without releasing nodes or consuming pending changes.
+  void updateArchivedNodes();
+
   std::vector<uint64_t> prune();
+
+  void acknowledgeChanges() { graph_.acknowledgeChanges(); }
 
   const GvdGraph& gvd() const { return gvd_; }
 

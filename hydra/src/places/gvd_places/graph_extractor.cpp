@@ -72,7 +72,7 @@ std::optional<NodeId> getBestNode(const GraphExtractor::LocalGraph& graph,
                                   const std::vector<NodeId>& candidates,
                                   double max_distance_m) {
   const auto& source_attrs = graph.at(source);
-  if (!source_attrs.is_active) {
+  if (graph.archived(source)) {
     return std::nullopt;  // no best node for archived node
   }
 
@@ -81,7 +81,7 @@ std::optional<NodeId> getBestNode(const GraphExtractor::LocalGraph& graph,
   const auto pos = source_attrs.position;
   for (const auto& target : candidates) {
     const auto target_attrs = graph.at(target);
-    if (!target_attrs.is_active) {
+    if (graph.archived(target)) {
       continue;  // archived node
     }
 
@@ -174,25 +174,34 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
   updateFreespaceEdges(layer);
 }
 
-std::vector<uint64_t> GraphExtractor::prune() {
-  // update archived flags for all nodes after archive pass
+void GraphExtractor::updateArchivedNodes() {
   for (const auto& [node_id, node] : gvd_.compressed()) {
     if (!node.archived()) {
       continue;
     }
 
-    auto attrs = graph_.find(node_id);
-    if (!attrs) {
-      continue;
+    if (graph_.has(node_id)) {
+      graph_.archive(node_id);
     }
-
-    attrs->is_active = false;
   }
+}
 
+std::vector<uint64_t> GraphExtractor::prune() {
+  updateArchivedNodes();
   const auto archived = gvd_.clearArchived();
   MLOG(2) << "Cleared archived nodes [" << archived << "]";
+  for (const auto node_id : archived) {
+    node_attribute_map_.erase(node_id);
+  }
 
-  const auto archived_node_ids = graph_.prune();
+  // Contraction changes adjacency: the GVD may still need an archived partial node.
+  // Keep it until both graphs can release it, otherwise extraction reintroduces it.
+  std::set<NodeId> retained_nodes;
+  for (const auto& [node_id, node] : gvd_.compressed()) {
+    retained_nodes.insert(node_id);
+  }
+
+  const auto archived_node_ids = graph_.prune(retained_nodes);
   MLOG(2) << "Cleared graph nodes [" << archived_node_ids << "]";
   for (const auto& node_id : archived_node_ids) {
     node_index_map_.erase(node_id);
@@ -242,24 +251,33 @@ void GraphExtractor::updateCompressedNodes() {
     CHECK(result);
 
     auto attrs = std::make_unique<PlaceNodeAttributes>();
-    attrs->is_active = !node.archived();
     fillAttributes(*result, *attrs);
     graph_.add(node_id, std::move(attrs));
+    if (node.archived()) {
+      graph_.archive(node_id);
+    }
+
     node_index_map_[node_id] = result->index;
     node_attribute_map_[node_id] = result;
   }
 
   for (const auto& node_id : stale_nodes) {
+    // Heuristic edges can retain an archived node after its GVD support is released.
+    node_attribute_map_.erase(node_id);
+    if (graph_.archived(node_id)) {
+      continue;
+    }
+
     graph_.remove(node_id);
     node_index_map_.erase(node_id);
-    node_attribute_map_.erase(node_id);
   }
 }
 
 void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
   std::set<EdgeKey> stale_edges;
   for (const auto& [key, _] : graph_.edges()) {
-    if (overlap_edges_.count(key) || freespace_edges_.count(key)) {
+    if (overlap_edges_.count(key) || freespace_edges_.count(key) ||
+        (graph_.archived(key.k1) && graph_.archived(key.k2))) {
       continue;
     }
 
@@ -289,7 +307,7 @@ void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
 
       // if one or both of the nodes are archived, we try and respect the previous
       // minimum clearance in the archived block
-      const auto archived = !node_attrs->is_active || !sibling_attrs->is_active;
+      const auto archived = graph_.archived(node_id) || graph_.archived(sibling_id);
       const auto prev = graph_.find(node_id, sibling_id);
       if (archived && prev) {
         min_dist = optional_min(min_dist, prev->weight);
@@ -318,12 +336,16 @@ void GraphExtractor::mergeNearbyNodes() {
   std::unordered_map<uint64_t, uint64_t> merges;
   std::unordered_map<uint64_t, std::unordered_set<uint64_t>> reversed_merges;
   for (const auto& [node_id, node] : gvd_.compressed()) {
-    if (merges.count(node_id)) {
-      continue;  // skip already merged nodes
+    if (node.archived() || merges.count(node_id)) {
+      continue;  // skip archived or already merged nodes
     }
 
     const auto node_info = node_attribute_map_.at(node_id);
     for (const auto sibling_id : node.siblings) {
+      if (gvd_.compressed().at(sibling_id).archived()) {
+        continue;
+      }
+
       const auto sibling_info = node_attribute_map_.at(sibling_id);
       const auto dist = (node_info->position - sibling_info->position).norm();
       if (dist > config.node_merge_distance_m) {
@@ -374,7 +396,7 @@ void GraphExtractor::updateOverlapEdges() {
     const auto [source, target] = *iter;
     if (!graph_.has(source) || !graph_.has(target)) {
       iter = overlap_edges_.erase(iter);  // drop edges from removed nodes
-    } else if (!graph_.at(source).is_active && !graph_.at(target).is_active) {
+    } else if (graph_.archived(source) && graph_.archived(target)) {
       iter = overlap_edges_.erase(iter);  // edge between archived nodes can be fixed
     } else {
       ++iter;
@@ -386,7 +408,7 @@ void GraphExtractor::updateOverlapEdges() {
     for (auto t_iter = std::next(s_iter); t_iter != graph_.nodes().end(); ++t_iter) {
       const auto& [source_id, source] = *s_iter;
       const auto& [target_id, target] = *t_iter;
-      if (!source.attributes().is_active && !target.attributes().is_active) {
+      if (source.archived() && target.archived()) {
         continue;
       }
 
@@ -419,7 +441,7 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
       continue;
     }
 
-    if (!graph_.at(source).is_active && !graph_.at(target).is_active) {
+    if (graph_.archived(source) && graph_.archived(target)) {
       iter = freespace_edges_.erase(iter);  // edge between archived nodes can be fixed
       continue;
     }

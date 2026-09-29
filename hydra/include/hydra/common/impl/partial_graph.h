@@ -35,7 +35,10 @@
 #pragma once
 #include <spark_dsg/node_symbol.h>
 
+#include <algorithm>
 #include <deque>
+#include <stdexcept>
+#include <unordered_set>
 
 #include "hydra/common/partial_graph.h"
 
@@ -44,19 +47,28 @@ namespace hydra {
 template <typename AttrT>
 auto PartialGraph<AttrT>::add(NodeId node_id, NodeAttrPtr&& attrs) -> NodeAttr& {
   deleted_nodes_.erase(node_id);
-  auto& node = allocate(node_id);
+  finalized_nodes_.erase(node_id);
+  auto& node = nodes_.try_emplace(node_id).first->second;
+  node.archived_ = false;
   if (attrs) {
     node.attrs_ = std::move(attrs);
   }
 
-  return *node.attrs_;
+  return node.attributes();
 }
 
 template <typename AttrT>
 auto PartialGraph<AttrT>::add(NodeId source, NodeId target, EdgeAttrPtr&& attrs)
     -> EdgeAttr& {
-  allocate(source).neighbors.insert(target);
-  allocate(target).neighbors.insert(source);
+  if (source == target) {
+    throw std::invalid_argument("PartialGraph edges must have distinct endpoints");
+  }
+
+  // Validate both endpoints before modifying either neighbor set.
+  auto& source_node = nodes_.at(source);
+  auto& target_node = nodes_.at(target);
+  source_node.neighbors.insert(target);
+  target_node.neighbors.insert(source);
 
   const spark_dsg::EdgeKey key{source, target};
   deleted_edges_.erase(key);
@@ -73,66 +85,69 @@ auto PartialGraph<AttrT>::add(NodeId source, NodeId target, EdgeAttrPtr&& attrs)
 }
 
 template <typename AttrT>
-void PartialGraph<AttrT>::remove(NodeId node_id, bool ignore_archive) {
-  erase(nodes_.find(node_id), ignore_archive);
-}
-
-template <typename AttrT>
-void PartialGraph<AttrT>::remove(NodeId source, NodeId target, bool ignore_archive) {
-  erase(edges_.find({source, target}), ignore_archive);
-}
-
-template <typename AttrT>
-auto PartialGraph<AttrT>::erase(const typename Nodes::iterator& iter,
-                                bool ignore_archive) -> typename Nodes::iterator {
+void PartialGraph<AttrT>::remove(NodeId node_id) {
+  auto iter = nodes_.find(node_id);
   if (iter == nodes_.end()) {
-    return iter;
+    return;
   }
 
-  const auto active = iter->second.attributes().is_active;
-  for (const auto& neighbor : iter->second.neighbors) {
-    const spark_dsg::EdgeKey key{iter->first, neighbor};
-    edges_.erase(key);
-    nodes_.at(neighbor).neighbors.erase(iter->first);
-    if (active || ignore_archive) {
-      deleted_edges_.insert(key);
-    }
+  for (const auto neighbor : iter->second.neighbors) {
+    deleted_edges_.insert({node_id, neighbor});
   }
 
-  if (active || ignore_archive) {
-    deleted_nodes_.insert(iter->first);
-  }
-
-  return nodes_.erase(iter);
+  deleted_nodes_.insert(node_id);
+  finalized_nodes_.erase(node_id);
+  eraseNode(iter);
 }
 
 template <typename AttrT>
-auto PartialGraph<AttrT>::erase(const typename Edges::iterator& iter,
-                                bool ignore_archive) -> typename Edges::iterator {
+void PartialGraph<AttrT>::remove(NodeId source, NodeId target) {
+  auto iter = edges_.find({source, target});
   if (iter == edges_.end()) {
-    return iter;
+    return;
   }
 
+  deleted_edges_.insert(iter->first);
+  eraseEdge(iter);
+}
+
+template <typename AttrT>
+void PartialGraph<AttrT>::finalize(NodeId node_id) {
+  auto iter = nodes_.find(node_id);
+  if (iter == nodes_.end()) {
+    return;
+  }
+
+  if (!canFinalize(node_id)) {
+    throw std::logic_error("Cannot finalize a node with active support or neighbors");
+  }
+
+  finalized_nodes_.insert(node_id);
+  eraseNode(iter);
+}
+
+template <typename AttrT>
+void PartialGraph<AttrT>::acknowledgeChanges() {
+  deleted_nodes_.clear();
+  deleted_edges_.clear();
+  finalized_nodes_.clear();
+}
+
+template <typename AttrT>
+void PartialGraph<AttrT>::eraseNode(typename Nodes::iterator iter) {
+  while (!iter->second.neighbors.empty()) {
+    eraseEdge(edges_.find({iter->first, *iter->second.neighbors.begin()}));
+  }
+
+  nodes_.erase(iter);
+}
+
+template <typename AttrT>
+void PartialGraph<AttrT>::eraseEdge(typename Edges::iterator iter) {
   const auto [source, target] = iter->first;
-
-  bool active = false;
-  auto source_node = nodes_.find(source);
-  if (source_node != nodes_.end()) {
-    source_node->second.neighbors.erase(target);
-    active |= source_node->second.attributes().is_active;
-  }
-
-  auto target_node = nodes_.find(target);
-  if (target_node != nodes_.end()) {
-    target_node->second.neighbors.erase(source);
-    active |= target_node->second.attributes().is_active;
-  }
-
-  if (active || ignore_archive) {
-    deleted_edges_.insert(iter->first);
-  }
-
-  return edges_.erase(iter);
+  nodes_.at(source).neighbors.erase(target);
+  nodes_.at(target).neighbors.erase(source);
+  edges_.erase(iter);
 }
 
 template <typename AttrT>
@@ -148,7 +163,7 @@ bool PartialGraph<AttrT>::has(NodeId source, NodeId target) const {
 template <typename AttrT>
 auto PartialGraph<AttrT>::find(NodeId node) -> NodeAttr* {
   auto iter = nodes_.find(node);
-  return iter == nodes_.end() ? nullptr : iter->second.attrs_.get();
+  return iter == nodes_.end() ? nullptr : &iter->second.attributes();
 }
 
 template <typename AttrT>
@@ -200,7 +215,12 @@ auto PartialGraph<AttrT>::at(NodeId source, NodeId target) const -> const EdgeAt
 
 template <typename AttrT>
 void PartialGraph<AttrT>::archive(NodeId node) {
-  at(node).is_active = false;
+  nodes_.at(node).archived_ = true;
+}
+
+template <typename AttrT>
+bool PartialGraph<AttrT>::archived(NodeId node) const {
+  return nodes_.at(node).archived();
 }
 
 template <typename AttrT>
@@ -216,7 +236,7 @@ void PartialGraph<AttrT>::contract(NodeId from, NodeId to) {
     return;
   }
 
-  if (!nodes_.count(to)) {
+  if (from == to || !nodes_.count(to) || archived(from) || archived(to)) {
     return;
   }
 
@@ -230,37 +250,35 @@ void PartialGraph<AttrT>::contract(NodeId from, NodeId to) {
     }
   }
 
-  erase(iter);
+  remove(from);
 }
 
 template <typename AttrT>
-std::vector<uint64_t> PartialGraph<AttrT>::prune() {
+bool PartialGraph<AttrT>::canFinalize(NodeId node) const {
+  const auto& entry = nodes_.at(node);
+  if (!entry.archived()) {
+    return false;
+  }
+
+  return std::all_of(entry.neighbors.begin(),
+                     entry.neighbors.end(),
+                     [this](NodeId neighbor) { return archived(neighbor); });
+}
+
+template <typename AttrT>
+std::vector<uint64_t> PartialGraph<AttrT>::prune(
+    const std::set<NodeId>& retained_nodes) {
   std::vector<uint64_t> pruned;
-  auto iter = nodes_.begin();
-  while (iter != nodes_.end()) {
-    if (!iter->second.archived()) {
-      ++iter;
-      continue;  // skip active nodes
-    }
-
-    bool can_prune = true;
-    for (const auto& neighbor : iter->second.neighbors) {
-      if (!nodes_.at(neighbor).archived()) {
-        can_prune = false;
-        break;
-      }
-    }
-
-    if (can_prune) {
-      pruned.push_back(iter->first);
-      iter = erase(iter);
-    } else {
-      ++iter;
+  for (const auto& [node_id, node] : nodes_) {
+    if (!retained_nodes.count(node_id) && canFinalize(node_id)) {
+      pruned.push_back(node_id);
     }
   }
 
-  deleted_nodes_.clear();
-  deleted_edges_.clear();
+  for (const auto node_id : pruned) {
+    finalize(node_id);
+  }
+
   return pruned;
 }
 
@@ -299,17 +317,6 @@ auto PartialGraph<AttrT>::connected_components(bool sort_components) const
   }
 
   return components;
-}
-
-template <typename AttrT>
-auto PartialGraph<AttrT>::allocate(NodeId node) -> typename PartialGraph::Node& {
-  auto iter = nodes_.find(node);
-  if (iter == nodes_.end()) {
-    iter = nodes_.emplace(node, Node()).first;
-    deleted_nodes_.erase(node);
-  }
-
-  return iter->second;
 }
 
 }  // namespace hydra
