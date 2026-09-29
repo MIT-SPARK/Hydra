@@ -82,6 +82,7 @@ inline std::optional<NodeId> getClosest(const SceneGraphLayer& layer,
     const auto diff = std::chrono::abs(getAgentTimestamp(node) - stamp);
     if (diff < best_diff) {
       best_diff = diff;
+      closest = node.id;
     }
   }
 
@@ -143,15 +144,23 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const SceneGraph& graph,
 
   const auto stamp = std::chrono::nanoseconds(stamp_ns);
   const auto last_stamp = getLastStamp(*layer);
-  if (stamp > last_stamp) {
+  if (!last_stamp) {
+    MLOG(1) << "No nodes exist for robot '" << robot_id
+            << "' when looking up timestamp " << stamp_ns << " [ns]";
+    return {};
+  }
+
+  if (stamp > *last_stamp) {
     // avoid clearing loop closure before best candidate node can be determined
+    MLOG(1) << "Latest timestamp " << *last_stamp << " [ns] for " << robot_id
+            << "' when looking up timestamp " << stamp_ns << " [ns] is too old";
     return {};
   }
 
   auto closest = getClosest(*layer, stamp);
   if (!closest) {
-    MLOG(1) << "No nodes exist for robot " << robot_id << "' when looking up timestamp "
-            << stamp_ns << " [ns]";
+    MLOG(1) << "Could not find closest node for '" << robot_id
+            << "' when looking up timestamp " << stamp_ns << " [ns]";
     return {};
   }
 
