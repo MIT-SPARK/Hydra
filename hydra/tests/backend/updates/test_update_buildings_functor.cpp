@@ -69,7 +69,7 @@ TEST(UpdateRoomsBuildingsFunctor, BuildingUpdate) {
   functor.call(*unmerged, *dsg, info);
 
   Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);
-  Eigen::Vector3d first_result = graph.getPosition("B0"_id);
+  Eigen::Vector3d first_result = graph.getNode("B0"_id).attributes().position;
   EXPECT_NEAR(0.0, (first_expected - first_result).norm(), 1.0e-7);
 }
 

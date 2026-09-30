@@ -226,7 +226,7 @@ Polygon Polygon::fromSceneGraph(const SceneGraph& graph,
   size_t id = 0;
   std::vector<Vertex> vertices;
   for (const auto node : vertex_nodes) {
-    const auto pos = graph.getPosition(node);
+    const auto pos = graph.getNode(node).attributes().position;
     vertices.push_back({pos.head<2>(), id});
     ++id;
   }
