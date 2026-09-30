@@ -169,7 +169,6 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
 
   GraphMergeConfig merge_config;
   merge_config.previous_merges = &target_dsg_->merges;
-  merge_config.update_dynamic_attributes = false;
   target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
 
   // Nodes occasionally get added to the backend after they've left the active window,

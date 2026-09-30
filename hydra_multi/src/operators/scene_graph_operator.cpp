@@ -8,9 +8,9 @@
 
 namespace hydra_multi {
 
+using spark_dsg::GraphMergeConfig;
 using spark_dsg::LayerId;
 using spark_dsg::SceneGraph;
-using GraphMergeConfig = spark_dsg::GraphMergeConfig;
 
 bool SceneGraphOperator::incrementalAppend(const SceneGraphDelta& incremental_source) {
   // Appending scene graph nodes and edges from source to data_
@@ -36,12 +36,8 @@ bool SceneGraphOperator::update(const SceneGraph& source) {
   // Update transform
   updateAppendTransform(source);
 
-  // TODO(nathan) think about whether this should be by key
-  std::map<LayerId, bool> layer_updates;
-  for (const auto& layer_id : data_->layer_ids()) {
-    layer_updates.insert({layer_id, true});
-  }
-  GraphMergeConfig config{nullptr, &layer_updates, true, true};
+  GraphMergeConfig config;
+  config.update_archived_attributes = true;
   return data_->mergeGraph(source, config);
 }
 
@@ -66,12 +62,8 @@ bool SceneGraphOperator::rebase(const SceneGraph& source) {
     data_->removeNode(non_overlap_node);
   }
 
-  // TODO(nathan) think about whether this should be by key
-  std::map<LayerId, bool> layer_updates;
-  for (const auto& layer_id : data_->layer_ids()) {
-    layer_updates.insert({layer_id, true});
-  }
-  GraphMergeConfig config{nullptr, &layer_updates, true, true};
+  GraphMergeConfig config;
+  config.update_archived_attributes = true;
   if (!data_->mergeGraph(source, config)) {
     return false;
   }
