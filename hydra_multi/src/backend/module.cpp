@@ -205,7 +205,6 @@ void MultiBackendModule::save(const DataDirectory& output) {
     kimera_pgmo::WriteMesh(backend_path / "mesh.ply", *mesh, *mesh);
   }
 
-  backend_graph_logger_.save(backend_path);
   writeBackendStatus(status_log_, pgmo_path / "dsg_pgmo_status.csv");
   deformation_graph_->save(pgmo_path / "deformation_graph.dgrf");
 

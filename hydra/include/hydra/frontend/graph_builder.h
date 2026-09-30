@@ -35,7 +35,6 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/mesh_offset_info.h>
-#include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
 #include <mutex>
@@ -165,7 +164,6 @@ class GraphBuilder : public Module {
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
   std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
 
-  spark_dsg::SceneGraphLogger frontend_graph_logger_;
   OutputQueue::Ptr lcd_input_queue_;
 
   Sink::List sinks_;

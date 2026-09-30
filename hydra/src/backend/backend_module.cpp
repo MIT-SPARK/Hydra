@@ -159,8 +159,6 @@ void BackendModule::save(const DataDirectory& output) {
   dsg_updater_->save(output, "backend");
 
   const auto backend_path = output.path("backend");
-  backend_graph_logger_.save(backend_path);
-
   const auto filename = output.path("backend/pgmo") / "dsg_pgmo_status.csv";
   writeBackendStatus(status_log_, filename);
 
@@ -474,7 +472,6 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     unmerged_graph_->mergeGraph(*shared_dsg.graph);
   }  // end joint critical section
 
-  backend_graph_logger_.logGraph(*private_dsg_->graph);
   return true;
 }
 

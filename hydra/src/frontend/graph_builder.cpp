@@ -187,7 +187,6 @@ void GraphBuilder::save(const DataDirectory& output) {
 
   dsg_->graph->save(output_path / "dsg.json", false);
   dsg_->graph->save(output_path / "dsg_with_mesh.json");
-  frontend_graph_logger_.save(output_path);
 
   const auto mesh = dsg_->graph->mesh();
   if (mesh && !mesh->empty()) {
@@ -318,9 +317,6 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
   if (lcd_input_queue_) {
     lcd_input_queue_->push(curr_output_);
   }
-
-  // mutex not required because nothing is modifying the graph
-  frontend_graph_logger_.logGraph(*dsg_->graph);
 
   if (dsg_->graph && curr_output_) {
     ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
