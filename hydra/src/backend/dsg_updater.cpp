@@ -171,12 +171,13 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
   merge_config.previous_merges = &target_dsg_->merges;
   target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
 
+  // TODO(nathan) fix!
   // Nodes occasionally get added to the backend after they've left the active window,
   // which means they never get deformed or updated correctly. This forces them to be
   // active for at least one update
   std::vector<NodeId> active_nodes_to_restore;
-  for (auto& [layer_id, layer] : source_graph_->layers()) {
-    for (const auto& node : layer->nodes()) {
+  for (const auto& layer : source_graph_->layers()) {
+    for (const auto& node : layer.nodes()) {
       auto& attrs = node.attributes();
       if (source_graph_->checkNode(node.id) == NodeStatus::NEW && !attrs.is_active) {
         attrs.is_active = true;

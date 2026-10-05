@@ -83,9 +83,9 @@ void UpdateAgentsFunctor::call(const SceneGraph&,
   ScopedTimer timer("backend/agent_update", info->timestamp_ns, true, 1, false);
   auto& graph = *dsg.graph;
   const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
-  for (const auto& [prefix, layer] : graph.layer_partition(desired_layer)) {
+  for (const auto& layer : graph.layer_partition(desired_layer)) {
     std::set<NodeId> missing_nodes;
-    for (const auto& node : layer->nodes()) {
+    for (const auto& node : layer.nodes()) {
       auto& attrs = node.attributes<AgentNodeAttributes>();
       if (!info->pgmo_values->exists(attrs.external_key)) {
         missing_nodes.insert(node.id);
@@ -110,7 +110,7 @@ void UpdateAgentsFunctor::call(const SceneGraph&,
     }
 
     if (!missing_nodes.empty()) {
-      LOG(WARNING) << "Layer " << DsgLayers::AGENTS << "(" << prefix
+      LOG(WARNING) << "Layer " << DsgLayers::AGENTS << "(" << layer.id.partition
                    << "): could not update "
                    << displayNodeSymbolContainer(missing_nodes);
     }

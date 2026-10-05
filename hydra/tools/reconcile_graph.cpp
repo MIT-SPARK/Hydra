@@ -69,29 +69,15 @@ void AppArgs::add_to_app(CLI::App& app) {
 }
 
 void printCounts(spark_dsg::SceneGraph& graph) {
-  for (const auto& [layer_id, layer] : graph.layers()) {
-    std::cout << "Layer " << layer->id << ": " << layer->numNodes() << std::endl;
-  }
-
-  for (const auto& [layer_id, partitions] : graph.layer_partitions()) {
-    for (const auto& [key, layer] : partitions) {
-      std::cout << "Layer " << layer->id << ": " << layer->numNodes() << std::endl;
-    }
+  for (const auto& layer : graph.all_layers()) {
+    std::cout << "Layer " << layer.id << ": " << layer.numNodes() << std::endl;
   }
 }
 
 void resetActive(spark_dsg::SceneGraph& graph) {
-  for (const auto& [layer_id, layer] : graph.layers()) {
-    for (const auto& node : layer->nodes()) {
+  for (const auto& layer : graph.all_layers()) {
+    for (const auto& node : layer.nodes()) {
       node.attributes().is_active = false;
-    }
-  }
-
-  for (const auto& [layer_id, partitions] : graph.layer_partitions()) {
-    for (const auto& [key, layer] : partitions) {
-      for (const auto& node : layer->nodes()) {
-        node.attributes().is_active = false;
-      }
     }
   }
 }

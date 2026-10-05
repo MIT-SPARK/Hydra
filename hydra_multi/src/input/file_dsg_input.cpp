@@ -33,8 +33,8 @@ static const auto registration_ =
 inline void rewireRobotId(int new_id, SceneGraph& graph) {
   const auto agent_key = graph.getLayerKey(DsgLayers::AGENTS).value();
   const SceneGraphLayer* prev_layer = nullptr;
-  for (const auto& [prefix, layer] : graph.layer_partition(agent_key.layer)) {
-    prev_layer = layer.get();
+  for (const auto& layer : graph.layer_partition(agent_key.layer)) {
+    prev_layer = &layer;
     break;
   }
 

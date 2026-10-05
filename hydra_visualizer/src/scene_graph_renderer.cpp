@@ -200,24 +200,13 @@ void SceneGraphRenderer::draw(const std_msgs::msg::Header& header,
   setContext(graph);
 
   MarkerArray msg;
-  for (const auto& [_, layer] : graph.layers()) {
-    const auto context = contexts_.at(layer->id);
+  for (const auto& layer : graph.all_layers()) {
+    const auto context = contexts_.at(layer.id);
     if (!context) {
       continue;
     }
 
-    drawLayer(header, *context, *layer, graph.mesh().get(), msg);
-  }
-
-  for (const auto& [_, partitions] : graph.layer_partitions()) {
-    for (const auto& [_, partition] : partitions) {
-      const auto context = contexts_.at(partition->id);
-      if (!context) {
-        continue;
-      }
-
-      drawLayer(header, *context, *partition, graph.mesh().get(), msg);
-    }
+    drawLayer(header, *context, layer, graph.mesh().get(), msg);
   }
 
   MarkerArray edges;
@@ -423,16 +412,9 @@ void SceneGraphRenderer::setContext(const SceneGraph& graph) const {
   const auto graph_config = graph_config_.get();
   const auto z_step = graph_config.layer_z_step;
   const auto collapse = graph_config.collapse_layers;
-  for (const auto& [_, layer] : graph.layers()) {
-    const auto& info = getLayerInfo(layer->id);
-    contexts_.emplace(layer->id, info.context(graph, layer->id, z_step, collapse));
-  }
-
-  for (const auto& [_, partitions] : graph.layer_partitions()) {
-    for (const auto& [_, layer] : partitions) {
-      const auto& info = getLayerInfo(layer->id);
-      contexts_.emplace(layer->id, info.context(graph, layer->id, z_step, collapse));
-    }
+  for (const auto& layer : graph.all_layers()) {
+    const auto& info = getLayerInfo(layer.id);
+    contexts_.emplace(layer.id, info.context(graph, layer.id, z_step, collapse));
   }
 }
 
