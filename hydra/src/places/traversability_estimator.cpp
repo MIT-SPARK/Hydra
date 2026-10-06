@@ -240,29 +240,28 @@ void declare_config(HeightTraversabilityEstimator::Config& config) {
 HeightTraversabilityEstimator::HeightTraversabilityEstimator(const Config& config)
     : TraversabilityEstimator(config), config(config::checkValid(config)) {}
 
-void HeightTraversabilityEstimator::updateTraversability(
-    const ActiveWindowOutput& msg) {
-  updateTsdf(msg);
-  computeTraversability(msg);
+void HeightTraversabilityEstimator::updateTraversability(const ActiveWindowOutput& msg,
+                                                         TraversabilityLayer& layer) {
+  updateTsdf(msg, layer);
+  computeTraversability(msg, layer);
 }
 
-void HeightTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg) {
+void HeightTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg,
+                                               TraversabilityLayer& layer) {
   // Initialize the TSDF if this is the first call.
   if (!tsdf_layer_) {
     const auto& map_config = msg.map().config;
     tsdf_layer_ =
         std::make_shared<TsdfLayer>(map_config.voxel_size, map_config.voxels_per_side);
-    traversability_layer_ = std::make_unique<TraversabilityLayer>(
-        map_config.voxel_size, map_config.voxels_per_side);
   }
 
   // Erase archived blocks.
   tsdf_layer_->removeBlocks(msg.archived);
   const BlockIndexSet blocks_2d =
       get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
-  for (const auto& block_index : traversability_layer_->allocatedBlockIndices()) {
+  for (const auto& block_index : layer.allocatedBlockIndices()) {
     if (!blocks_2d.count(block_index)) {
-      traversability_layer_->removeBlock(block_index);
+      layer.removeBlock(block_index);
     }
   }
 
@@ -276,13 +275,13 @@ void HeightTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg) {
   }
 
   // Reset the updated flag.
-  for (auto& block : *traversability_layer_) {
+  for (auto& block : layer) {
     block.updated = false;
   }
 }
 
-void HeightTraversabilityEstimator::computeTraversability(
-    const ActiveWindowOutput& msg) {
+void HeightTraversabilityEstimator::computeTraversability(const ActiveWindowOutput& msg,
+                                                          TraversabilityLayer& layer) {
   // Naive implementation: simply recompute the traversability from scratch.
   const BlockIndexSet updated_blocks_2d =
       get2DBlockIndices(msg.map().getTsdfLayer().allocatedBlockIndices());
@@ -310,9 +309,8 @@ void HeightTraversabilityEstimator::computeTraversability(
   // Iterate over all 2D blocks.
   for (auto& block_idx_2d : updated_blocks_2d) {
     // Reset the traversability.
-    auto& traversability_block =
-        traversability_layer_->allocateBlock(block_idx_2d, voxels_per_side);
-    traversability_block.reset();
+    auto& traversability_block = layer.allocateBlock(block_idx_2d, voxels_per_side);
+    resetGeometry(traversability_block);
     traversability_block.updated = true;
     for (int block_z = min_height.first.z(); block_z <= max_height.first.z();
          ++block_z) {
@@ -398,28 +396,27 @@ GradientTraversabilityEstimator::GradientTraversabilityEstimator(const Config& c
       sinks_(Sink::instantiate(config.sinks)) {}
 
 void GradientTraversabilityEstimator::updateTraversability(
-    const ActiveWindowOutput& msg) {
-  updateTsdf(msg);
-  computeTraversability(msg);
+    const ActiveWindowOutput& msg, TraversabilityLayer& layer) {
+  updateTsdf(msg, layer);
+  computeTraversability(msg, layer);
 }
 
-void GradientTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg) {
+void GradientTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg,
+                                                 TraversabilityLayer& layer) {
   // Initialize the TSDF if this is the first call.
   if (!tsdf_layer_) {
     const auto& map_config = msg.map().config;
     tsdf_layer_ =
         std::make_shared<TsdfLayer>(map_config.voxel_size, map_config.voxels_per_side);
-    traversability_layer_ = std::make_unique<TraversabilityLayer>(
-        map_config.voxel_size, map_config.voxels_per_side);
   }
 
   // Erase archived blocks.
   tsdf_layer_->removeBlocks(msg.archived);
   const BlockIndexSet blocks_2d =
       get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
-  for (const auto& block_index : traversability_layer_->allocatedBlockIndices()) {
+  for (const auto& block_index : layer.allocatedBlockIndices()) {
     if (!blocks_2d.count(block_index)) {
-      traversability_layer_->removeBlock(block_index);
+      layer.removeBlock(block_index);
     }
   }
 
@@ -433,13 +430,13 @@ void GradientTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg) 
   }
 
   // Reset the updated flag.
-  for (auto& block : *traversability_layer_) {
+  for (auto& block : layer) {
     block.updated = false;
   }
 }
 
 void GradientTraversabilityEstimator::computeTraversability(
-    const ActiveWindowOutput& msg) {
+    const ActiveWindowOutput& msg, TraversabilityLayer& layer) {
   const auto updated =
       get2DBlockIndices(msg.map().getTsdfLayer().allocatedBlockIndices());
   const float robot_z = msg.world_T_body().translation().z();
@@ -461,8 +458,8 @@ void GradientTraversabilityEstimator::computeTraversability(
   const auto threshold = config.gradient_threshold;
   const auto gradient_map = computeGradientMap(height_map, tsdf_layer_->voxel_size);
   for (auto& block_idx : updated) {
-    auto& block = traversability_layer_->allocateBlock(block_idx, voxels_per_side);
-    block.reset();
+    auto& block = layer.allocateBlock(block_idx, voxels_per_side);
+    resetGeometry(block);
     block.updated = true;
 
     for (int x = 0; x < voxels_per_side; ++x) {

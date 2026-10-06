@@ -37,6 +37,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 
+#include <optional>
+
 #include "hydra/utils/timing_utilities.h"
 
 using Timer = hydra::timing::ScopedTimer;
@@ -57,6 +59,8 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
   name("TraversabilityPlaceExtractor::Config");
   field(config.layer, "layer");
   field(config.estimator, "estimator");
+  config.integrator.setOptional();
+  field(config.integrator, "integrator");
   field(config.postprocessing, "postprocessing");
   field(config.clustering, "clustering");
   field(config.sinks, "sinks");
@@ -65,6 +69,7 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
 TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
     : config(config::checkValid(config)),
       estimator_(config.estimator.create()),
+      integrator_(config.integrator.create()),
       postprocessing_(config.postprocessing),
       clustering_(config.clustering.create()),
       sinks_(Sink::instantiate(config.sinks)) {}
@@ -81,16 +86,35 @@ void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
 
 void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
-  estimator_->updateTraversability(msg);
+  if (!layer_) {
+    const auto& map_config = msg.map().config;
+    layer_ = std::make_unique<TraversabilityLayer>(map_config.voxel_size,
+                                                   map_config.voxels_per_side);
+  }
+
+  estimator_->updateTraversability(msg, *layer_);
+  if (integrator_) {
+    timer.reset("traversability/integrate");
+    integrator_->integrate(*layer_, msg);
+  }
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
                                                spark_dsg::SceneGraph& graph) {
-  // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
-  // expensive though.
+  if (!layer_) {
+    return;
+  }
+
+  // The estimator only recomputes the blocks touched by this update, the rest keep
+  // their previous state. Postprocessing (e.g. dilation) therefore acts on a copy,
+  // otherwise its changes would compound on the persistent layer with every update.
   Timer timer("traversability/postprocessing", msg.timestamp_ns);
-  auto layer = estimator_->getTraversabilityLayer();
-  postprocessing_.apply(layer);
+  std::optional<TraversabilityLayer> processed;
+  if (!postprocessing_.empty()) {
+    processed.emplace(*layer_);
+    postprocessing_.apply(*processed, msg);
+  }
+  const auto& layer = processed ? *processed : *layer_;
 
   timer.reset("traversability/clustering");
   clustering_->updateGraph(layer, msg, graph, config.layer);
