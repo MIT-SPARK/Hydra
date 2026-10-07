@@ -32,69 +32,79 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/pipeline_queues.h"
+#pragma once
 
-#include <glog/logging.h>
+#include <hydra/common/module.h>
+#include <hydra/frontend/keyframe_gate.h>
+#include <hydra/frontend/keyframe_writer.h>
+#include <hydra/utils/logging.h>
+
+#include <atomic>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <thread>
+
+#include "hydra_ros/utils/tf_lookup.h"
 
 namespace hydra {
 
-PipelineQueues::~PipelineQueues() {
-  VLOG(2) << "backend_queue: " << backend_queue.size();
-  VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
-  VLOG(2) << "external_loop_closure_queue: " << external_loop_closure_queue.size();
-}
+struct SubKeyframeInput;
 
-PipelineQueues& PipelineQueues::instance() {
-  if (!s_instance_) {
-    s_instance_.reset(new PipelineQueues());
-  }
+/**
+ * @brief Captures sub-keyframes from the full-rate color and depth images.
+ *
+ * Drains PipelineQueues::subkeyframe_queue (filled by the image receivers, so it is
+ * independent of the rate of the semantic input), looks up the body pose, writes
+ * images that pass the keyframe gate to disk (files named
+ * `subkf_<timestamp_ns>_{rgb.jpg,depth.png,meta.json}`, see KeyframeWriter) and
+ * requests a sub-keyframe node from the frontend via
+ * PipelineQueues::subkeyframe_node_queue.
+ */
+class SubKeyframeModule : public Module {
+ public:
+  struct Config : public VerbosityConfig {
+    Config();
 
-  return *s_instance_;
-}
+    //! Directory to save sub-keyframe images to (required). Image folders are relative
+    //! to its parent directory
+    std::filesystem::path image_output_path;
+    //! Name of the sensor to capture sub-keyframes from (empty accepts any sensor)
+    std::string sensor_name;
+    //! Motion required between sub-keyframes
+    KeyframeGate::Config gate;
+    //! Body pose lookup
+    TFLookup::Config tf_lookup;
+    //! Maximum number of pending images and node requests (excess is dropped)
+    size_t queue_max_size = 30;
+  } const config;
 
-void PipelineQueues::clear() {
-  backend_queue.clear();
-  backend_lcd_queue.clear();
-  external_loop_closure_queue.clear();
-  subkeyframe_queue.clear();
-  subkeyframe_node_queue.clear();
-}
+  explicit SubKeyframeModule(const Config& config);
 
-void PipelineQueues::enableSubKeyframes(size_t max_queue_size,
-                                        const std::string& sensor_name) {
-  {
-    std::lock_guard<std::mutex> lock(subkeyframe_mutex_);
-    subkeyframe_sensor_ = sensor_name;
-  }
+  virtual ~SubKeyframeModule();
 
-  {
-    std::lock_guard<std::mutex> lock(subkeyframe_queue.mutex);
-    subkeyframe_queue.max_size = max_queue_size;
-  }
+  void start() override;
 
-  {
-    std::lock_guard<std::mutex> lock(subkeyframe_node_queue.mutex);
-    subkeyframe_node_queue.max_size = max_queue_size;
-  }
+  void stop() override;
 
-  subkeyframes_enabled_ = true;
-}
+  std::string printInfo() const override;
 
-void PipelineQueues::disableSubKeyframes() {
-  subkeyframes_enabled_ = false;
-  subkeyframe_queue.clear();
-  subkeyframe_node_queue.clear();
-}
+  //! @brief Process one input (exposed for testing)
+  bool processInput(const SubKeyframeInput& input,
+                    const Eigen::Isometry3d& world_T_body);
 
-bool PipelineQueues::acceptsSubKeyframes(const std::string& sensor_name) const {
-  if (!subkeyframes_enabled_) {
-    return false;
-  }
+ private:
+  void spin();
 
-  std::lock_guard<std::mutex> lock(subkeyframe_mutex_);
-  return subkeyframe_sensor_.empty() || subkeyframe_sensor_ == sensor_name;
-}
+  void stopImpl();
 
-PipelineQueues::PipelineQueues() {}
+  KeyframeGate gate_;
+  KeyframeWriter writer_;
+  std::unique_ptr<TFLookup> lookup_;
+  std::atomic<bool> should_shutdown_{false};
+  std::unique_ptr<std::thread> spin_thread_;
+};
+
+void declare_config(SubKeyframeModule::Config& config);
 
 }  // namespace hydra
