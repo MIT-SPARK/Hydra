@@ -71,8 +71,6 @@ class RoomFinder {
 
   const RoomFinderConfig config;
 
-  const RoomExtents room_extents;
-
  protected:
   InitialClusters getBestComponents(const Layer& places,
                                     const DistanceAdaptor& get_distance) const;

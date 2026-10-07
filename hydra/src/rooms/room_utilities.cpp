@@ -37,7 +37,6 @@
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
-#include <yaml-cpp/yaml.h>
 
 namespace hydra {
 
@@ -164,55 +163,6 @@ void addEdgesToRoomLayer(SceneGraph& graph, const std::set<NodeId>& active_rooms
       }
     }
   }
-}
-
-RoomExtents::RoomExtents(const RoomExtents::BoundingBoxes& room_extents)
-    : room_bounding_boxes(room_extents) {}
-
-RoomExtents::RoomExtents(const std::filesystem::path& path_to_yaml) {
-  YAML::Node root = YAML::LoadFile(path_to_yaml);
-  std::vector<std::vector<spark_dsg::BoundingBox>> result;
-
-  for (const auto& key_group : root) {
-    auto& group_node = key_group.second;
-    auto& group = result.emplace_back();
-
-    for (const auto& box_node : group_node) {
-      // Extract center
-      const auto& center_node = box_node["center"];
-      Eigen::Vector3f center(center_node[0].as<float>(),
-                             center_node[1].as<float>(),
-                             center_node[2].as<float>());
-
-      // Extract extents
-      const auto& extents_node = box_node["extents"];
-      Eigen::Vector3f dimensions(extents_node[0].as<float>(),
-                                 extents_node[1].as<float>(),
-                                 extents_node[2].as<float>());
-
-      // Extract rotation
-      const auto& rot_node = box_node["rotation"];
-      Eigen::Quaternionf rotation(rot_node["w"].as<float>(),
-                                  rot_node["x"].as<float>(),
-                                  rot_node["y"].as<float>(),
-                                  rot_node["z"].as<float>());
-
-      group.emplace_back(dimensions, center, rotation);
-    }
-  }
-
-  room_bounding_boxes = result;
-}
-
-RoomExtents::QueryResult RoomExtents::getRoomForPoint(Eigen::Vector3d point) const {
-  for (size_t room_idx = 0; room_idx < room_bounding_boxes.size(); ++room_idx) {
-    for (const auto& bb : room_bounding_boxes.at(room_idx)) {
-      if (bb.contains(point)) {
-        return {true, room_idx};
-      }
-    }
-  }
-  return {false, 0};
 }
 
 }  // namespace hydra

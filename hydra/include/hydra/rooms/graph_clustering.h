@@ -36,7 +36,6 @@
 #include <spark_dsg/scene_graph_layer.h>
 
 #include "hydra/rooms/graph_filtration.h"
-#include "hydra/rooms/room_utilities.h"
 
 namespace hydra {
 
@@ -75,7 +74,4 @@ ClusterResults clusterGraphByNeighbors(const spark_dsg::SceneGraphLayer& layer,
                                        const InitialClusters& initial_clusters,
                                        const DistanceAdaptor& get_distance = {});
 
-ClusterResults clusterGraphByGt(const spark_dsg::SceneGraphLayer& layer,
-                                const RoomExtents& room_extents,
-                                const DistanceAdaptor& get_distance = {});
 }  // namespace hydra

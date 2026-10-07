@@ -298,31 +298,4 @@ ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
   return {clusters, labels, 0, true};
 }
 
-ClusterResults clusterGraphByGt(const SceneGraphLayer& layer,
-                                const RoomExtents& room_extents,
-                                const DistanceAdaptor& get_distance) {
-  std::map<NodeId, size_t> labels;
-  std::map<size_t, std::unordered_set<NodeId>> clusters;
-  for (const auto& node : layer.nodes()) {
-    if (!get_distance(node)) {
-      continue;
-    }
-
-    auto valid_room_idx = room_extents.getRoomForPoint(node.attributes().position);
-    if (!valid_room_idx.valid) {
-      continue;
-    }
-
-    size_t room_idx = valid_room_idx.index;
-    if (!clusters.count(room_idx)) {
-      clusters[room_idx] = std::unordered_set<NodeId>();
-    }
-
-    clusters[room_idx].insert(node.id);
-    labels[node.id] = room_idx;
-  }
-
-  return {clusters, labels, 0, true};
-}
-
 }  // namespace hydra

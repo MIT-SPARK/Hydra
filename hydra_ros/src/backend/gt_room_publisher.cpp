@@ -11,11 +11,14 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 
 namespace hydra {
+namespace {
 
 static const auto registration_ =
-    config::RegistrationWithConfig<UpdateRoomsFunctor::Sink,
+    config::RegistrationWithConfig<UpdateGtRoomsFunctor::Sink,
                                    GtRoomPublisher,
                                    GtRoomPublisher::Config>("GtRoomPublisher");
+
+}  // namespace
 
 void declare_config(GtRoomPublisher::Config& config) {
   using namespace config;
@@ -35,7 +38,7 @@ GtRoomPublisher::GtRoomPublisher(const Config& config)
 
 std::string GtRoomPublisher::printInfo() const { return config::toString(config); }
 
-void GtRoomPublisher::call(uint64_t, const RoomFinder& rf) const {
+void GtRoomPublisher::call(uint64_t, const RoomExtents& extents) const {
   MarkerArray ma;
   auto& m = ma.markers.emplace_back();
   m.action = m.DELETEALL;
@@ -44,12 +47,13 @@ void GtRoomPublisher::call(uint64_t, const RoomFinder& rf) const {
 
   auto colormap = visualizer::DiscreteColormap(config.colormap);
 
-  for (auto room : rf.room_extents.room_bounding_boxes) {
-    for (auto box : room) {
+  for (const auto& room : extents.room_bounding_boxes) {
+    for (const auto& box : room) {
       auto& m = ma.markers.emplace_back();
       m.header.frame_id = config.room_frame_id;
       m.ns = "gt_rooms";
-      m.id = idx++;
+      m.id = idx;
+      ++idx;
       m.action = m.ADD;
       m.type = m.CUBE;
 
@@ -66,6 +70,7 @@ void GtRoomPublisher::call(uint64_t, const RoomFinder& rf) const {
       m.scale.z = box.dimensions.z();
       m.color = visualizer::makeColorMsg(colormap.getColor(room_idx), 0.5);
     }
+
     ++room_idx;
   }
 

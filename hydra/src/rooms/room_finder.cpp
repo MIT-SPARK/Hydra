@@ -103,16 +103,8 @@ void logFiltration(std::ostream& fout,
   fout << "]},";
 }
 
-RoomExtents load_room_extents(std::filesystem::path path) {
-  if (path != "") {
-    return RoomExtents(path);
-  }
-  return RoomExtents(std::vector<std::vector<spark_dsg::BoundingBox>>());
-}
-
 RoomFinder::RoomFinder(const RoomFinderConfig& config)
-    : config(config::checkValid(config)),
-      room_extents(load_room_extents(config.ground_truth_rooms_path)) {}
+    : config(config::checkValid(config)) {}
 
 RoomFinder::~RoomFinder() {
   if (log_file_) {
@@ -295,11 +287,6 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
     return nullptr;
   }
 
-  if (config.clustering_mode == RoomClusterMode::GROUND_TRUTH) {
-    last_results_ = clusterGraphByGt(places, room_extents, get_distance);
-    return makeRoomLayer(places);
-  }
-
   const auto components = getBestComponents(places, get_distance);
   if (components.empty()) {
     VLOG(2) << "[Room Finder] No components found";
@@ -330,10 +317,6 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
       break;
     case RoomClusterMode::NEIGHBORS:
       last_results_ = clusterGraphByNeighbors(places, components, get_distance);
-      break;
-    case RoomClusterMode::GROUND_TRUTH:
-      last_results_ = clusterGraphByGt(places, room_extents, get_distance);
-      LOG(WARNING) << "Got GT results";
       break;
     case RoomClusterMode::NONE:
     default:
