@@ -45,11 +45,13 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
+#include "hydra/common/sub_keyframes.h"
 #include "hydra/frontend/frontend_output.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/frontend/graph_connector.h"
 #include "hydra/frontend/mesh_compressor.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/subkeyframe_anchor.h"
 #include "hydra/frontend/surface_place_extractor.h"
 #include "hydra/utils/logging.h"
 
@@ -96,6 +98,12 @@ class GraphBuilder : public Module {
     config::VirtualConfig<GraphBuilderFunctor> frontier_places;
     //! Optional functor saving images for agent nodes (e.g., AgentImageExtractor)
     config::VirtualConfig<GraphBuilderFunctor> agent_extractor;
+    //! Maximum distance [m] between a sub-keyframe and its anchor agent node
+    double subkeyframe_anchor_max_dist_m = 2.0;
+    //! Time window [s] of recent agent nodes considered as sub-keyframe anchors
+    double subkeyframe_anchor_window_s = 30.0;
+    //! Partition of the agents layer (and node symbol category) for sub-keyframes
+    char subkeyframe_partition = kDefaultSubKeyframePartition;
 
     //! Output sinks and visualization
     std::vector<Sink::Factory> sinks;
@@ -143,6 +151,9 @@ class GraphBuilder : public Module {
 
   void updatePlaces2d(const ActiveWindowOutput& msg);
 
+  //! Create sub-keyframe nodes for pending requests (see PipelineQueues)
+  void updateSubKeyframes();
+
  protected:
   InputQueue::Ptr queue_;
   uint64_t sequence_number_;
@@ -165,6 +176,10 @@ class GraphBuilder : public Module {
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
   std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
+  //! Index of the next sub-keyframe node
+  size_t next_subkeyframe_index_ = 0;
+  //! Recent agent nodes of this robot that sub-keyframes can be anchored to
+  AnchorWindow subkeyframe_anchors_;
 
   OutputQueue::Ptr lcd_input_queue_;
 

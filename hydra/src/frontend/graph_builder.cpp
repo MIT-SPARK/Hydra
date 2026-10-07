@@ -36,10 +36,13 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
+#include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <kimera_pgmo/utils/common_functions.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/common/global_info.h"
@@ -48,6 +51,7 @@
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/subkeyframe_anchor.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
@@ -99,6 +103,15 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.frontier_places, "frontier_places");
   config.agent_extractor.setOptional();
   field(config.agent_extractor, "agent_extractor");
+  field(config.subkeyframe_anchor_max_dist_m, "subkeyframe_anchor_max_dist_m", "m");
+  check(config.subkeyframe_anchor_max_dist_m, GE, 0.0, "subkeyframe_anchor_max_dist_m");
+  field(config.subkeyframe_anchor_window_s, "subkeyframe_anchor_window_s", "s");
+  check(config.subkeyframe_anchor_window_s, GT, 0.0, "subkeyframe_anchor_window_s");
+  field<CharConversion>(config.subkeyframe_partition, "subkeyframe_partition");
+  checkCondition(
+      !kimera_pgmo::robot_prefix_to_id.count(config.subkeyframe_partition) &&
+          !kimera_pgmo::vertex_prefix_to_id.count(config.subkeyframe_partition),
+      "subkeyframe_partition must differ from robot and vertex prefixes");
 
   field(config.sinks, "sinks");
 }
@@ -124,6 +137,10 @@ GraphBuilder::GraphBuilder(const Config& config,
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
       surface_places_(config.surface_places.create(
           GlobalInfo::instance().labelspace().surface_places_labels)),
+      subkeyframe_anchors_(static_cast<uint64_t>(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::duration<double>(config.subkeyframe_anchor_window_s))
+              .count())),
       sinks_(Sink::instantiate(config.sinks)) {
   const auto& global_info = GlobalInfo::instance();
   if (config.enable_mesh_objects) {
@@ -367,6 +384,9 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
       functor->callPostUpdate(*dsg_, *curr_output_);
     }
   }
+
+  // runs after the pose graph tracker added this update's agent nodes
+  updateSubKeyframes();
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
@@ -418,6 +438,64 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
   surface_places_->updateGraph(input, mesh_offsets_, *dsg_->graph);
+}
+
+void GraphBuilder::updateSubKeyframes() {
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+  std::vector<NodeId> new_anchors;
+  if (curr_output_) {
+    for (const auto node_id : curr_output_->new_agent_nodes) {
+      if (NodeSymbol(node_id).category() == prefix.key) {
+        new_anchors.push_back(node_id);
+      }
+    }
+  }
+
+  auto& queue = PipelineQueues::instance().subkeyframe_node_queue;
+  if (new_anchors.empty() && queue.empty()) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(dsg_->mutex);
+  auto& graph = *dsg_->graph;
+  // requests are close to the current time, so only recent agent nodes are anchors
+  subkeyframe_anchors_.update(graph, new_anchors);
+  if (queue.empty()) {
+    return;
+  }
+
+  const auto layer_key = graph.getLayerKey(DsgLayers::AGENTS);
+  if (!layer_key) {
+    return;
+  }
+
+  const auto anchors = subkeyframe_anchors_.candidates(graph);
+  while (!queue.empty()) {
+    const auto request = queue.pop();
+    const auto anchor_idx = selectNearestAnchor(anchors,
+                                                request.timestamp_ns,
+                                                request.world_T_subframe.translation(),
+                                                config.subkeyframe_anchor_max_dist_m);
+    if (!anchor_idx) {
+      MLOG(2) << "Dropping sub-keyframe @ " << request.timestamp_ns
+              << " [ns]: no anchor within " << config.subkeyframe_anchor_max_dist_m
+              << " [m]";
+      continue;
+    }
+
+    const auto& anchor = anchors[*anchor_idx];
+    auto attrs = buildSubKeyframeAttrs(anchor.id,
+                                       anchor.world_T_anchor,
+                                       request.world_T_subframe,
+                                       request.timestamp_ns,
+                                       request.image_folder);
+    const auto partition = config.subkeyframe_partition;
+    graph.emplaceNode(
+        layer_key->layer,
+        subKeyframeNodeId(partition, prefix.id, next_subkeyframe_index_++),
+        std::move(attrs),
+        partition);
+  }
 }
 
 }  // namespace hydra

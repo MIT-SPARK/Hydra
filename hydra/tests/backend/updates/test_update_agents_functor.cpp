@@ -142,4 +142,39 @@ TEST(UpdateAgentsFunctor, CopiesImageFolderFromUnmerged) {
             "agents/agent_1000000000");
 }
 
+// Sub-keyframes share the agents layer and follow their optimized anchor
+TEST(UpdateAgentsFunctor, SubKeyframeUpdate) {
+  auto dsg = test::makeSharedDsg();
+  auto& graph = *dsg->graph;
+  graph.emplaceNode(
+      2,
+      "a0"_id,
+      std::make_unique<AgentNodeAttributes>(std::chrono::seconds(1),
+                                            Eigen::Quaterniond::Identity(),
+                                            Eigen::Vector3d::Zero(),
+                                            NodeSymbol('a', 0)),
+      'a');
+  {
+    auto attrs = std::make_unique<SubKeyframeNodeAttributes>();
+    attrs->anchor_node_id = "a0"_id;
+    attrs->anchor_t_subframe << 1.0, 0.0, 0.0;
+    attrs->position << 1.0, 0.0, 0.0;
+    graph.emplaceNode(2, "k0"_id, std::move(attrs), 'k');
+  }
+
+  gtsam::Values agent_values;
+  const gtsam::Rot3 rot = gtsam::Rot3::Rz(M_PI / 2.0);
+  agent_values.insert(NodeSymbol('a', 0),
+                      gtsam::Pose3(rot, gtsam::Point3(4.0, 5.0, 6.0)));
+
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, &agent_values, false, {}});
+  UpdateAgentsFunctor functor;
+  EXPECT_NO_THROW(functor.call(*dsg->graph, *dsg, info));
+
+  const auto& attrs =
+      graph.getNode(NodeSymbol('k', 0)).attributes<SubKeyframeNodeAttributes>();
+  const Eigen::Vector3d expected(4.0, 6.0, 6.0);
+  EXPECT_NEAR(0.0, (attrs.position - expected).norm(), 1.0e-7);
+}
+
 }  // namespace hydra

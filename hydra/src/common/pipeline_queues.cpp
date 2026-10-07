@@ -56,6 +56,7 @@ void PipelineQueues::clear() {
   backend_queue.clear();
   backend_lcd_queue.clear();
   external_loop_closure_queue.clear();
+  subkeyframe_node_queue.clear();
 }
 
 PipelineQueues::PipelineQueues() {}

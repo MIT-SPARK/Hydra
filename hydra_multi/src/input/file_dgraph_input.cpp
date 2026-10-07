@@ -54,6 +54,11 @@ void FileDGraphInput::init() {
     size_t num_layers = 0;
     const auto agent_layer_id = state_->dsg_->getLayerKey(DsgLayers::AGENTS)->layer;
     for (const auto& layer : state_->dsg_->layer_partition(agent_layer_id)) {
+      // skip non-robot partitions (e.g., sub-keyframes)
+      if (!kimera_pgmo::robot_prefix_to_id.count(layer.id.partition)) {
+        continue;
+      }
+
       ++num_layers;
       if (num_layers > 1) {
         LOG(FATAL) << "FileUnitInterface assumes loading a single robot";
@@ -61,7 +66,10 @@ void FileDGraphInput::init() {
 
       LOG(INFO) << "Found agent layer with " << layer.numNodes() << " poses";
       for (const auto& node : layer.nodes()) {
-        stamps[id_].push_back(node.attributes<AgentNodeAttributes>().timestamp.count());
+        const auto attrs = node.tryAttributes<AgentNodeAttributes>();
+        if (attrs) {
+          stamps[id_].push_back(attrs->timestamp.count());
+        }
       }
     }
   } else {

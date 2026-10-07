@@ -33,41 +33,33 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/pose_graph.h>
 
-#include <memory>
+#include <spark_dsg/node_symbol.h>
 
-#include "hydra/common/message_queue.h"
-#include "hydra/common/sub_keyframes.h"
-#include "hydra/loop_closure/registration_solution.h"
+#include <Eigen/Geometry>
+#include <cstdint>
+#include <string>
 
 namespace hydra {
 
-struct FrontendOutput;
+//! Default partition (and node symbol category) of the agents layer for sub-keyframe
+//! nodes, distinct from the robot prefixes (`a`-`h`) and the kimera_pgmo vertex
+//! prefixes (`s`-`z`)
+inline constexpr char kDefaultSubKeyframePartition = 'k';
 
-class PipelineQueues {
- public:
-  ~PipelineQueues();
+//! @brief Node id of the index-th sub-keyframe of a robot. The robot id is stored in
+//! the upper bits of the symbol index so that ids are unique across robots
+inline spark_dsg::NodeId subKeyframeNodeId(char category, int robot_id, size_t index) {
+  return spark_dsg::NodeSymbol(category, (static_cast<size_t>(robot_id) << 48) | index);
+}
 
-  static PipelineQueues& instance();
-
-  void clear();
-
-  //! Connection between frontend and backend
-  MessageQueue<std::shared_ptr<const FrontendOutput>> backend_queue;
-  //! Connection between backend and LCD module
-  MessageQueue<lcd::RegistrationSolution> backend_lcd_queue;
-  //! Queue for receiving (timestamped) external loop closures
-  MessageQueue<pose_graph_tools::PoseGraph> external_loop_closure_queue;
-  //! Sub-keyframe node requests drained by the frontend (which owns all mutation of
-  //! the frontend graph)
-  MessageQueue<SubKeyframeRequest> subkeyframe_node_queue;
-
- private:
-  PipelineQueues();
-
-  // TODO(nathan) fix thread safety (by probably just having a single static instance)
-  inline static std::unique_ptr<PipelineQueues> s_instance_;
+//! Request for a sub-keyframe node, created by the frontend once anchors exist
+struct SubKeyframeRequest {
+  uint64_t timestamp_ns = 0;
+  //! Body pose of the sub-keyframe
+  Eigen::Isometry3d world_T_subframe = Eigen::Isometry3d::Identity();
+  //! Image folder value of the sub-keyframe images (see KeyframeWriter::imageFolder)
+  std::string image_folder;
 };
 
 }  // namespace hydra

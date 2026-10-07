@@ -15,6 +15,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_delta_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_segmenter.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/place_mesh_connector.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/subkeyframe_anchor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/surface_place_extractor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/traversability_place_extractor.cpp
 )

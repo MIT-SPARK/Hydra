@@ -33,6 +33,7 @@ add_executable(
   frontend/test_keyframe_writer.cpp
   frontend/test_mesh_compression.cpp
   frontend/test_mesh_segmenter.cpp
+  frontend/test_subkeyframe_anchor.cpp
   frontend/test_feature_selector.cpp
   input/test_camera.cpp
   input/test_input_data_io.cpp
