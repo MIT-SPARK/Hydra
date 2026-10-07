@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/rooms/graph_clustering.h>
+#include <spark_dsg/node_attributes.h>
 
 using namespace spark_dsg;
 
@@ -70,7 +71,7 @@ TEST(GraphClusteringTests, FillFromClusters) {
 TEST(GraphClusteringTests, ModularityClusteringCorrect) {
   SceneGraphLayer layer(1);
   for (size_t i = 0; i < 10; ++i) {
-    layer.emplaceNode(i, std::make_unique<NodeAttributes>());
+    layer.emplaceNode(i, std::make_unique<PlaceNodeAttributes>(1.0, 0));
   }
 
   // first clique (3 nodes)

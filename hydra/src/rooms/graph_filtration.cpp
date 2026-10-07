@@ -37,25 +37,35 @@
 #include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 
+#include <cmath>
 #include <iomanip>
 
 using namespace spark_dsg;
 
 namespace hydra {
 
-double DistanceAdaptor::operator()(const SceneGraphNode& node) const {
-  return node.attributes<PlaceNodeAttributes>().distance;
+std::optional<double> DistanceAdaptor::operator()(const SceneGraphNode& node) const {
+  double distance = 0.0;
+  if (const auto attrs = node.tryAttributes<PlaceNodeAttributes>()) {
+    if (!attrs->real_place) {
+      return std::nullopt;
+    }
+
+    distance = attrs->distance;
+  } else if (const auto attrs = node.tryAttributes<TraversabilityNodeAttributes>()) {
+    distance = attrs->distance;
+  } else {
+    return std::nullopt;
+  }
+
+  if (!std::isfinite(distance) || distance <= 0.0) {
+    return std::nullopt;
+  }
+
+  return distance;
 }
 
 double DistanceAdaptor::operator()(const SceneGraphEdge& edge) const {
-  return edge.info->weight;
-}
-
-double TraversabilityDistanceAdaptor::operator()(const SceneGraphNode& node) const {
-  return node.attributes<spark_dsg::TraversabilityNodeAttributes>().distance;
-}
-
-double TraversabilityDistanceAdaptor::operator()(const SceneGraphEdge& edge) const {
   return edge.info->weight;
 }
 
@@ -162,16 +172,29 @@ void fillEntries(const SceneGraphLayer& layer,
                  const DistanceAdaptor& get_distance) {
   entries.reserve(layer.numEdges() + layer.numNodes());
 
+  for (const auto& node : layer.nodes()) {
+    const auto distance = get_distance(node);
+    if (!distance) {
+      continue;
+    }
+
+    node_distances.emplace(node.id, *distance);
+  }
+
   for (const auto& edge : layer.edges()) {
+    if (!node_distances.count(edge.source) || !node_distances.count(edge.target)) {
+      continue;
+    }
+
     entries.push_back({get_distance(edge), edge.source, edge.target});
   }
 
-  for (const auto& node : layer.nodes()) {
-    const auto distance = get_distance(node);
-    node_distances.emplace(node.id, distance);
-
-    if (include_nodes) {
-      entries.push_back({distance, node.id});
+  if (include_nodes) {
+    for (const auto& node : layer.nodes()) {
+      const auto iter = node_distances.find(node.id);
+      if (iter != node_distances.end()) {
+        entries.push_back({iter->second, node.id});
+      }
     }
   }
 
@@ -296,6 +319,10 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
   if (!include_nodes) {
     // seed components with all nodes if we're not including nodes in the filtration
     for (const auto& node : layer.nodes()) {
+      if (!node_distances.count(node.id)) {
+        continue;
+      }
+
       updateComponentsFromNode(
           node.id, components, tracker, unused_edges, node_distances);
     }

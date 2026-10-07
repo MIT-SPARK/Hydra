@@ -74,13 +74,11 @@ class RoomFinder {
   const RoomExtents room_extents;
 
  protected:
-  InitialClusters getBestComponents(const Layer& places) const;
+  InitialClusters getBestComponents(const Layer& places,
+                                    const DistanceAdaptor& get_distance) const;
 
   Layer::Ptr makeRoomLayer(const Layer& places);
 
-  void setupDistanceAdaptor(const Layer& places);
-
-  std::unique_ptr<DistanceAdaptor> distance_adaptor_;
   ClusterResults last_results_;
   std::map<size_t, spark_dsg::NodeId> cluster_room_map_;
   mutable bool logged_once_ = false;

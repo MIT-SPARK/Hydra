@@ -35,6 +35,8 @@
 #pragma once
 #include <spark_dsg/scene_graph_layer.h>
 
+#include <optional>
+
 #include "hydra/utils/disjoint_set.h"
 
 namespace hydra {
@@ -53,19 +55,9 @@ using LifetimeMap = std::unordered_map<spark_dsg::NodeId, ComponentLifetime>;
 
 struct DistanceAdaptor {
   virtual ~DistanceAdaptor() = default;
-  virtual double operator()(const spark_dsg::SceneGraphNode& node) const;
+  //! Return a finite, positive place distance, or nullopt for ineligible nodes.
+  virtual std::optional<double> operator()(const spark_dsg::SceneGraphNode& node) const;
   virtual double operator()(const spark_dsg::SceneGraphEdge& edge) const;
-};
-
-struct TraversabilityDistanceAdaptor : public DistanceAdaptor {
-  explicit TraversabilityDistanceAdaptor(const spark_dsg::SceneGraphLayer& layer)
-      : layer(layer) {};
-
-  double operator()(const spark_dsg::SceneGraphNode& node) const override;
-  double operator()(const spark_dsg::SceneGraphEdge& edge) const override;
-
- private:
-  const spark_dsg::SceneGraphLayer& layer;
 };
 
 struct BarcodeTracker : public DisjointSet {

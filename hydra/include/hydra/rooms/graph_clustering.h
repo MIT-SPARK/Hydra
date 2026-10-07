@@ -35,6 +35,7 @@
 #pragma once
 #include <spark_dsg/scene_graph_layer.h>
 
+#include "hydra/rooms/graph_filtration.h"
 #include "hydra/rooms/room_utilities.h"
 
 namespace hydra {
@@ -60,17 +61,21 @@ struct ClusterResults {
 ClusterResults clusterGraphByModularity(const spark_dsg::SceneGraphLayer& layer,
                                         const InitialClusters& initial_clusters,
                                         size_t max_iters = 5,
-                                        double gamma = 1.0);
+                                        double gamma = 1.0,
+                                        const DistanceAdaptor& get_distance = {});
 
 ClusterResults clusterGraphByModularity(const spark_dsg::SceneGraphLayer& layer,
                                         const InitialClusters& initial_clusters,
                                         const EdgeWeightFunc& edge_weight_func,
                                         size_t max_iters = 5,
-                                        double gamma = 1.0);
+                                        double gamma = 1.0,
+                                        const DistanceAdaptor& get_distance = {});
 
 ClusterResults clusterGraphByNeighbors(const spark_dsg::SceneGraphLayer& layer,
-                                       const InitialClusters& initial_clusters);
+                                       const InitialClusters& initial_clusters,
+                                       const DistanceAdaptor& get_distance = {});
 
 ClusterResults clusterGraphByGt(const spark_dsg::SceneGraphLayer& layer,
-                                const RoomExtents& room_extents);
+                                const RoomExtents& room_extents,
+                                const DistanceAdaptor& get_distance = {});
 }  // namespace hydra
