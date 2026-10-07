@@ -94,9 +94,9 @@ void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
     ScopedTimer add_timer("backend/add_places_nodes", timestamp_ns);
 
     kimera_pgmo::NodeValenceInfoList factors;
-    for (const auto& [node_id, node] : places.nodes()) {
-      const auto& attrs = node->attributes<PlaceNodeAttributes>();
-      if (!node->hasSiblings()) {
+    for (const auto& node : places.nodes()) {
+      const auto& attrs = node.attributes<PlaceNodeAttributes>();
+      if (!node.hasSiblings()) {
         continue;
       }
 
@@ -105,10 +105,10 @@ void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
       } else {
         factor.valence_prefix = this_vertex_key;
       }
-      factor.key = node_id;
+      factor.key = node.id;
       factor.pose = gtsam::Pose3(gtsam::Rot3(), attrs.position);
 
-      if (mst_info.leaves.count(node_id)) {
+      if (mst_info.leaves.count(node.id)) {
         for (const auto& idx : attrs.deformation_connections) {
           if (idx == std::numeric_limits<size_t>::max()) {
             continue;

@@ -165,13 +165,13 @@ void KhronosObjectPlugin::drawDynamicObjects(const Config& config,
   const auto& objects = graph.getLayer(config.layer);
   MarkerArray msg;
 
-  for (const auto& [node_id, node] : objects.nodes()) {
-    const auto attrs = node->tryAttributes<KhronosObjectAttributes>();
+  for (const auto& node : objects.nodes()) {
+    const auto attrs = node.tryAttributes<KhronosObjectAttributes>();
     if (!attrs || attrs->trajectory_positions.empty()) {
       continue;
     }
 
-    const uint64_t id = spark_dsg::NodeSymbol(node_id).categoryId();
+    const uint64_t id = spark_dsg::NodeSymbol(node.id).categoryId();
     spark_dsg::BoundingBox bbox = attrs->bounding_box;
     const auto color = visualizer::makeColorMsg(getDynamicColor(config, *attrs, id));
 
@@ -231,12 +231,12 @@ void KhronosObjectPlugin::drawStaticObjects(const Config& config,
 
   std::unordered_set<uint64_t> present_objects;
   const auto& objects = dsg.getLayer(config.layer);
-  for (const auto& [node_id, node] : objects.nodes()) {
-    const auto attrs = node->tryAttributes<KhronosObjectAttributes>();
+  for (const auto& node : objects.nodes()) {
+    const auto attrs = node.tryAttributes<KhronosObjectAttributes>();
     if (!attrs) {
       continue;
     }
-    const uint64_t id = spark_dsg::NodeSymbol(node_id).categoryId();
+    const uint64_t id = spark_dsg::NodeSymbol(node.id).categoryId();
 
     // Always update the transform.
     publishTransform(header, *attrs, id);

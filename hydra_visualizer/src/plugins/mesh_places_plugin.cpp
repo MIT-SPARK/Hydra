@@ -74,14 +74,14 @@ Marker makeLayerEllipseBoundaries(const MeshPlacesPlugin::Config& config,
 
   std_msgs::msg::ColorRGBA color;
   geometry_msgs::msg::Point last_point;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<Place2dNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<Place2dNodeAttributes>();
     if (!attrs || attrs->boundary.size() <= 1) {
       // TODO(nathan) log warning
       continue;
     }
 
-    color = makeColorMsg(info.node_color(*node), config.ellipse_alpha);
+    color = makeColorMsg(info.node_color(node), config.ellipse_alpha);
     const auto pos = attrs->position;
     last_point.x = attrs->ellipse_matrix_expand(0, 0) + attrs->ellipse_centroid(0);
     last_point.y = attrs->ellipse_matrix_expand(1, 0) + attrs->ellipse_centroid(1);
@@ -120,8 +120,8 @@ Marker makeLayerPolygonEdges(const MeshPlacesPlugin::Config& config,
   marker.ns = ns;
   marker.scale.x = config.wireframe_scale;
 
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<Place2dNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<Place2dNodeAttributes>();
     if (!attrs || attrs->boundary.size() <= 1) {
       // TODO(nathan) log warning
       continue;
@@ -131,7 +131,7 @@ Marker makeLayerPolygonEdges(const MeshPlacesPlugin::Config& config,
     geometry_msgs::msg::Point node_point;
     tf2::convert(pos, node_point);
     node_point.z += info.z_offset;
-    const auto color = makeColorMsg(info.node_color(*node), config.alpha);
+    const auto color = makeColorMsg(info.node_color(node), config.alpha);
 
     for (size_t i = 0; i < attrs->boundary.size(); ++i) {
       geometry_msgs::msg::Point boundary_point;
@@ -162,14 +162,14 @@ Marker makeLayerPolygonBoundaries(const MeshPlacesPlugin::Config& config,
   marker.scale.x = config.wireframe_scale;
   marker.pose.position.z += config.collapse ? 0.0 : info.z_offset;
 
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<Place2dNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<Place2dNodeAttributes>();
     if (!attrs || attrs->boundary.size() <= 1) {
       continue;
     }
 
     const auto pos = attrs->position;
-    const auto color = config.use_node_color ? info.node_color(*node) : Color();
+    const auto color = config.use_node_color ? info.node_color(node) : Color();
     const auto color_msg = makeColorMsg(color, config.alpha);
 
     geometry_msgs::msg::Point last_point;

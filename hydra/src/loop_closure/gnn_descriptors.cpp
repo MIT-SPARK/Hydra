@@ -35,14 +35,17 @@
 #include "hydra/loop_closure/gnn_descriptors.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
 #include <yaml-cpp/yaml.h>
-
-#include <deque>
 
 namespace hydra::lcd {
 
-using Dsg = SceneGraph;
-using DsgNode = SceneGraphNode;
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::NodeId;
+using spark_dsg::PlaceNodeAttributes;
+using spark_dsg::SceneGraph;
+using spark_dsg::SceneGraphNode;
+using spark_dsg::SemanticNodeAttributes;
 
 ObjectGnnDescriptor::ObjectGnnDescriptor(const std::string& model_path,
                                          const SubgraphConfig& config,
@@ -87,7 +90,7 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const SceneGraph& graph,
   size_t index = 0;
   std::map<NodeId, size_t> index_mapping;
   for (const auto node : nodes) {
-    const auto& attrs = graph.getNode(node)->get().attributes<SemanticNodeAttributes>();
+    const auto& attrs = graph.getNode(node).attributes<SemanticNodeAttributes>();
 
     size_t start_idx = 0;
     if (use_pos_in_feature_) {
@@ -113,13 +116,13 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const SceneGraph& graph,
 
   std::list<std::pair<int64_t, int64_t>> edges;
   for (const auto& source : nodes) {
-    const auto source_position = graph.getPosition(source);
+    const auto source_position = graph.getNode(source).attributes().position;
     for (const auto& target : nodes) {
       if (source == target) {
         continue;
       }
 
-      const auto target_position = graph.getPosition(target);
+      const auto target_position = graph.getNode(target).attributes().position;
       if ((source_position - target_position).norm() > max_edge_distance_m_) {
         continue;
       }
@@ -145,8 +148,8 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const SceneGraph& graph,
   }
 }
 
-Descriptor::Ptr ObjectGnnDescriptor::construct(const Dsg& graph,
-                                               const DsgNode& agent_node) const {
+Descriptor::Ptr ObjectGnnDescriptor::construct(const SceneGraph& graph,
+                                               const SceneGraphNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -156,8 +159,8 @@ Descriptor::Ptr ObjectGnnDescriptor::construct(const Dsg& graph,
   descriptor->normalized = false;
   descriptor->nodes = getSubgraphNodes(config_, graph, *parent, false);
   descriptor->root_node = *parent;
-  descriptor->root_position = graph.getPosition(*parent);
-  descriptor->timestamp = agent_node.timestamp;
+  descriptor->root_position = graph.getNode(*parent).attributes().position;
+  descriptor->timestamp = agent_node.attributes<AgentNodeAttributes>().timestamp;
 
   if (descriptor->nodes.empty()) {
     descriptor->is_null = true;
@@ -201,7 +204,7 @@ gnn::TensorMap PlaceGnnDescriptor::makeInput(const SceneGraph& graph,
   size_t index = 0;
   std::map<NodeId, size_t> index_mapping;
   for (const auto node : nodes) {
-    const auto& attrs = graph.getNode(node)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = graph.getNode(node).attributes<PlaceNodeAttributes>();
     if (use_pos_in_feature_) {
       x_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
       x_map(index, 3) = attrs.distance;
@@ -217,7 +220,7 @@ gnn::TensorMap PlaceGnnDescriptor::makeInput(const SceneGraph& graph,
 
   std::list<std::pair<int64_t, int64_t>> edges;
   for (const auto source : nodes) {
-    const SceneGraphNode& node = *graph.getNode(source);
+    const auto& node = graph.getNode(source);
     for (const auto sibling : node.siblings()) {
       if (!nodes.count(sibling)) {
         continue;
@@ -244,8 +247,8 @@ gnn::TensorMap PlaceGnnDescriptor::makeInput(const SceneGraph& graph,
   }
 }
 
-Descriptor::Ptr PlaceGnnDescriptor::construct(const Dsg& graph,
-                                              const DsgNode& agent_node) const {
+Descriptor::Ptr PlaceGnnDescriptor::construct(const SceneGraph& graph,
+                                              const SceneGraphNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -255,8 +258,8 @@ Descriptor::Ptr PlaceGnnDescriptor::construct(const Dsg& graph,
   descriptor->normalized = false;
   descriptor->nodes = getSubgraphNodes(config_, graph, *parent, true);
   descriptor->root_node = *parent;
-  descriptor->root_position = graph.getPosition(*parent);
-  descriptor->timestamp = agent_node.timestamp;
+  descriptor->root_position = graph.getNode(*parent).attributes().position;
+  descriptor->timestamp = agent_node.attributes<AgentNodeAttributes>().timestamp;
 
   if (descriptor->nodes.empty()) {
     return nullptr;

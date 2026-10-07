@@ -10,7 +10,6 @@ add_executable(
   test_${PROJECT_NAME}
   main.cpp
   eval/test_evaluation.cpp
-  utils/test_graph_utilities.cpp
   src/resources.cpp
   backend/test_deformation_interpolator.cpp
   backend/test_external_loop_closure.cpp

@@ -160,19 +160,18 @@ void fillEntries(const SceneGraphLayer& layer,
                  std::unordered_map<NodeId, double>& node_distances,
                  bool include_nodes,
                  const DistanceAdaptor& get_distance) {
-  entries.reserve(layer.edges().size() + layer.nodes().size());
+  entries.reserve(layer.numEdges() + layer.numNodes());
 
-  for (const auto& id_edge_pair : layer.edges()) {
-    const auto& edge = id_edge_pair.second;
+  for (const auto& edge : layer.edges()) {
     entries.push_back({get_distance(edge), edge.source, edge.target});
   }
 
-  for (auto&& [id, node] : layer.nodes()) {
-    const auto distance = get_distance(*node);
-    node_distances.emplace(id, distance);
+  for (const auto& node : layer.nodes()) {
+    const auto distance = get_distance(node);
+    node_distances.emplace(node.id, distance);
 
     if (include_nodes) {
-      entries.push_back({distance, id});
+      entries.push_back({distance, node.id});
     }
   }
 
@@ -296,9 +295,9 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
   UnusedEdgeMap unused_edges;
   if (!include_nodes) {
     // seed components with all nodes if we're not including nodes in the filtration
-    for (const auto& id_node_pair : layer.nodes()) {
+    for (const auto& node : layer.nodes()) {
       updateComponentsFromNode(
-          id_node_pair.first, components, tracker, unused_edges, node_distances);
+          node.id, components, tracker, unused_edges, node_distances);
     }
   }
 

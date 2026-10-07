@@ -113,19 +113,19 @@ void RegionGrowingBoundaryPlugin::draw(const std_msgs::msg::Header& header,
   fill_marker.scale.y = 1.0;
   fill_marker.scale.z = 1.0;
 
-  for (const auto& [node_id, node] : layer.nodes()) {
-    if (!info.valid(*node)) {
+  for (const auto& node : layer.nodes()) {
+    if (!info.valid(node)) {
       continue;
     }
 
-    auto attrs = node->tryAttributes<spark_dsg::TravNodeAttributes>();
+    auto attrs = node.tryAttributes<spark_dsg::TravNodeAttributes>();
     if (!attrs || attrs->radii.empty()) {
       continue;
     }
 
     Eigen::MatrixXd points(3, attrs->radii.size());
     const auto color =
-        visualizer::makeColorMsg(info.node_color(*node), info.nodes.alpha);
+        visualizer::makeColorMsg(info.node_color(node), info.nodes.alpha);
     for (size_t i = 1; i <= attrs->radii.size(); ++i) {
       const auto start_idx = i - 1;
       const auto end_idx = i % attrs->radii.size();

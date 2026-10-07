@@ -72,8 +72,8 @@ void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
                                       SceneGraph& graph) const {
   std::vector<NodeId> to_remove;
   const auto& prev_rooms = graph.getLayer(DsgLayers::ROOMS);
-  for (const auto& id_node_pair : prev_rooms.nodes()) {
-    to_remove.push_back(id_node_pair.first);
+  for (const auto& node : prev_rooms.nodes()) {
+    to_remove.push_back(node.id);
   }
 
   for (const auto node_id : to_remove) {
@@ -84,12 +84,11 @@ void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
     return;
   }
 
-  for (auto&& [id, node] : new_rooms->nodes()) {
-    graph.emplaceNode(DsgLayers::ROOMS, id, node->attributes().clone());
+  for (const auto& node : new_rooms->nodes()) {
+    graph.emplaceNode(DsgLayers::ROOMS, node.id, node.attributes().clone());
   }
 
-  for (const auto& id_edge_pair : new_rooms->edges()) {
-    const auto& edge = id_edge_pair.second;
+  for (const auto& edge : new_rooms->edges()) {
     graph.insertEdge(edge.source, edge.target, edge.info->clone());
   }
 }
@@ -107,14 +106,15 @@ void UpdateRoomsFunctor::call(const SceneGraph&,
   }
 
   ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
-  auto places_clone = places_layer->clone([](const auto& node) {
-    const auto cat = NodeSymbol(node.id).category();
-    return cat == 'p' || cat == 'h' || cat == 't';
+
+  // TODO: Update RoomFinder's interface to accept a filtered graph without cloning.
+  auto places = places_layer->clone([](const auto& node) {
+    const auto category = NodeSymbol(node.id).category();
+    return category == 'p' || category == 'h' || category == 't';
   });
 
-  // TODO(nathan) layer view
   // TODO(nathan) pass in timestamp?
-  auto rooms = room_finder->findRooms(*places_clone);
+  auto rooms = room_finder->findRooms(*places);
   rewriteRooms(rooms.get(), *dsg.graph);
   room_finder->addRoomPlaceEdges(*dsg.graph, config.places_layer);
   Sink::callAll(sinks_, info->timestamp_ns, *room_finder);

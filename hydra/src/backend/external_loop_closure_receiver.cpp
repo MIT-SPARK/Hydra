@@ -44,6 +44,7 @@ namespace hydra {
 
 using LookupResult = ExternalLoopClosureReceiver::LookupResult;
 using spark_dsg::AgentNodeAttributes;
+using spark_dsg::NodeId;
 using spark_dsg::NodeSymbol;
 using spark_dsg::SceneGraph;
 using spark_dsg::SceneGraphLayer;
@@ -59,13 +60,33 @@ inline double convertToSeconds(std::chrono::nanoseconds time_ns) {
   return std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
 }
 
-inline std::chrono::nanoseconds getLastStamp(const SceneGraphLayer& layer) {
-  auto last = std::max_element(
-      layer.nodes().begin(), layer.nodes().end(), [](const auto& lhs, const auto& rhs) {
-        return getAgentTimestamp(*lhs.second) < getAgentTimestamp(*rhs.second);
-      });
-  return last == layer.nodes().end() ? std::chrono::nanoseconds(0)
-                                     : getAgentTimestamp(*last->second);
+using OptStamp = std::optional<std::chrono::nanoseconds>;
+
+inline OptStamp getLastStamp(const SceneGraphLayer& layer) {
+  std::optional<std::chrono::nanoseconds> result;
+  for (const auto& node : layer.nodes()) {
+    const auto stamp = getAgentTimestamp(node);
+    if (!result || stamp > *result) {
+      result = stamp;
+    }
+  }
+
+  return result;
+}
+
+inline std::optional<NodeId> getClosest(const SceneGraphLayer& layer,
+                                        std::chrono::nanoseconds stamp) {
+  std::optional<NodeId> closest;
+  std::chrono::nanoseconds best_diff = std::chrono::nanoseconds::max();
+  for (const auto& node : layer.nodes()) {
+    const auto diff = std::chrono::abs(getAgentTimestamp(node) - stamp);
+    if (diff < best_diff) {
+      best_diff = diff;
+      closest = node.id;
+    }
+  }
+
+  return closest;
 }
 
 }  // namespace
@@ -123,27 +144,28 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const SceneGraph& graph,
 
   const auto stamp = std::chrono::nanoseconds(stamp_ns);
   const auto last_stamp = getLastStamp(*layer);
-  if (stamp > last_stamp) {
+  if (!last_stamp) {
+    MLOG(1) << "No nodes exist for robot '" << robot_id
+            << "' when looking up timestamp " << stamp_ns << " [ns]";
+    return {};
+  }
+
+  if (stamp > *last_stamp) {
     // avoid clearing loop closure before best candidate node can be determined
+    MLOG(1) << "Latest timestamp " << *last_stamp << " [ns] for " << robot_id
+            << "' when looking up timestamp " << stamp_ns << " [ns] is too old";
     return {};
   }
 
-  auto closest =
-      std::min_element(layer->nodes().begin(),
-                       layer->nodes().end(),
-                       [stamp](const auto& lhs, const auto& rhs) {
-                         const auto diff_lhs = getAgentTimestamp(*lhs.second) - stamp;
-                         const auto diff_rhs = getAgentTimestamp(*rhs.second) - stamp;
-                         return std::abs(diff_lhs.count()) < std::abs(diff_rhs.count());
-                       });
-  if (closest == layer->nodes().end()) {
-    MLOG(1) << "No nodes exist for robot " << robot_id << "' when looking up timestamp "
-            << stamp_ns << " [ns]";
+  auto closest = getClosest(*layer, stamp);
+  if (!closest) {
+    MLOG(1) << "Could not find closest node for '" << robot_id
+            << "' when looking up timestamp " << stamp_ns << " [ns]";
     return {};
   }
 
-  const NodeSymbol best_id(closest->second->id);
-  const auto best_stamp = getAgentTimestamp(*closest->second);
+  const NodeSymbol best_id(*closest);
+  const auto best_stamp = getAgentTimestamp(layer->getNode(*closest));
   const auto diff_s = convertToSeconds(best_stamp - stamp);
   MLOG(2) << "Found node " << best_id.str() << " with difference of " << diff_s
           << " [s] for timestamp " << stamp_ns << " [ns]";

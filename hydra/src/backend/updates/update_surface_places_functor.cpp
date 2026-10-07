@@ -341,8 +341,8 @@ void Update2dPlacesFunctor::updateMeshIndices(const SceneGraph& graph,
   }
 
   const auto& layer = *surface_places;
-  for (auto& [node_id, node] : layer.nodes()) {
-    auto attrs = node->tryAttributes<spark_dsg::Place2dNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    auto attrs = node.tryAttributes<spark_dsg::Place2dNodeAttributes>();
     if (!attrs || !attrs->has_active_mesh_indices) {
       continue;
     }

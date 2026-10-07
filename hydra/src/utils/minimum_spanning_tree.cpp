@@ -51,13 +51,13 @@ MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer) {
 MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer,
                                                 const EdgeFilter& filter) {
   std::vector<MinimalEdge> sorted_edges;
-  sorted_edges.reserve(layer.edges().size());
-  for (const auto& [key, edge] : layer.edges()) {
+  sorted_edges.reserve(layer.numEdges());
+  for (const auto& edge : layer.edges()) {
     if (filter && !filter(layer, edge)) {
       continue;
     }
 
-    const auto& [source, target] = key;
+    const auto [source, target] = edge.key();
     sorted_edges.emplace_back(edge.source,
                               edge.target,
                               (layer.getNode(source).attributes().position -
@@ -68,13 +68,13 @@ MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer,
 
   MinimumSpanningTreeInfo info;
   info.edges.reserve(sorted_edges.size());
-  for (const auto& id_node_pair : layer.nodes()) {
-    info.counts[id_node_pair.first] = 0;
+  for (const auto& node : layer.nodes()) {
+    info.counts[node.id] = 0;
   }
 
   DisjointSet subtrees;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    subtrees.addSet(node_id);
+  for (const auto& node : layer.nodes()) {
+    subtrees.addSet(node.id);
   }
 
   while (!sorted_edges.empty()) {

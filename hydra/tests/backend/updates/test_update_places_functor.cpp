@@ -92,20 +92,20 @@ TEST(UpdatePlacesFunctor, PlaceUpdate) {
   callWithUnmerged(functor, *dsg, info, false);
 
   {  // first key exists: new value
-    Eigen::Vector3d expected(4.0, 5.0, 6.0);
-    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 0));
+    const Eigen::Vector3d expected(4.0, 5.0, 6.0);
+    const Eigen::Vector3d result = graph.getNode("p0"_id).attributes().position;
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
 
   {  // non-zero key exists: new value
-    Eigen::Vector3d expected(7.0, 8.0, 9.0);
-    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 5));
+    const Eigen::Vector3d expected(7.0, 8.0, 9.0);
+    const Eigen::Vector3d result = graph.getNode("p5"_id).attributes().position;
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
 
   {  // key doesn't exist: original value
-    Eigen::Vector3d expected(1.0, 2.0, 3.0);
-    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 6));
+    const Eigen::Vector3d expected(1.0, 2.0, 3.0);
+    const Eigen::Vector3d result = graph.getNode("p6"_id).attributes().position;
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
 }
@@ -181,14 +181,14 @@ TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
   const auto result_merges = callWithUnmerged(functor, *dsg, info, true);
 
   {  // first key exists: new value
-    Eigen::Vector3d expected(4.0, 5.0, 6.0);
-    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 0));
+    const Eigen::Vector3d expected(4.0, 5.0, 6.0);
+    const Eigen::Vector3d result = graph.getNode("p0"_id).attributes().position;
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
 
   {  // merge target key exists: new value
-    Eigen::Vector3d expected(7.0, 8.0, 9.0);
-    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 5));
+    const Eigen::Vector3d expected(7.0, 8.0, 9.0);
+    const Eigen::Vector3d result = graph.getNode("p5"_id).attributes().position;
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
 

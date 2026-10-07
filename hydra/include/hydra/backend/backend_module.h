@@ -36,7 +36,6 @@
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/kimera_pgmo_interface.h>
 #include <kimera_pgmo/mesh_offset_info.h>
-#include <spark_dsg/scene_graph_logger.h>
 
 #include <filesystem>
 #include <memory>
@@ -181,7 +180,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   size_t last_deformed_vertices_ = 0;
 
   std::vector<BackendModuleStatus> status_log_;
-  spark_dsg::SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
   ExternalLoopClosureReceiver external_lc_receiver_;
 

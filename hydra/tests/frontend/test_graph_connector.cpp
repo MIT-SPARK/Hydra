@@ -49,8 +49,8 @@ namespace {
 // set to preserve ordering
 std::set<EdgeKey> getEdges(const SceneGraph& graph) {
   std::set<EdgeKey> edges;
-  for (const auto& [key, edge] : graph.interlayer_edges()) {
-    edges.insert(key);
+  for (const auto& edge : graph.interlayer_edges()) {
+    edges.insert(edge.key());
   }
 
   return edges;

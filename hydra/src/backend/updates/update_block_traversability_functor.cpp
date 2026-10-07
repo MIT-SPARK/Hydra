@@ -170,11 +170,11 @@ void UpdateBlockTraversabilityFunctor::updateDistances(
   // Simple initial solution: Recompute distances for all places. This is not pretty but
   // should be ok for a first test.
   if (config.use_metric_distance) {
-    for (const auto& [id, node] : layer.nodes()) {
-      auto& attrs = node->attributes<TraversabilityNodeAttributes>();
+    for (const auto& node : layer.nodes()) {
+      auto& attrs = node.attributes<TraversabilityNodeAttributes>();
       NodeSet visited;
       attrs.distance =
-          computeMetricDistance(layer, attrs.position.head<2>(), {id}, visited);
+          computeMetricDistance(layer, attrs.position.head<2>(), {node.id}, visited);
     }
   } else {
     computeTopologicalDistances(layer);
@@ -438,13 +438,13 @@ void UpdateBlockTraversabilityFunctor::computeTopologicalDistances(
   std::queue<NodeId> queue;
 
   // Initialization.
-  for (const auto& [id, node] : layer.nodes()) {
-    auto& attrs = node->attributes<TraversabilityNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    auto& attrs = node.attributes<TraversabilityNodeAttributes>();
     attrs.distance = std::numeric_limits<double>::max();
     for (const Side side : Side::ALL) {
       if (!spark_dsg::areAllTraversable(attrs.boundary.states[side], true)) {
         attrs.distance = 0.0;
-        queue.push(id);
+        queue.push(node.id);
         break;
       }
     }
@@ -467,12 +467,12 @@ void UpdateBlockTraversabilityFunctor::computeTopologicalDistances(
 
   // TMP(lschmid): Convert the distances to the edges for room detection via
   // filtration.
-  for (const auto& [id, node] : layer.nodes()) {
-    auto& attrs = node->attributes<TraversabilityNodeAttributes>();
-    for (const auto& to_id : node->siblings()) {
+  for (const auto& node : layer.nodes()) {
+    auto& attrs = node.attributes<TraversabilityNodeAttributes>();
+    for (const auto& to_id : node.siblings()) {
       const auto& to_attrs =
           layer.getNode(to_id).attributes<TraversabilityNodeAttributes>();
-      auto& edge = layer.getEdge(id, to_id);
+      auto& edge = layer.getEdge(node.id, to_id);
       if (attrs.distance == std::numeric_limits<double>::max()) {
         edge.attributes().weight = to_attrs.distance;
       } else if (to_attrs.distance == std::numeric_limits<double>::max()) {

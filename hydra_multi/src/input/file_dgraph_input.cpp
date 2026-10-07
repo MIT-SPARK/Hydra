@@ -51,16 +51,17 @@ void FileDGraphInput::init() {
   stamps[id_] = Timestamps();
   std::lock_guard<std::mutex> state_lock(state_->mutex);
   if (state_->dsg_) {
+    size_t num_layers = 0;
     const auto agent_layer_id = state_->dsg_->getLayerKey(DsgLayers::AGENTS)->layer;
-    if (state_->dsg_->layer_partition(agent_layer_id).size() > 1) {
-      LOG(FATAL) << "FileUnitInterface assumes loading a single robot";
-    }
+    for (const auto& layer : state_->dsg_->layer_partition(agent_layer_id)) {
+      ++num_layers;
+      if (num_layers > 1) {
+        LOG(FATAL) << "FileUnitInterface assumes loading a single robot";
+      }
 
-    for (const auto& [prefix, layer] : state_->dsg_->layer_partition(agent_layer_id)) {
-      LOG(INFO) << "Found agent layer with " << layer->numNodes() << " poses";
-      for (const auto& [node_id, node] : layer->nodes()) {
-        stamps[id_].push_back(
-            node->attributes<AgentNodeAttributes>().timestamp.count());
+      LOG(INFO) << "Found agent layer with " << layer.numNodes() << " poses";
+      for (const auto& node : layer.nodes()) {
+        stamps[id_].push_back(node.attributes<AgentNodeAttributes>().timestamp.count());
       }
     }
   } else {

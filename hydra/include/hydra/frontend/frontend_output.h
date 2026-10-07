@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <memory>
+#include <unordered_set>
 
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/odometry/pose_graph_packet.h"

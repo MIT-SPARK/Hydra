@@ -35,6 +35,8 @@
 #pragma once
 #include <spark_dsg/scene_graph_layer.h>
 
+#include <unordered_set>
+
 namespace hydra {
 
 struct MinimalEdge {

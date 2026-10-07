@@ -118,8 +118,8 @@ TEST(ActiveWindowTracker, FirstNodeStateCorrect) {
   ActiveWindowTracker tracker;
 
   // toggle active flag on for all nodes
-  for (const auto& iter : graph->getLayer(2).nodes()) {
-    iter.second->attributes().is_active = true;
+  for (const auto& node : graph->getLayer(2).nodes()) {
+    node.attributes().is_active = true;
   }
 
   {  // layer 2 should just be active
@@ -129,8 +129,8 @@ TEST(ActiveWindowTracker, FirstNodeStateCorrect) {
   }
 
   // toggle active flag off for all nodes
-  for (const auto& iter : graph->getLayer(2).nodes()) {
-    iter.second->attributes().is_active = false;
+  for (const auto& node : graph->getLayer(2).nodes()) {
+    node.attributes().is_active = false;
   }
 
   {  // layer 2 should be all previous active nodes
@@ -151,8 +151,8 @@ TEST(ActiveWindowTracker, ViewStateCorrect) {
   }
 
   // toggle active flag off for all nodes
-  for (const auto& iter : graph->getLayer(2).nodes()) {
-    iter.second->attributes().is_active = false;
+  for (const auto& node : graph->getLayer(2).nodes()) {
+    node.attributes().is_active = false;
   }
 
   {  // layer 2 should be all previous active nodes
@@ -185,8 +185,8 @@ TEST(ActiveWindowTracker, RemovedNodesCorrect) {
   }
 
   // toggle active flag off for all nodes
-  for (const auto& iter : graph->getLayer(2).nodes()) {
-    iter.second->attributes().is_active = false;
+  for (const auto& node : graph->getLayer(2).nodes()) {
+    node.attributes().is_active = false;
   }
 
   // technically this is enough on its own for the tracker to not iterate over the

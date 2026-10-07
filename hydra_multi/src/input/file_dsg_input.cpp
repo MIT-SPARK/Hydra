@@ -33,8 +33,8 @@ static const auto registration_ =
 inline void rewireRobotId(int new_id, SceneGraph& graph) {
   const auto agent_key = graph.getLayerKey(DsgLayers::AGENTS).value();
   const SceneGraphLayer* prev_layer = nullptr;
-  for (const auto& [prefix, layer] : graph.layer_partition(agent_key.layer)) {
-    prev_layer = layer.get();
+  for (const auto& layer : graph.layer_partition(agent_key.layer)) {
+    prev_layer = &layer;
     break;
   }
 
@@ -53,10 +53,10 @@ inline void rewireRobotId(int new_id, SceneGraph& graph) {
 
   // add all nodes
   std::map<NodeId, NodeId> lookup;
-  for (const auto& [node_id, node] : prev_layer->nodes()) {
-    const NodeSymbol new_id(new_char, NodeSymbol(node_id).categoryId());
-    graph.emplaceNode(agent_key.layer, new_id, node->attributes().clone(), new_char);
-    lookup[node_id] = new_id;
+  for (const auto& node : prev_layer->nodes()) {
+    const NodeSymbol new_id(new_char, NodeSymbol(node.id).categoryId());
+    graph.emplaceNode(agent_key.layer, new_id, node.attributes().clone(), new_char);
+    lookup[node.id] = new_id;
 
     auto new_attrs = graph.getNode(new_id).tryAttributes<AgentNodeAttributes>();
     if (!new_attrs) {
@@ -68,11 +68,11 @@ inline void rewireRobotId(int new_id, SceneGraph& graph) {
   }
 
   // add all edges
-  for (const auto& [node_id, node] : prev_layer->nodes()) {
-    const auto new_id = lookup.at(node_id);
-    const auto connections = node->connections();
+  for (const auto& node : prev_layer->nodes()) {
+    const auto new_id = lookup.at(node.id);
+    const auto connections = node.connections();
     for (const auto n_id : connections) {
-      const auto& prev_edge = graph.getEdge(node_id, n_id);
+      const auto& prev_edge = graph.getEdge(node.id, n_id);
       const auto iter = lookup.find(n_id);
       const NodeId new_n_id = iter == lookup.end() ? n_id : iter->second;
       graph.insertEdge(new_id, new_n_id, prev_edge.info->clone());

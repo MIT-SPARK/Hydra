@@ -73,6 +73,7 @@ inline void addToQueue(ExternalLoopClosureReceiver::Queue& queue,
 TEST(ExternalLoopClosureReceiver, FindClosest) {
   ExternalLoopClosureReceiver::Config config;
   config.layer = "AGENTS";
+  config.verbosity = 5;
   ExternalLoopClosureReceiver receiver(config, nullptr);
 
   SceneGraph graph;

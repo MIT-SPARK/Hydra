@@ -83,16 +83,16 @@ void RoomEvaluator::computeDsgIndices(const SceneGraph& graph,
                                       RoomIndices& indices) const {
   indices.clear();
   const auto& rooms = graph.getLayer(DsgLayers::ROOMS);
-  for (auto&& [room, room_node] : rooms.nodes()) {
-    if (room_node->children().size() < config.min_room_nodes) {
-      VLOG(5) << "skipping room of size: " << room_node->children().size() << " (vs. "
+  for (const auto& room_node : rooms.nodes()) {
+    if (room_node.children().size() < config.min_room_nodes) {
+      VLOG(5) << "skipping room of size: " << room_node.children().size() << " (vs. "
               << config.min_room_nodes << ")";
       continue;
     }
 
-    indices[room] = {};
+    indices[room_node.id] = {};
 
-    for (const auto& child : room_node->children()) {
+    for (const auto& child : room_node.children()) {
       const auto& place_node = graph.getNode(child);
       const auto& attrs = place_node.attributes<PlaceNodeAttributes>();
       const Point pos = attrs.position.cast<float>();
@@ -115,7 +115,8 @@ void RoomEvaluator::computeDsgIndices(const SceneGraph& graph,
             continue;
           }
         }
-        indices[room].insert({global_index.x(), global_index.y(), global_index.z()});
+        indices[room_node.id].insert(
+            {global_index.x(), global_index.y(), global_index.z()});
       }
     }
   }

@@ -150,17 +150,17 @@ MarkerArray makeLayerBoundingBoxes(const std_msgs::msg::Header& header,
     edges->colors.reserve(8 * layer.numNodes());
   }
 
-  for (const auto& [node_id, node] : layer.nodes()) {
-    if (!info.valid(*node)) {
+  for (const auto& node : layer.nodes()) {
+    if (!info.valid(node)) {
       continue;
     }
 
-    const auto attrs = node->tryAttributes<SemanticNodeAttributes>();
+    const auto attrs = node.tryAttributes<SemanticNodeAttributes>();
     if (!attrs || attrs->bounding_box.type == BoundingBox::Type::INVALID) {
       continue;
     }
 
-    const auto color = makeColorMsg(info.node_color(*node), info.bounding_boxes.alpha);
+    const auto color = makeColorMsg(info.node_color(node), info.bounding_boxes.alpha);
     size_t offset = marker.points.size();
     drawBoundingBox(attrs->bounding_box, color, marker);
 
@@ -207,28 +207,28 @@ MarkerArray makeLayerNodeTextMarkers(const std_msgs::msg::Header& header,
     return msg;
   }
 
-  for (const auto& [node_id, node] : layer.nodes()) {
-    if (!info.valid(*node)) {
+  for (const auto& node : layer.nodes()) {
+    if (!info.valid(node)) {
       continue;
     }
 
     auto& marker = msg.markers.emplace_back();
     marker.header = header;
     marker.ns = ns;
-    marker.id = node->id;
+    marker.id = node.id;
     marker.type = Marker::TEXT_VIEW_FACING;
     marker.action = Marker::ADD;
 
-    const auto name = info.node_text(*node);
+    const auto name = info.node_text(node);
     if (name.empty()) {
       continue;
     }
 
-    marker.text = name.empty() ? NodeSymbol(node->id).str() : name;
+    marker.text = name.empty() ? NodeSymbol(node.id).str() : name;
     marker.scale.z = info.text.scale;
     marker.color = makeColorMsg(info.text_color);
 
-    tf2::convert(node->attributes().position, marker.pose.position);
+    tf2::convert(node.attributes().position, marker.pose.position);
     marker.pose.position.z += info.text.height;
     if (!info.text.collapse) {
       marker.pose.position.z += info.z_offset;
@@ -236,7 +236,7 @@ MarkerArray makeLayerNodeTextMarkers(const std_msgs::msg::Header& header,
 
     if (info.text.add_jitter) {
       static JitterGenerator jitters;
-      const auto z_jitter = info.text.jitter_scale * jitters.getJitter(ns, node_id);
+      const auto z_jitter = info.text.jitter_scale * jitters.getJitter(ns, node.id);
       marker.pose.position.z += z_jitter;
     }
   }
@@ -260,17 +260,17 @@ Marker makeLayerNodeMarkers(const std_msgs::msg::Header& header,
 
   marker.points.reserve(layer.numNodes());
   marker.colors.reserve(layer.numNodes());
-  for (const auto& [node_id, node] : layer.nodes()) {
-    if (!info.valid(*node)) {
+  for (const auto& node : layer.nodes()) {
+    if (!info.valid(node)) {
       continue;
     }
 
     geometry_msgs::msg::Point node_centroid;
-    tf2::convert(node->attributes().position, node_centroid);
+    tf2::convert(node.attributes().position, node_centroid);
     node_centroid.z += info.z_offset;
     marker.points.push_back(node_centroid);
 
-    const auto desired_color = info.node_color(*node);
+    const auto desired_color = info.node_color(node);
     marker.colors.push_back(makeColorMsg(desired_color, info.nodes.alpha));
   }
 
@@ -293,7 +293,7 @@ Marker makeLayerEdgeMarkers(const std_msgs::msg::Header& header,
   }
 
   size_t num_seen = 0;
-  for (const auto& [key, edge] : layer.edges()) {
+  for (const auto& edge : layer.edges()) {
     const auto& source_node = layer.getNode(edge.source);
     const auto& target_node = layer.getNode(edge.target);
     if (!info.valid(source_node) || !info.valid(target_node)) {
@@ -339,17 +339,17 @@ Marker makeLayerTextMarker(const std_msgs::msg::Header& header,
 
   std::optional<uint64_t> best_stamp;
   Eigen::Vector3d pos = Eigen::Vector3d::Zero();
-  for (const auto& [node_id, node] : layer.nodes()) {
-    if (!info.valid(*node)) {
+  for (const auto& node : layer.nodes()) {
+    if (!info.valid(node)) {
       continue;
     }
 
-    const auto& attrs = node->attributes();
+    const auto& attrs = node.attributes();
     if (!best_stamp || attrs.last_update_time_ns >= best_stamp.value()) {
       best_stamp = attrs.last_update_time_ns;
       pos = attrs.position;
       if (info.node_text) {
-        marker.text = info.node_text(*node);
+        marker.text = info.node_text(node);
       }
     }
   }

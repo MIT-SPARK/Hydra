@@ -77,15 +77,15 @@ ScoreWorkspace propagateScores(const SceneGraphLayer& layer,
                                const ScoreWorkspace& workspace,
                                float lambda) {
   ScoreWorkspace updated;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    auto iter = workspace.find(node_id);
+  for (const auto& node : layer.nodes()) {
+    auto iter = workspace.find(node.id);
     if (iter == workspace.end()) {
       continue;
     }
 
     size_t num_valid = 0;
     Eigen::VectorXf scores;
-    for (const auto& sibling : node->siblings()) {
+    for (const auto& sibling : node.siblings()) {
       const auto sibling_iter = workspace.find(sibling);
       if (sibling_iter == workspace.end()) {
         continue;
@@ -170,8 +170,8 @@ auto VmfClustering::cluster(const spark_dsg::SceneGraphLayer& layer) const -> Cl
   std::vector<float> kappas;
   kappas.reserve(layer.numNodes());
   ScoreWorkspace scores;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    auto attrs = node->tryAttributes<SemanticNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    auto attrs = node.tryAttributes<SemanticNodeAttributes>();
     if (!attrs) {
       continue;
     }
@@ -179,12 +179,12 @@ auto VmfClustering::cluster(const spark_dsg::SceneGraphLayer& layer) const -> Cl
     const auto has_vmf =
         attrs->semantic_feature.size() > 0 && attrs->feature_concentration.size() == 1;
     if (!has_vmf && config.allow_empty_scores) {
-      scores[node_id] = {Eigen::VectorXf::Zero(queries_->size()), 0.0f};
+      scores[node.id] = {Eigen::VectorXf::Zero(queries_->size()), 0.0f};
       continue;
     }
 
     const auto kappa = attrs->feature_concentration(0, 0);
-    scores[node_id] = {kappa * queries_->getScores(*metric_, attrs->semantic_feature),
+    scores[node.id] = {kappa * queries_->getScores(*metric_, attrs->semantic_feature),
                        kappa};
     kappas.push_back(kappa);
   }

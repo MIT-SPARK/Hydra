@@ -132,7 +132,7 @@ std::set<NodeId> getFilteredNodeSet(const SubgraphConfig& config,
                                     const std::set<NodeId>& found) {
   std::vector<std::pair<double, NodeId>> candidates;
   for (const auto node : found) {
-    const double distance_m = (graph.getPosition(node) - origin).norm();
+    const auto distance_m = (graph.getNode(node).attributes().position - origin).norm();
     candidates.push_back({distance_m, node});
   }
   std::sort(candidates.begin(), candidates.end());
@@ -175,7 +175,7 @@ std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
                                   bool is_places) {
   Eigen::Vector3d origin;
   try {
-    origin = graph.getPosition(root_node);
+    origin = graph.getNode(root_node).attributes().position;
   } catch (const std::out_of_range& e) {
     LOG(ERROR) << "Invalid root node " << NodeSymbol(root_node).str() << ": "
                << e.what();

@@ -133,14 +133,14 @@ void FeatureScoreColor::setGraph(const SceneGraph& graph, LayerKey layer_key) {
   const auto& layer = graph.getLayer(layer_key.layer, layer_key.partition);
   range_.min = 1.0f;
   range_.max = 0.0f;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto& attrs = node->attributes<SemanticNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto& attrs = node.attributes<SemanticNodeAttributes>();
     const auto score = metric_->score(feature_, attrs.semantic_feature);
-    MLOG(3) << "node " << NodeSymbol(node_id).str() << " -> " << score << ": "
+    MLOG(3) << "node " << NodeSymbol(node.id).str() << " -> " << score << ": "
             << showVec(attrs.semantic_feature);
     range_.min = std::min(range_.min, score);
     range_.max = std::max(range_.max, score);
-    values_[node_id] = score;
+    values_[node.id] = score;
   }
 
   if (config.use_fixed_range) {

@@ -179,8 +179,8 @@ void RosBackendPublisher::publishPoseGraph(const SceneGraph& graph,
   std::map<size_t, std::vector<size_t>> id_timestamps;
   id_timestamps[prefix.id] = std::vector<size_t>();
   auto& times = id_timestamps[prefix.id];
-  for (const auto& [node_id, node] : agent->nodes()) {
-    times.push_back(node->attributes<AgentNodeAttributes>().timestamp.count());
+  for (const auto& node : agent->nodes()) {
+    times.push_back(node.attributes<AgentNodeAttributes>().timestamp.count());
   }
 
   auto pose_graph = *dgraph.getPoseGraph(id_timestamps, false, true);

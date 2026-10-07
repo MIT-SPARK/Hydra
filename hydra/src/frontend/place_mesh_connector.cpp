@@ -99,8 +99,8 @@ size_t PlaceMeshConnector::addConnections(const kimera_pgmo::MeshDelta& delta,
   const MeshVertexLookup lookup(delta);
 
   size_t num_missing = 0;
-  for (const auto& [node_id, node] : places.nodes()) {
-    auto& attrs = node->attributes<PlaceNodeAttributes>();
+  for (const auto& node : places.nodes()) {
+    auto& attrs = node.attributes<PlaceNodeAttributes>();
     // TODO(nathan) archive logic should live here if we actually track mesh vertices
     if (!attrs.is_active) {
       continue;

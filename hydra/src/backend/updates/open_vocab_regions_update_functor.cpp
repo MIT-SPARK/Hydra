@@ -24,8 +24,8 @@ static const auto functor_reg =
 
 void clearRegions(SceneGraph& graph, const std::string& layer) {
   std::vector<NodeId> prev_regions;
-  for (const auto& [node_id, node] : graph.getLayer(layer).nodes()) {
-    prev_regions.push_back(node_id);
+  for (const auto& node : graph.getLayer(layer).nodes()) {
+    prev_regions.push_back(node.id);
   }
 
   for (const auto node : prev_regions) {
@@ -88,10 +88,10 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
     new_nodes.insert(new_node_id);
   }
 
-  for (const auto& [node_id, node] : graph.getLayer(config.target_layer).nodes()) {
-    const std::unordered_set<NodeId> to_use(node->children().begin(),
-                                            node->children().end());
-    node->attributes().position = getRoomPosition(places, to_use);
+  for (const auto& node : graph.getLayer(config.target_layer).nodes()) {
+    const std::unordered_set<NodeId> to_use(node.children().begin(),
+                                            node.children().end());
+    node.attributes().position = getRoomPosition(places, to_use);
   }
 
   addEdgesToRoomLayer(graph, new_nodes);

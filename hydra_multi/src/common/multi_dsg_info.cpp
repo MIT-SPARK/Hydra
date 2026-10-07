@@ -93,12 +93,12 @@ void MultiDsgInfo::remapAndAddLayer(size_t robot_id,
   auto& node_map = robot_node_map[robot_id];
 
   const auto& layer = dsg.getLayer(key.layer, key.partition);
-  for (const auto& [old_node_id, node] : layer.nodes()) {
-    const NodeSymbol node_symb(old_node_id);
+  for (const auto& node : layer.nodes()) {
+    const NodeSymbol node_symb(node.id);
     const NodeId new_node_id = NodeSymbol(node_symb.category(), iter->second);
 
     // Add to graph.
-    auto attrs = node->attributes().clone();
+    auto attrs = node.attributes().clone();
     if (transform) {
       attrs->transform(*transform);
     }
@@ -106,14 +106,14 @@ void MultiDsgInfo::remapAndAddLayer(size_t robot_id,
     graph->emplaceNode(key.layer, new_node_id, std::move(attrs), key.partition);
 
     // Update node book-keeping
-    node_map[old_node_id] = new_node_id;
+    node_map[node.id] = new_node_id;
     node_robot_map[new_node_id] = robot_id;
 
     // Incremental next node index
     iter->second++;
   }
 
-  for (const auto& [key, edge] : layer.edges()) {
+  for (const auto& edge : layer.edges()) {
     const NodeSymbol new_source = node_map.at(edge.source);
     const NodeSymbol new_target = node_map.at(edge.target);
     graph->insertEdge(new_source, new_target, edge.info->clone());
@@ -130,8 +130,7 @@ void MultiDsgInfo::remapAndAddLayers(size_t robot_id,
 
   // Add interlayer edges
   const auto& node_mapping = robot_node_map[robot_id];
-  for (const auto& id_edge_pair : dsg.interlayer_edges()) {
-    const auto& edge = id_edge_pair.second;
+  for (const auto& edge : dsg.interlayer_edges()) {
     const auto src_iter = node_mapping.find(edge.source);
     const auto tgt_iter = node_mapping.find(edge.target);
     if (src_iter == node_mapping.end() || tgt_iter == node_mapping.end()) {

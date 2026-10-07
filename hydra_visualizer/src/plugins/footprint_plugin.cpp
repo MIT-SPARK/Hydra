@@ -127,19 +127,19 @@ void FootprintPlugin::draw(const std_msgs::msg::Header& header,
   }
 
   const auto& layer = graph.getLayer(config.layer);
-  for (auto&& [id, node] : layer.nodes()) {
-    const auto mean_z = getMeanNeighborHeight(layer, *node);
-    const auto& attrs = node->attributes<SemanticNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto mean_z = getMeanNeighborHeight(layer, node);
+    const auto& attrs = node.attributes<SemanticNodeAttributes>();
 
     auto color = visualizer::makeColorMsg(attrs.color);
     color.a = config.line_alpha;
 
     double radius = config.footprint_radius;
     if (config.use_place_radius) {
-      radius = node->attributes<PlaceNodeAttributes>().distance;
+      radius = node.attributes<PlaceNodeAttributes>().distance;
     }
 
-    const auto footprint = getCirclePolygon(*node, radius, config.num_samples);
+    const auto footprint = getCirclePolygon(node, radius, config.num_samples);
 
     auto mesh_color = color;
     mesh_color.a = config.mesh_alpha;

@@ -7,7 +7,6 @@
 #include <hydra/backend/update_functions.h>
 #include <hydra/common/output_sink.h>
 #include <kimera_pgmo/kimera_pgmo_interface.h>
-#include <spark_dsg/scene_graph_logger.h>
 
 #include <map>
 #include <memory>
@@ -166,7 +165,6 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
   std::mutex status_mutex_;
   MultiBackendModuleStatus status_;
   std::vector<MultiBackendModuleStatus> status_log_;
-  spark_dsg::SceneGraphLogger backend_graph_logger_;
 
   std::list<LoopClosureLog> loop_closures_;
   hydra::MessageQueue<pose_graph_tools::PoseGraph> lc_queue_;

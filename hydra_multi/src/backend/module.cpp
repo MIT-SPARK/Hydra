@@ -82,10 +82,10 @@ void saveTrajectory(const SceneGraphLayer& layer,
                     const std::filesystem::path& output_path) {
   std::ofstream fout(output_path);
   fout << "#timestamp_kf,x,y,z,qw,qx,qy,qz\n";
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<AgentNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<AgentNodeAttributes>();
     if (!attrs) {
-      LOG(ERROR) << "Invalid agent layer, node " << NodeSymbol(node_id).str()
+      LOG(ERROR) << "Invalid agent layer, node " << NodeSymbol(node.id).str()
                  << " is not agent node";
       continue;
     }
@@ -192,11 +192,11 @@ void MultiBackendModule::save(const DataDirectory& output) {
 
   const auto& graph = *merged_dsg_->graph;
   const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
-  for (const auto& [prefix, layer] : graph.layer_partition(desired_layer)) {
-    const auto robot_id = kimera_pgmo::robot_prefix_to_id.at(prefix);
+  for (const auto& layer : graph.layer_partition(desired_layer)) {
+    const auto robot_id = kimera_pgmo::robot_prefix_to_id.at(layer.id.partition);
     std::string filename = "robot_" + std::to_string(robot_id) + "_trajectory.csv";
     const std::filesystem::path trajectory_path = backend_path / filename;
-    ::hydra_multi::saveTrajectory(*layer, trajectory_path);
+    ::hydra_multi::saveTrajectory(layer, trajectory_path);
   }
 
   const auto mesh = merged_dsg_->graph->mesh();
@@ -205,7 +205,6 @@ void MultiBackendModule::save(const DataDirectory& output) {
     kimera_pgmo::WriteMesh(backend_path / "mesh.ply", *mesh, *mesh);
   }
 
-  backend_graph_logger_.save(backend_path);
   writeBackendStatus(status_log_, pgmo_path / "dsg_pgmo_status.csv");
   deformation_graph_->save(pgmo_path / "deformation_graph.dgrf");
 
@@ -527,8 +526,8 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
   }
 
   const auto& objects = unmerged_dsg_->graph->getLayer(DsgLayers::OBJECTS);
-  for (const auto& [node_id, node] : objects.nodes()) {
-    auto attrs = node->tryAttributes<ObjectNodeAttributes>();
+  for (const auto& node : objects.nodes()) {
+    auto attrs = node.tryAttributes<ObjectNodeAttributes>();
     if (!attrs) {
       continue;  // not an object
     }
@@ -539,7 +538,7 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
     /*unmerged_dsg_->node_robot_map.at(obj.id),*/
     /*config.object_association_max_diff_s);*/
     if (!agent_node) {
-      LOG(ERROR) << "Failed to associated object " << NodeSymbol(node->id)
+      LOG(ERROR) << "Failed to associated object " << NodeSymbol(node.id)
                  << " to agent node.";
       continue;
     }
@@ -558,10 +557,10 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
     // TODO(Yun) this is needed right now bc scene graph transformed to world frame
     // while dgraph not. Fix in next PR.
     gtsam::Pose3 Wrobot_T_obj =
-        curr_W_T_robot_.at(unmerged_dsg_->node_robot_map.at(node->id)).between(W_T_obj);
-    deformation_graph_->processNewNode(node->id, Wrobot_T_obj, false);
+        curr_W_T_robot_.at(unmerged_dsg_->node_robot_map.at(node.id)).between(W_T_obj);
+    deformation_graph_->processNewNode(node.id, Wrobot_T_obj, false);
     deformation_graph_->processNewBetween(
-        agent_attrs.external_key, node->id, agent_T_obj, config.object_variance);
+        agent_attrs.external_key, node.id, agent_T_obj, config.object_variance);
   }
 }
 

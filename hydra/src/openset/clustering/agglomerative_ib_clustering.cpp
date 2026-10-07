@@ -91,7 +91,28 @@ Indices findTopKIndicesCols(const Eigen::MatrixXd& m, size_t top_k) {
 }  // namespace
 
 ClusterWorkspace::Workspace(const ClusteringConfig& config,
-                            const EdgeContainer::Edges& edges_,
+                            const SceneGraphLayer& layer,
+                            const NodeEmbeddings& node_embeddings,
+                            const EmbeddingGroup& queries,
+                            const EmbeddingDistance& metric)
+    : Workspace(config, node_embeddings, queries, metric) {
+  for (const auto& edge : layer.edges()) {
+    addEdge(edge.source, edge.target);
+  }
+}
+
+ClusterWorkspace::Workspace(const ClusteringConfig& config,
+                            const std::vector<EdgeKey>& edges_,
+                            const NodeEmbeddings& node_embeddings,
+                            const EmbeddingGroup& queries,
+                            const EmbeddingDistance& metric)
+    : Workspace(config, node_embeddings, queries, metric) {
+  for (const auto& edge : edges_) {
+    addEdge(edge.k1, edge.k2);
+  }
+}
+
+ClusterWorkspace::Workspace(const ClusteringConfig& config,
                             const NodeEmbeddings& node_embeddings,
                             const EmbeddingGroup& queries,
                             const EmbeddingDistance& metric)
@@ -103,16 +124,6 @@ ClusterWorkspace::Workspace(const ClusteringConfig& config,
     node_lookup[index] = node_id;
     order[node_id] = index;
     ++index;
-  }
-
-  for (const auto& [key, _] : edges_) {
-    const auto source = order.find(key.k1);
-    const auto target = order.find(key.k2);
-    if (source == order.end() || target == order.end()) {
-      continue;
-    }
-
-    edges.emplace(EdgeKey(source->second, target->second), 0.0);
   }
 
   assignments.resize(order.size());
@@ -361,13 +372,13 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
   }
 
   Workspace::NodeEmbeddings features;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<SemanticNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<SemanticNodeAttributes>();
     if (!attrs || attrs->semantic_feature.size() <= 1) {
       continue;
     }
 
-    features[node_id] = attrs->semantic_feature;
+    features[node.id] = attrs->semantic_feature;
   }
 
   if (features.empty()) {
@@ -375,7 +386,7 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
     return {};
   }
 
-  Workspace ws(config, layer.edges(), features, *queries_, *metric_);
+  Workspace ws(config, layer, features, *queries_, *metric_);
   MLOG(1) << "starting clustering with " << ws.edges.size() << " edges";
   cluster(ws, config);
   MLOG(1) << ws.summary();

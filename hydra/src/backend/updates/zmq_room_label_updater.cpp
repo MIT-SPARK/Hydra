@@ -85,8 +85,8 @@ void ZmqRoomLabelUpdater::checkForUpdates() {
     // start critical section for updating room label map
     std::lock_guard<std::mutex> lock(mutex_);
     const auto& rooms = update_graph->getLayer(DsgLayers::ROOMS);
-    for (const auto& [node_id, node] : rooms.nodes()) {
-      room_name_map_[node_id] = node->attributes<SemanticNodeAttributes>().name;
+    for (const auto& node : rooms.nodes()) {
+      room_name_map_[node.id] = node.attributes<SemanticNodeAttributes>().name;
     }
   }
 }
@@ -97,13 +97,13 @@ void ZmqRoomLabelUpdater::call(const SceneGraph&,
   // start critical section for reading from room label map
   std::lock_guard<std::mutex> lock(mutex_);
   const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
-  for (const auto& [node_id, node] : rooms.nodes()) {
-    const auto iter = room_name_map_.find(node_id);
+  for (const auto& node : rooms.nodes()) {
+    const auto iter = room_name_map_.find(node.id);
     if (iter == room_name_map_.end()) {
       continue;
     }
 
-    node->attributes<SemanticNodeAttributes>().name = iter->second;
+    node.attributes<SemanticNodeAttributes>().name = iter->second;
   }
 
   return;

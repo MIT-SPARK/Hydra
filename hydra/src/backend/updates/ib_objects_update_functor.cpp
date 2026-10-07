@@ -144,10 +144,10 @@ FeatureMap<NodeId> getLayerEmbeddings(const SceneGraphLayer& layer,
 
 std::vector<FeatureVector> getAllFeatures(const SceneGraphLayer& layer) {
   std::vector<FeatureVector> features;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    auto attrs = node->tryAttributes<SemanticNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    auto attrs = node.tryAttributes<SemanticNodeAttributes>();
     if (!attrs) {
-      LOG(ERROR) << "Node " << NodeSymbol(node_id).str() << " has invalid attributes!";
+      LOG(ERROR) << "Node " << NodeSymbol(node.id).str() << " has invalid attributes!";
       continue;
     }
 
@@ -185,7 +185,7 @@ ComponentInfo::ComponentInfo(const Config& config,
                              const SceneGraphLayer& layer,
                              const std::vector<NodeId>& nodes,
                              double I_xy_full)
-    : ws(config, layer.edges(), getLayerEmbeddings(layer, nodes), tasks, metric),
+    : ws(config, layer, getLayerEmbeddings(layer, nodes), tasks, metric),
       segments(nodes) {
   ws.reweight(I_xy_full, static_cast<double>(nodes.size()) / layer.numNodes());
   AgglomerativeIBClustering::cluster(ws);
@@ -241,36 +241,36 @@ std::set<size_t> IBObjectsUpdateFunctor::addSegmentEdges(SceneGraph& graph) cons
   const auto& segments = graph.getLayer(config.source_layer);
 
   std::set<size_t> active_components;
-  for (const auto& [node_id, node] : segments.nodes()) {
-    if (ignored_.count(node_id)) {
+  for (const auto& node : segments.nodes()) {
+    if (ignored_.count(node.id)) {
       continue;
     }
 
-    if (node_to_component_.count(node_id)) {
+    if (node_to_component_.count(node.id)) {
       // only examine new nodes
       continue;
     }
 
-    auto& attrs = node->attributes<SemanticNodeAttributes>();
+    auto& attrs = node.attributes<SemanticNodeAttributes>();
     const auto result = tasks_->getBestScore(*metric_, attrs.semantic_feature);
     if (result.score < config.min_segment_score) {
       MLOG(1) << "Skipping segment with score: " << result.score;
-      ignored_.insert(node_id);
+      ignored_.insert(node.id);
       attrs.is_active = false;
       continue;
     }
 
-    for (const auto& [other_id, other_node] : segments.nodes()) {
-      if (other_id == node_id) {
+    for (const auto& other_node : segments.nodes()) {
+      if (other_node.id == node.id) {
         continue;
       }
 
-      if (!edge_checker_->match(attrs, other_node->attributes())) {
+      if (!edge_checker_->match(attrs, other_node.attributes())) {
         continue;
       }
 
-      graph.insertEdge(node_id, other_id);
-      const auto iter = node_to_component_.find(other_id);
+      graph.insertEdge(node.id, other_node.id);
+      const auto iter = node_to_component_.find(other_node.id);
       if (iter != node_to_component_.end()) {
         active_components.insert(iter->second);
       }
@@ -357,12 +357,12 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
 void IBObjectsUpdateFunctor::updateActiveParents(SceneGraph& graph) const {
   std::vector<NodeId> place_ids;
   const auto& places = graph.getLayer(config.parent_layer);
-  for (const auto& [node_id, node] : places.nodes()) {
-    place_ids.push_back(node_id);
+  for (const auto& node : places.nodes()) {
+    place_ids.push_back(node.id);
   }
 
-  for (const auto& [node_id, node] : graph.getLayer(config.target_layer).nodes()) {
-    active_.insert(node_id);
+  for (const auto& node : graph.getLayer(config.target_layer).nodes()) {
+    active_.insert(node.id);
   }
 
   NearestNodeFinder places_finder(places, place_ids);

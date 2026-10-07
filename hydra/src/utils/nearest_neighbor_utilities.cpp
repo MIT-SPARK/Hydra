@@ -100,9 +100,9 @@ NearestNodeFinder::~NearestNodeFinder() {}
 NearestNodeFinder::Ptr NearestNodeFinder::fromLayer(const SceneGraphLayer& layer,
                                                     const Filter& filter) {
   std::unordered_set<NodeId> layer_nodes;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    if (filter(*node)) {
-      layer_nodes.insert(node_id);
+  for (const auto& node : layer.nodes()) {
+    if (filter(node)) {
+      layer_nodes.insert(node.id);
     }
   }
 
@@ -176,8 +176,8 @@ size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
                                bool use_active) {
   std::map<SemanticLabel, std::unordered_set<NodeId>> label_node_map;
   size_t total = 0;
-  for (const auto& id_node_pair : layer.nodes()) {
-    auto& attrs = id_node_pair.second->attributes<SemanticNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    auto& attrs = node.attributes<SemanticNodeAttributes>();
     if (!use_active && attrs.is_active) {
       continue;
     }
@@ -188,7 +188,7 @@ size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
       iter = label_node_map.insert({attrs.semantic_label, {}}).first;
     }
 
-    iter->second.insert(id_node_pair.first);
+    iter->second.insert(node.id);
   }
 
   // creating nodefinders

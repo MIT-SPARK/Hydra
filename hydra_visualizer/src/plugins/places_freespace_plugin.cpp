@@ -82,8 +82,8 @@ void PlacesFreespacePlugin::draw(const std_msgs::msg::Header& header,
   const auto config = config_.get();
 
   size_t id = 0;
-  for (const auto& [node_id, node] : layer.nodes()) {
-    const auto attrs = node->tryAttributes<PlaceNodeAttributes>();
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<PlaceNodeAttributes>();
     if (!attrs) {
       continue;
     }

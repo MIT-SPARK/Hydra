@@ -167,21 +167,21 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
 
   std::unordered_set<NodeId> layer_nodes;
   std::unordered_set<NodeId> frontier_nodes;
-  for (const auto& [node_id, node] : places_layer.nodes()) {
-    auto attrs = node->tryAttributes<PlaceNodeAttributes>();
+  for (const auto& node : places_layer.nodes()) {
+    auto attrs = node.tryAttributes<PlaceNodeAttributes>();
     if (!attrs) {
       continue;
     }
     if (attrs->real_place) {
-      layer_nodes.insert(node_id);
+      layer_nodes.insert(node.id);
     } else if (!attrs->is_predicted && !attrs->need_cleanup) {
-      frontier_nodes.insert(node_id);
+      frontier_nodes.insert(node.id);
     }
   }
 
   std::unordered_set<NodeId> layer_2d_nodes;
-  for (const auto& [node_id, node] : places_2d_layer.nodes()) {
-    layer_2d_nodes.insert(node_id);
+  for (const auto& node : places_2d_layer.nodes()) {
+    layer_2d_nodes.insert(node.id);
   }
 
   bool have_existing_frontiers = frontier_nodes.size() > 0;
@@ -195,8 +195,8 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
   std::set<NodeId> nodes_to_remove;
   std::set<NodeId> nodes_to_copy;
   std::set<NodeId> nodes_to_anti;
-  for (const auto& [node_id, node] : places_layer.nodes()) {
-    auto attrs = node->tryAttributes<PlaceNodeAttributes>();
+  for (const auto& node : places_layer.nodes()) {
+    auto attrs = node.tryAttributes<PlaceNodeAttributes>();
     if (!attrs || attrs->real_place) {
       continue;
     }
@@ -211,7 +211,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
           dsg.graph->getNode(nearest_frontier).attributes<FrontierNodeAttributes>();
       double neighbor_distance = (neighbor_attrs.position - attrs->position).norm();
       if (neighbor_distance < config.frontier_exclusion_radius) {
-        nodes_to_remove.insert(node_id);
+        nodes_to_remove.insert(node.id);
         continue;
       }
     }
@@ -226,7 +226,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
 
     if (attrs->need_cleanup || close_to_robot) {
       attrs->need_cleanup = false;
-      auto unmerged_node = unmerged_dsg.findNode(node_id);
+      auto unmerged_node = unmerged_dsg.findNode(node.id);
       if (unmerged_node) {
         unmerged_node->attributes<FrontierNodeAttributes>().need_cleanup = false;
       }
@@ -244,7 +244,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
     }
 
     if (remove) {
-      nodes_to_remove.insert(node_id);
+      nodes_to_remove.insert(node.id);
       continue;
     }
 
@@ -262,11 +262,11 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
     if (facing_frontier && near_frontier) {
       // nodes_to_remove.insert(id_node_pair.first);
       if (!attrs->active_frontier) {
-        nodes_to_anti.insert(node_id);
+        nodes_to_anti.insert(node.id);
       } else {
         // If the frontier is active, we need to copy it or it will be deleted by the
         // frontend
-        nodes_to_copy.insert(node_id);
+        nodes_to_copy.insert(node.id);
       }
 
       continue;
