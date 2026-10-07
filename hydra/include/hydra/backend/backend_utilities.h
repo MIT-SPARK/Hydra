@@ -113,6 +113,32 @@ class ObjectImageFolders {
   mutable std::map<spark_dsg::NodeId, std::string> moved_;
 };
 
+/**
+ * @brief Fill empty image folders of agent nodes from the keyframe images on disk.
+ *
+ * Agent keyframe images are saved as `<agent_dir>/agent_<timestamp_ns>*`, possibly
+ * after the corresponding node was archived, so the folder can be missing from a graph
+ * that skips archived attribute updates (e.g., when the frontend stopped before the
+ * update reached the backend). The prefix is reconstructed from the node timestamp and
+ * only set if `<prefix>_meta.json` exists. The stored prefix is relative to the parent
+ * of agent_dir, e.g., `agents/agent_<timestamp_ns>`.
+ * @param graph Graph to update
+ * @param agent_dir Directory containing the keyframe images (empty is a no-op)
+ * @returns Number of image folders filled
+ */
+size_t reconcileAgentImageFolders(spark_dsg::SceneGraph& graph,
+                                  const std::filesystem::path& agent_dir);
+
+/**
+ * @brief Fill empty image folders of object nodes with the final per-node folder (see
+ * ObjectImageFolders) if that folder exists on disk.
+ * @param graph Graph to update
+ * @param image_root Root of the object image folders (empty is a no-op)
+ * @returns Number of image folders filled
+ */
+size_t reconcileObjectImageFolders(spark_dsg::SceneGraph& graph,
+                                   const std::filesystem::path& image_root);
+
 template <typename T>
 void mergeIndices(const T& from, T& to) {
   std::vector<typename T::value_type> from_indices(from.begin(), from.end());

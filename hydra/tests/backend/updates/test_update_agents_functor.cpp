@@ -118,4 +118,28 @@ TEST(UpdateAgentsFunctor, AgentUpdate) {
   }
 }
 
+// Image folders written after a node archived only reach the unmerged graph
+TEST(UpdateAgentsFunctor, CopiesImageFolderFromUnmerged) {
+  auto dsg = test::makeSharedDsg();
+  auto& graph = *dsg->graph;
+  graph.emplaceNode(
+      2,
+      "a0"_id,
+      std::make_unique<AgentNodeAttributes>(std::chrono::seconds(1),
+                                            Eigen::Quaterniond::Identity(),
+                                            Eigen::Vector3d::Zero(),
+                                            NodeSymbol('a', 0)),
+      'a');
+  const auto unmerged = graph.clone();
+  unmerged->getNode("a0"_id).attributes<AgentNodeAttributes>().image_folder =
+      "agents/agent_1000000000";
+
+  // no optimized poses are required
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, false, {}});
+  UpdateAgentsFunctor functor;
+  functor.call(*unmerged, *dsg, info);
+  EXPECT_EQ(graph.getNode("a0"_id).attributes<AgentNodeAttributes>().image_folder,
+            "agents/agent_1000000000");
+}
+
 }  // namespace hydra

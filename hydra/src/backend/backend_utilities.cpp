@@ -43,6 +43,7 @@
 namespace hydra::utils {
 
 using spark_dsg::AgentNodeAttributes;
+using spark_dsg::DsgLayers;
 using spark_dsg::KhronosObjectAttributes;
 using spark_dsg::NodeAttributes;
 using spark_dsg::NodeId;
@@ -203,6 +204,62 @@ void ObjectImageFolders::finalize(NodeId node, NodeAttributes& attrs) const {
   }
 
   derived->image_folder = finalFolder(node);
+}
+
+size_t reconcileAgentImageFolders(SceneGraph& graph,
+                                  const std::filesystem::path& agent_dir) {
+  const auto agents_key = graph.getLayerKey(DsgLayers::AGENTS);
+  if (agent_dir.empty() || !agents_key) {
+    return 0;
+  }
+
+  size_t filled = 0;
+  for (const auto& layer : graph.layer_partition(agents_key->layer)) {
+    for (const auto& node : layer.nodes()) {
+      auto attrs = node.tryAttributes<AgentNodeAttributes>();
+      if (!attrs || !attrs->image_folder.empty()) {
+        continue;
+      }
+
+      const auto prefix =
+          agent_dir / keyframeStem(kAgentKeyframePrefix, attrs->timestamp.count());
+      std::error_code ec;
+      if (std::filesystem::exists(prefix.string() + kKeyframeMetaSuffix, ec)) {
+        attrs->image_folder = relativeImageFolder(agent_dir, prefix);
+        ++filled;
+      }
+    }
+  }
+
+  VLOG_IF(1, filled > 0) << "Restored image folder for " << filled
+                         << " agent node(s) from " << agent_dir;
+  return filled;
+}
+
+size_t reconcileObjectImageFolders(SceneGraph& graph,
+                                   const std::filesystem::path& image_root) {
+  if (image_root.empty() || !graph.hasLayer(DsgLayers::OBJECTS)) {
+    return 0;
+  }
+
+  const ObjectImageFolders folders(image_root);
+  size_t filled = 0;
+  for (const auto& node : graph.getLayer(DsgLayers::OBJECTS).nodes()) {
+    auto attrs = node.tryAttributes<KhronosObjectAttributes>();
+    if (!attrs || !attrs->image_folder.empty()) {
+      continue;
+    }
+
+    std::error_code ec;
+    if (std::filesystem::exists(folders.finalPath(node.id), ec)) {
+      attrs->image_folder = folders.finalFolder(node.id);
+      ++filled;
+    }
+  }
+
+  VLOG_IF(1, filled > 0) << "Restored image folder for " << filled
+                         << " object node(s) from " << image_root;
+  return filled;
 }
 
 }  // namespace hydra::utils

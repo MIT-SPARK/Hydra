@@ -63,6 +63,19 @@ inline std::string toString(const Eigen::Quaterniond& q, const Eigen::Vector3d& 
   return ss.str();
 }
 
+// The merge into the backend graph skips archived nodes, so image folders written
+// after a node archived only reach the unmerged graph
+void copyImageFolder(const SceneGraph& unmerged,
+                     NodeId node_id,
+                     AgentNodeAttributes& attrs) {
+  const auto source = unmerged.findNode(node_id);
+  const auto source_attrs =
+      source ? source->tryAttributes<AgentNodeAttributes>() : nullptr;
+  if (source_attrs && !source_attrs->image_folder.empty()) {
+    attrs.image_folder = source_attrs->image_folder;
+  }
+}
+
 }  // namespace
 
 using timing::ScopedTimer;
@@ -73,20 +86,22 @@ void declare_config(UpdateAgentsFunctor::Config&) {
 
 UpdateAgentsFunctor::UpdateAgentsFunctor(const Config&) {}
 
-void UpdateAgentsFunctor::call(const SceneGraph&,
+void UpdateAgentsFunctor::call(const SceneGraph& unmerged,
                                SharedDsgInfo& dsg,
                                const UpdateInfo::ConstPtr& info) const {
-  if (!info->pgmo_values || info->pgmo_values->size() == 0) {
-    return;
-  }
-
   ScopedTimer timer("backend/agent_update", info->timestamp_ns, true, 1, false);
+  const bool has_poses = info->pgmo_values && info->pgmo_values->size() > 0;
   auto& graph = *dsg.graph;
   const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
   for (const auto& layer : graph.layer_partition(desired_layer)) {
     std::set<NodeId> missing_nodes;
     for (const auto& node : layer.nodes()) {
       auto& attrs = node.attributes<AgentNodeAttributes>();
+      copyImageFolder(unmerged, node.id, attrs);
+      if (!has_poses) {
+        continue;
+      }
+
       if (!info->pgmo_values->exists(attrs.external_key)) {
         missing_nodes.insert(node.id);
         continue;
