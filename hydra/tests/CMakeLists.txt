@@ -22,6 +22,7 @@ add_executable(
   backend/updates/test_update_objects_functor.cpp
   backend/updates/test_update_places_functor.cpp
   common/test_config_utilities.cpp
+  common/test_graph_update.cpp
   common/test_node_matchers.cpp
   common/test_partial_graph.cpp
   common/test_shared_dsg_info.cpp
