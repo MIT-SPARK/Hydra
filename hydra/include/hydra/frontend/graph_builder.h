@@ -94,6 +94,8 @@ class GraphBuilder : public Module {
     config::VirtualConfig<GraphBuilderFunctor> freespace_places;
     config::VirtualConfig<GraphBuilderFunctor> traversability_places;
     config::VirtualConfig<GraphBuilderFunctor> frontier_places;
+    //! Optional functor saving images for agent nodes (e.g., AgentImageExtractor)
+    config::VirtualConfig<GraphBuilderFunctor> agent_extractor;
 
     //! Output sinks and visualization
     std::vector<Sink::Factory> sinks;

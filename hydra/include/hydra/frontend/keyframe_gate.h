@@ -32,56 +32,40 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/utils/image_folder.h"
+#pragma once
 
-namespace hydra::utils {
+#include <Eigen/Geometry>
 
-std::string keyframeStem(const std::string& prefix, uint64_t timestamp_ns) {
-  return prefix + std::to_string(timestamp_ns);
-}
+namespace hydra {
 
-bool isPathUnder(const std::filesystem::path& path,
-                 const std::filesystem::path& directory) {
-  auto normed_dir = directory.lexically_normal();
-  if (!normed_dir.empty() && !normed_dir.has_filename()) {
-    normed_dir = normed_dir.parent_path();  // trailing separator
-  }
+/**
+ * @brief Translation/rotation keyframe trigger.
+ *
+ * Triggers on the first pose and whenever the pose moved or rotated far enough from
+ * the last triggering pose.
+ */
+class KeyframeGate {
+ public:
+  struct Config {
+    //! Minimum translation [m] since the last keyframe to trigger
+    double min_translation_m = 0.25;
+    //! Minimum rotation [deg] since the last keyframe to trigger
+    double min_rotation_deg = 15.0;
+  };
 
-  const auto relative = path.lexically_normal().lexically_relative(normed_dir);
-  return !relative.empty() && relative != "." && *relative.begin() != "..";
-}
+  explicit KeyframeGate(const Config& config) : config_(config) {}
 
-std::filesystem::path imageFolderBase(const std::filesystem::path& image_root) {
-  auto root = image_root.lexically_normal();
-  if (!root.empty() && !root.has_filename()) {
-    root = root.parent_path();  // trailing separator
-  }
+  //! @brief Check whether a pose is a new keyframe (and record it if so)
+  bool shouldTrigger(const Eigen::Vector3d& position,
+                     const Eigen::Quaterniond& orientation);
 
-  return root.parent_path();
-}
+ private:
+  Config config_;
+  bool initialized_ = false;
+  Eigen::Vector3d last_position_ = Eigen::Vector3d::Zero();
+  Eigen::Quaterniond last_orientation_ = Eigen::Quaterniond::Identity();
+};
 
-std::filesystem::path resolveImageFolder(const std::filesystem::path& image_root,
-                                         const std::string& value) {
-  const std::filesystem::path folder(value);
-  if (value.empty() || folder.is_absolute()) {
-    return folder;
-  }
+void declare_config(KeyframeGate::Config& config);
 
-  return imageFolderBase(image_root) / folder;
-}
-
-std::string relativeImageFolder(const std::filesystem::path& image_root,
-                                const std::filesystem::path& path) {
-  const auto base = imageFolderBase(image_root);
-  if (base.empty()) {
-    return path.is_absolute() ? path.string() : path.lexically_normal().string();
-  }
-
-  if (!isPathUnder(path, base)) {
-    return path.string();
-  }
-
-  return path.lexically_normal().lexically_relative(base).string();
-}
-
-}  // namespace hydra::utils
+}  // namespace hydra

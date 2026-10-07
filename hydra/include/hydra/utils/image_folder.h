@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -42,6 +43,22 @@ namespace hydra::utils {
 //! Subdirectory of an object image root holding the per-track folders written by the
 //! frontend before the backend assigns them to a node
 inline constexpr char kTempImageFolder[] = "temp";
+
+//! File name prefix of agent keyframe images
+inline constexpr char kAgentKeyframePrefix[] = "agent_";
+//! File name prefix of sub-keyframe images
+inline constexpr char kSubKeyframePrefix[] = "subkf_";
+//! File name prefix of object images (written by Khronos per object track)
+inline constexpr char kObjectImagePrefix[] = "frame_";
+//! File name suffixes of the files written per keyframe
+inline constexpr char kKeyframeRgbSuffix[] = "_rgb.jpg";
+inline constexpr char kKeyframeDepthSuffix[] = "_depth.png";
+inline constexpr char kKeyframeMetaSuffix[] = "_meta.json";
+//! Camera calibration shared by all keyframes in a directory
+inline constexpr char kCameraCalibFile[] = "camera_calib.json";
+
+//! @brief Common file name stem of the files of a keyframe, e.g., `agent_<timestamp>`
+std::string keyframeStem(const std::string& prefix, uint64_t timestamp_ns);
 
 //! @brief Check whether path lies strictly inside directory (lexical check, no
 //! filesystem access)

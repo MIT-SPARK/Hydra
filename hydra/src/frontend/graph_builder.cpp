@@ -97,6 +97,8 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.traversability_places, "traversability_places");
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
+  config.agent_extractor.setOptional();
+  field(config.agent_extractor, "agent_extractor");
 
   field(config.sinks, "sinks");
 }
@@ -143,6 +145,7 @@ GraphBuilder::GraphBuilder(const Config& config,
   functors_.emplace("freespace_places", config.freespace_places.create());
   functors_.emplace("traversability_places", config.traversability_places.create());
   functors_.emplace("frontier_places", config.frontier_places.create());
+  functors_.emplace("agent_extractor", config.agent_extractor.create());
   for (const auto& [_, functor] : functors_) {
     callbacks_.push_back([&](auto msg) {
       if (msg && functor) {

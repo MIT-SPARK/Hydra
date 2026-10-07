@@ -32,56 +32,40 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/utils/image_folder.h"
+#include "hydra/frontend/keyframe_gate.h"
 
-namespace hydra::utils {
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
 
-std::string keyframeStem(const std::string& prefix, uint64_t timestamp_ns) {
-  return prefix + std::to_string(timestamp_ns);
+#include <cmath>
+
+namespace hydra {
+
+void declare_config(KeyframeGate::Config& config) {
+  using namespace config;
+  name("KeyframeGate::Config");
+  field(config.min_translation_m, "min_translation_m", "m");
+  field(config.min_rotation_deg, "min_rotation_deg", "deg");
+  check(config.min_translation_m, GE, 0.0, "min_translation_m");
+  check(config.min_rotation_deg, GE, 0.0, "min_rotation_deg");
 }
 
-bool isPathUnder(const std::filesystem::path& path,
-                 const std::filesystem::path& directory) {
-  auto normed_dir = directory.lexically_normal();
-  if (!normed_dir.empty() && !normed_dir.has_filename()) {
-    normed_dir = normed_dir.parent_path();  // trailing separator
+bool KeyframeGate::shouldTrigger(const Eigen::Vector3d& position,
+                                 const Eigen::Quaterniond& orientation) {
+  if (initialized_) {
+    const double translation_diff = (position - last_position_).norm();
+    const double angular_diff =
+        last_orientation_.angularDistance(orientation) * 180.0 / M_PI;
+    if (translation_diff < config_.min_translation_m &&
+        angular_diff < config_.min_rotation_deg) {
+      return false;
+    }
   }
 
-  const auto relative = path.lexically_normal().lexically_relative(normed_dir);
-  return !relative.empty() && relative != "." && *relative.begin() != "..";
+  last_position_ = position;
+  last_orientation_ = orientation;
+  initialized_ = true;
+  return true;
 }
 
-std::filesystem::path imageFolderBase(const std::filesystem::path& image_root) {
-  auto root = image_root.lexically_normal();
-  if (!root.empty() && !root.has_filename()) {
-    root = root.parent_path();  // trailing separator
-  }
-
-  return root.parent_path();
-}
-
-std::filesystem::path resolveImageFolder(const std::filesystem::path& image_root,
-                                         const std::string& value) {
-  const std::filesystem::path folder(value);
-  if (value.empty() || folder.is_absolute()) {
-    return folder;
-  }
-
-  return imageFolderBase(image_root) / folder;
-}
-
-std::string relativeImageFolder(const std::filesystem::path& image_root,
-                                const std::filesystem::path& path) {
-  const auto base = imageFolderBase(image_root);
-  if (base.empty()) {
-    return path.is_absolute() ? path.string() : path.lexically_normal().string();
-  }
-
-  if (!isPathUnder(path, base)) {
-    return path.string();
-  }
-
-  return path.lexically_normal().lexically_relative(base).string();
-}
-
-}  // namespace hydra::utils
+}  // namespace hydra
