@@ -33,25 +33,51 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/scene_graph_types.h>
-#include <spark_dsg/spark_dsg_fwd.h>
+#include <spark_dsg/bounding_box.h>
 
-#include <Eigen/Dense>
-#include <map>
-#include <set>
-#include <unordered_set>
+#include <filesystem>
+#include <vector>
+
+#include "hydra/backend/update_functions.h"
+#include "hydra/common/output_sink.h"
 
 namespace hydra {
 
-Eigen::Vector3d getRoomPosition(const spark_dsg::SceneGraphLayer& places,
-                                const std::unordered_set<spark_dsg::NodeId>& cluster);
+struct RoomExtents {
+  using BoundingBoxes = std::vector<std::vector<spark_dsg::BoundingBox>>;
 
-void addEdgesToRoomLayer(const spark_dsg::SceneGraphLayer& places,
-                         const std::map<spark_dsg::NodeId, size_t>& labels,
-                         const std::map<size_t, spark_dsg::NodeId>& label_to_room_map,
-                         spark_dsg::SceneGraphLayer& rooms);
+  explicit RoomExtents(const BoundingBoxes& boxes);
+  explicit RoomExtents(const std::filesystem::path& path_to_yaml);
 
-void addEdgesToRoomLayer(spark_dsg::SceneGraph& graph,
-                         const std::set<spark_dsg::NodeId>& active_rooms);
+  struct QueryResult {
+    bool valid = false;
+    size_t index = 0;
+  };
+  QueryResult getRoomForPoint(Eigen::Vector3d point) const;
+
+  BoundingBoxes room_bounding_boxes;
+};
+
+struct UpdateGtRoomsFunctor : public UpdateFunctor {
+  using Sink = OutputSink<uint64_t, const RoomExtents&>;
+  struct Config {
+    std::filesystem::path ground_truth_rooms_path;
+    std::string places_layer = spark_dsg::DsgLayers::PLACES;
+    char room_prefix = 'R';
+    std::vector<Sink::Factory> sinks;
+  } const config;
+
+  explicit UpdateGtRoomsFunctor(const Config& config);
+
+  void call(const spark_dsg::SceneGraph& /* unmerged */,
+            SharedDsgInfo& dsg,
+            const UpdateInfo::ConstPtr& info) const override;
+
+ private:
+  const RoomExtents room_extents_;
+  const Sink::List sinks_;
+};
+
+void declare_config(UpdateGtRoomsFunctor::Config& config);
 
 }  // namespace hydra

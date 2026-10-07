@@ -354,4 +354,29 @@ TEST(GraphFiltrationTests, TestBestPlateau) {
   }
 }
 
+TEST(GraphFiltrationTests, InvalidNodesMatchFilteredClone) {
+  SceneGraphLayer layer(1);
+  for (size_t i = 0; i < 5; ++i) {
+    addNode(layer, i, i < 3 ? 2.0 : 0.0);
+  }
+
+  layer.getNode(3).attributes<PlaceNodeAttributes>().distance = 0.001;
+  layer.getNode(3).attributes<PlaceNodeAttributes>().real_place = false;
+  addEdge(layer, 0, 1, 0.4);
+  addEdge(layer, 1, 2, 0.6);
+  addEdge(layer, 0, 3, 1.0);
+  addEdge(layer, 3, 2, 1.0);
+  addEdge(layer, 3, 4, 1.0);
+  const auto filtered = layer.clone([](const auto& node) { return node.id < 3; });
+  for (const auto include_nodes : {true, false}) {
+    BarcodeTracker actual_tracker;
+    BarcodeTracker expected_tracker;
+    const auto count = [](const DisjointSet& sets) { return sets.sizes.size(); };
+    EXPECT_EQ(
+        getGraphFiltration(layer, actual_tracker, 1.0e-4, count, include_nodes),
+        getGraphFiltration(*filtered, expected_tracker, 1.0e-4, count, include_nodes));
+    EXPECT_EQ(actual_tracker.barcodes, expected_tracker.barcodes);
+  }
+}
+
 }  // namespace hydra

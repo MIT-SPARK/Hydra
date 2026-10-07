@@ -1,6 +1,6 @@
 #pragma once
 
-#include <hydra/backend/updates/update_rooms_functor.h>
+#include <hydra/backend/updates/update_gt_rooms_functor.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
 #include <ianvs/node_handle.h>
 
@@ -10,7 +10,7 @@
 
 namespace hydra {
 
-class GtRoomPublisher : public UpdateRoomsFunctor::Sink {
+class GtRoomPublisher : public UpdateGtRoomsFunctor::Sink {
  public:
   struct Config {
     std::string ns = "~/gt_rooms";
@@ -24,7 +24,7 @@ class GtRoomPublisher : public UpdateRoomsFunctor::Sink {
 
   std::string printInfo() const;
 
-  void call(uint64_t timestamp_ns, const RoomFinder&) const;
+  void call(uint64_t timestamp_ns, const RoomExtents& extents) const override;
 
  private:
   ianvs::NodeHandle nh_;

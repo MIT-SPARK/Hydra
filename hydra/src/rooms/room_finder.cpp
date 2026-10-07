@@ -41,6 +41,7 @@
 #include <spark_dsg/node_symbol.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <queue>
 
 #include "hydra/rooms/graph_filtration.h"
@@ -102,17 +103,8 @@ void logFiltration(std::ostream& fout,
   fout << "]},";
 }
 
-RoomExtents load_room_extents(std::filesystem::path path) {
-  if (path != "") {
-    return RoomExtents(path);
-  }
-  return RoomExtents(std::vector<std::vector<spark_dsg::BoundingBox>>());
-}
-
 RoomFinder::RoomFinder(const RoomFinderConfig& config)
-    : config(config::checkValid(config)),
-      room_extents(load_room_extents(config.ground_truth_rooms_path)),
-      distance_adaptor_(new DistanceAdaptor()) {}
+    : config(config::checkValid(config)) {}
 
 RoomFinder::~RoomFinder() {
   if (log_file_) {
@@ -167,7 +159,8 @@ void RoomFinder::enableLogging(const std::string& log_path) {
   graph_log_file_.reset(new std::ofstream(gname, std::ios::binary));
 }
 
-InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) const {
+InitialClusters RoomFinder::getBestComponents(
+    const SceneGraphLayer& places, const DistanceAdaptor& get_distance) const {
   BarcodeTracker tracker(config.min_component_size);
   const auto filtration = getGraphFiltration(
       places,
@@ -183,7 +176,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
         return num_components;
       },
       false,
-      *distance_adaptor_);
+      get_distance);
 
   VLOG(10) << "[RoomFinder] Filtration: " << filtration;
 
@@ -263,11 +256,10 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
   const auto components = graph_utilities::getConnectedComponents(
       places,
       [&](const SceneGraphNode& node) {
-        return (*distance_adaptor_)(node) > info.distance;
+        const auto distance = get_distance(node);
+        return distance && *distance > info.distance;
       },
-      [&](const SceneGraphEdge& edge) {
-        return (*distance_adaptor_)(edge) > info.distance;
-      });
+      [&](const SceneGraphEdge& edge) { return get_distance(edge) > info.distance; });
 
   InitialClusters filtered;
   for (const auto& component : components) {
@@ -281,54 +273,33 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
   return filtered;
 }
 
-void RoomFinder::setupDistanceAdaptor(const SceneGraphLayer& places) {
-  // NOTE(lschmid): For now try to figure out which adaptor to use based on the places.
-  // Assumes there is only one kind of place attributes in the layer.
-  if (places.numNodes() == 0) {
-    return;
-  }
-
-  // TODO(nathan) fix this!
-  for (const auto& node : places.nodes()) {
-    const auto place_attrs = node.tryAttributes<PlaceNodeAttributes>();
-    if (place_attrs) {
-      distance_adaptor_ = std::make_unique<DistanceAdaptor>();
-      return;
-    }
-
-    const auto trav_attrs = node.tryAttributes<TraversabilityNodeAttributes>();
-    if (trav_attrs) {
-      distance_adaptor_ = std::make_unique<TraversabilityDistanceAdaptor>(places);
-      return;
-    }
-
-    break;
-  }
-
-  LOG(ERROR) << "[RoomFinder] Unknown place attributes to create distance adaptor.";
-}
-
 SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
   VLOG(2) << "[Room Finder] Detecting rooms for " << places.numNodes() << " nodes";
-
-  if (config.clustering_mode == RoomClusterMode::GROUND_TRUTH) {
-    last_results_ = clusterGraphByGt(places, room_extents);
-    cluster_room_map_.clear();
-    return makeRoomLayer(places);
+  last_results_.clear();
+  cluster_room_map_.clear();
+  const DistanceAdaptor get_distance;
+  const auto nodes = places.nodes();
+  const auto has_places =
+      std::any_of(nodes.begin(), nodes.end(), [&](const auto& node) {
+        return get_distance(node).has_value();
+      });
+  if (!has_places) {
+    return nullptr;
   }
 
-  setupDistanceAdaptor(places);
-  const auto components = getBestComponents(places);
+  const auto components = getBestComponents(places, get_distance);
   if (components.empty()) {
     VLOG(2) << "[Room Finder] No components found";
     return nullptr;
   }
 
-  last_results_.clear();
   switch (config.clustering_mode) {
     case RoomClusterMode::MODULARITY:
-      last_results_ = clusterGraphByModularity(
-          places, components, config.max_modularity_iters, config.modularity_gamma);
+      last_results_ = clusterGraphByModularity(places,
+                                               components,
+                                               config.max_modularity_iters,
+                                               config.modularity_gamma,
+                                               get_distance);
       break;
     case RoomClusterMode::MODULARITY_DISTANCE:
       last_results_ = clusterGraphByModularity(
@@ -341,14 +312,11 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
                              .norm();
           },
           config.max_modularity_iters,
-          config.modularity_gamma);
+          config.modularity_gamma,
+          get_distance);
       break;
     case RoomClusterMode::NEIGHBORS:
-      last_results_ = clusterGraphByNeighbors(places, components);
-      break;
-    case RoomClusterMode::GROUND_TRUTH:
-      last_results_ = clusterGraphByGt(places, room_extents);
-      LOG(WARNING) << "Got GT results";
+      last_results_ = clusterGraphByNeighbors(places, components, get_distance);
       break;
     case RoomClusterMode::NONE:
     default:
@@ -361,7 +329,6 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
     last_results_.fillFromInitialClusters(components);
   }
 
-  cluster_room_map_.clear();
   return makeRoomLayer(places);
 }
 

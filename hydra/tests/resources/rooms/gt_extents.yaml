@@ -1,0 +1,16 @@
+---
+left:
+  - center: [0.0, 0.0, 0.0]
+    extents: [3.0, 3.0, 3.0]
+    rotation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}
+right:
+  - center: [4.0, 0.0, 0.0]
+    extents: [2.0, 2.0, 2.0]
+    rotation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}
+  - center: [8.0, 0.0, 0.0]
+    extents: [2.0, 2.0, 2.0]
+    rotation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}
+unused:
+  - center: [12.0, 0.0, 0.0]
+    extents: [2.0, 2.0, 2.0]
+    rotation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}

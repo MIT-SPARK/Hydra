@@ -24,6 +24,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/update_objects_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/update_places_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/update_region_growing_traversability_functor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/updates/update_gt_rooms_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/update_rooms_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/update_surface_places_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/updates/zmq_room_label_updater.cpp
