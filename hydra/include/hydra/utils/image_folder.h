@@ -33,58 +33,38 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+#include <filesystem>
+#include <string>
 
-namespace hydra {
+namespace hydra::utils {
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config : VerbosityConfig {
-    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
-    using SemanticAssociation = association::SemanticNearestNode::Config;
+//! Subdirectory of an object image root holding the per-track folders written by the
+//! frontend before the backend assigns them to a node
+inline constexpr char kTempImageFolder[] = "temp";
 
-    Config() : VerbosityConfig("[update_objects] ") {}
+//! @brief Check whether path lies strictly inside directory (lexical check, no
+//! filesystem access)
+bool isPathUnder(const std::filesystem::path& path,
+                 const std::filesystem::path& directory);
 
-    //! Layer to update
-    std::string layer = spark_dsg::DsgLayers::OBJECTS;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
-    //! Root of the per-object image folders (see utils::ObjectImageFolders); empty
-    //! disables image folder management
-    std::filesystem::path image_root;
-  } const config;
+/**
+ * @brief Directory that image folder values for an image root are relative to.
+ *
+ * Image folder values stored in node attributes are relative to the parent directory
+ * of the configured image root they belong to, e.g., `images/O_5` for the root
+ * `/run/images`, so that run directories can be moved. Absolute values are accepted
+ * and pass through unchanged. Trailing separators of the root are ignored.
+ */
+std::filesystem::path imageFolderBase(const std::filesystem::path& image_root);
 
-  explicit UpdateObjectsFunctor(const Config& config);
+//! @brief Filesystem path of a stored image folder value (empty stays empty)
+std::filesystem::path resolveImageFolder(const std::filesystem::path& image_root,
+                                         const std::string& value);
 
-  Hooks hooks() const override;
+//! @brief Image folder value to store for a path (relative to imageFolderBase if the
+//! path lies inside it, otherwise unchanged)
+std::string relativeImageFolder(const std::filesystem::path& image_root,
+                                const std::filesystem::path& path);
 
-  void call(const spark_dsg::SceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
-  MergeList findMerges(const spark_dsg::SceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
-  void mergeAttributes(const spark_dsg::SceneGraph& layer,
-                       spark_dsg::NodeId from,
-                       spark_dsg::NodeId to) const;
-
-  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
-                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
-
-  mutable std::set<spark_dsg::NodeId> merged_nodes_;
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const utils::ObjectImageFolders image_folders;
-};
-
-void declare_config(UpdateObjectsFunctor::Config& config);
-
-}  // namespace hydra
+}  // namespace hydra::utils

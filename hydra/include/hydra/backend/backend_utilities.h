@@ -38,10 +38,80 @@
 #include <kimera_pgmo/mesh_offset_info.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <filesystem>
+#include <map>
+#include <string>
+
+#include "hydra/utils/image_folder.h"
+
 namespace hydra::utils {
 
 std::optional<uint64_t> getTimeNs(const spark_dsg::SceneGraph& graph,
                                   gtsam::Symbol key);
+
+/**
+ * @brief Move every file in src into dest (creating dest if needed) and remove src.
+ *
+ * No-op if src and dest are the same or src does not exist. Files whose name already
+ * exists in dest are not moved (src is then kept) and a warning is logged.
+ * @returns Number of files moved
+ */
+size_t moveImageFiles(const std::filesystem::path& src,
+                      const std::filesystem::path& dest);
+
+/**
+ * @brief Bookkeeping for per-object image folders written by the frontend.
+ *
+ * The frontend writes image crops for each object track to a temporary folder under
+ * `<image_root>/temp` (see kTempImageFolder) and points the node's image_folder at it.
+ * This moves the crops to a stable per-node folder `<image_root>/<prefix>_<index>`,
+ * unions the folders of merged nodes into the surviving node's folder and mirrors the
+ * final folder onto the backend graph. Attributes other than image_folder are never
+ * touched. An empty image_root disables all of this. Stored image folders are relative
+ * to the parent of image_root (see imageFolderBase), e.g., `images/temp/<track>` and
+ * `images/O_<index>`; absolute values are also accepted.
+ */
+class ObjectImageFolders {
+ public:
+  explicit ObjectImageFolders(const std::filesystem::path& image_root);
+
+  //! @brief Whether an image root was configured
+  bool enabled() const { return !image_root_.empty(); }
+
+  //! @brief Final image folder for a node on disk
+  std::filesystem::path finalPath(spark_dsg::NodeId node) const;
+
+  //! @brief Final image folder value stored for a node (relative)
+  std::string finalFolder(spark_dsg::NodeId node) const;
+
+  //! @brief Whether a stored image folder value is a temporary frontend folder
+  bool isTemporary(const std::string& folder) const;
+
+  /**
+   * @brief Move temporary folders and union merged folders on disk and update the
+   * image folders of the merged graph.
+   * @param unmerged Unmerged graph (whose image folders point to the frontend output)
+   * @param layer Layer to update
+   * @param merges Mapping from merged node to surviving node
+   * @param merged Merged graph to update
+   */
+  void update(const spark_dsg::SceneGraph& unmerged,
+              const std::string& layer,
+              const std::map<spark_dsg::NodeId, spark_dsg::NodeId>& merges,
+              spark_dsg::SceneGraph& merged) const;
+
+  //! @brief Point non-empty image folders of node attributes to the node's final path
+  void finalize(spark_dsg::NodeId node, spark_dsg::NodeAttributes& attrs) const;
+
+ private:
+  const std::filesystem::path image_root_;
+  const std::filesystem::path temp_root_;
+  //! Surviving node each merged node's folder was last moved to (merges can be
+  //! recomputed, so a node may later be merged into a different node)
+  mutable std::map<spark_dsg::NodeId, spark_dsg::NodeId> unioned_;
+  //! Temporary folder already moved per node (the frontend writes each folder once)
+  mutable std::map<spark_dsg::NodeId, std::string> moved_;
+};
 
 template <typename T>
 void mergeIndices(const T& from, T& to) {

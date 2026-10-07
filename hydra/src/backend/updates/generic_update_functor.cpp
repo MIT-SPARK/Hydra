@@ -35,6 +35,7 @@
 #include "hydra/backend/updates/generic_update_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
@@ -65,6 +66,7 @@ void declare_config(GenericUpdateFunctor::Config& config) {
   config.matcher.setOptional();
   field(config.matcher, "node_matcher");
   field(config.merge_proposer, "merge_proposer");
+  field<Path>(config.image_root, "image_root");
   checkCondition(!config.layer.empty(), "layer must be non-empty!");
 }
 
@@ -72,7 +74,8 @@ GenericUpdateFunctor::GenericUpdateFunctor(const Config& config)
     : config(config::checkValid(config)),
       node_matcher(config.matcher.create()),
       merge_proposer(config.merge_proposer),
-      deformation_interpolator(config.deformation_interpolator) {}
+      deformation_interpolator(config.deformation_interpolator),
+      image_folders(config.image_root) {}
 
 UpdateFunctor::Hooks GenericUpdateFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
@@ -98,6 +101,8 @@ void GenericUpdateFunctor::call(const SceneGraph& unmerged,
   active_tracker.clear();  // reset from previous pass
   const auto view = new_loopclosure ? LayerView(layer) : active_tracker.view(layer);
   deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
+  // only touches image folders, so merged attributes keep their deformed geometry
+  image_folders.update(unmerged, config.layer, dsg.merges, *dsg.graph);
   MLOG(1) << "[Hydra Backend] " << config.layer << " update: " << layer.numNodes()
           << " nodes";
 }
