@@ -119,6 +119,22 @@ class AgglomerativeIBClustering : public LayerClustering {
     double I_zy_prev;
     double delta_weight = 1.0;
     std::vector<double> deltas;
+
+   private:
+    Workspace(const ClusteringConfig& config,
+              const NodeEmbeddings& node_embeddings,
+              const EmbeddingGroup& tasks,
+              const EmbeddingDistance& metric);
+
+    void addEdge(spark_dsg::NodeId source_id, spark_dsg::NodeId target_id) {
+      const auto source = order.find(source_id);
+      const auto target = order.find(target_id);
+      if (source == order.end() || target == order.end()) {
+        return;
+      }
+
+      edges.emplace(spark_dsg::EdgeKey(source->second, target->second), 0.0);
+    }
   };
 
   AgglomerativeIBClustering(const Config& config);

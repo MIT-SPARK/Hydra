@@ -107,9 +107,14 @@ void UpdateRoomsFunctor::call(const SceneGraph&,
 
   ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
 
-  // TODO(nathan) filter places layer to only include valid nodes
+  // TODO: Update RoomFinder's interface to accept a filtered graph without cloning.
+  auto places = places_layer->clone([](const auto& node) {
+    const auto category = NodeSymbol(node.id).category();
+    return category == 'p' || category == 'h' || category == 't';
+  });
+
   // TODO(nathan) pass in timestamp?
-  auto rooms = room_finder->findRooms(*places_layer);
+  auto rooms = room_finder->findRooms(*places);
   rewriteRooms(rooms.get(), *dsg.graph);
   room_finder->addRoomPlaceEdges(*dsg.graph, config.places_layer);
   Sink::callAll(sinks_, info->timestamp_ns, *room_finder);

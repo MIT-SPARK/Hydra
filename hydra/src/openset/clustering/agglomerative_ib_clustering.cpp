@@ -88,16 +88,6 @@ Indices findTopKIndicesCols(const Eigen::MatrixXd& m, size_t top_k) {
   return top_indices;
 }
 
-std::vector<EdgeKey> getKeys(const SceneGraphLayer& layer) {
-  std::vector<EdgeKey> edges;
-  edges.reserve(layer.numEdges());
-  for (const auto& edge : layer.edges()) {
-    edges.push_back(edge.key());
-  }
-
-  return edges;
-}
-
 }  // namespace
 
 ClusterWorkspace::Workspace(const ClusteringConfig& config,
@@ -105,10 +95,24 @@ ClusterWorkspace::Workspace(const ClusteringConfig& config,
                             const NodeEmbeddings& node_embeddings,
                             const EmbeddingGroup& queries,
                             const EmbeddingDistance& metric)
-    : Workspace(config, getKeys(layer), node_embeddings, queries, metric) {}
+    : Workspace(config, node_embeddings, queries, metric) {
+  for (const auto& edge : layer.edges()) {
+    addEdge(edge.source, edge.target);
+  }
+}
 
 ClusterWorkspace::Workspace(const ClusteringConfig& config,
                             const std::vector<EdgeKey>& edges_,
+                            const NodeEmbeddings& node_embeddings,
+                            const EmbeddingGroup& queries,
+                            const EmbeddingDistance& metric)
+    : Workspace(config, node_embeddings, queries, metric) {
+  for (const auto& edge : edges_) {
+    addEdge(edge.k1, edge.k2);
+  }
+}
+
+ClusterWorkspace::Workspace(const ClusteringConfig& config,
                             const NodeEmbeddings& node_embeddings,
                             const EmbeddingGroup& queries,
                             const EmbeddingDistance& metric)
@@ -120,16 +124,6 @@ ClusterWorkspace::Workspace(const ClusteringConfig& config,
     node_lookup[index] = node_id;
     order[node_id] = index;
     ++index;
-  }
-
-  for (const auto& edge : edges_) {
-    const auto source = order.find(edge.k1);
-    const auto target = order.find(edge.k2);
-    if (source == order.end() || target == order.end()) {
-      continue;
-    }
-
-    edges.emplace(EdgeKey(source->second, target->second), 0.0);
   }
 
   assignments.resize(order.size());
