@@ -303,7 +303,10 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_graph", msg->timestamp_ns);
     state_->backend_graph->sequence_number = sequence_number_;
-    state_->backend_graph->graph->mergeGraph(*dsg_->graph);
+    // archived nodes can still receive attribute updates (e.g., image folders)
+    GraphMergeConfig merge_config;
+    merge_config.update_archived_attributes = true;
+    state_->backend_graph->graph->mergeGraph(*dsg_->graph, merge_config);
   }  // end critical section
 
   if (lcd_input_queue_) {  // LCD graph critical section
