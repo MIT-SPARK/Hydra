@@ -275,31 +275,50 @@ void addBindings(pybind11::module_& m) {
       .def(
           "step",
           [](PythonPipeline& pipeline,
-             size_t timestamp_ns,
-             const Eigen::Vector4d& odom_R_body,
-             const Eigen::Vector3d& odom_t_body,
+             size_t stamp,
+             const Eigen::Vector4d& rot,
+             const Eigen::Vector3d& pos,
              const py::buffer& rgb,
              const py::buffer& depth,
-             const py::buffer& labels,
              const FeatureVector& feature) {
-            auto packet =
-                std::make_shared<PythonImageInput>(timestamp_ns, rgb, depth, labels);
+            const Eigen::Quaterniond q(rot[0], rot[1], rot[2], rot[3]);
+            const Eigen::Isometry3d pose = Eigen::Translation<double, 3>(pos) * q;
+            auto packet = std::make_shared<PythonImageInput>(stamp, rgb, depth);
             packet->input_feature = feature;
-            const Eigen::Quaterniond q(
-                odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
-            const Eigen::Isometry3d odom_T_body =
-                Eigen::Translation<double, 3>(odom_t_body) * q;
-            return pipeline.step(packet, odom_T_body);
+
+            return pipeline.step(packet, pose);
           },
           "timestamp_ns"_a,
           "odom_R_body"_a,
           "odom_t_body"_a,
           "rgb"_a,
           "depth"_a,
-          "labels"_a = py::buffer(),
+          "feature"_a = FeatureVector())
+      .def(
+          "step",
+          [](PythonPipeline& pipeline,
+             size_t stamp,
+             const Eigen::Vector4d& rot,
+             const Eigen::Vector3d& pos,
+             const py::buffer& rgb,
+             const py::buffer& depth,
+             const py::buffer& labels,
+             const FeatureVector& feature) {
+            const Eigen::Quaterniond q(rot[0], rot[1], rot[2], rot[3]);
+            const Eigen::Isometry3d pose = Eigen::Translation<double, 3>(pos) * q;
+            auto packet = std::make_shared<PythonImageInput>(stamp, rgb, depth, labels);
+            packet->input_feature = feature;
+
+            return pipeline.step(packet, pose);
+          },
+          "timestamp_ns"_a,
+          "odom_R_body"_a,
+          "odom_t_body"_a,
+          "rgb"_a,
+          "depth"_a,
+          "labels"_a,
           "feature"_a = FeatureVector());
 }
 
 }  // namespace python_pipeline
-
-};  // namespace hydra::python
+}  // namespace hydra::python
