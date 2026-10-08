@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/printing.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra_multi {
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <hydra_multi/operators/scene_graph_operator.h>
+#include <spark_dsg/scene_graph.h>
 #include <spark_dsg/serialization/graph_binary_serialization.h>
 
 namespace hydra_multi {
