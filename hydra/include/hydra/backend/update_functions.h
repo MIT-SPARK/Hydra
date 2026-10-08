@@ -33,11 +33,22 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <gtsam/nonlinear/Values.h>
 #include <kimera_pgmo/mesh_offset_info.h>
+#include <spark_dsg/spark_dsg_fwd.h>
 
-#include "hydra/backend/merge_proposer.h"
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
+#include "hydra/backend/merge_types.h"
 #include "hydra/common/shared_dsg_info.h"
+
+namespace gtsam {
+class Values;
+}  // namespace gtsam
 
 namespace kimera_pgmo {
 class DeformationGraph;

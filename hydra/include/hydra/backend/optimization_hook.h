@@ -33,8 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_pgmo/deformation_graph.h>
-#include <spark_dsg/scene_graph.h>
+#include <spark_dsg/scene_graph_types.h>
+#include <spark_dsg/spark_dsg_fwd.h>
+
+#include <cstddef>
+#include <map>
+#include <memory>
+
+namespace kimera_pgmo {
+class DeformationGraph;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 

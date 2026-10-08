@@ -34,38 +34,26 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/virtual_config.h>
-#include <spark_dsg/layer_view.h>
+#include <spark_dsg/scene_graph_types.h>
 
-#include "hydra/backend/merge_types.h"
+#include <iosfwd>
+#include <list>
+#include <map>
 
 namespace hydra {
 
-struct AssociationStrategy {
-  using Layer = spark_dsg::SceneGraphLayer;
-  using Node = spark_dsg::SceneGraphNode;
-
-  virtual ~AssociationStrategy() = default;
-  virtual spark_dsg::LayerView candidates(const Layer& layer,
-                                          const Node& node) const = 0;
+struct Merge {
+  spark_dsg::NodeId from;
+  spark_dsg::NodeId to;
+  Merge remap(const std::map<spark_dsg::NodeId, spark_dsg::NodeId>& remapping) const;
 };
 
-struct MergeProposer {
-  using MergeCheck = std::function<bool(const spark_dsg::SceneGraphNode&,
-                                        const spark_dsg::SceneGraphNode&)>;
+std::ostream& operator<<(std::ostream& out, const Merge& merge);
 
-  struct Config {
-    config::VirtualConfig<AssociationStrategy> strategy;
-  } const config;
+inline bool operator==(const Merge& lhs, const Merge& rhs) {
+  return lhs.from == rhs.from && lhs.to == rhs.to;
+}
 
-  explicit MergeProposer(const Config& config) : config(config) {}
-
-  void findMerges(const spark_dsg::SceneGraphLayer& layer,
-                  const spark_dsg::LayerView& view,
-                  const MergeCheck& should_merge,
-                  MergeList& nodes_to_merge) const;
-};
-
-void declare_config(MergeProposer::Config& config);
+using MergeList = std::list<Merge>;
 
 }  // namespace hydra
