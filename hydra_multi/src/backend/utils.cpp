@@ -4,6 +4,7 @@
 #include <hydra/places/2d_places/index_remapping.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra_multi {
 
