@@ -35,9 +35,11 @@
 #include "hydra/backend/updates/update_buildings_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 using namespace spark_dsg;
 

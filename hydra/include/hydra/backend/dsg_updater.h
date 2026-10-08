@@ -35,6 +35,7 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/kimera_pgmo_interface.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <map>
 #include <memory>

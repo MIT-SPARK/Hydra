@@ -7,6 +7,7 @@
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/probability_utilities.h"

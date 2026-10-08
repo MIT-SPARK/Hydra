@@ -36,6 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <glog/logging.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace YAML {
 

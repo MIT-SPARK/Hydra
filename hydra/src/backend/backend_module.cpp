@@ -42,6 +42,7 @@
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/pcl_mesh_traits.h>
 #include <kimera_pgmo/utils/mesh_io.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/common/global_info.h"

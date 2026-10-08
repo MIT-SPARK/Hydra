@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 
 #pragma once
+#include <functional>
+
 #include "hydra/backend/optimization_hook.h"
 
 namespace hydra {

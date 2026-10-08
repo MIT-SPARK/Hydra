@@ -39,6 +39,8 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
+#include <iostream>
+
 #include "hydra/backend/merge_tracker.h"
 
 namespace hydra {

@@ -34,9 +34,11 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <gtsam/geometry/Pose3.h>
+#include <gtsam/nonlinear/Values.h>
 #include <hydra/backend/updates/update_agents_functor.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra_test/shared_dsg_fixture.h"
 

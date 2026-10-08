@@ -35,6 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/backend/updates/update_buildings_functor.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra_test/shared_dsg_fixture.h"
 

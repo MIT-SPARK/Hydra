@@ -40,6 +40,7 @@
 #include <config_utilities/validation.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 #include <yaml-cpp/yaml.h>
 
 #include "hydra/utils/timing_utilities.h"

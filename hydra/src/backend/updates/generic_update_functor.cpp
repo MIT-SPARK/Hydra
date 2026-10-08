@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/utils/timing_utilities.h"
 

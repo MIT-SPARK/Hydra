@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <hydra/backend/updates/ib_objects_update_functor.h>
+#include <spark_dsg/scene_graph.h>
 
 using namespace spark_dsg;
 
