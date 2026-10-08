@@ -35,6 +35,7 @@
 #include "hydra/backend/updates/update_objects_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/printing.h>
@@ -98,10 +99,13 @@ void declare_config(UpdateObjectsFunctor::Config& config) {
   base<VerbosityConfig>(config);
   field(config.allow_connection_merging, "allow_connection_merging");
   field(config.merge_proposer, "merge_proposer");
+  field<Path>(config.image_root, "image_root");
 }
 
 UpdateObjectsFunctor::UpdateObjectsFunctor(const Config& config)
-    : config(config::checkValid(config)), merge_proposer(config.merge_proposer) {}
+    : config(config::checkValid(config)),
+      merge_proposer(config.merge_proposer),
+      image_folders(config.image_root) {}
 
 UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
@@ -112,7 +116,13 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   if (config.allow_connection_merging) {
     my_hooks.merge = [this](const auto& graph, const auto& nodes) {
       merged_nodes_.insert(nodes.begin(), nodes.end());
-      return mergeObjectAttributes(config, graph, nodes);
+      auto attrs = mergeObjectAttributes(config, graph, nodes);
+      if (attrs && !nodes.empty()) {
+        // the unmerged attributes point to the frontend's temporary image folder
+        image_folders.finalize(nodes.front(), *attrs);
+      }
+
+      return attrs;
     };
 
     // merging indices means that we have archived objects with active vertices
@@ -166,6 +176,8 @@ void UpdateObjectsFunctor::call(const SceneGraph& unmerged,
     // TODO(nathan) this is sloppy and needs to be cleaned up
     dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
+
+  image_folders.update(unmerged, config.layer, dsg.merges, *dsg.graph);
 
   MLOG(1) << "object update: " << num_changed << " node(s)";
 }

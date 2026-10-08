@@ -83,10 +83,13 @@ size_t MergeTracker::applyMerges(const SceneGraph& unmerged,
       continue;
     }
 
-    if (!unmerged.hasNode(node)) {
-      CHECK(!graph.hasNode(node)) << NodeSymbol(node).str()
-                                  << " deleted from unmerged graph but in merged graph";
-      VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(node).str();
+    // the frontend can delete nodes from the unmerged graph before the deletion
+    // reaches the merged graph (or vice versa); the merged attributes can't be
+    // rebuilt for a parent missing from either graph
+    if (!unmerged.hasNode(node) || !graph.hasNode(node)) {
+      VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(node).str()
+              << " (unmerged: " << std::boolalpha << unmerged.hasNode(node)
+              << ", merged: " << graph.hasNode(node) << ")";
       merge_sets_.erase(iter);
       continue;
     }
@@ -117,11 +120,11 @@ void MergeTracker::updateAllMergeAttributes(const SceneGraph& unmerged,
   auto iter = merge_sets_.begin();
   while (iter != merge_sets_.end()) {
     const auto parent = iter->first;
-    if (!unmerged.hasNode(parent)) {
-      CHECK(!merged.hasNode(parent))
-          << NodeSymbol(parent).str()
-          << " deleted from unmerged graph but in merged graph";
-      VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(parent).str();
+    // see applyMerges: the parent may be missing from either graph
+    if (!unmerged.hasNode(parent) || !merged.hasNode(parent)) {
+      VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(parent).str()
+              << " (unmerged: " << std::boolalpha << unmerged.hasNode(parent)
+              << ", merged: " << merged.hasNode(parent) << ")";
       iter = merge_sets_.erase(iter);
       continue;
     }

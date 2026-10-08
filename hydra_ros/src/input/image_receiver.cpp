@@ -38,6 +38,7 @@
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <hydra/common/pipeline_queues.h>
 #include <hydra/utils/timing_utilities.h>
 #include <ianvs/node_handle.h>
 #include <message_filters/subscriber.h>
@@ -398,8 +399,8 @@ struct PacketBuilderBase {
 
   explicit PacketBuilderBase(const Callback& push) : push(push) {}
 
-  ImagePacketPtr make_packet(const Image::ConstSharedPtr& color,
-                             const Image::ConstSharedPtr& depth) const {
+  static ImagePacketPtr make_packet(const Image::ConstSharedPtr& color,
+                                    const Image::ConstSharedPtr& depth) {
     const auto timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
     auto packet = std::make_shared<ImageInputPacket>(timestamp_ns);
     packet->color = parseColor(*color);
@@ -456,6 +457,14 @@ struct ImageReceiverBase {
 };
 
 using PacketQueue = MessageQueue<ImageInputPacket::Ptr>;
+//! Forwards full-rate color and depth independent of semantics and features
+struct ImageTap {
+  //! Whether images should currently be forwarded
+  std::function<bool()> enabled;
+  //! Forward synchronized color and depth
+  std::function<void(const Image::ConstSharedPtr&, const Image::ConstSharedPtr&)>
+      forward;
+};
 
 template <typename AdapterT, typename TypeT>
 struct ImageReceiverImpl : public ImageReceiverBase {
@@ -463,13 +472,16 @@ struct ImageReceiverImpl : public ImageReceiverBase {
 
   using Info = ReceiverInfo<AdapterT, TypeT>;
   using Sync = Synchronizer<typename Info::policy>;
+  using TapPolicy = ApproximateTime<Image, Image>;
+  using TapSync = Synchronizer<TapPolicy>;
   using FeatureQueue = OptionalMessageSync<ImageInputPacket, FeatureVectorStamped>;
 
   ImageReceiverImpl(ianvs::NodeHandle nh,
                     const rclcpp::QoS& qos,
                     size_t queue_size,
                     bool with_feature,
-                    PacketQueue& queue);
+                    PacketQueue& queue,
+                    const ImageTap& tap);
 
   virtual ~ImageReceiverImpl() {
     features.reset();  // stop feature sync if enabled first
@@ -477,9 +489,18 @@ struct ImageReceiverImpl : public ImageReceiverBase {
 
   void push(ImageInputPacket::Ptr packet);
 
+  //! Whether color and depth should also be forwarded to the full-rate tap
+  bool tapEnabled() const { return tap_sync && tap.enabled(); }
+
+  void tapCallback(const ImgPtr& color, const ImgPtr& depth) {
+    tap.forward(color, depth);
+  }
+
   Sync sync;
   PacketQueue& queue;
   Info::builder builder;
+  const ImageTap tap;
+  std::unique_ptr<TapSync> tap_sync;
 
   rclcpp::CallbackGroup::SharedPtr color_group;
   rclcpp::Subscription<Image>::SharedPtr color;
@@ -497,25 +518,44 @@ ImageReceiverImpl<AdapterT, TypeT>::ImageReceiverImpl(ianvs::NodeHandle nh,
                                                       const rclcpp::QoS& qos,
                                                       size_t queue_size,
                                                       bool with_feature,
-                                                      PacketQueue& _queue)
+                                                      PacketQueue& _queue,
+                                                      const ImageTap& _tap)
     : sync(queue_size),
       queue(_queue),
       builder([this](auto packet) { push(packet); }),
+      tap(_tap),
+      tap_sync(tap.enabled && tap.forward
+                   ? std::make_unique<TapSync>(TapPolicy(queue_size))
+                   : nullptr),
       color_group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
       color(nh.create_subscription<Image>(
           "rgb/image_raw",
           qos,
-          [this](const ImgPtr& msg) { sync.template add<0>(msg); },
+          [this](const ImgPtr& msg) {
+            sync.template add<0>(msg);
+            if (tapEnabled()) {
+              tap_sync->template add<0>(msg);
+            }
+          },
           color_group)),
       depth_group(nh.as<NodeBaseInterface>()->create_callback_group(MutexGroup)),
       depth(nh.create_subscription<Image>(
           "depth_registered/image_rect",
           qos,
-          [this](const ImgPtr& msg) { sync.template add<1>(msg); },
+          [this](const ImgPtr& msg) {
+            sync.template add<1>(msg);
+            if (tapEnabled()) {
+              tap_sync->template add<1>(msg);
+            }
+          },
           depth_group)),
       semantics(nh, "semantic/image_raw", qos, *this),
       traversability(nh, "traversability/image_raw", qos, *this) {
   sync.registerCallback(&Info::builder::callback, &builder);
+  if (tap_sync) {
+    tap_sync->registerCallback(&ImageReceiverImpl::tapCallback, this);
+  }
+
   if (with_feature) {
     OptionalMessageSyncConfig feature_config{queue_size, qos};
     features = std::make_unique<FeatureQueue>(
@@ -555,43 +595,47 @@ using ApproxRecv = ImageReceiverImpl<T, ReceiverType<traversability, false>>;
 template <typename T, template <typename, bool> typename RecvT>
 std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
                                                 ianvs::NodeHandle nh,
-                                                PacketQueue& queue) {
+                                                PacketQueue& queue,
+                                                const ImageTap& tap) {
   const auto qos = config.qos;
   const auto size = config.queue_size;
+  const auto feature = config.with_feature;
   if (config.with_traversability) {
-    return std::make_unique<RecvT<T, true>>(nh, qos, size, config.with_feature, queue);
+    return std::make_unique<RecvT<T, true>>(nh, qos, size, feature, queue, tap);
   } else {
-    return std::make_unique<RecvT<T, false>>(nh, qos, size, config.with_feature, queue);
+    return std::make_unique<RecvT<T, false>>(nh, qos, size, feature, queue, tap);
   }
 }
 
 template <typename T>
 std::unique_ptr<ImageReceiverBase> makeReceiver(const ImageReceiver::Config& config,
                                                 ianvs::NodeHandle nh,
-                                                PacketQueue& queue) {
+                                                PacketQueue& queue,
+                                                const ImageTap& tap) {
   if (config.use_exact) {
-    return makeReceiver<T, ExactRecv>(config, nh, queue);
+    return makeReceiver<T, ExactRecv>(config, nh, queue, tap);
   } else {
-    return makeReceiver<T, ApproxRecv>(config, nh, queue);
+    return makeReceiver<T, ApproxRecv>(config, nh, queue, tap);
   }
 }
 
 struct ImageReceiver::Impl {
   explicit Impl(const ImageReceiver::Config& config,
                 ianvs::NodeHandle nh,
-                PacketQueue& queue) {
+                PacketQueue& queue,
+                const ImageTap& tap) {
     switch (config.semantics_type) {
       case ImageReceiver::Config::SemanticsType::NONE:
-        recv = makeReceiver<NullAdapter>(config, nh, queue);
+        recv = makeReceiver<NullAdapter>(config, nh, queue, tap);
         break;
       case ImageReceiver::Config::SemanticsType::CLOSED_SET:
-        recv = makeReceiver<ClosedSetAdapter>(config, nh, queue);
+        recv = makeReceiver<ClosedSetAdapter>(config, nh, queue, tap);
         break;
       case ImageReceiver::Config::SemanticsType::INSTANCE:
-        recv = makeReceiver<InstanceAdapter>(config, nh, queue);
+        recv = makeReceiver<InstanceAdapter>(config, nh, queue, tap);
         break;
       case ImageReceiver::Config::SemanticsType::OPEN_SET:
-        recv = makeReceiver<OpenSetAdapter>(config, nh, queue);
+        recv = makeReceiver<OpenSetAdapter>(config, nh, queue, tap);
         break;
     }
   }
@@ -634,7 +678,25 @@ void ImageReceiver::stop() {
 
 bool ImageReceiver::initImpl() {
   auto nh = ianvs::NodeHandle::this_node(ns_);
-  impl_.reset(new Impl(config, nh, queue_));
+  // forwards full-rate color and depth while sub-keyframe capture accepts the sensor
+  ImageTap tap;
+  tap.enabled = [name = sensor->name] {
+    return PipelineQueues::instance().acceptsSubKeyframes(name);
+  };
+  tap.forward = [sensor = sensor](const Image::ConstSharedPtr& color,
+                                  const Image::ConstSharedPtr& depth) {
+    // images are only parsed once selected by the sub-keyframe module
+    SubKeyframeInput input;
+    input.sensor = sensor;
+    input.timestamp_ns = rclcpp::Time(color->header.stamp).nanoseconds();
+    input.parse = [color, depth] {
+      return PacketBuilderBase::make_packet(color, depth);
+    };
+    // drop images instead of blocking the subscriber callbacks
+    PipelineQueues::instance().subkeyframe_queue.push(std::move(input), false);
+  };
+
+  impl_.reset(new Impl(config, nh, queue_, tap));
   return true;
 }
 

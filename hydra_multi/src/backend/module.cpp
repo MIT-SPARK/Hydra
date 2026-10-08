@@ -193,7 +193,13 @@ void MultiBackendModule::save(const DataDirectory& output) {
   const auto& graph = *merged_dsg_->graph;
   const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
   for (const auto& layer : graph.layer_partition(desired_layer)) {
-    const auto robot_id = kimera_pgmo::robot_prefix_to_id.at(layer.id.partition);
+    // the agents layer can also contain non-robot partitions (e.g., sub-keyframes)
+    const auto iter = kimera_pgmo::robot_prefix_to_id.find(layer.id.partition);
+    if (iter == kimera_pgmo::robot_prefix_to_id.end()) {
+      continue;
+    }
+
+    const auto robot_id = iter->second;
     std::string filename = "robot_" + std::to_string(robot_id) + "_trajectory.csv";
     const std::filesystem::path trajectory_path = backend_path / filename;
     ::hydra_multi::saveTrajectory(layer, trajectory_path);

@@ -33,58 +33,35 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
+#include <cstdlib>
+#include <filesystem>
+#include <stdexcept>
+#include <string>
+#include <system_error>
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+namespace hydra::test {
 
-namespace hydra {
+//! Unique temporary directory (created with mkdtemp) that is removed when destroyed
+struct TempDirectory {
+  explicit TempDirectory(const std::string& name = "hydra_test") {
+    auto pattern =
+        (std::filesystem::temp_directory_path() / (name + "-XXXXXX")).string();
+    if (!mkdtemp(pattern.data())) {
+      throw std::runtime_error("failed to create temporary directory " + pattern);
+    }
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config : VerbosityConfig {
-    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
-    using SemanticAssociation = association::SemanticNearestNode::Config;
+    path = pattern;
+  }
 
-    Config() : VerbosityConfig("[update_objects] ") {}
+  ~TempDirectory() {
+    std::error_code ec;
+    std::filesystem::remove_all(path, ec);
+  }
 
-    //! Layer to update
-    std::string layer = spark_dsg::DsgLayers::OBJECTS;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
-    //! Root of the per-object image folders (see utils::ObjectImageFolders); empty
-    //! disables image folder management
-    std::filesystem::path image_root;
-  } const config;
+  TempDirectory(const TempDirectory&) = delete;
+  TempDirectory& operator=(const TempDirectory&) = delete;
 
-  explicit UpdateObjectsFunctor(const Config& config);
-
-  Hooks hooks() const override;
-
-  void call(const spark_dsg::SceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
-  MergeList findMerges(const spark_dsg::SceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
-  void mergeAttributes(const spark_dsg::SceneGraph& layer,
-                       spark_dsg::NodeId from,
-                       spark_dsg::NodeId to) const;
-
-  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
-                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
-
-  mutable std::set<spark_dsg::NodeId> merged_nodes_;
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const utils::ObjectImageFolders image_folders;
+  std::filesystem::path path;
 };
 
-void declare_config(UpdateObjectsFunctor::Config& config);
-
-}  // namespace hydra
+}  // namespace hydra::test

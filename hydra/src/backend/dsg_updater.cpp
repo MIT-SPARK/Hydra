@@ -36,12 +36,14 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
+#include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
 
+#include "hydra/backend/backend_utilities.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
@@ -92,6 +94,8 @@ void declare_config(DsgUpdater::Config& config) {
   field(config.reset_dsg_on_loop_closure, "reset_dsg_on_loop_closure");
   field(config.update_functors, "update_functors");
   field(config.exhaustive_functors, "exhaustive_functors");
+  field<Path>(config.agent_image_root, "agent_image_root");
+  field<Path>(config.object_image_root, "object_image_root");
 }
 
 DsgUpdater::DsgUpdater(const Config& config,
@@ -107,6 +111,10 @@ DsgUpdater::DsgUpdater(const Config& config,
 void DsgUpdater::save(const DataDirectory& output, const std::string& label) const {
   std::lock_guard<std::mutex> graph_lock(target_dsg_->mutex);
   const auto graph_path = output.path(label);
+  // crash recovery: the backend copies agent and object image folders during updates,
+  // but folders written after the last update reached the backend are only on disk
+  utils::reconcileAgentImageFolders(*target_dsg_->graph, config.agent_image_root);
+  utils::reconcileObjectImageFolders(*target_dsg_->graph, config.object_image_root);
   target_dsg_->graph->save(graph_path / "dsg.json", false);
   target_dsg_->graph->save(graph_path / "dsg_with_mesh.json");
 

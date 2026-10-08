@@ -32,59 +32,56 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/virtual_config.h>
+#include "hydra/utils/image_folder.h"
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+namespace hydra::utils {
 
-namespace hydra {
+std::string keyframeStem(const std::string& prefix, uint64_t timestamp_ns) {
+  return prefix + std::to_string(timestamp_ns);
+}
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config : VerbosityConfig {
-    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
-    using SemanticAssociation = association::SemanticNearestNode::Config;
+bool isPathUnder(const std::filesystem::path& path,
+                 const std::filesystem::path& directory) {
+  auto normed_dir = directory.lexically_normal();
+  if (!normed_dir.empty() && !normed_dir.has_filename()) {
+    normed_dir = normed_dir.parent_path();  // trailing separator
+  }
 
-    Config() : VerbosityConfig("[update_objects] ") {}
+  const auto relative = path.lexically_normal().lexically_relative(normed_dir);
+  return !relative.empty() && relative != "." && *relative.begin() != "..";
+}
 
-    //! Layer to update
-    std::string layer = spark_dsg::DsgLayers::OBJECTS;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
-    //! Root of the per-object image folders (see utils::ObjectImageFolders); empty
-    //! disables image folder management
-    std::filesystem::path image_root;
-  } const config;
+std::filesystem::path imageFolderBase(const std::filesystem::path& image_root) {
+  auto root = image_root.lexically_normal();
+  if (!root.empty() && !root.has_filename()) {
+    root = root.parent_path();  // trailing separator
+  }
 
-  explicit UpdateObjectsFunctor(const Config& config);
+  return root.parent_path();
+}
 
-  Hooks hooks() const override;
+std::filesystem::path resolveImageFolder(const std::filesystem::path& image_root,
+                                         const std::string& value) {
+  const std::filesystem::path folder(value);
+  if (value.empty() || folder.is_absolute()) {
+    return folder;
+  }
 
-  void call(const spark_dsg::SceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
+  return imageFolderBase(image_root) / folder;
+}
 
-  MergeList findMerges(const spark_dsg::SceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
+std::string relativeImageFolder(const std::filesystem::path& image_root,
+                                const std::filesystem::path& path) {
+  const auto base = imageFolderBase(image_root);
+  if (base.empty()) {
+    return path.is_absolute() ? path.string() : path.lexically_normal().string();
+  }
 
-  void mergeAttributes(const spark_dsg::SceneGraph& layer,
-                       spark_dsg::NodeId from,
-                       spark_dsg::NodeId to) const;
+  if (!isPathUnder(path, base)) {
+    return path.string();
+  }
 
-  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
-                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
+  return path.lexically_normal().lexically_relative(base).string();
+}
 
-  mutable std::set<spark_dsg::NodeId> merged_nodes_;
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const utils::ObjectImageFolders image_folders;
-};
-
-void declare_config(UpdateObjectsFunctor::Config& config);
-
-}  // namespace hydra
+}  // namespace hydra::utils

@@ -32,59 +32,49 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/virtual_config.h>
+#include <gtest/gtest.h>
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+#include "hydra/frontend/keyframe_gate.h"
 
 namespace hydra {
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config : VerbosityConfig {
-    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
-    using SemanticAssociation = association::SemanticNearestNode::Config;
+TEST(KeyframeGate, FirstCallAlwaysTriggers) {
+  KeyframeGate gate({0.5, 15.0});
+  EXPECT_TRUE(
+      gate.shouldTrigger(Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond::Identity()));
+}
 
-    Config() : VerbosityConfig("[update_objects] ") {}
+TEST(KeyframeGate, SmallMotionDoesNotTrigger) {
+  KeyframeGate gate({0.5, 15.0});
+  gate.shouldTrigger(Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond::Identity());
+  EXPECT_FALSE(
+      gate.shouldTrigger(Eigen::Vector3d(0.1, 0, 0), Eigen::Quaterniond::Identity()));
+}
 
-    //! Layer to update
-    std::string layer = spark_dsg::DsgLayers::OBJECTS;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
-    //! Root of the per-object image folders (see utils::ObjectImageFolders); empty
-    //! disables image folder management
-    std::filesystem::path image_root;
-  } const config;
+TEST(KeyframeGate, TranslationOverThresholdTriggers) {
+  KeyframeGate gate({0.5, 15.0});
+  gate.shouldTrigger(Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond::Identity());
+  EXPECT_TRUE(
+      gate.shouldTrigger(Eigen::Vector3d(0.6, 0, 0), Eigen::Quaterniond::Identity()));
+}
 
-  explicit UpdateObjectsFunctor(const Config& config);
+TEST(KeyframeGate, RotationOverThresholdTriggers) {
+  KeyframeGate gate({10.0, 15.0});  // large translation thresh so only rotation matters
+  gate.shouldTrigger(Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond::Identity());
+  const Eigen::Quaterniond r(
+      Eigen::AngleAxisd(20.0 * M_PI / 180.0, Eigen::Vector3d::UnitZ()));
+  EXPECT_TRUE(gate.shouldTrigger(Eigen::Vector3d(0, 0, 0), r));
+}
 
-  Hooks hooks() const override;
-
-  void call(const spark_dsg::SceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
-  MergeList findMerges(const spark_dsg::SceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
-  void mergeAttributes(const spark_dsg::SceneGraph& layer,
-                       spark_dsg::NodeId from,
-                       spark_dsg::NodeId to) const;
-
-  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
-                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
-
-  mutable std::set<spark_dsg::NodeId> merged_nodes_;
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const utils::ObjectImageFolders image_folders;
-};
-
-void declare_config(UpdateObjectsFunctor::Config& config);
+TEST(KeyframeGate, StateAdvancesOnlyOnTrigger) {
+  KeyframeGate gate({0.5, 90.0});
+  gate.shouldTrigger(Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond::Identity());
+  // 0.3 then 0.3 again: neither individually >=0.5 from a non-advancing anchor,
+  // but cumulative from the origin anchor the second (0.6) must trigger.
+  EXPECT_FALSE(
+      gate.shouldTrigger(Eigen::Vector3d(0.3, 0, 0), Eigen::Quaterniond::Identity()));
+  EXPECT_TRUE(
+      gate.shouldTrigger(Eigen::Vector3d(0.6, 0, 0), Eigen::Quaterniond::Identity()));
+}
 
 }  // namespace hydra

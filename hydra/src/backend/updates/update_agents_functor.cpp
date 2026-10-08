@@ -63,6 +63,19 @@ inline std::string toString(const Eigen::Quaterniond& q, const Eigen::Vector3d& 
   return ss.str();
 }
 
+// The merge into the backend graph skips archived nodes, so image folders written
+// after a node archived only reach the unmerged graph
+void copyImageFolder(const SceneGraph& unmerged,
+                     NodeId node_id,
+                     AgentNodeAttributes& attrs) {
+  const auto source = unmerged.findNode(node_id);
+  const auto source_attrs =
+      source ? source->tryAttributes<AgentNodeAttributes>() : nullptr;
+  if (source_attrs && !source_attrs->image_folder.empty()) {
+    attrs.image_folder = source_attrs->image_folder;
+  }
+}
+
 }  // namespace
 
 using timing::ScopedTimer;
@@ -73,39 +86,46 @@ void declare_config(UpdateAgentsFunctor::Config&) {
 
 UpdateAgentsFunctor::UpdateAgentsFunctor(const Config&) {}
 
-void UpdateAgentsFunctor::call(const SceneGraph&,
+void UpdateAgentsFunctor::call(const SceneGraph& unmerged,
                                SharedDsgInfo& dsg,
                                const UpdateInfo::ConstPtr& info) const {
-  if (!info->pgmo_values || info->pgmo_values->size() == 0) {
-    return;
-  }
-
   ScopedTimer timer("backend/agent_update", info->timestamp_ns, true, 1, false);
+  const bool has_poses = info->pgmo_values && info->pgmo_values->size() > 0;
   auto& graph = *dsg.graph;
   const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
   for (const auto& layer : graph.layer_partition(desired_layer)) {
     std::set<NodeId> missing_nodes;
     for (const auto& node : layer.nodes()) {
-      auto& attrs = node.attributes<AgentNodeAttributes>();
-      if (!info->pgmo_values->exists(attrs.external_key)) {
+      // the agents layer also contains non-agent nodes (e.g., sub-keyframes)
+      auto attrs = node.tryAttributes<AgentNodeAttributes>();
+      if (!attrs) {
+        continue;
+      }
+
+      copyImageFolder(unmerged, node.id, *attrs);
+      if (!has_poses) {
+        continue;
+      }
+
+      if (!info->pgmo_values->exists(attrs->external_key)) {
         missing_nodes.insert(node.id);
         continue;
       }
 
-      const auto p_prev = attrs.position;
-      const auto q_prev = attrs.world_R_body;
+      const auto p_prev = attrs->position;
+      const auto q_prev = attrs->world_R_body;
       const gtsam::Pose3 prev_pose(gtsam::Rot3(q_prev), p_prev);
-      auto pose = info->pgmo_values->at<gtsam::Pose3>(attrs.external_key);
-      attrs.position = pose.translation();
-      attrs.world_R_body = Eigen::Quaterniond(pose.rotation().matrix());
+      auto pose = info->pgmo_values->at<gtsam::Pose3>(attrs->external_key);
+      attrs->position = pose.translation();
+      attrs->world_R_body = Eigen::Quaterniond(pose.rotation().matrix());
 
       const auto diff = prev_pose.between(pose);
       const auto q_diff = Eigen::Quaterniond(diff.rotation().matrix());
       const auto p_diff = diff.translation();
       VLOG(10) << "Updating agent " << NodeSymbol(node.id).str() << " pose from "
-               << NodeSymbol(attrs.external_key).str() << ":"
+               << NodeSymbol(attrs->external_key).str() << ":"
                << "\n - original: " << toString(q_prev, p_prev)
-               << "\n - new:      " << toString(attrs.world_R_body, attrs.position)
+               << "\n - new:      " << toString(attrs->world_R_body, attrs->position)
                << "\n - diff:     " << toString(q_diff, p_diff);
     }
 
@@ -113,6 +133,28 @@ void UpdateAgentsFunctor::call(const SceneGraph&,
       LOG(WARNING) << "Layer " << DsgLayers::AGENTS << "(" << layer.id.partition
                    << "): could not update "
                    << displayNodeSymbolContainer(missing_nodes);
+    }
+  }
+
+  if (!has_poses) {
+    return;
+  }
+
+  // sub-keyframes are rigidly attached to their (now optimized) anchor agent node
+  for (const auto& layer : graph.layer_partition(desired_layer)) {
+    for (const auto& node : layer.nodes()) {
+      auto attrs = node.tryAttributes<SubKeyframeNodeAttributes>();
+      if (!attrs) {
+        continue;
+      }
+
+      const auto anchor = graph.findNode(attrs->anchor_node_id);
+      const auto anchor_attrs =
+          anchor ? anchor->tryAttributes<AgentNodeAttributes>() : nullptr;
+      if (anchor_attrs) {
+        attrs->position = anchor_attrs->position +
+                          anchor_attrs->world_R_body * attrs->anchor_t_subframe;
+      }
     }
   }
 }

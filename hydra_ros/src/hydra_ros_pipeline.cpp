@@ -68,6 +68,8 @@ void declare_config(HydraRosPipeline::Config& config) {
   config.lcd.setOptional();
   field(config.lcd, "lcd");
   field(config.status_monitor, "status_monitor");
+  config.sub_keyframe.setOptional();
+  field(config.sub_keyframe, "sub_keyframe");
 }
 
 HydraRosPipeline::Config::Config()
@@ -118,6 +120,12 @@ void HydraRosPipeline::init() {
       [this](uint64_t stamp, const auto&, const auto&) {
         monitor_->recordModuleCallback("active_window", nanoseconds(stamp));
       }));
+
+  // has to exist before the input module receives images
+  auto sub_keyframe = config.sub_keyframe.create();
+  if (sub_keyframe) {
+    modules_["sub_keyframe"] = std::move(sub_keyframe);
+  }
 
   input_module_ =
       std::make_shared<RosInputModule>(config.input, active_window_->queue());

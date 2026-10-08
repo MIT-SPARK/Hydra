@@ -68,14 +68,15 @@ void MultiRosBackendPublisher::publishPoseGraph(const SceneGraph& graph,
   const auto agent_layer_id = graph.getLayerKey(DsgLayers::AGENTS)->layer;
   for (const auto& layer : graph.layer_partition(agent_layer_id)) {
     for (const auto& node : layer.nodes()) {
-      NodeSymbol node_symb(node.id);
-      size_t robot_id = kimera_pgmo::robot_prefix_to_id.at(node_symb.category());
-      if (!id_timestamps.count(robot_id)) {
-        id_timestamps[robot_id] = std::vector<size_t>();
+      // the agents layer can also contain non-agent nodes (e.g., sub-keyframes)
+      const auto attrs = node.tryAttributes<AgentNodeAttributes>();
+      const auto iter =
+          kimera_pgmo::robot_prefix_to_id.find(NodeSymbol(node.id).category());
+      if (!attrs || iter == kimera_pgmo::robot_prefix_to_id.end()) {
+        continue;
       }
 
-      id_timestamps[robot_id].push_back(
-          node.attributes<AgentNodeAttributes>().timestamp.count());
+      id_timestamps[iter->second].push_back(attrs->timestamp.count());
     }
   }
 

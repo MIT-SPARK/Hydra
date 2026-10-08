@@ -33,58 +33,39 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+#include <Eigen/Geometry>
 
 namespace hydra {
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config : VerbosityConfig {
-    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
-    using SemanticAssociation = association::SemanticNearestNode::Config;
+/**
+ * @brief Translation/rotation keyframe trigger.
+ *
+ * Triggers on the first pose and whenever the pose moved or rotated far enough from
+ * the last triggering pose.
+ */
+class KeyframeGate {
+ public:
+  struct Config {
+    //! Minimum translation [m] since the last keyframe to trigger
+    double min_translation_m = 0.25;
+    //! Minimum rotation [deg] since the last keyframe to trigger
+    double min_rotation_deg = 15.0;
+  };
 
-    Config() : VerbosityConfig("[update_objects] ") {}
+  explicit KeyframeGate(const Config& config) : config_(config) {}
 
-    //! Layer to update
-    std::string layer = spark_dsg::DsgLayers::OBJECTS;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
-    //! Root of the per-object image folders (see utils::ObjectImageFolders); empty
-    //! disables image folder management
-    std::filesystem::path image_root;
-  } const config;
+  //! @brief Check whether a pose is a new keyframe (and record it if so)
+  bool shouldTrigger(const Eigen::Vector3d& position,
+                     const Eigen::Quaterniond& orientation);
 
-  explicit UpdateObjectsFunctor(const Config& config);
-
-  Hooks hooks() const override;
-
-  void call(const spark_dsg::SceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
-  MergeList findMerges(const spark_dsg::SceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
-  void mergeAttributes(const spark_dsg::SceneGraph& layer,
-                       spark_dsg::NodeId from,
-                       spark_dsg::NodeId to) const;
-
-  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
-                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
-
-  mutable std::set<spark_dsg::NodeId> merged_nodes_;
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const utils::ObjectImageFolders image_folders;
+ private:
+  Config config_;
+  bool initialized_ = false;
+  Eigen::Vector3d last_position_ = Eigen::Vector3d::Zero();
+  Eigen::Quaterniond last_orientation_ = Eigen::Quaterniond::Identity();
 };
 
-void declare_config(UpdateObjectsFunctor::Config& config);
+void declare_config(KeyframeGate::Config& config);
 
 }  // namespace hydra

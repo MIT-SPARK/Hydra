@@ -33,58 +33,33 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+#include <spark_dsg/node_symbol.h>
+
+#include <Eigen/Geometry>
+#include <cstdint>
+#include <string>
 
 namespace hydra {
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config : VerbosityConfig {
-    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
-    using SemanticAssociation = association::SemanticNearestNode::Config;
+//! Default partition (and node symbol category) of the agents layer for sub-keyframe
+//! nodes, distinct from the robot prefixes (`a`-`h`) and the kimera_pgmo vertex
+//! prefixes (`s`-`z`)
+inline constexpr char kDefaultSubKeyframePartition = 'k';
 
-    Config() : VerbosityConfig("[update_objects] ") {}
+//! @brief Node id of the index-th sub-keyframe of a robot. The robot id is stored in
+//! the upper bits of the symbol index so that ids are unique across robots
+inline spark_dsg::NodeId subKeyframeNodeId(char category, int robot_id, size_t index) {
+  return spark_dsg::NodeSymbol(category, (static_cast<size_t>(robot_id) << 48) | index);
+}
 
-    //! Layer to update
-    std::string layer = spark_dsg::DsgLayers::OBJECTS;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
-    //! Root of the per-object image folders (see utils::ObjectImageFolders); empty
-    //! disables image folder management
-    std::filesystem::path image_root;
-  } const config;
-
-  explicit UpdateObjectsFunctor(const Config& config);
-
-  Hooks hooks() const override;
-
-  void call(const spark_dsg::SceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
-  MergeList findMerges(const spark_dsg::SceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
-  void mergeAttributes(const spark_dsg::SceneGraph& layer,
-                       spark_dsg::NodeId from,
-                       spark_dsg::NodeId to) const;
-
-  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
-                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
-
-  mutable std::set<spark_dsg::NodeId> merged_nodes_;
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const utils::ObjectImageFolders image_folders;
+//! Request for a sub-keyframe node, created by the frontend once anchors exist
+struct SubKeyframeRequest {
+  uint64_t timestamp_ns = 0;
+  //! Body pose of the sub-keyframe
+  Eigen::Isometry3d world_T_subframe = Eigen::Isometry3d::Identity();
+  //! Image folder value of the sub-keyframe images (see KeyframeWriter::imageFolder)
+  std::string image_folder;
 };
-
-void declare_config(UpdateObjectsFunctor::Config& config);
 
 }  // namespace hydra

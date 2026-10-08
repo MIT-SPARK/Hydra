@@ -37,6 +37,7 @@
 #include <config_utilities/virtual_config.h>
 
 #include "hydra/backend/association_strategies.h"
+#include "hydra/backend/backend_utilities.h"
 #include "hydra/backend/deformation_interpolator.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/common/node_matchers.h"
@@ -58,6 +59,9 @@ struct GenericUpdateFunctor : public UpdateFunctor {
     //! Association strategy for finding matches to active nodes
     MergeProposer::Config merge_proposer = {
         config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
+    //! Root of the per-object image folders (see utils::ObjectImageFolders); empty
+    //! disables image folder management
+    std::filesystem::path image_root = {};
   } const config;
 
   explicit GenericUpdateFunctor(const Config& config);
@@ -77,6 +81,7 @@ struct GenericUpdateFunctor : public UpdateFunctor {
   const std::unique_ptr<NodeMatcher> node_matcher;
   const MergeProposer merge_proposer;
   const DeformationInterpolator deformation_interpolator;
+  const utils::ObjectImageFolders image_folders;
 };
 
 void declare_config(GenericUpdateFunctor::Config& config);

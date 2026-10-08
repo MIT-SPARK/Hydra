@@ -32,59 +32,40 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/virtual_config.h>
+#include "hydra/frontend/keyframe_gate.h"
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
+
+#include <cmath>
 
 namespace hydra {
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config : VerbosityConfig {
-    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
-    using SemanticAssociation = association::SemanticNearestNode::Config;
+void declare_config(KeyframeGate::Config& config) {
+  using namespace config;
+  name("KeyframeGate::Config");
+  field(config.min_translation_m, "min_translation_m", "m");
+  field(config.min_rotation_deg, "min_rotation_deg", "deg");
+  check(config.min_translation_m, GE, 0.0, "min_translation_m");
+  check(config.min_rotation_deg, GE, 0.0, "min_rotation_deg");
+}
 
-    Config() : VerbosityConfig("[update_objects] ") {}
+bool KeyframeGate::shouldTrigger(const Eigen::Vector3d& position,
+                                 const Eigen::Quaterniond& orientation) {
+  if (initialized_) {
+    const double translation_diff = (position - last_position_).norm();
+    const double angular_diff =
+        last_orientation_.angularDistance(orientation) * 180.0 / M_PI;
+    if (translation_diff < config_.min_translation_m &&
+        angular_diff < config_.min_rotation_deg) {
+      return false;
+    }
+  }
 
-    //! Layer to update
-    std::string layer = spark_dsg::DsgLayers::OBJECTS;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
-    //! Root of the per-object image folders (see utils::ObjectImageFolders); empty
-    //! disables image folder management
-    std::filesystem::path image_root;
-  } const config;
-
-  explicit UpdateObjectsFunctor(const Config& config);
-
-  Hooks hooks() const override;
-
-  void call(const spark_dsg::SceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
-  MergeList findMerges(const spark_dsg::SceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
-  void mergeAttributes(const spark_dsg::SceneGraph& layer,
-                       spark_dsg::NodeId from,
-                       spark_dsg::NodeId to) const;
-
-  void updateMeshIndices(const spark_dsg::SceneGraph& graph,
-                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
-
-  mutable std::set<spark_dsg::NodeId> merged_nodes_;
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const utils::ObjectImageFolders image_folders;
-};
-
-void declare_config(UpdateObjectsFunctor::Config& config);
+  last_position_ = position;
+  last_orientation_ = orientation;
+  initialized_ = true;
+  return true;
+}
 
 }  // namespace hydra

@@ -76,6 +76,57 @@ TEST(MergeTracker, DeletedParentCorrect) {
   EXPECT_NO_THROW(tracker.applyMerges(*unmerged, repeat, *dsg, merge_attrs));
 }
 
+// The frontend can delete a merge parent from the unmerged graph before the
+// deletion is propagated to the merged graph; the tracker drops the merge set.
+TEST(MergeTracker, ParentDeletedOnlyFromUnmerged) {
+  auto dsg = test::makeSharedDsg();
+  auto& merged = *dsg->graph;
+  addObject(merged, 0);
+  addObject(merged, 1);
+  const auto unmerged = merged.clone();
+
+  MergeTracker tracker;
+  size_t num_calls = 0;
+  const auto merge_attrs =
+      [&num_calls](const SceneGraph& unmerged,
+                   const std::vector<NodeId>& nodes) -> NodeAttributes::Ptr {
+    ++num_calls;
+    return unmerged.getNode(nodes.front()).attributes().clone();
+  };
+
+  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
+  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, merge_attrs), 1u);
+  EXPECT_EQ(num_calls, 1u);
+
+  unmerged->removeNode(NodeSymbol('O', 0));
+  EXPECT_NO_THROW(tracker.updateAllMergeAttributes(*unmerged, merged, merge_attrs));
+  EXPECT_EQ(num_calls, 1u);
+  EXPECT_TRUE(tracker.print().empty());
+}
+
+// The parent can also be missing from the merged graph only.
+TEST(MergeTracker, ParentDeletedOnlyFromMerged) {
+  auto dsg = test::makeSharedDsg();
+  auto& merged = *dsg->graph;
+  addObject(merged, 0);
+  addObject(merged, 1);
+  const auto unmerged = merged.clone();
+
+  MergeTracker tracker;
+  const auto merge_attrs = [](const SceneGraph& unmerged,
+                              const std::vector<NodeId>& nodes) -> NodeAttributes::Ptr {
+    return unmerged.getNode(nodes.front()).attributes().clone();
+  };
+
+  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
+  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, merge_attrs), 1u);
+
+  merged.removeNode(NodeSymbol('O', 0));
+  EXPECT_NO_THROW(tracker.updateAllMergeAttributes(*unmerged, merged, merge_attrs));
+  EXPECT_FALSE(merged.hasNode(NodeSymbol('O', 0)));
+  EXPECT_TRUE(tracker.print().empty());
+}
+
 TEST(MergeTracker, NullAttributesCorrect) {
   auto dsg = test::makeSharedDsg();
   auto& merged = *dsg->graph;

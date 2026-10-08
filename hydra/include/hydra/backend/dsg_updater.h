@@ -36,6 +36,7 @@
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/kimera_pgmo_interface.h>
 
+#include <filesystem>
 #include <map>
 #include <memory>
 
@@ -69,6 +70,11 @@ class DsgUpdater {
     config::OrderedMap<std::string, FunctorConfig> update_functors;
     //! Names of functors to use exhaustive merging for
     std::vector<std::string> exhaustive_functors;
+    //! Directories of the agent keyframe images and the object image folders used to
+    //! restore missing image folders on agent and object nodes before saving (empty
+    //! disables). Restored folders are relative to their parent directory
+    std::filesystem::path agent_image_root;
+    std::filesystem::path object_image_root;
   } const config;
 
   DsgUpdater(const Config& config,

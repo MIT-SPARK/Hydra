@@ -78,6 +78,8 @@ struct LayerTracker {
     std::optional<spark_dsg::LayerId> target_layer;
     config::VirtualConfig<NodeMatcher> matcher;
     config::VirtualConfig<AttributeMerger> merger{EarliestAttributeMerger::Config()};
+    //! @brief archive (is_active=false) tracked nodes absent from an update round
+    bool archive_missing = false;
   } const config;
 
   explicit LayerTracker(const Config& config);

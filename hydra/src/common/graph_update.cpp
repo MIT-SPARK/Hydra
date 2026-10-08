@@ -41,6 +41,7 @@
 #include <spark_dsg/scene_graph.h>
 
 #include <algorithm>
+#include <unordered_set>
 
 #include "hydra/common/attribute_merger.h"
 
@@ -86,6 +87,7 @@ void declare_config(LayerTracker::Config& config) {
   field(config.matcher, "matcher");
   config.merger.setOptional();
   field(config.merger, "merger");
+  field(config.archive_missing, "archive_missing");
 }
 
 void declare_config(GraphUpdater::Config& config) {
@@ -272,7 +274,12 @@ void GraphUpdater::update(const GraphUpdate& update, SceneGraph& graph) {
     const auto target_layer_id = tracker.config.target_layer.value_or(layer_id);
 
     std::map<NodeId, const NodeAttributes*> active_targets;
+    std::unordered_set<size_t> seen_tracks;
     for (auto&& entry : layer_update->updates) {
+      if (entry.track_id) {
+        seen_tracks.insert(*entry.track_id);
+      }
+
       switch (entry.update_type) {
         case NodeUpdate::UpdateType::Delete: {
           deleteNode(entry, tracker, graph);
@@ -289,6 +296,21 @@ void GraphUpdater::update(const GraphUpdate& update, SceneGraph& graph) {
           }
 
           break;
+        }
+      }
+    }
+
+    if (tracker.config.archive_missing) {
+      // tracks the active window stopped emitting have left the window; archiving
+      // them makes the node visible to archived-only merge candidates
+      for (const auto& [track, node_id] : tracker.track_to_node) {
+        if (seen_tracks.count(track)) {
+          continue;
+        }
+
+        const auto node = graph.findNode(node_id);
+        if (node) {
+          node->attributes().is_active = false;
         }
       }
     }

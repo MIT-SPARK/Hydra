@@ -42,6 +42,7 @@
 
 #include <memory>
 
+#include "hydra_ros/frontend/sub_keyframe_module.h"
 #include "hydra_ros/input/ros_input_module.h"
 #include "hydra_ros/utils/status_monitor.h"
 
@@ -69,6 +70,8 @@ class HydraRosPipeline : public HydraPipeline {
     config::VirtualConfig<LoopClosureModule> lcd;
     //! @brief Monitor to report whether or Hydra is running normally
     StatusMonitor::Config status_monitor;
+    //! @brief Optional config for full-rate sub-keyframe capture
+    config::VirtualConfig<SubKeyframeModule> sub_keyframe;
   } const config;
 
   explicit HydraRosPipeline(int robot_id, int config_verbosity = 1);

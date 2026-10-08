@@ -33,11 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/backend/merge_tracker.h>
 #include <hydra/backend/updates/update_objects_functor.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
+#include <filesystem>
+#include <fstream>
+
 #include "hydra_test/shared_dsg_fixture.h"
+#include "hydra_test/temp_directory.h"
 
 using namespace spark_dsg;
 
@@ -194,6 +199,50 @@ TEST(UpdateObjectsFunctor, ObjectUpdateMergeNoLC) {
 
   MergeList expected{{1, 0}};
   EXPECT_EQ(result_merges, expected);
+}
+
+// Merged attributes are cloned from the unmerged graph, whose image folder points to
+// the frontend's temporary folder; the merge result points to the final folder and
+// the temporary folders are moved and unioned on the next update.
+TEST(UpdateObjectsFunctor, ImageFoldersOnMerge) {
+  namespace fs = std::filesystem;
+  test::TempDirectory tmp;
+  const auto root = tmp.path / "images";
+  for (const auto& name : {"a", "b"}) {
+    fs::create_directories(root / "temp" / name);
+    std::ofstream(root / "temp" / name / (std::string(name) + ".png")) << "{}";
+  }
+
+  auto dsg = test::makeSharedDsg();
+  auto& merged = *dsg->graph;
+  for (const auto& [index, name] : std::map<size_t, std::string>{{0, "a"}, {1, "b"}}) {
+    auto attrs = std::make_unique<KhronosObjectAttributes>();
+    attrs->image_folder = "images/temp/" + name;  // relative to the root's parent
+    merged.emplaceNode(DsgLayers::OBJECTS, NodeSymbol('O', index), std::move(attrs));
+  }
+
+  const auto unmerged = merged.clone();
+
+  UpdateObjectsFunctor::Config config;
+  config.image_root = root;
+  UpdateObjectsFunctor functor(config);
+  const auto hooks = functor.hooks();
+  ASSERT_TRUE(hooks.merge);
+
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, false, {}});
+  functor.call(*unmerged, *dsg, info);
+
+  MergeTracker tracker;
+  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
+  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, hooks.merge), 1u);
+  const auto& attrs =
+      merged.getNode(NodeSymbol('O', 0)).attributes<KhronosObjectAttributes>();
+  EXPECT_EQ(attrs.image_folder, "images/O_0");
+
+  functor.call(*unmerged, *dsg, info);
+  EXPECT_TRUE(fs::exists(root / "O_0" / "a.png"));
+  EXPECT_TRUE(fs::exists(root / "O_0" / "b.png"));
+  EXPECT_FALSE(fs::exists(root / "O_1"));
 }
 
 }  // namespace hydra
