@@ -219,11 +219,11 @@ class Trajectory:
         pose_df.insert(0, "timestamp_ns", self._times)
         return pose_df
 
-    def to_csv(self, filename):
+    def to_csv(self, filename, **kwargs):
         """Save the trajectory to the csv."""
         filepath = pathlib.Path(filename).expanduser().absolute()
         with filepath.open("w") as fout:
-            self.dataframe().to_csv(fout, index=False)
+            self.dataframe(**kwargs).to_csv(fout, index=False)
 
     @classmethod
     def from_flattened(cls, times: np.ndarray, poses: np.ndarray):
