@@ -38,6 +38,7 @@
 #include <config_utilities/validation.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 #include <spark_dsg/traversability_boundary.h>
 
 #include <queue>

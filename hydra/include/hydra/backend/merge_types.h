@@ -32,41 +32,28 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-
 #pragma once
-#include <functional>
 
-#include "hydra/backend/optimization_hook.h"
+#include <spark_dsg/scene_graph_types.h>
+
+#include <iosfwd>
+#include <list>
+#include <map>
 
 namespace hydra {
 
-class MstPlaceFactors : public OptimizationHook {
- public:
-  struct Config {
-    //! Factor variance between minimum spanning tree leaves and mesh control points
-    double mesh_variance = 1.0e-2;
-    //! Factor variance between nodes of the minimum spanning tree (i.e., places)
-    double edge_variance = 10.0;
-  } const config;
-
-  explicit MstPlaceFactors(const Config& config);
-
-  virtual ~MstPlaceFactors() = default;
-
-  void updateProblem(uint64_t timestamp_ns,
-                     const spark_dsg::SceneGraph& graph,
-                     kimera_pgmo::DeformationGraph& deformation_graph,
-                     const NodeRobotMap* robot_lookup) const override;
+struct Merge {
+  spark_dsg::NodeId from;
+  spark_dsg::NodeId to;
+  Merge remap(const std::map<spark_dsg::NodeId, spark_dsg::NodeId>& remapping) const;
 };
 
-void declare_config(MstPlaceFactors::Config& config);
+std::ostream& operator<<(std::ostream& out, const Merge& merge);
 
-void addPlacesToDeformationGraph(
-    const spark_dsg::SceneGraph& graph,
-    size_t timestamp_ns,
-    kimera_pgmo::DeformationGraph& deformation_graph,
-    double mst_edge_variance,
-    double mesh_edge_variance,
-    const std::function<char(spark_dsg::NodeId)>& prefix_lookup);
+inline bool operator==(const Merge& lhs, const Merge& rhs) {
+  return lhs.from == rhs.from && lhs.to == rhs.to;
+}
+
+using MergeList = std::list<Merge>;
 
 }  // namespace hydra

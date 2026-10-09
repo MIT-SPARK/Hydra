@@ -36,6 +36,7 @@
 
 #include <glog/logging.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 using namespace spark_dsg;
 

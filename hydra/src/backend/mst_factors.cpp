@@ -38,8 +38,10 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <kimera_pgmo/deformation_graph.h>
 #include <pose_graph_tools/pose_graph.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/utils/minimum_spanning_tree.h"

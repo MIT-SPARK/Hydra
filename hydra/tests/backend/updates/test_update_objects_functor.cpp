@@ -36,6 +36,7 @@
 #include <hydra/backend/updates/update_objects_functor.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra_test/shared_dsg_fixture.h"
 

@@ -38,6 +38,7 @@
 #include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/places/2d_places/ellipsoid_math.h"
 #include "hydra/places/2d_places/index_remapping.h"

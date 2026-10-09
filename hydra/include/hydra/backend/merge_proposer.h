@@ -37,21 +37,9 @@
 #include <config_utilities/virtual_config.h>
 #include <spark_dsg/layer_view.h>
 
+#include "hydra/backend/merge_types.h"
+
 namespace hydra {
-
-struct Merge {
-  spark_dsg::NodeId from;
-  spark_dsg::NodeId to;
-  Merge remap(const std::map<spark_dsg::NodeId, spark_dsg::NodeId>& remapping) const;
-};
-
-std::ostream& operator<<(std::ostream& out, const Merge& merge);
-
-inline bool operator==(const Merge& lhs, const Merge& rhs) {
-  return lhs.from == rhs.from && lhs.to == rhs.to;
-}
-
-using MergeList = std::list<Merge>;
 
 struct AssociationStrategy {
   using Layer = spark_dsg::SceneGraphLayer;

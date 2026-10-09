@@ -41,6 +41,7 @@
 #include <hydra/common/global_info.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <spark_dsg/printing.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/utils/timing_utilities.h"
 

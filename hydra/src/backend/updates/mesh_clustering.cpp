@@ -41,6 +41,7 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/utils/pgmo_mesh_traits.h"

@@ -35,10 +35,13 @@
 #include "hydra/backend/updates/update_agents_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <gtsam/nonlinear/Values.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <iomanip>
 

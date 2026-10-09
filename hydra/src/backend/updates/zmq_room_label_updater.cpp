@@ -40,6 +40,7 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 #include <spark_dsg/zmq_interface.h>
 
 using namespace spark_dsg;

@@ -40,6 +40,7 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/labelspace.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/pgmo_glog_sink.h"

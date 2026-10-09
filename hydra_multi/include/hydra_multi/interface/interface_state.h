@@ -2,6 +2,7 @@
 
 #include <config_utilities/factory.h>
 #include <hydra/common/message_queue.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <Eigen/Dense>
 #include <atomic>

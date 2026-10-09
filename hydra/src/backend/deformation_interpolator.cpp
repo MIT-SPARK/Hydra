@@ -44,6 +44,7 @@
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 

@@ -35,8 +35,10 @@
 #include "hydra/backend/updates/update_region_growing_traversability_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 #include <spark_dsg/traversability_boundary.h>
 
 #include "hydra/utils/timing_utilities.h"
