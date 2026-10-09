@@ -38,6 +38,7 @@
 #include <config_utilities/config.h>
 #include <glog/logging.h>
 #include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph_layer.h>
 
 using namespace spark_dsg;
 

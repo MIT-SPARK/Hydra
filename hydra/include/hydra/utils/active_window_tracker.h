@@ -34,6 +34,9 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <spark_dsg/layer_view.h>
+#include <spark_dsg/scene_graph_types.h>
+
+#include <set>
 
 namespace hydra {
 
