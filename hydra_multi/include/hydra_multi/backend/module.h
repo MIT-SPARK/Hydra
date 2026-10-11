@@ -70,12 +70,6 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
     bool include_mesh_factors = true;
     //! Configuration for associating external loop closures
     hydra::ExternalLoopClosureReceiver::Config external_loop_closures;
-    //! Add object pose to deformation graph
-    bool add_objects_to_deformation_graph = false;
-    //! Object agent association max time diff (s) when adding to dgraph
-    double object_association_max_diff_s = 10.0;
-    //! Object agent association covariance
-    double object_variance = 1.0;
     //! Scene graph loop closure variance
     double sg_loop_closure_variance = 0.1;
     //! Output sinks that process that latest backed scene graph and state
@@ -130,8 +124,6 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
   void addLoopClosures();
 
   void initialAlignment();
-
-  void addObjectsToDeformationGraph();
 
   void optimizeStartup() override;
 

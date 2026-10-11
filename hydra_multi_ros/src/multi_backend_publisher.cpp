@@ -79,7 +79,7 @@ void MultiRosBackendPublisher::publishPoseGraph(const SceneGraph& graph,
     }
   }
 
-  auto pose_graph = *dgraph.getPoseGraph(id_timestamps, false, true);
+  auto pose_graph = *dgraph.getPoseGraph(false, true);
   pose_graph_pub_->publish(pose_graph);
 }
 

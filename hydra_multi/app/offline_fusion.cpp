@@ -192,7 +192,7 @@ ProblemInfo::ProblemInfo(const Args& args)
     robot_config.inputs.emplace_back("dsg", dsg);
 
     hydra_multi::FileDGraphInput::Config dgraph;
-    dgraph.dgrf_path = dirpath / "backend/deformation_graph.dgrf";
+    dgraph.dgrf_path = dirpath / "backend/deformation_graph.json";
     dgraph.include_priors = false;
     robot_config.inputs.emplace_back("dgrf", dgraph);
 

@@ -73,7 +73,7 @@ TEST(LoopClosureInitialAlignTests, UpdatePrivatePairwiseTransforms) {
   for (char prefix : {'a', 'b', 'c'}) {
     gtsam::Pose3 odom_pose;
     for (size_t i = 0; i < 3; i++) {
-      dgraph->processNewNode(gtsam::Symbol(prefix, i), odom_pose, false);
+      dgraph->addNewNode(gtsam::Symbol(prefix, i), 0, odom_pose, false);
       odom_pose = odom_pose.compose(odom_step);
     }
   }
@@ -114,7 +114,7 @@ TEST(LoopClosureInitialAlignTests, ComputeInitialTransformsIdentity) {
   for (char prefix : {'a', 'b', 'c'}) {
     gtsam::Pose3 odom_pose;
     for (size_t i = 0; i < 3; i++) {
-      dgraph->processNewNode(gtsam::Symbol(prefix, i), gtsam::Pose3(), false);
+      dgraph->addNewNode(gtsam::Symbol(prefix, i), 0, gtsam::Pose3(), false);
     }
   }
 
@@ -156,7 +156,7 @@ TEST(LoopClosureInitialAlignTests, ComputeInitialTransforms) {
   for (char prefix : {'a', 'b', 'c'}) {
     gtsam::Pose3 odom_pose;
     for (size_t i = 0; i < 3; i++) {
-      dgraph->processNewNode(gtsam::Symbol(prefix, i), gtsam::Pose3(), false);
+      dgraph->addNewNode(gtsam::Symbol(prefix, i), 0, gtsam::Pose3(), false);
     }
   }
 
@@ -203,7 +203,7 @@ TEST(LoopClosureInitialAlignTests, ComputeInitialGuess) {
   for (char prefix : {'a', 'b', 'c'}) {
     gtsam::Pose3 odom_pose;
     for (size_t i = 0; i < 3; i++) {
-      dgraph->processNewNode(gtsam::Symbol(prefix, i), gtsam::Pose3(), false);
+      dgraph->addNewNode(gtsam::Symbol(prefix, i), 0, gtsam::Pose3(), false);
       initial.insert(gtsam::Symbol(prefix, i), gtsam::Pose3());
     }
   }

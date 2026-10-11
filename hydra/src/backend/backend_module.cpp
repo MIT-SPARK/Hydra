@@ -163,7 +163,7 @@ void BackendModule::save(const DataDirectory& output) {
   const auto filename = output.path("backend/pgmo") / "dsg_pgmo_status.csv";
   writeBackendStatus(status_log_, filename);
 
-  deformation_graph_->save(backend_path / "deformation_graph.dgrf");
+  deformation_graph_->save(backend_path / "deformation_graph.json");
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   if (deformation_graph_->hasPrefixPoses(prefix.key)) {
     const auto optimized_path = getOptimizedTrajectory(prefix.id);

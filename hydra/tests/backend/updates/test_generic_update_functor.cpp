@@ -102,15 +102,16 @@ TEST(GenericUpdateFunctor, shouldUpdate) {
     graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
   }
 
-  kimera_pgmo::DeformationGraph dgraph;
-  dgraph.load(test::get_resource_path() / "graph.dgrf");
+  const auto filepath = test::get_resource_path() / "graph.json";
+  auto dgraph = kimera_pgmo::DeformationGraph::load(filepath);
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, false, {}, &dgraph});
   auto config = defaultConfig();
   config.enable_merging = false;
   VLOG(1) << "Using config:\n" << config::toString(config);
 
   GenericUpdateFunctor functor(config);
+  auto info = std::make_shared<UpdateInfo>();
+  info->deformation_graph = dgraph.get();
   callWithUnmerged(functor, *dsg, info, false);
 
   const auto& result = graph.getNode(0).attributes();
