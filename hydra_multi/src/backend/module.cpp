@@ -30,7 +30,6 @@ using spark_dsg::DsgLayers;
 using spark_dsg::Mesh;
 using spark_dsg::NodeId;
 using spark_dsg::NodeSymbol;
-using spark_dsg::ObjectNodeAttributes;
 using spark_dsg::SceneGraphLayer;
 
 namespace {
@@ -133,16 +132,11 @@ void declare_config(MultiBackendModule::Config& config) {
   field(config.anchor_robot_id, "anchor_robot_id");
   field(config.include_mesh_factors, "include_mesh_factors");
   field(config.external_loop_closures, "external_loop_closures");
-  field(config.add_objects_to_deformation_graph, "add_objects_to_deformation_graph");
-  field(config.object_variance, "object_variance");
   field(config.sg_loop_closure_variance, "sg_loop_closure_variance");
-  field(config.object_association_max_diff_s, "object_association_max_diff_s", "s");
   config.initial_align.setOptional();
   field(config.initial_align, "initial_align");
   config.partial_optimizer.setOptional();
   field(config.partial_optimizer, "partial_optimizer");
-
-  check(config.object_association_max_diff_s, GE, 0.0, "object_association_max_diff_s");
 }
 
 MultiBackendModule::MultiBackendModule(
@@ -520,51 +514,6 @@ void MultiBackendModule::addLoopClosures() {
   }
 }
 
-void MultiBackendModule::addObjectsToDeformationGraph() {
-  if (!unmerged_dsg_->graph->hasLayer(DsgLayers::OBJECTS)) {
-    return;
-  }
-
-  const auto& objects = unmerged_dsg_->graph->getLayer(DsgLayers::OBJECTS);
-  for (const auto& node : objects.nodes()) {
-    auto attrs = node.tryAttributes<ObjectNodeAttributes>();
-    if (!attrs) {
-      continue;  // not an object
-    }
-
-    // TODO(nathan) fix this to associate to agent nodes some other way
-    const std::optional<NodeId> agent_node;
-    /*    const auto agent_node = findClosestAgentId(attrs->last_update_time_ns,*/
-    /*unmerged_dsg_->node_robot_map.at(obj.id),*/
-    /*config.object_association_max_diff_s);*/
-    if (!agent_node) {
-      LOG(ERROR) << "Failed to associated object " << NodeSymbol(node.id)
-                 << " to agent node.";
-      continue;
-    }
-
-    const auto& agent_attrs =
-        unmerged_dsg_->graph->getNode(*agent_node).attributes<AgentNodeAttributes>();
-
-    // Extract transforms
-    gtsam::Pose3 W_T_obj =
-        gtsam::Pose3(gtsam::Rot3(attrs->world_R_object), attrs->position);
-    gtsam::Pose3 W_T_agent =
-        gtsam::Pose3(gtsam::Rot3(agent_attrs.world_R_body), agent_attrs.position);
-    auto agent_T_obj = W_T_agent.between(W_T_obj);
-
-    // Add to deformation graph
-    // TODO(Yun) this is needed right now bc scene graph transformed to world frame
-    // while dgraph not. Fix in next PR.
-    gtsam::Pose3 Wrobot_T_obj =
-        curr_W_T_robot_.at(unmerged_dsg_->node_robot_map.at(node.id)).between(W_T_obj);
-    deformation_graph_->addNewNode(
-        node.id, attrs->last_update_time_ns, Wrobot_T_obj, false);
-    deformation_graph_->processNewBetween(
-        agent_attrs.external_key, node.id, agent_T_obj, config.object_variance);
-  }
-}
-
 void MultiBackendModule::optimizeStartup() {
   addLoopClosures();
   initialAlignment();
@@ -719,9 +668,6 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
 
   // Add objects or places to deformation graph
   deformation_graph_->clearTemporaryStructures();
-  if (config.add_objects_to_deformation_graph) {
-    addObjectsToDeformationGraph();
-  }
 
   // Add loop closures so they appear in the published pose graph
   addLoopClosures();
