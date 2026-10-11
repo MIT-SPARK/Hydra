@@ -206,7 +206,7 @@ void MultiBackendModule::save(const DataDirectory& output) {
   }
 
   writeBackendStatus(status_log_, pgmo_path / "dsg_pgmo_status.csv");
-  deformation_graph_->save(pgmo_path / "deformation_graph.dgrf");
+  deformation_graph_->save(pgmo_path / "deformation_graph.json");
 
   const std::string output_csv = backend_path / "loop_closures.csv";
   std::ofstream output_file;
@@ -558,7 +558,8 @@ void MultiBackendModule::addObjectsToDeformationGraph() {
     // while dgraph not. Fix in next PR.
     gtsam::Pose3 Wrobot_T_obj =
         curr_W_T_robot_.at(unmerged_dsg_->node_robot_map.at(node.id)).between(W_T_obj);
-    deformation_graph_->processNewNode(node.id, Wrobot_T_obj, false);
+    deformation_graph_->addNewNode(
+        node.id, attrs->last_update_time_ns, Wrobot_T_obj, false);
     deformation_graph_->processNewBetween(
         agent_attrs.external_key, node.id, agent_T_obj, config.object_variance);
   }
@@ -684,8 +685,11 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
       if (config.anchor_robot_id >= 0 &&
           id == static_cast<size_t>(config.anchor_robot_id)) {
         auto prefix = kimera_pgmo::GetRobotPrefix(id);
-        deformation_graph_->processNewNode(
-            gtsam::Symbol(prefix, 0), gtsam::Pose3(), true, config.pgmo.prior_variance);
+        deformation_graph_->addNewNode(gtsam::Symbol(prefix, 0),
+                                       0,
+                                       gtsam::Pose3(),
+                                       true,
+                                       config.pgmo.prior_variance);
       }
     }
 
