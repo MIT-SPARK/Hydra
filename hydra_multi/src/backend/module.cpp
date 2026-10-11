@@ -206,7 +206,7 @@ void MultiBackendModule::save(const DataDirectory& output) {
   }
 
   writeBackendStatus(status_log_, pgmo_path / "dsg_pgmo_status.csv");
-  deformation_graph_->save(pgmo_path / "deformation_graph.dgrf");
+  deformation_graph_->save(pgmo_path / "deformation_graph.json");
 
   const std::string output_csv = backend_path / "loop_closures.csv";
   std::ofstream output_file;
