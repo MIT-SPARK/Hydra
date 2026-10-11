@@ -77,7 +77,7 @@ void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
                                     kimera_pgmo::DeformationGraph& deformation_graph,
                                     const NodeRobotMap* robot_lookup) const {
   const auto& places = graph.getLayer(DsgLayers::PLACES);
-  if (places.nodes().empty()) {
+  if (places.numNodes() == 0) {
     LOG(WARNING) << "Attempting to add places to deformation graph without places";
     return;
   }
