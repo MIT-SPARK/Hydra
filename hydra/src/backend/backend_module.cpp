@@ -47,7 +47,6 @@
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/common/global_info.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -97,42 +96,6 @@ inline bool hasLoopClosure(const PoseGraph& graph) {
 }
 
 }  // namespace
-
-using StampedVertices = BackendModule::StampedVertices;
-
-size_t pgmoNumVertices(const StampedVertices& mesh) { return mesh.vertices.size(); }
-
-void pgmoResizeVertices(StampedVertices& mesh, size_t size) {
-  mesh.vertices.resize(size);
-}
-
-kimera_pgmo::traits::VertexProperties pgmoGetVertexProperties(const StampedVertices&) {
-  return {false, true, false, false};
-}
-
-Eigen::Vector3f pgmoGetVertex(const StampedVertices& mesh,
-                              size_t i,
-                              kimera_pgmo::traits::VertexTraits* traits) {
-  if (traits) {
-    traits->stamp = mesh.vertices.at(i).stamp_ns;
-  }
-
-  return mesh.vertices.at(i).pos;
-}
-
-void pgmoSetVertex(StampedVertices& mesh,
-                   size_t i,
-                   const Eigen::Vector3f& pos,
-                   const kimera_pgmo::traits::VertexTraits* traits) {
-  mesh.vertices.at(i).pos = pos;
-  if (traits) {
-    mesh.vertices.at(i).stamp_ns = traits->stamp;
-  }
-}
-
-uint64_t pgmoGetVertexStamp(const StampedVertices& mesh, size_t i) {
-  return mesh.vertices.at(i).stamp_ns;
-}
 
 void declare_config(BackendModule::Config& config) {
   using namespace config;
@@ -192,21 +155,14 @@ void BackendModule::save(const DataDirectory& output) {
   dsg_updater_->save(output, "backend");
 
   const auto backend_path = output.path("backend");
-  const auto filename = output.path("backend/pgmo") / "dsg_pgmo_status.csv";
+  const auto filename = output.path("backend") / "pgmo_status.csv";
   writeBackendStatus(status_log_, filename);
 
   deformation_graph_->save(backend_path / "deformation_graph.json");
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  if (deformation_graph_->hasPrefixPoses(prefix.key)) {
-    const auto optimized_path = getOptimizedTrajectory(prefix.id);
-    std::string csv_name = backend_path / "trajectory.csv";
-    saveTrajectory(optimized_path, timestamps_, csv_name);
-  }
 
   const std::string output_csv = backend_path / "loop_closures.csv";
   std::ofstream output_file;
   output_file.open(output_csv);
-
   output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type,level" << std::endl;
   for (const auto& loop_closure : loop_closures_) {
     // pose = src.between(dest) or to_T_from
@@ -363,7 +319,7 @@ void BackendModule::loadState(const std::filesystem::path& mesh_path,
   have_new_mesh_ = true;
   have_loopclosures_ = force_loopclosures;
 
-  loadDeformationGraphFromFile(dgrf_path);
+  KimeraPgmoInterface::loadGraph(dgrf_path);
   LOG(WARNING) << "Loaded " << deformation_graph_->getNumVertices()
                << " vertices for deformation graph";
 }

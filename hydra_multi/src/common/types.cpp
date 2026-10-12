@@ -6,34 +6,24 @@ namespace hydra_multi {
 
 using spark_dsg::Mesh;
 
-MeshData::MeshData()
-    : mesh(new Mesh),
-      original_vertices(new pcl::PointCloud<pcl::PointXYZ>),
-      vertex_stamps(new Timestamps) {}
-
-Timestamps MeshData::getStamps() const {
-  if (mesh->has_timestamps) {
-    return mesh->stamps;
-  }
-
-  return *vertex_stamps;
-}
+MeshData::MeshData() : mesh(new Mesh()) {}
 
 MeshData::Ptr MeshData::clone() const {
   auto cloned = std::make_shared<MeshData>();
   cloned->mesh = mesh->clone();
-  cloned->original_vertices.reset(
-      new pcl::PointCloud<pcl::PointXYZ>(*original_vertices));
-  cloned->vertex_stamps.reset(new Timestamps(*vertex_stamps));
+  cloned->original = original;
   cloned->offsets = offsets;
   return cloned;
 }
 
 void MeshData::transform(const Eigen::Isometry3d& tf) {
-  mesh->transform(tf.cast<float>());
-  pcl::transformPointCloud(*original_vertices, *original_vertices, tf.cast<float>());
+  const Eigen::Isometry3f a_T_b = tf.cast<float>();
+  mesh->transform(a_T_b);
+  for (auto& v : original) {
+    v.pos = (a_T_b * v.pos).eval();
+  }
 }
 
-Timestamp MeshData::getLatestStamp() const { return getStamps().back(); }
+Timestamp MeshData::getLatestStamp() const { return original.back().stamp_ns; }
 
 }  // namespace hydra_multi

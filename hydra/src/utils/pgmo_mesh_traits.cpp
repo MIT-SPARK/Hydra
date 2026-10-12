@@ -34,22 +34,23 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/pgmo_mesh_traits.h"
 
+using kimera_pgmo::traits::VertexProperties;
+using kimera_pgmo::traits::VertexTraits;
+
 namespace spark_dsg {
 
 size_t pgmoNumVertices(const Mesh& mesh) { return mesh.numVertices(); }
 
 void pgmoResizeVertices(Mesh& mesh, size_t size) { mesh.resizeVertices(size); }
 
-kimera_pgmo::traits::VertexProperties pgmoGetVertexProperties(const Mesh& mesh) {
+VertexProperties pgmoGetVertexProperties(const Mesh& mesh) {
   return {mesh.has_colors,
           mesh.has_timestamps,
           mesh.has_labels,
           mesh.has_first_seen_stamps};
 }
 
-Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
-                              size_t i,
-                              kimera_pgmo::traits::VertexTraits* traits) {
+Eigen::Vector3f pgmoGetVertex(const Mesh& mesh, size_t i, VertexTraits* traits) {
   if (!traits) {
     return mesh.pos(i);
   }
@@ -77,7 +78,7 @@ Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
 void pgmoSetVertex(Mesh& mesh,
                    size_t i,
                    const Eigen::Vector3f& pos,
-                   const kimera_pgmo::traits::VertexTraits* traits) {
+                   const VertexTraits* traits) {
   mesh.setPos(i, pos);
   if (!traits) {
     return;
@@ -122,3 +123,41 @@ void pgmoSetFace(Mesh& mesh, size_t i, const kimera_pgmo::traits::Face& face) {
 }
 
 }  // namespace spark_dsg
+
+namespace hydra {
+
+size_t pgmoNumVertices(const StampedMeshVertices& points) { return points.size(); }
+
+void pgmoResizeVertices(StampedMeshVertices& points, size_t size) {
+  points.resize(size);
+}
+
+VertexProperties pgmoGetVertexProperties(const StampedMeshVertices&) {
+  return {false, true, false, false};
+}
+
+Eigen::Vector3f pgmoGetVertex(const StampedMeshVertices& points,
+                              size_t i,
+                              VertexTraits* traits) {
+  if (traits) {
+    traits->stamp = points.at(i).stamp_ns;
+  }
+
+  return points.at(i).pos;
+}
+
+void pgmoSetVertex(StampedMeshVertices& points,
+                   size_t i,
+                   const Eigen::Vector3f& pos,
+                   const VertexTraits* traits) {
+  points.at(i).pos = pos;
+  if (traits) {
+    points.at(i).stamp_ns = traits->stamp;
+  }
+}
+
+uint64_t pgmoGetVertexStamp(const StampedMeshVertices& points, size_t i) {
+  return points.at(i).stamp_ns;
+}
+
+}  // namespace hydra

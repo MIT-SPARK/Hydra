@@ -7,10 +7,9 @@
 #include <hydra/common/shared_module_state.h>
 #include <hydra/loop_closure/registration_solution.h>
 #include <hydra/utils/data_directory.h>
+#include <hydra/utils/pgmo_mesh_traits.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/mesh_offset_info.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
 #include <spark_dsg/mesh.h>
 
 #include <map>
@@ -33,21 +32,18 @@ using Timestamps = std::vector<Timestamp>;
 
 // Mesh
 using MeshDelta = kimera_pgmo::MeshDelta;
+
 struct MeshData {
   using Ptr = std::shared_ptr<MeshData>;
   MeshData();
 
   MeshData::Ptr clone() const;
-
+  Timestamp getLatestStamp() const;
   void transform(const Eigen::Isometry3d& tf);
 
   spark_dsg::Mesh::Ptr mesh;
+  hydra::StampedMeshVertices original;
   kimera_pgmo::MeshOffsetInfo offsets;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices;
-  std::shared_ptr<Timestamps> vertex_stamps;
-
-  Timestamps getStamps() const;
-  Timestamp getLatestStamp() const;
 };
 
 // Scene Graph

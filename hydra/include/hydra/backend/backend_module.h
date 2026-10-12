@@ -50,6 +50,7 @@
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_output.h"
+#include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra {
 
@@ -84,14 +85,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   using Sink = OutputSink<uint64_t,
                           const spark_dsg::SceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
-
-  struct StampedVertices {
-    struct Vertex {
-      uint64_t stamp_ns;
-      Eigen::Vector3f pos;
-    };
-    std::vector<Vertex> vertices;
-  };
 
   struct Config : DsgUpdater::Config {
     //! Optimize the graph on every detected loop closure
@@ -180,9 +173,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   DsgUpdater::Ptr dsg_updater_;
   std::vector<OptimizationHook::Ptr> optimization_hooks_;
 
-  kimera_pgmo::Path trajectory_;
+  std::vector<gtsam::Pose3> trajectory_;
   std::vector<size_t> timestamps_;
-  StampedVertices original_vertices_;
+  StampedMeshVertices original_vertices_;
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;
   size_t last_deformed_vertices_ = 0;
 
