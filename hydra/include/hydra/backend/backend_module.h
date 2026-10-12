@@ -85,6 +85,14 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                           const spark_dsg::SceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
 
+  struct StampedVertices {
+    struct Vertex {
+      uint64_t stamp_ns;
+      Eigen::Vector3f pos;
+    };
+    std::vector<Vertex> vertices;
+  };
+
   struct Config : DsgUpdater::Config {
     //! Optimize the graph on every detected loop closure
     bool optimize_on_lc = true;
@@ -174,8 +182,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   kimera_pgmo::Path trajectory_;
   std::vector<size_t> timestamps_;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
-  std::shared_ptr<std::vector<uint64_t>> vertex_stamps_;
+  StampedVertices original_vertices_;
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;
   size_t last_deformed_vertices_ = 0;
 

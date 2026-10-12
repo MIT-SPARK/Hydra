@@ -98,6 +98,42 @@ inline bool hasLoopClosure(const PoseGraph& graph) {
 
 }  // namespace
 
+using StampedVertices = BackendModule::StampedVertices;
+
+size_t pgmoNumVertices(const StampedVertices& mesh) { return mesh.vertices.size(); }
+
+void pgmoResizeVertices(StampedVertices& mesh, size_t size) {
+  mesh.vertices.resize(size);
+}
+
+kimera_pgmo::traits::VertexProperties pgmoGetVertexProperties(const StampedVertices&) {
+  return {false, true, false, false};
+}
+
+Eigen::Vector3f pgmoGetVertex(const StampedVertices& mesh,
+                              size_t i,
+                              kimera_pgmo::traits::VertexTraits* traits) {
+  if (traits) {
+    traits->stamp = mesh.vertices.at(i).stamp_ns;
+  }
+
+  return mesh.vertices.at(i).pos;
+}
+
+void pgmoSetVertex(StampedVertices& mesh,
+                   size_t i,
+                   const Eigen::Vector3f& pos,
+                   const kimera_pgmo::traits::VertexTraits* traits) {
+  mesh.vertices.at(i).pos = pos;
+  if (traits) {
+    mesh.vertices.at(i).stamp_ns = traits->stamp;
+  }
+}
+
+uint64_t pgmoGetVertexStamp(const StampedVertices& mesh, size_t i) {
+  return mesh.vertices.at(i).stamp_ns;
+}
+
 void declare_config(BackendModule::Config& config) {
   using namespace config;
   base<DsgUpdater::Config>(config);
@@ -129,10 +165,6 @@ BackendModule::BackendModule(const Config& config,
   private_dsg_->graph->setMesh(GlobalInfo::instance().createMesh());
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
   dsg_updater_.reset(new DsgUpdater(config, unmerged_graph_, private_dsg_));
-
-  // set up pgmo mesh infrastructure
-  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
-  vertex_stamps_.reset(new std::vector<uint64_t>());
 }
 
 BackendModule::~BackendModule() { stopImpl(); }
@@ -450,9 +482,7 @@ void BackendModule::copyMeshDelta(const FrontendOutput& input) {
   {  // mesh critical section
     std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
     input.mesh_update->updateMesh(*private_dsg_->graph->mesh(), mesh_offsets_);
-    kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
-                                                       *vertex_stamps_};
-    input.mesh_update->updateVertices(cloud_out);
+    input.mesh_update->updateVertices(original_vertices_);
   }  // mesh critical section
 
   dsg_updater_->handleMeshUpdate(input.timestamp_ns, mesh_offsets_);
@@ -506,15 +536,12 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 
   VLOG(2) << "Deforming mesh with " << mesh->numVertices() << " vertices";
 
-  kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{*original_vertices_,
-                                                         *vertex_stamps_};
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
-                                   cloud_in,
+                                   original_vertices_,
                                    GlobalInfo::instance().getRobotPrefix().vertex_key,
                                    *deformation_graph_->getValues(),
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
-                                   nullptr,
                                    last_deformed_vertices_);
   last_deformed_vertices_ = mesh_offsets_.archived_vertices;
 }
