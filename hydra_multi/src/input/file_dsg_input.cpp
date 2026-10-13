@@ -106,14 +106,10 @@ void FileDsgInput::init() {
   state_->mesh_data_->mesh = state_->dsg_->mesh();
   if (state_->dsg_->mesh()) {
     auto mesh = state_->dsg_->mesh();
-    state_->mesh_data_->original_vertices.reset(new pcl::PointCloud<pcl::PointXYZ>);
-    state_->mesh_data_->vertex_stamps.reset(new Timestamps);
-
+    state_->mesh_data_->original.clear();
+    state_->mesh_data_->original.reserve(mesh->numVertices());
     for (size_t idx = 0; idx < mesh->numVertices(); ++idx) {
-      auto vertex_pos = mesh->pos(idx);
-      state_->mesh_data_->original_vertices->push_back(
-          {vertex_pos.x(), vertex_pos.y(), vertex_pos.z()});
-      state_->mesh_data_->vertex_stamps->push_back(mesh->timestamp(idx));
+      state_->mesh_data_->original.push_back({mesh->timestamp(idx), mesh->pos(idx)});
     }
   }
 

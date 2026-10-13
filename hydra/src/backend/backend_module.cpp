@@ -47,7 +47,6 @@
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/common/global_info.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -129,10 +128,6 @@ BackendModule::BackendModule(const Config& config,
   private_dsg_->graph->setMesh(GlobalInfo::instance().createMesh());
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
   dsg_updater_.reset(new DsgUpdater(config, unmerged_graph_, private_dsg_));
-
-  // set up pgmo mesh infrastructure
-  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
-  vertex_stamps_.reset(new std::vector<uint64_t>());
 }
 
 BackendModule::~BackendModule() { stopImpl(); }
@@ -160,21 +155,14 @@ void BackendModule::save(const DataDirectory& output) {
   dsg_updater_->save(output, "backend");
 
   const auto backend_path = output.path("backend");
-  const auto filename = output.path("backend/pgmo") / "dsg_pgmo_status.csv";
+  const auto filename = output.path("backend") / "pgmo_status.csv";
   writeBackendStatus(status_log_, filename);
 
   deformation_graph_->save(backend_path / "deformation_graph.json");
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  if (deformation_graph_->hasPrefixPoses(prefix.key)) {
-    const auto optimized_path = getOptimizedTrajectory(prefix.id);
-    std::string csv_name = backend_path / "trajectory.csv";
-    saveTrajectory(optimized_path, timestamps_, csv_name);
-  }
 
   const std::string output_csv = backend_path / "loop_closures.csv";
   std::ofstream output_file;
   output_file.open(output_csv);
-
   output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type,level" << std::endl;
   for (const auto& loop_closure : loop_closures_) {
     // pose = src.between(dest) or to_T_from
@@ -331,7 +319,7 @@ void BackendModule::loadState(const std::filesystem::path& mesh_path,
   have_new_mesh_ = true;
   have_loopclosures_ = force_loopclosures;
 
-  loadDeformationGraphFromFile(dgrf_path);
+  KimeraPgmoInterface::loadGraph(dgrf_path);
   LOG(WARNING) << "Loaded " << deformation_graph_->getNumVertices()
                << " vertices for deformation graph";
 }
@@ -450,9 +438,7 @@ void BackendModule::copyMeshDelta(const FrontendOutput& input) {
   {  // mesh critical section
     std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
     input.mesh_update->updateMesh(*private_dsg_->graph->mesh(), mesh_offsets_);
-    kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
-                                                       *vertex_stamps_};
-    input.mesh_update->updateVertices(cloud_out);
+    input.mesh_update->updateVertices(original_vertices_);
   }  // mesh critical section
 
   dsg_updater_->handleMeshUpdate(input.timestamp_ns, mesh_offsets_);
@@ -506,15 +492,12 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 
   VLOG(2) << "Deforming mesh with " << mesh->numVertices() << " vertices";
 
-  kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{*original_vertices_,
-                                                         *vertex_stamps_};
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
-                                   cloud_in,
+                                   original_vertices_,
                                    GlobalInfo::instance().getRobotPrefix().vertex_key,
                                    *deformation_graph_->getValues(),
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
-                                   nullptr,
                                    last_deformed_vertices_);
   last_deformed_vertices_ = mesh_offsets_.archived_vertices;
 }

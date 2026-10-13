@@ -37,73 +37,47 @@
 #include <kimera_pgmo/mesh_types.h>
 #include <spark_dsg/mesh.h>
 
-#include "hydra/reconstruction/voxel_types.h"
-
 namespace spark_dsg {
 
 size_t pgmoNumVertices(const Mesh& mesh);
-
 void pgmoResizeVertices(Mesh& mesh, size_t size);
-
 kimera_pgmo::traits::VertexProperties pgmoGetVertexProperties(const Mesh& mesh);
-
 Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
                               size_t i,
                               kimera_pgmo::traits::VertexTraits* traits = nullptr);
-
 void pgmoSetVertex(Mesh& mesh,
                    size_t i,
                    const Eigen::Vector3f& pos,
                    const kimera_pgmo::traits::VertexTraits* traits = nullptr);
-
 uint64_t pgmoGetVertexStamp(const Mesh& mesh, size_t i);
 
 size_t pgmoNumFaces(const Mesh& mesh);
-
 void pgmoResizeFaces(Mesh& mesh, size_t size);
-
 kimera_pgmo::traits::Face pgmoGetFace(const Mesh& mesh, size_t i);
-
 void pgmoSetFace(Mesh& mesh, size_t i, const kimera_pgmo::traits::Face& face);
 
 }  // namespace spark_dsg
 
 namespace hydra {
 
-struct BlockMeshIter {
-  explicit BlockMeshIter(const MeshLayer& mesh) : mesh(mesh) {}
-
-  struct const_iterator {
-    using iterator_category = std::forward_iterator_tag;
-    using difference_type = std::ptrdiff_t;
-    using value_type = const std::pair<BlockIndex, const spark_dsg::Mesh&>;
-
-    explicit const_iterator(MeshLayer::const_iterator iter) : iter_(iter) {}
-
-    value_type operator*() const { return {iter_->index, *iter_}; }
-
-    const_iterator& operator++() {
-      ++iter_;
-      return *this;
-    }
-
-    const_iterator operator++(int) {
-      auto tmp = *this;
-      ++iter_;
-      return tmp;
-    }
-
-    bool operator==(const const_iterator& other) const { return other.iter_ == iter_; }
-
-    bool operator!=(const const_iterator& other) const { return other.iter_ != iter_; }
-
-   private:
-    MeshLayer::const_iterator iter_;
-  };
-
-  const MeshLayer& mesh;
-  const_iterator begin() const { return const_iterator(mesh.begin()); }
-  const_iterator end() const { return const_iterator(mesh.end()); }
+struct StampedMeshVertex {
+  uint64_t stamp_ns;
+  Eigen::Vector3f pos;
 };
+
+using StampedMeshVertices = std::vector<StampedMeshVertex>;
+
+size_t pgmoNumVertices(const StampedMeshVertices& points);
+void pgmoResizeVertices(StampedMeshVertices& points, size_t size);
+kimera_pgmo::traits::VertexProperties pgmoGetVertexProperties(
+    const StampedMeshVertices&);
+Eigen::Vector3f pgmoGetVertex(const StampedMeshVertices& points,
+                              size_t i,
+                              kimera_pgmo::traits::VertexTraits* traits);
+uint64_t pgmoGetVertexStamp(const StampedMeshVertices& points, size_t i);
+void pgmoSetVertex(StampedMeshVertices& points,
+                   size_t i,
+                   const Eigen::Vector3f& pos,
+                   const kimera_pgmo::traits::VertexTraits* traits);
 
 }  // namespace hydra

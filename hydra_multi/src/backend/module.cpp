@@ -688,21 +688,14 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
 
     if (have_loopclosures_ || force_mesh_update) {
       VLOG(3) << "Deforming mesh for robot " << id;
+      // TODO(Yun): cannot use pre archived vertices as 'start_hint'
       // Note that here the mesh in the state is actually getting modified!
       char vertex_prefix = kimera_pgmo::robot_id_to_vertex_prefix.at(id);
-      const kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{
-          *mesh_data->original_vertices, *mesh_data->vertex_stamps};
-      deformation_graph_->deformPoints(
-          *mesh_data->mesh,
-          cloud_in,
-          vertex_prefix,
-          *deformation_graph_->getValues(),
-          KimeraPgmoInterface::config_.num_interp_pts,
-          KimeraPgmoInterface::config_.interp_horizon,
-          nullptr,
-          0);  // TODO(Yun): cannot use pre archived vertices as 'start_hint' because
-               // there could be a change in initial alignment. but this could be pretty
-               // slow
+      deformation_graph_->deformPoints(*mesh_data->mesh,
+                                       mesh_data->original,
+                                       vertex_prefix,
+                                       KimeraPgmoInterface::config_.num_interp_pts,
+                                       KimeraPgmoInterface::config_.interp_horizon);
     }
 
     VLOG(5) << "Copying mesh to combined mesh for robot " << id;

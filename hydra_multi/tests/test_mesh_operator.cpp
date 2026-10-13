@@ -10,27 +10,12 @@ namespace {
 
 static const Eigen::IOFormat fmt(3, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
 
-struct Vertex {
-  float x;
-  float y;
-  float z;
-
-  operator pcl::PointXYZRGBA() const {
-    pcl::PointXYZRGBA point;
-    point.x = x;
-    point.y = y;
-    point.z = z;
-    return point;
-  }
-};
-
 inline MeshData makeMesh(size_t num_vertices,
                          Eigen::Vector3f offset = Eigen::Vector3f::Zero(),
                          Eigen::Vector3f original_offset = Eigen::Vector3f::Zero()) {
   MeshData mesh_data;
   mesh_data.mesh.reset(new spark_dsg::Mesh(true, true, false));
-  mesh_data.original_vertices.reset(new pcl::PointCloud<pcl::PointXYZ>);
-  mesh_data.vertex_stamps.reset(new Timestamps);
+  mesh_data.original.resize(num_vertices);
   mesh_data.mesh->resizeVertices(num_vertices);
   for (size_t i = 0; i < mesh_data.mesh->numVertices(); ++i) {
     Eigen::Vector3f pos;
@@ -39,16 +24,16 @@ inline MeshData makeMesh(size_t num_vertices,
     } else {
       pos << static_cast<float>(i), static_cast<float>(i), 1.0;
     }
+
     mesh_data.mesh->setPos(i, pos + offset);
     mesh_data.mesh->setTimestamp(i, i);
-    auto original_pos = pos + original_offset;
-    mesh_data.original_vertices->push_back(
-        {original_pos(0), original_pos(1), original_pos(2)});
-    mesh_data.vertex_stamps->push_back(i);
+    mesh_data.original[i] = {i, pos + original_offset};
   }
+
   for (size_t i = 0; i < mesh_data.mesh->numVertices(); i += 3) {
     mesh_data.mesh->faces.push_back({i, i + 1, i + 2});
   }
+
   return mesh_data;
 }
 
