@@ -91,10 +91,17 @@ class DsgUpdater {
 
   void callUpdateFunctions(uint64_t timestamp_ns, UpdateInfo::ConstPtr info);
 
+  void finalize(UpdateInfo::ConstPtr info);
+
  private:
+  void callFunctors(UpdateInfo::ConstPtr info);
+  void markNewNodes();
+  void clearNewNodes();
+
   GroupedMergeTracker merge_tracker;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
+  std::vector<spark_dsg::NodeId> active_nodes_to_restore_;
   spark_dsg::SceneGraph::Ptr source_graph_;
   SharedDsgInfo::Ptr target_dsg_;
 };
