@@ -61,13 +61,18 @@ struct UpdateInfo {
   using ConstPtr = std::shared_ptr<const UpdateInfo>;
   using LayerMerges = std::map<spark_dsg::LayerId, MergeList>;
 
+  //! Timestamp of update
   uint64_t timestamp_ns = 0;
+  //! Optimization result for factors outside of deformation graph
   const gtsam::Values* places_values = nullptr;
+  //! Main optimization result
   const gtsam::Values* pgmo_values = nullptr;
-  bool loop_closure_detected = false;
+  //! Whether or not to consider all attributes
+  bool full_update = false;
   //! External merges (e.g., from GNC)
   LayerMerges given_merges = {};
   // TODO(nathan) flip to const when we have mutable state
+  //! Optimized deformation graph
   kimera_pgmo::DeformationGraph* deformation_graph = nullptr;
   //! Mapping between nodes and robots
   const std::unordered_map<spark_dsg::NodeId, size_t>* node_to_robot_id = nullptr;

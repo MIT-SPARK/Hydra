@@ -173,7 +173,7 @@ void UpdateMeshClustersFunctor::call(const SceneGraph&,
   // TODO(nathan) fix this partial processing
   const auto num_archived = info ? info->mesh_offsets.archived_vertices : 0;
   const auto num_previous = info ? info->mesh_offsets.prev_archived_vertices : 0;
-  if (info && info->loop_closure_detected) {
+  if (info && info->full_update) {
     clustering_.clear();
     clustering_.update(*mesh, [num_archived](size_t i) { return i > num_archived; });
   } else {

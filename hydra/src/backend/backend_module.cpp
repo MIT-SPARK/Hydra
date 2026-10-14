@@ -148,6 +148,7 @@ void BackendModule::stopImpl() {
   }
 
   auto info = getUpdateInfo(0);
+  info->full_update = true;
   dsg_updater_->finalize(info);
 }
 
@@ -262,6 +263,7 @@ bool BackendModule::spinOnce(bool force_update) {
   should_optimize |= force_optimize_;
   if (should_optimize) {
     optimize(timestamp_ns);
+
   } else {
     updateDsgMesh(timestamp_ns);
 
@@ -276,8 +278,8 @@ bool BackendModule::spinOnce(bool force_update) {
   return true;
 }
 
-UpdateInfo::ConstPtr BackendModule::getUpdateInfo(uint64_t timestamp_ns) {
-  UpdateInfo::ConstPtr info;
+UpdateInfo::Ptr BackendModule::getUpdateInfo(uint64_t timestamp_ns) {
+  UpdateInfo::Ptr info;
   if (have_loopclosures_) {
     // update graph with cached optimization solution
     info.reset(new UpdateInfo{timestamp_ns,
@@ -537,14 +539,12 @@ void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
 
   updateDsgMesh(timestamp_ns);
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{timestamp_ns,
-                                           deformation_graph_->getTempValues(),
-                                           deformation_graph_->getValues(),
-                                           have_new_loopclosures_ || force_find_merge,
-                                           {},
-                                           deformation_graph_.get(),
-                                           nullptr,
-                                           mesh_offsets_});
+  if (config.reset_dsg_on_loop_closure && have_new_loopclosures_) {
+    dsg_updater_->reset(timestamp_ns);
+  }
+
+  auto info = getUpdateInfo(timestamp_ns);
+  info->full_update = have_new_loopclosures_ || force_find_merge;
   dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   have_new_loopclosures_ = false;
 }

@@ -188,8 +188,7 @@ void Update2dPlacesFunctor::call(const SceneGraph& unmerged,
   }
 
   active_tracker.clear();  // reset from previous pass
-  const auto new_loopclosure = info->loop_closure_detected;
-  const auto view = new_loopclosure ? LayerView(*layer) : active_tracker.view(*layer);
+  const auto view = info->full_update ? LayerView(*layer) : active_tracker.view(*layer);
 
   size_t num_changed = 0;
   const auto mesh = unmerged.mesh();
@@ -200,7 +199,7 @@ void Update2dPlacesFunctor::call(const SceneGraph& unmerged,
       continue;
     }
 
-    if (!new_loopclosure && !attrs->is_active) {
+    if (!info->full_update && !attrs->is_active) {
       // reallocate mesh vertices for newly archived nodes
       cleanup_nodes.insert(node.id);
     }
@@ -222,9 +221,9 @@ MergeList Update2dPlacesFunctor::findMerges(const SceneGraph& graph,
     return {};
   }
 
-  const auto new_lcd = info->loop_closure_detected;
   // freeze layer view to avoid messing with tracker
-  const auto view = new_lcd ? LayerView(*layer) : active_tracker.view(*layer, true);
+  const auto view =
+      info->full_update ? LayerView(*layer) : active_tracker.view(*layer, true);
 
   MergeList nodes_to_merge;
   merge_proposer.findMerges(

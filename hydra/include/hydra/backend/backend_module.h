@@ -158,7 +158,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  protected:
   void stopImpl();
 
-  UpdateInfo::ConstPtr getUpdateInfo(uint64_t timestamp_ns);
+  UpdateInfo::Ptr getUpdateInfo(uint64_t timestamp_ns);
 
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};

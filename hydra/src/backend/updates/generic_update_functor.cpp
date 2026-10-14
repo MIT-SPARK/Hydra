@@ -94,10 +94,9 @@ void GenericUpdateFunctor::call(const SceneGraph& unmerged,
     return;
   }
 
-  const auto new_loopclosure = info->loop_closure_detected;
   const auto& layer = unmerged.getLayer(config.layer);
   active_tracker.clear();  // reset from previous pass
-  const auto view = new_loopclosure ? LayerView(layer) : active_tracker.view(layer);
+  const auto view = info->full_update ? LayerView(layer) : active_tracker.view(layer);
   deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
   MLOG(1) << "[Hydra Backend] " << config.layer << " update: " << layer.numNodes()
           << " nodes";
@@ -110,10 +109,10 @@ MergeList GenericUpdateFunctor::findMerges(const SceneGraph& graph,
     return {};
   }
 
-  const auto new_lcd = info->loop_closure_detected;
   const auto& layer = graph.getLayer(config.layer);
   // freeze layer view to avoid messing with tracker
-  const auto view = new_lcd ? LayerView(layer) : active_tracker.view(layer, true);
+  const auto view =
+      info->full_update ? LayerView(layer) : active_tracker.view(layer, true);
 
   MergeList proposals;
   merge_proposer.findMerges(

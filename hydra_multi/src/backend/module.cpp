@@ -722,7 +722,7 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
   // TODO(nathan) fix this!!!!!!!!!!!!!!!!
   // Merged DSG is actually reset twice here (but resetBackendDsg necessary to reset
   // MergeTracker)
-  dsg_updater_->resetBackendDsg(timestamp_ns);
+  dsg_updater_->reset(timestamp_ns);
   std::lock_guard<std::mutex> merged_graph_lock(merged_dsg_->mutex);
   merged_dsg_->update(*unmerged_dsg_);
 }
