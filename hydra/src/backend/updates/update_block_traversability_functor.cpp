@@ -122,7 +122,7 @@ void UpdateBlockTraversabilityFunctor::updateDeformation(
   // Update global poses (deformation) of all nodes.
   const auto& places = unmerged.getLayer(config.layer);
   const auto view =
-      info->loop_closure_detected ? LayerView(places) : active_tracker_.view(places);
+      info->full_update ? LayerView(places) : active_tracker_.view(places);
   deformation_interpolator_.interpolateNodePositions(unmerged, *dsg.graph, info, view);
 }
 
@@ -191,8 +191,8 @@ MergeList UpdateBlockTraversabilityFunctor::findNodeMerges(
   }
 
   const auto& places = dsg.getLayer(config.layer);
-  const auto view = info->loop_closure_detected ? LayerView(places)
-                                                : active_tracker_.view(places, true);
+  const auto view =
+      info->full_update ? LayerView(places) : active_tracker_.view(places, true);
 
   // Compare all (newly) archived nodes against inactive candidate nodes.
   MergeList result;

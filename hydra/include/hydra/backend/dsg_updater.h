@@ -84,7 +84,7 @@ class DsgUpdater {
 
   void save(const DataDirectory& output, const std::string& label) const;
 
-  void resetBackendDsg(uint64_t timestamp_ns);
+  void reset(uint64_t timestamp_ns);
 
   void handleMeshUpdate(uint64_t timestamp_ns,
                         const kimera_pgmo::MeshOffsetInfo& offsets);
@@ -99,6 +99,7 @@ class DsgUpdater {
   void clearNewNodes();
 
   GroupedMergeTracker merge_tracker;
+  const std::set<std::string> exhaustive_names_;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
   std::vector<spark_dsg::NodeId> active_nodes_to_restore_;

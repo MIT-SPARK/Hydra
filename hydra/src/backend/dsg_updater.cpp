@@ -98,7 +98,11 @@ void declare_config(DsgUpdater::Config& config) {
 DsgUpdater::DsgUpdater(const Config& config,
                        SceneGraph::Ptr source,
                        SharedDsgInfo::Ptr target)
-    : config(config::checkValid(config)), source_graph_(source), target_dsg_(target) {
+    : config(config::checkValid(config)),
+      exhaustive_names_(config.exhaustive_functors.begin(),
+                        config.exhaustive_functors.end()),
+      source_graph_(source),
+      target_dsg_(target) {
   for (const auto& [name, functor] : config.update_functors) {
     update_functors_.emplace(name, functor.create());
     merge_tracker.initializeTracker(name);
@@ -118,7 +122,7 @@ void DsgUpdater::save(const DataDirectory& output, const std::string& label) con
   }
 }
 
-void DsgUpdater::resetBackendDsg(uint64_t timestamp_ns) {
+void DsgUpdater::reset(uint64_t timestamp_ns) {
   ScopedTimer timer("dsg_updater/reset_dsg", timestamp_ns, true, 1, false);
   constexpr bool reset_mesh = false;
   {
@@ -172,25 +176,18 @@ void DsgUpdater::markNewNodes() {
 
 void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info) {
   ScopedTimer spin_timer("dsg_updater/update_layers", timestamp_ns);
-  if (config.reset_dsg_on_loop_closure && info->loop_closure_detected) {
-    resetBackendDsg(timestamp_ns);
-  }
-
   // merge topological changes to private dsg, respecting merges
   // attributes may be overwritten, but ideally we don't bother
   GraphMergeConfig merge_config;
   merge_config.previous_merges = &target_dsg_->merges;
   target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
+
   markNewNodes();
-
   callFunctors(info);
-
   clearNewNodes();
 }
 
 void DsgUpdater::callFunctors(UpdateInfo::ConstPtr info) {
-  const std::set<std::string> exhaustive_names(config.exhaustive_functors.begin(),
-                                               config.exhaustive_functors.end());
   std::list<UpdateFunctor::Hooks::CleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : update_functors_) {
     if (!functor) {
@@ -211,8 +208,8 @@ void DsgUpdater::callFunctors(UpdateInfo::ConstPtr info) {
                          *source_graph_,
                          *target_dsg_,
                          tracker,
-                         exhaustive_names.count(name));
-      if (info->loop_closure_detected && hooks.merge) {
+                         exhaustive_names_.count(name));
+      if (info->full_update && hooks.merge) {
         MLOG(3) << "updating all merge attributes for " << name;
         MLOG(3) << "current tracker: " << tracker.print();
         tracker.updateAllMergeAttributes(
