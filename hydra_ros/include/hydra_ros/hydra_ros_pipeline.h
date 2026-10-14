@@ -33,12 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/active_window/active_window_module.h>
-#include <hydra/active_window/reconstruction_module.h>
-#include <hydra/backend/backend_module.h>
 #include <hydra/common/hydra_pipeline.h>
-#include <hydra/frontend/graph_builder.h>
-#include <hydra/loop_closure/loop_closure_module.h>
 
 #include <memory>
 
@@ -51,27 +46,16 @@ class ExternalLoopClosureSubscriber;
 
 class HydraRosPipeline : public HydraPipeline {
  public:
-  struct Config : VerbosityConfig {
-    Config();
-
-    //! @brief Show the config passed to Hydra (before resolving sensor configurations)
+  struct Config : HydraPipeline::Config {
+    //! Show the config passed to Hydra (before resolving sensor configurations)
     bool preprint_config = false;
-    //! @brief Configuration for sensor inputs
+    //! Configuration for sensor inputs
     RosInputModule::Config input;
-    //! @brief Configuration for active window / metric-semantic reconstruction
-    config::VirtualConfig<ActiveWindowModule> active_window{
-        ReconstructionModule::Config()};
-    //! @brief Configuration for frontend module
-    config::VirtualConfig<GraphBuilder> frontend{GraphBuilder::Config()};
-    //! @brief Configuration for backend module
-    config::VirtualConfig<BackendModule> backend{BackendModule::Config()};
-    //! @brief Optional config for loop closure module
-    config::VirtualConfig<LoopClosureModule> lcd;
-    //! @brief Monitor to report whether or Hydra is running normally
+    //! Monitor to report whether or Hydra is running normally
     StatusMonitor::Config status_monitor;
   } const config;
 
-  explicit HydraRosPipeline(int robot_id, int config_verbosity = 1);
+  explicit HydraRosPipeline(const Config& config);
 
   virtual ~HydraRosPipeline();
 
@@ -82,10 +66,7 @@ class HydraRosPipeline : public HydraPipeline {
   void stop() override;
 
  protected:
-  std::shared_ptr<ActiveWindowModule> active_window_;
-  std::shared_ptr<GraphBuilder> frontend_;
-  std::shared_ptr<BackendModule> backend_;
-
+  std::unique_ptr<RosInputModule> input_;
   std::unique_ptr<StatusMonitor> monitor_;
   std::unique_ptr<ExternalLoopClosureSubscriber> external_loop_closure_sub_;
 };

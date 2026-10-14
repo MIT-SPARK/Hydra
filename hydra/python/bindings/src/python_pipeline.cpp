@@ -65,11 +65,12 @@ namespace hydra::python {
 
 class PythonPipeline : public HydraPipeline {
  public:
-  struct Config : PipelineConfig {
-    config::VirtualConfig<ActiveWindowModule> active_window{
-        ReconstructionModule::Config()};
-    config::VirtualConfig<GraphBuilder> frontend{GraphBuilder::Config()};
-    config::VirtualConfig<BackendModule> backend{BackendModule::Config()};
+  struct Config : PipelineConfig, HydraPipeline::Config {
+    Config with_id(int robot_id) const {
+      auto new_config = *this;
+      new_config.robot_id = robot_id;
+      return new_config;
+    }
   } const config;
 
   PythonPipeline(const Config& config,
@@ -97,11 +98,6 @@ class PythonPipeline : public HydraPipeline {
 
  protected:
   bool step_mode_only_;
-  std::shared_ptr<ActiveWindowModule> active_window_;
-  std::shared_ptr<GraphBuilder> frontend_;
-  std::shared_ptr<BackendModule> backend_;
-  std::shared_ptr<LoopClosureModule> loop_closure_;
-
   SceneGraph::Ptr graph_;
 
  private:
@@ -112,9 +108,7 @@ void declare_config(PythonPipeline::Config& config) {
   using namespace config;
   name("PythonPipeline::Config");
   base<PipelineConfig>(config);
-  field(config.active_window, "active_window");
-  field(config.frontend, "frontend");
-  field(config.backend, "backend");
+  base<HydraPipeline::Config>(config);
 }
 
 PythonPipeline::PythonPipeline(const Config& _config,
@@ -123,7 +117,7 @@ PythonPipeline::PythonPipeline(const Config& _config,
                                int config_verbosity,
                                bool step_mode_only,
                                std::string zmq_url)
-    : HydraPipeline(_config, robot_id, config_verbosity),
+    : HydraPipeline(_config.with_id(robot_id), _config),
       config(_config),
       sensor(sensor),
       zmq_url(zmq_url),
@@ -149,23 +143,11 @@ void PythonPipeline::start() {
 }
 
 void PythonPipeline::initModules() {
-  frontend_ = config.frontend.create(frontend_dsg_, shared_state_);
-  if (!frontend_) {
-    throw std::runtime_error("Invalid frontend config!");
-  }
-
-  modules_["frontend"] = frontend_;
-  backend_ = config.backend.create(backend_dsg_, shared_state_);
-  modules_["backend"] = backend_;
-  active_window_ = config.active_window.create(frontend_->queue());
-  modules_["reconstruction"] = active_window_;
-
+  init();
   if (!zmq_url.empty()) {
     ZmqSink::Config zmq_config{zmq_url, true};
     backend_->addSink(std::make_shared<ZmqSink>(zmq_config));
   }
-
-  // TODO(nathan) LCD
 
   showModules();
 }
@@ -185,11 +167,7 @@ void PythonPipeline::reset() {
   active_window_.reset();
   frontend_.reset();
   backend_.reset();
-  loop_closure_.reset();
-
-  // reset any other modules (will actually deconstruct specific module instances given
-  // shared_ptr usage)
-  modules_.clear();
+  lcd_.reset();
 
   // reset state
   const auto& config = GlobalInfo::instance();
