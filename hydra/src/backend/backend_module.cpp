@@ -148,6 +148,9 @@ void BackendModule::stopImpl() {
     spin_thread_.reset();
     VLOG(2) << "[Hydra Backend] stopped!";
   }
+
+  auto info = getUpdateInfo(0);
+  dsg_updater_->finalize(info);
 }
 
 void BackendModule::stop() { stopImpl(); }
@@ -264,21 +267,7 @@ bool BackendModule::spinOnce(bool force_update) {
   } else {
     updateDsgMesh(timestamp_ns);
 
-    UpdateInfo::ConstPtr info;
-    if (have_loopclosures_) {
-      // update graph with cached optimization solution
-      info.reset(new UpdateInfo{timestamp_ns,
-                                &extra_estimates_,
-                                deformation_graph_->getValues(),
-                                false,
-                                {},
-                                deformation_graph_.get(),
-                                nullptr,
-                                mesh_offsets_});
-    } else {
-      info.reset(new UpdateInfo{timestamp_ns});
-    }
-
+    auto info = getUpdateInfo(timestamp_ns);
     dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   }
 
@@ -287,6 +276,25 @@ bool BackendModule::spinOnce(bool force_update) {
   ScopedTimer sink_timer("backend/sinks", timestamp_ns);
   Sink::callAll(sinks_, timestamp_ns, *private_dsg_->graph, *deformation_graph_);
   return true;
+}
+
+UpdateInfo::ConstPtr BackendModule::getUpdateInfo(uint64_t timestamp_ns) {
+  UpdateInfo::ConstPtr info;
+  if (have_loopclosures_) {
+    // update graph with cached optimization solution
+    info.reset(new UpdateInfo{timestamp_ns,
+                              &extra_estimates_,
+                              deformation_graph_->getValues(),
+                              false,
+                              {},
+                              deformation_graph_.get(),
+                              nullptr,
+                              mesh_offsets_});
+  } else {
+    info.reset(new UpdateInfo{timestamp_ns});
+  }
+
+  return info;
 }
 
 void BackendModule::loadState(const std::filesystem::path& mesh_path,
