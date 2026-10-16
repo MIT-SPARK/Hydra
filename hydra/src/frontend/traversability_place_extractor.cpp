@@ -57,7 +57,8 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
   name("TraversabilityPlaceExtractor::Config");
   field(config.layer, "layer");
   field(config.estimator, "estimator");
-  field(config.postprocessing, "postprocessing");
+  field(config.persistent_processing, "persistent_processing");
+  field(config.transient_processing, "transient_processing");
   field(config.clustering, "clustering");
   field(config.sinks, "sinks");
 }
@@ -65,7 +66,8 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
 TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
     : config(config::checkValid(config)),
       estimator_(config.estimator.create()),
-      postprocessing_(config.postprocessing),
+      persistent_processing_(config.persistent_processing),
+      transient_processing_(config.transient_processing),
       clustering_(config.clustering.create()),
       sinks_(Sink::instantiate(config.sinks)) {}
 
@@ -81,16 +83,29 @@ void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
 
 void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
-  estimator_->updateTraversability(msg);
+  if (!layer_) {
+    const auto& map_config = msg.map().config;
+    layer_ = std::make_unique<TraversabilityLayer>(map_config.voxel_size,
+                                                   map_config.voxels_per_side);
+  }
+
+  estimator_->updateTraversability(msg, *layer_);
+
+  timer.reset("traversability/persistent_processing");
+  persistent_processing_.apply(msg, *layer_);
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
                                                spark_dsg::SceneGraph& graph) {
+  if (!layer_) {
+    return;
+  }
+
   // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
   // expensive though.
-  Timer timer("traversability/postprocessing", msg.timestamp_ns);
-  auto layer = estimator_->getTraversabilityLayer();
-  postprocessing_.apply(layer);
+  Timer timer("traversability/transient_processing", msg.timestamp_ns);
+  auto layer = *layer_;
+  transient_processing_.apply(msg, layer);
 
   timer.reset("traversability/clustering");
   clustering_->updateGraph(layer, msg, graph, config.layer);

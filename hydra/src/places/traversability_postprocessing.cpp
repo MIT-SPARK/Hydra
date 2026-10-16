@@ -35,33 +35,28 @@
 #include "hydra/places/traversability_postprocessing.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
+
+#include <cmath>
+#include <limits>
 
 namespace hydra::places {
 
 using State = spark_dsg::TraversabilityState;
 
 namespace {
-static const auto registration =
-    config::RegistrationWithConfig<TraversabilityProcessor,
+static const auto dilation_registration =
+    config::RegistrationWithConfig<TransientTraversabilityProcessor,
                                    ErosionDilation,
                                    ErosionDilation::Config>("ErosionDilation");
+
+static const auto footprint_registration =
+    config::RegistrationWithConfig<PersistentTraversabilityProcessor,
+                                   RobotFootprintTraversability,
+                                   RobotFootprintTraversability::Config>(
+        "RobotFootprintTraversability");
 }  // namespace
-
-TraversabilityProcessors::TraversabilityProcessors(const Config& config) {
-  for (const auto& processor_config : config) {
-    auto processor = processor_config.create();
-    if (processor) {
-      processors_.emplace_back(std::move(processor));
-    }
-  }
-}
-
-void TraversabilityProcessors::apply(TraversabilityLayer& layer) const {
-  for (const auto& processor : processors_) {
-    processor->apply(layer);
-  }
-}
 
 void declare_config(ErosionDilation::Config& config) {
   using namespace config;
@@ -79,7 +74,7 @@ struct Updates : public spatial_hash::Block, Index2DSet {
 };
 using UpdatesLayer = spatial_hash::BlockLayer<Updates>;
 
-void ErosionDilation::apply(TraversabilityLayer& layer) {
+void ErosionDilation::apply(const ActiveWindowOutput&, TraversabilityLayer& layer) {
   // NOTE(lschmid): Naive implementation for now.
   UpdatesLayer updates(layer.blockSize());
   for (const auto& block : layer) {
@@ -133,5 +128,89 @@ const std::array<Index2D, 4> ErosionDilation::offsets_ = {
 // Index2D(-1, -1),
 // Index2D(1, -1),
 // Index2D(-1, 1)};
+
+void declare_config(RobotFootprintTraversability::Config& config) {
+  using namespace config;
+  name("RobotFootprintTraversability::Config");
+  field(config.bbox_min, "bbox_min", "m");
+  field(config.bbox_max, "bbox_max", "m");
+  checkCondition(config.bbox_max.x() > config.bbox_min.x(),
+                 "'bbox_max.x' must be larger than 'bbox_min.x'");
+  checkCondition(config.bbox_max.y() > config.bbox_min.y(),
+                 "'bbox_max.y' must be larger than 'bbox_min.y'");
+}
+
+RobotFootprintTraversability::RobotFootprintTraversability(const Config& config)
+    : config(config::checkValid(config)) {}
+
+void RobotFootprintTraversability::apply(const ActiveWindowOutput& msg,
+                                         TraversabilityLayer& layer) {
+  addFootprint(msg.world_T_body<float>(), layer);
+  markTraversable(layer);
+}
+
+void RobotFootprintTraversability::addFootprint(const Eigen::Isometry3f& world_T_body,
+                                                const TraversabilityLayer& layer) {
+  const float voxel_size = layer.voxel_size;
+  // Inflate the footprint by half a voxel so that every voxel intersecting the
+  // footprint is included, not only those whose center lies inside it.
+  const Eigen::Vector2f half_voxel = Eigen::Vector2f::Constant(voxel_size / 2.0f);
+  const Eigen::Vector2f min = config.bbox_min.head<2>() - half_voxel;
+  const Eigen::Vector2f max = config.bbox_max.head<2>() + half_voxel;
+
+  // Compute the world frame xy extent of the footprint.
+  Eigen::Vector2f world_min =
+      Eigen::Vector2f::Constant(std::numeric_limits<float>::max());
+  Eigen::Vector2f world_max = -world_min;
+  for (const auto& corner : {Eigen::Vector2f(min.x(), min.y()),
+                             Eigen::Vector2f(min.x(), max.y()),
+                             Eigen::Vector2f(max.x(), min.y()),
+                             Eigen::Vector2f(max.x(), max.y())}) {
+    const Eigen::Vector3f p_world =
+        world_T_body * Eigen::Vector3f(corner.x(), corner.y(), 0.0f);
+    world_min = world_min.cwiseMin(p_world.head<2>());
+    world_max = world_max.cwiseMax(p_world.head<2>());
+  }
+
+  const auto body_T_world = world_T_body.inverse();
+  const float z = world_T_body.translation().z();
+  const int x_min = std::floor(world_min.x() / voxel_size);
+  const int x_max = std::floor(world_max.x() / voxel_size);
+  const int y_min = std::floor(world_min.y() / voxel_size);
+  const int y_max = std::floor(world_max.y() / voxel_size);
+  for (int x = x_min; x <= x_max; ++x) {
+    for (int y = y_min; y <= y_max; ++y) {
+      const Eigen::Vector3f center((x + 0.5f) * voxel_size, (y + 0.5f) * voxel_size, z);
+      const Eigen::Vector2f p_body = (body_T_world * center).head<2>();
+      if ((p_body.array() >= min.array()).all() &&
+          (p_body.array() <= max.array()).all()) {
+        footprint_.insert(Index2D(x, y));
+      }
+    }
+  }
+}
+
+void RobotFootprintTraversability::markTraversable(TraversabilityLayer& layer) const {
+  // Floor division to also handle negative indices correctly.
+  const int vps = static_cast<int>(layer.voxels_per_side);
+  const auto floor_div = [vps](int i) {
+    return i >= 0 ? i / vps : (i - vps + 1) / vps;
+  };
+  for (const auto& index : footprint_) {
+    const BlockIndex block_index(floor_div(index.x()), floor_div(index.y()), 0);
+    auto block = layer.getBlockPtr(block_index);
+    if (!block) {
+      continue;
+    }
+
+    const Index2D local(index.x() - block_index.x() * vps,
+                        index.y() - block_index.y() * vps);
+    auto& voxel = block->voxel(local);
+    if (voxel.state != State::TRAVERSABLE) {
+      voxel.state = State::TRAVERSABLE;
+      block->updated = true;
+    }
+  }
+}
 
 }  // namespace hydra::places
