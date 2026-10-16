@@ -495,7 +495,6 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
                                    original_vertices_,
                                    GlobalInfo::instance().getRobotPrefix().vertex_key,
-                                   *deformation_graph_->getValues(),
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
                                    last_deformed_vertices_);
