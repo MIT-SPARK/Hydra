@@ -54,8 +54,10 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
     std::string layer = spark_dsg::DsgLayers::TRAVERSABILITY;
     //! Estimator for maintaining traversability state
     config::VirtualConfig<TraversabilityEstimator> estimator;
-    //! Postprocessing filters for the traversability state (before clustering)
-    TraversabilityProcessors::Config postprocessing;
+    //! Processors applied to the stored traversability state after estimation
+    PersistentTraversabilityProcessors::Config persistent_processing;
+    //! Processors applied to a copy of the traversability state before clustering
+    TransientTraversabilityProcessors::Config transient_processing;
     //! Clustering that produces the places layer from the traversability state
     config::VirtualConfig<TraversabilityClustering> clustering;
     //! Visualization sinks for the current traversaiblity information
@@ -79,7 +81,8 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
   TraversabilityEstimator::Ptr estimator_;
   //! Persistent traversability layer, allocated on the first update.
   std::unique_ptr<TraversabilityLayer> layer_;
-  const TraversabilityProcessors postprocessing_;
+  const PersistentTraversabilityProcessors persistent_processing_;
+  const TransientTraversabilityProcessors transient_processing_;
   TraversabilityClustering::Ptr clustering_;
   Sink::List sinks_;
 };

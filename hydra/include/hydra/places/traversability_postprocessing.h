@@ -62,26 +62,63 @@ class TraversabilityProcessor {
 };
 
 /**
+ * @brief Processor whose changes are one-off and do not persist, i.e., applied to a
+ * copy of the traversability layer.
+ */
+class TransientTraversabilityProcessor : public TraversabilityProcessor {
+ public:
+  using Ptr = std::shared_ptr<TransientTraversabilityProcessor>;
+  using ConstPtr = std::shared_ptr<const TransientTraversabilityProcessor>;
+};
+
+/**
+ * @brief Processor whose changes persist, i.e., applied to the stored traversability
+ * layer.
+ */
+class PersistentTraversabilityProcessor : public TraversabilityProcessor {
+ public:
+  using Ptr = std::shared_ptr<PersistentTraversabilityProcessor>;
+  using ConstPtr = std::shared_ptr<const PersistentTraversabilityProcessor>;
+};
+
+/**
  * @brief Utility container for several processors.
  */
+template <typename ProcessorT>
 struct TraversabilityProcessors {
-  using Config = std::vector<config::VirtualConfig<TraversabilityProcessor>>;
+  using Config = std::vector<config::VirtualConfig<ProcessorT>>;
 
-  explicit TraversabilityProcessors(const Config& config);
+  explicit TraversabilityProcessors(const Config& config) {
+    for (const auto& processor_config : config) {
+      auto processor = processor_config.create();
+      if (processor) {
+        processors_.emplace_back(std::move(processor));
+      }
+    }
+  }
 
   /** @brief Apply all processors to the traversability layer.
    * @param layer The traversability layer to process.
    */
-  void apply(TraversabilityLayer& layer) const;
+  void apply(TraversabilityLayer& layer) const {
+    for (const auto& processor : processors_) {
+      processor->apply(layer);
+    }
+  }
 
  private:
-  std::vector<TraversabilityProcessor::Ptr> processors_;
+  std::vector<std::shared_ptr<ProcessorT>> processors_;
 };
+
+using TransientTraversabilityProcessors =
+    TraversabilityProcessors<TransientTraversabilityProcessor>;
+using PersistentTraversabilityProcessors =
+    TraversabilityProcessors<PersistentTraversabilityProcessor>;
 
 /**
  * @brief Dilate intraversable space in the traversability layer.
  */
-class ErosionDilation : public TraversabilityProcessor {
+class ErosionDilation : public TransientTraversabilityProcessor {
  public:
   struct Config {
     //! @brief Number of dilation steps to apply.

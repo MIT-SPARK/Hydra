@@ -43,25 +43,10 @@ using State = spark_dsg::TraversabilityState;
 
 namespace {
 static const auto registration =
-    config::RegistrationWithConfig<TraversabilityProcessor,
+    config::RegistrationWithConfig<TransientTraversabilityProcessor,
                                    ErosionDilation,
                                    ErosionDilation::Config>("ErosionDilation");
 }  // namespace
-
-TraversabilityProcessors::TraversabilityProcessors(const Config& config) {
-  for (const auto& processor_config : config) {
-    auto processor = processor_config.create();
-    if (processor) {
-      processors_.emplace_back(std::move(processor));
-    }
-  }
-}
-
-void TraversabilityProcessors::apply(TraversabilityLayer& layer) const {
-  for (const auto& processor : processors_) {
-    processor->apply(layer);
-  }
-}
 
 void declare_config(ErosionDilation::Config& config) {
   using namespace config;
