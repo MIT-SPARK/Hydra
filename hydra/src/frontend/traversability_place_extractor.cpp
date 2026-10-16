@@ -81,15 +81,25 @@ void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
 
 void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
-  estimator_->updateTraversability(msg);
+  if (!layer_) {
+    const auto& map_config = msg.map().config;
+    layer_ = std::make_unique<TraversabilityLayer>(map_config.voxel_size,
+                                                   map_config.voxels_per_side);
+  }
+
+  estimator_->updateTraversability(msg, *layer_);
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
                                                spark_dsg::SceneGraph& graph) {
+  if (!layer_) {
+    return;
+  }
+
   // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
   // expensive though.
   Timer timer("traversability/postprocessing", msg.timestamp_ns);
-  auto layer = estimator_->getTraversabilityLayer();
+  auto layer = *layer_;
   postprocessing_.apply(layer);
 
   timer.reset("traversability/clustering");

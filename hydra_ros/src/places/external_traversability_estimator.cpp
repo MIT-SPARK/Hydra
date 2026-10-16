@@ -68,29 +68,42 @@ ExternalTraversabilityEstimator::ExternalTraversabilityEstimator(const Config& c
       this);
 }
 
-const TraversabilityLayer& ExternalTraversabilityEstimator::getTraversabilityLayer()
-    const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return *traversability_layer_;
-}
-
 void ExternalTraversabilityEstimator::updateTraversability(
-    const ActiveWindowOutput& msg) {
-  if (!traversability_layer_) {
+    const ActiveWindowOutput& msg, TraversabilityLayer& layer) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!grid_layer_) {
     const auto& map_config = msg.map().config;
-    traversability_layer_ = std::make_unique<TraversabilityLayer>(
-        map_config.voxel_size, map_config.voxels_per_side);
+    grid_layer_ = std::make_unique<TraversabilityLayer>(map_config.voxel_size,
+                                                        map_config.voxels_per_side);
+    return;
+  }
+
+  // Remove blocks that are no longer covered by the grid.
+  spatial_hash::BlockIndices to_remove;
+  for (const auto& block : layer) {
+    if (!grid_layer_->hasBlock(block.index)) {
+      to_remove.push_back(block.index);
+    }
+  }
+  layer.removeBlocks(to_remove);
+
+  // Copy in the latest grid.
+  for (const auto& grid_block : *grid_layer_) {
+    auto& block = layer.allocateBlock(grid_block.index, grid_block.voxels_per_side);
+    block.voxels = grid_block.voxels;
+    block.updated = true;
   }
 }
 
 void ExternalTraversabilityEstimator::callback(
     const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
-  if (!traversability_layer_) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!grid_layer_) {
     return;
   }
+
   // Reset update tracking.
-  std::lock_guard<std::mutex> lock(mutex_);
-  for (auto& block : *traversability_layer_) {
+  for (auto& block : *grid_layer_) {
     block.updated = false;
     for (auto& voxel : block.voxels) {
       voxel.confidence = 0.0f;
@@ -108,13 +121,12 @@ void ExternalTraversabilityEstimator::callback(
       // Compute the voxel coordinates.
       const Eigen::Vector3f position =
           Eigen::Vector3f(x, y, 0.0f) * voxel_size + origin;
-      const auto index = traversability_layer_->globalIndexFromPoint(position);
+      const auto index = grid_layer_->globalIndexFromPoint(position);
       // TODO(lschmid): Fix the allocate block interfaces for the traversability layer.
-      auto& block = traversability_layer_->allocateBlock(
-          traversability_layer_->blockIndexFromGlobal(index),
-          traversability_layer_->voxels_per_side);
+      auto& block = grid_layer_->allocateBlock(grid_layer_->blockIndexFromGlobal(index),
+                                               grid_layer_->voxels_per_side);
       block.updated = true;
-      auto& voxel = block.voxel(traversability_layer_->voxelIndexFromGlobal(index));
+      auto& voxel = block.voxel(grid_layer_->voxelIndexFromGlobal(index));
       // The grid is a flat plane: every voxel takes the grid's own height.
       voxel.height = msg->info.origin.position.z;
       if (voxel.confidence == 0.0f) {
@@ -130,12 +142,12 @@ void ExternalTraversabilityEstimator::callback(
 
   // Remove blocks that were not updated.
   spatial_hash::BlockIndices to_remove;
-  for (auto& block : *traversability_layer_) {
+  for (auto& block : *grid_layer_) {
     if (!block.updated) {
       to_remove.push_back(block.index);
     }
   }
-  traversability_layer_->removeBlocks(to_remove);
+  grid_layer_->removeBlocks(to_remove);
 }
 
 ExternalTraversabilityEstimator::State
