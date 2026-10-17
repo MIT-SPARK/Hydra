@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hydra_image_store"
+version = "0.1.0"
+description = "Reader, small writer and CLI for the Hydra id-keyed image store"
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.10"
+dependencies = ["numpy"]
+authors = [{name = "harelb", email = "harelb@mit.edu"}]
+
+[project.optional-dependencies]
+images = ["Pillow"]
+dsg = ["spark_dsg"]
+test = ["pytest", "Pillow"]
+
+[project.scripts]
+hydra-image-store = "hydra_image_store.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+hydra_image_store = ["schema.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
