@@ -162,6 +162,7 @@ def _connect(db: pathlib.Path, readonly: bool) -> sqlite3.Connection:
     else:
         db.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db), check_same_thread=False, isolation_level=None)
+        conn.execute("PRAGMA busy_timeout = 5000")  # the C++ writer may hold the lock
         conn.executescript(schema_sql())
         conn.execute("PRAGMA synchronous = NORMAL")
     conn.execute("PRAGMA busy_timeout = 5000")
