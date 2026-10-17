@@ -38,8 +38,10 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <gtsam/slam/BetweenFactor.h>
+#include <kimera_pgmo/deformation_edge_factor.h>
 #include <kimera_pgmo/deformation_graph.h>
-#include <pose_graph_tools/pose_graph.h>
+#include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 
@@ -72,19 +74,20 @@ void declare_config(MstPlaceFactors::Config& config) {
 MstPlaceFactors::MstPlaceFactors(const Config& config)
     : config(config::checkValid(config)) {}
 
-void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
-                                    const SceneGraph& graph,
-                                    kimera_pgmo::DeformationGraph& deformation_graph,
-                                    const NodeRobotMap* robot_lookup) const {
+void MstPlaceFactors::updateProblem(
+    uint64_t timestamp_ns,
+    const SceneGraph& graph,
+    const kimera_pgmo::DeformationGraph& deformation_graph,
+    kimera_pgmo::OptimizationProblem& extras,
+    const NodeRobotMap* robot_lookup) const {
   const auto& places = graph.getLayer(DsgLayers::PLACES);
   if (places.numNodes() == 0) {
-    LOG(WARNING) << "Attempting to add places to deformation graph without places";
+    LOG(WARNING) << "Attempting to build place constraints without places";
     return;
   }
 
   const auto this_vertex_key = GlobalInfo::instance().getRobotPrefix().vertex_key;
   ScopedTimer timer("backend/mst_place_factors", timestamp_ns);
-  deformation_graph.clearTemporaryStructures();
 
   MinimumSpanningTreeInfo mst_info;
   {  // start timing scope
@@ -95,55 +98,64 @@ void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
   {  // start timing scope
     ScopedTimer add_timer("backend/add_places_nodes", timestamp_ns);
 
-    kimera_pgmo::NodeValenceInfoList factors;
+    const auto noise = gtsam::noiseModel::Isotropic::Variance(3, config.mesh_variance);
     for (const auto& node : places.nodes()) {
       const auto& attrs = node.attributes<PlaceNodeAttributes>();
       if (!node.hasSiblings()) {
         continue;
       }
 
-      auto& factor = factors.emplace_back();
+      const auto pose = gtsam::Pose3(gtsam::Rot3(), attrs.position);
+      extras.initial.insert(node.id, pose);
+      auto vertex_prefix = this_vertex_key;
       if (robot_lookup) {
-      } else {
-        factor.valence_prefix = this_vertex_key;
+        vertex_prefix = kimera_pgmo::GetVertexPrefix(robot_lookup->at(node.id));
       }
-      factor.key = node.id;
-      factor.pose = gtsam::Pose3(gtsam::Rot3(), attrs.position);
 
-      if (mst_info.leaves.count(node.id)) {
-        for (const auto& idx : attrs.deformation_connections) {
-          if (idx == std::numeric_limits<size_t>::max()) {
-            continue;
-          }
-          factor.valence.push_back(idx);
+      if (!mst_info.leaves.count(node.id)) {
+        continue;
+      }
+
+      for (const auto idx : attrs.deformation_connections) {
+        if (idx == std::numeric_limits<size_t>::max()) {
+          continue;
         }
+
+        const auto vertex = gtsam::Symbol(vertex_prefix, idx);
+        if (!deformation_graph.getValues()->exists(vertex)) {
+          continue;
+        }
+
+        const auto position =
+            deformation_graph.getInitialPositionVertex(vertex_prefix, idx);
+        extras.factors.emplace_shared<kimera_pgmo::DeformationEdgeFactor>(
+            node.id, vertex, pose, position, noise);
+        extras.factors.emplace_shared<kimera_pgmo::DeformationEdgeFactor>(
+            vertex,
+            node.id,
+            gtsam::Pose3(gtsam::Rot3(), position),
+            attrs.position,
+            noise);
       }
     }
-
-    deformation_graph.processNewTempNodesValences(factors, false, config.mesh_variance);
   }  // end timing scope
 
   {  // start timing scope
     ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
-    const auto robot_id = GlobalInfo::instance().getRobotPrefix().id;
-    pose_graph_tools::PoseGraph mst_edges;
+    gtsam::Vector6 variances;
+    variances.head<3>().setConstant(1.0e-2 * config.edge_variance);
+    variances.tail<3>().setConstant(config.edge_variance);
+    const auto noise = gtsam::noiseModel::Diagonal::Variances(variances);
     for (const auto& [s_id, t_id, dist] : mst_info.edges) {
-      gtsam::Pose3 source(gtsam::Rot3(), places.getNode(s_id).attributes().position);
-      gtsam::Pose3 target(gtsam::Rot3(), places.getNode(t_id).attributes().position);
-      pose_graph_tools::PoseGraphEdge mst_e;
-      mst_e.key_from = s_id;
-      mst_e.key_to = t_id;
-      mst_e.robot_from = robot_id;
-      mst_e.robot_to = robot_id;
-      // TODO(nathan) this should technically be something else
-      mst_e.type = pose_graph_tools::PoseGraphEdge::Type::MESH;
-      mst_e.stamp_ns = 0;
-      mst_e.pose = source.between(target).matrix();
-      mst_e.covariance.setIdentity();
-      mst_edges.edges.push_back(mst_e);
-    }
+      if (!extras.initial.exists(s_id) || !extras.initial.exists(t_id)) {
+        continue;
+      }
 
-    deformation_graph.processNewTempEdges(mst_edges, config.edge_variance);
+      const auto source = extras.initial.at<gtsam::Pose3>(s_id);
+      const auto target = extras.initial.at<gtsam::Pose3>(t_id);
+      extras.factors.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(
+          s_id, t_id, source.between(target), noise);
+    }
   }  // end timing scope
 }
 

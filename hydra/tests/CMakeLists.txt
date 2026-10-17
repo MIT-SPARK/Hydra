@@ -14,6 +14,7 @@ add_executable(
   backend/test_deformation_interpolator.cpp
   backend/test_external_loop_closure.cpp
   backend/test_merge_tracker.cpp
+  backend/test_mst_factors.cpp
   backend/updates/test_generic_update_functor.cpp
   backend/updates/test_ib_objects_update_functor.cpp
   backend/updates/test_update_agents_functor.cpp

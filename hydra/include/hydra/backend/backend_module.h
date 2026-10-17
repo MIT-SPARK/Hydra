@@ -172,6 +172,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   DsgUpdater::Ptr dsg_updater_;
   std::vector<OptimizationHook::Ptr> optimization_hooks_;
+  gtsam::Values extra_estimates_;
 
   std::vector<gtsam::Pose3> trajectory_;
   std::vector<size_t> timestamps_;

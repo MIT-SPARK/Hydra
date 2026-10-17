@@ -10,6 +10,7 @@
 #include <hydra/common/pipeline_queues.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <hydra/utils/timing_utilities.h>
+#include <kimera_pgmo/deformation_graph_4dof.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <kimera_rpgo/utils/g2o.h>
 #include <spark_dsg/node_attributes.h>
@@ -375,7 +376,10 @@ void MultiBackendModule::partialOptimization(const Timestamp& timestamp_ns) {
   }
 
   ScopedTimer timer("backend/partial_optimization", timestamp_ns);
-  auto initial = deformation_graph_->getValuesCopy();
+  auto problem = deformation_graph_->getOptimizationProblem(
+      KimeraPgmoInterface::config_.use_4dof_optim);
+  auto& initial = problem.initial;
+  auto& factors = problem.factors;
 
   bool has_all_keys = true;
   for (const auto& key : initial.keys()) {
@@ -390,34 +394,32 @@ void MultiBackendModule::partialOptimization(const Timestamp& timestamp_ns) {
     return;
   }
 
-  auto factors = deformation_graph_->getFactorsCopy();
-  auto temp_factors = deformation_graph_->getTempFactorsCopy();
-  auto temp_initial = deformation_graph_->getTempValuesCopy();
-
   // TODO(Yun): remove hard coded value?
   static const gtsam::SharedNoiseModel& prior_noise =
       gtsam::noiseModel::Isotropic::Variance(6, 1.0e-3);
 
+  gtsam::NonlinearFactorGraph priors;
   for (const auto& key : optimized.keys()) {
-    auto value = optimized.at<gtsam::Pose3>(key);
-    factors.add(gtsam::PriorFactor<gtsam::Pose3>(key, value, prior_noise));
-    initial.update(key, value);
+    const auto value = optimized.at<gtsam::Pose3>(key);
+    priors.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(key, value, prior_noise);
   }
+
+  if (KimeraPgmoInterface::config_.use_4dof_optim) {
+    auto converted = kimera_pgmo::convertGraphToPose4DoF(priors, optimized);
+    priors = std::move(converted.first);
+    optimized = std::move(converted.second);
+  }
+
+  factors.push_back(priors);
+  initial.update(optimized);
 
   // Set all factors as inliers
   auto known_indices = std::views::iota(size_t(0), factors.size());
-  std::set<size_t> known_inliers(known_indices.begin(), known_indices.end());
-  auto temp_known_indices = std::views::iota(size_t(0), temp_factors.size());
-  std::set<size_t> temp_known_inliers(temp_known_indices.begin(),
-                                      temp_known_indices.end());
+  problem.inliers = std::set<size_t>(known_indices.begin(), known_indices.end());
   LOG(INFO) << "Starting partial optimization";
+  kimera_pgmo::OptimizationResult result;
   try {
-    partial_pgo_->update(factors,
-                         initial,
-                         known_inliers,
-                         temp_factors,
-                         temp_initial,
-                         temp_known_inliers);
+    result = partial_pgo_->update(problem);
     LOG(INFO) << "Finished partial optimization";
   } catch (const gtsam::IndeterminantLinearSystemException& e) {
     LOG(ERROR) << "Failed optimization: '" << gtsam::Symbol(e.nearbyVariable());
@@ -443,16 +445,17 @@ void MultiBackendModule::partialOptimization(const Timestamp& timestamp_ns) {
           ss << ", ";
         }
       }
+
       ss << "]";
       LOG(ERROR) << "factor " << i << ": " << ss.str();
     }
+
+    return;
   }
 
-  auto estimates = partial_pgo_->getEstimates();
-  auto temp_estimates = partial_pgo_->getTempEstimates();
-  // Only update values
-  deformation_graph_->updateValues(estimates);
-  deformation_graph_->updateTempValues(temp_estimates);
+  // Partial optimization only updates base values.
+  deformation_graph_->updateValues(
+      kimera_pgmo::convertPose4DoFToPose3(result.estimates));
 }
 
 bool MultiBackendModule::spinOnce(Timestamp timestamp_ns) {
@@ -504,6 +507,7 @@ void MultiBackendModule::addLoopClosures() {
     if (lc.added_to_dgraph) {
       continue;
     }
+
     deformation_graph_->processNewBetween(
         lc.src,
         lc.dest,
@@ -665,9 +669,6 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
     staged_mesh_data_[id] = state->mesh_data_->clone();
     staged_mesh_data_[id]->transform(transform);
   }
-
-  // Add objects or places to deformation graph
-  deformation_graph_->clearTemporaryStructures();
 
   // Add loop closures so they appear in the published pose graph
   addLoopClosures();

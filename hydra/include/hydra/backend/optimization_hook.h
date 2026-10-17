@@ -42,6 +42,7 @@
 
 namespace kimera_pgmo {
 class DeformationGraph;
+struct OptimizationProblem;
 }  // namespace kimera_pgmo
 
 namespace hydra {
@@ -55,7 +56,8 @@ class OptimizationHook {
 
   virtual void updateProblem(size_t timestamp_ns,
                              const spark_dsg::SceneGraph& graph,
-                             kimera_pgmo::DeformationGraph& deformation_graph,
+                             const kimera_pgmo::DeformationGraph& deformation_graph,
+                             kimera_pgmo::OptimizationProblem& extras,
                              const NodeRobotMap* robot_lookup = nullptr) const = 0;
 };
 
