@@ -53,9 +53,11 @@ bool SceneGraphOperator::rebase(const SceneGraph& source) {
 
   // Remove the non overlapping nodes
   std::vector<spark_dsg::NodeId> non_overlapping;
-  for (const auto& node : data_->nodes()) {
-    if (!source.hasNode(node.id)) {
-      non_overlapping.push_back(node.id);
+  for (const auto& layer : data_->all_layers()) {
+    for (const auto& node : layer.nodes()) {
+      if (!source.hasNode(node.id)) {
+        non_overlapping.push_back(node.id);
+      }
     }
   }
 
@@ -91,15 +93,17 @@ Eigen::Isometry3d SceneGraphOperator::computeSourceDataTransform(
   size_t num_pts_for_align = 9;
   std::queue<Eigen::Vector3d> source_pts_queue;
   std::queue<Eigen::Vector3d> pts_queue;
-  for (const auto& node : data_->nodes()) {
-    if (!source.hasNode(node.id)) {
-      continue;
-    }
+  for (const auto& layer : data_->all_layers()) {
+    for (const auto& node : layer.nodes()) {
+      if (!source.hasNode(node.id)) {
+        continue;
+      }
 
-    pts_queue.push(data_->getNode(node.id).attributes().position);
-    source_pts_queue.push(source.getNode(node.id).attributes().position);
-    if (source_pts_queue.size() >= num_pts_for_align) {
-      break;
+      pts_queue.push(data_->getNode(node.id).attributes().position);
+      source_pts_queue.push(source.getNode(node.id).attributes().position);
+      if (source_pts_queue.size() >= num_pts_for_align) {
+        break;
+      }
     }
   }
 
