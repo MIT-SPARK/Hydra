@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 
 #pragma once
-#include <functional>
 
 #include "hydra/backend/optimization_hook.h"
 
@@ -55,18 +54,11 @@ class MstPlaceFactors : public OptimizationHook {
 
   void updateProblem(uint64_t timestamp_ns,
                      const spark_dsg::SceneGraph& graph,
-                     kimera_pgmo::DeformationGraph& deformation_graph,
+                     const kimera_pgmo::DeformationGraph& deformation_graph,
+                     kimera_pgmo::OptimizationProblem& extras,
                      const NodeRobotMap* robot_lookup) const override;
 };
 
 void declare_config(MstPlaceFactors::Config& config);
-
-void addPlacesToDeformationGraph(
-    const spark_dsg::SceneGraph& graph,
-    size_t timestamp_ns,
-    kimera_pgmo::DeformationGraph& deformation_graph,
-    double mst_edge_variance,
-    double mesh_edge_variance,
-    const std::function<char(spark_dsg::NodeId)>& prefix_lookup);
 
 }  // namespace hydra

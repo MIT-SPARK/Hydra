@@ -39,6 +39,7 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
+#include <kimera_pgmo/deformation_graph_4dof.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/pcl_mesh_traits.h>
 #include <kimera_pgmo/utils/mesh_io.h>
@@ -92,6 +93,7 @@ inline bool hasLoopClosure(const PoseGraph& graph) {
       return true;
     }
   }
+
   return false;
 }
 
@@ -266,7 +268,7 @@ bool BackendModule::spinOnce(bool force_update) {
     if (have_loopclosures_) {
       // update graph with cached optimization solution
       info.reset(new UpdateInfo{timestamp_ns,
-                                deformation_graph_->getTempValues(),
+                                &extra_estimates_,
                                 deformation_graph_->getValues(),
                                 false,
                                 {},
@@ -367,6 +369,7 @@ void BackendModule::updateFactorGraph(const FrontendOutput& input) {
       LOG(INFO) << "[Hydra Backend] Input pose graph has loop closure @ "
                 << msg.stamp_ns << " [ns]";
     }
+
     processIncrementalPoseGraph(
         msg, inc_mesh_indices, inc_mesh_index_stamps, trajectory_, timestamps_);
     logIncrementalLoopClosures(msg);
@@ -510,26 +513,37 @@ void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
         {gtsam::Symbol(GlobalInfo::instance().getRobotPrefix().key, node.key),
          gtsam::Pose3(node.pose.matrix())});
   }
+
   deformation_graph_->processNodeMeasurements(agent_measurements);
 }
 
 void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
+  kimera_pgmo::OptimizationProblem extras;
   for (const auto& hook : optimization_hooks_) {
     if (!hook) {
       continue;
     }
 
-    hook->updateProblem(timestamp_ns, *unmerged_graph_, *deformation_graph_);
+    hook->updateProblem(timestamp_ns, *unmerged_graph_, *deformation_graph_, extras);
+  }
+
+  if (KimeraPgmoInterface::config_.use_4dof_optim) {
+    auto [factors, initial] =
+        kimera_pgmo::convertGraphToPose4DoF(extras.factors, extras.initial);
+    extras.factors = std::move(factors);
+    extras.initial = std::move(initial);
   }
 
   ScopedTimer timer("backend/optimization", timestamp_ns, true, 0, false);
-  KimeraPgmoInterface::optimize();
+  kimera_pgmo::OptimizationResult result;
+  KimeraPgmoInterface::optimize(extras, &result);
+  extra_estimates_ = kimera_pgmo::convertPose4DoFToPose3(result.extra_estimates);
   timer.stop();
 
   updateDsgMesh(timestamp_ns);
 
   UpdateInfo::ConstPtr info(new UpdateInfo{timestamp_ns,
-                                           deformation_graph_->getTempValues(),
+                                           &extra_estimates_,
                                            deformation_graph_->getValues(),
                                            have_new_loopclosures_ || force_find_merge,
                                            {},
