@@ -182,3 +182,29 @@ def test_import_legacy_real_run_smoke(tmp_path):
     assert main(["export", str(tmp_path / "store"), "--dsg", str(REAL_RUN / "hydra/backend/dsg.json"),
                  "--out", str(tmp_path / "export"), "--kept-only"]) == 0
     assert (tmp_path / "export/O_0/frame_1788127479836547276_rgb.jpg").exists()
+
+
+def test_strip_legacy_dsg(tmp_path):
+    from hydra_image_store.legacy import strip_legacy_dsg
+
+    src = tmp_path / "dsg.json"
+    data = {
+        "layer_keys": [{"layer": 2, "partition": 0}, {"layer": 2, "partition": 115}],
+        "layer_names": {"AGENTS": {"layer": 2, "partition": 0}},
+        "nodes": [
+            {"id": 1, "layer": 2, "partition": 0,
+             "attributes": {"type": "AgentNodeAttributes", "image_folder": "agents/agent_1"}},
+            {"id": 2, "layer": 2, "partition": 115,
+             "attributes": {"type": "SubKeyframeNodeAttributes", "image_folder": "x"}},
+        ],
+        "edges": [{"source": 1, "target": 2, "info": {}}],
+    }
+    src.write_text(json.dumps(data))
+    dst = tmp_path / "out.json"
+    stats = strip_legacy_dsg(src, dst)
+    out = json.loads(dst.read_text())
+    assert stats == {"subkeyframe_nodes_removed": 1, "edges_removed": 1, "image_folders_removed": 1}
+    assert [n["id"] for n in out["nodes"]] == [1]
+    assert "image_folder" not in out["nodes"][0]["attributes"]
+    assert out["edges"] == []
+    assert out["layer_keys"] == [{"layer": 2, "partition": 0}]

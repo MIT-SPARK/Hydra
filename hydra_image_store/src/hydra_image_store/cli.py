@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import sys
 
 from .store import ImageStore, ImageStoreWriter
@@ -60,6 +61,13 @@ def _cmd_import_legacy(args) -> int:
         link=link,
         sam3_dirs=tuple(args.sam3_dir) if args.sam3_dir else ("sam3_objects",),
     )
+    if args.write_dsg:
+        from .legacy import find_dsg, strip_legacy_dsg
+
+        src = args.dsg or find_dsg(pathlib.Path(args.run_dir))
+        if src is None:
+            raise SystemExit("--write-dsg needs --dsg (no scene graph found in the run dir)")
+        stats["stripped_dsg"] = strip_legacy_dsg(src, args.write_dsg)
     print(json.dumps(stats, indent=1))
     return 0
 
@@ -95,6 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out", required=True, help="new store directory")
     s.add_argument("--robot-id", type=int, default=0)
     s.add_argument("--sam3-dir", action="append", help="SAM3 object dirs (default: sam3_objects)")
+    s.add_argument("--write-dsg", help="also write a copy of the scene graph without pre-store "
+                   "SubKeyframe nodes and image_folder attributes (loadable by upstream spark_dsg)")
     g = s.add_mutually_exclusive_group()
     g.add_argument("--copy", action="store_true", help="copy images (default: hardlink)")
     g.add_argument("--symlink", action="store_true", help="symlink images (default: hardlink)")

@@ -304,3 +304,40 @@ def _import_obs_dir(writer, sensor, folder: pathlib.Path, track: int, anchors: _
         n += 1
         stats[counter] += 1
     return n, max_dt
+
+
+def strip_legacy_dsg(src, dst) -> dict:
+    """Write a copy of a pre-store scene graph (json) that upstream spark_dsg can load.
+
+    Removes SubKeyframe nodes (and their edges and now-empty layer keys) and the
+    image_folder attribute, both of which only exist in pre-store builds.
+    """
+    data = _load_json(pathlib.Path(src))
+    nodes = data.get("nodes", [])
+    removed = {n["id"] for n in nodes if n.get("attributes", {}).get("type") in _SUBKF_TYPES}
+    kept_nodes = [n for n in nodes if n["id"] not in removed]
+    image_folders = 0
+    for node in kept_nodes:
+        if node.get("attributes", {}).pop("image_folder", None) is not None:
+            image_folders += 1
+
+    edges = data.get("edges", [])
+    kept_edges = [e for e in edges if e["source"] not in removed and e["target"] not in removed]
+
+    used = {(n.get("layer"), n.get("partition", 0)) for n in kept_nodes}
+    named = {(v["layer"], v["partition"]) for v in data.get("layer_names", {}).values()}
+    if "layer_keys" in data:
+        data["layer_keys"] = [
+            k for k in data["layer_keys"]
+            if (k["layer"], k["partition"]) in used or (k["layer"], k["partition"]) in named
+        ]
+
+    data["nodes"] = kept_nodes
+    data["edges"] = kept_edges
+    with open(dst, "w") as fout:
+        json.dump(data, fout)
+    return {
+        "subkeyframe_nodes_removed": len(removed),
+        "edges_removed": len(edges) - len(kept_edges),
+        "image_folders_removed": image_folders,
+    }
