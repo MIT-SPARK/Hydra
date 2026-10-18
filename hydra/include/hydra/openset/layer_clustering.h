@@ -54,8 +54,7 @@ class LayerClustering {
     std::set<spark_dsg::NodeId> nodes;
     double score;
     FeatureVector feature;
-    size_t best_query;
-    std::string best_query_name;
+    uint32_t best_query = 0;
   };
   using Clusters = std::vector<Cluster::Ptr>;
 
@@ -67,6 +66,7 @@ class LayerClustering {
 
  protected:
   EmbeddingGroup::Ptr queries_;
+  std::vector<std::string> labels_;
   std::unique_ptr<EmbeddingDistance> metric_;
 };
 

@@ -81,9 +81,8 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
     NodeSymbol new_node_id(config.id_prefix, i);
     auto attrs = std::make_unique<SemanticNodeAttributes>();
     attrs->semantic_label = 0;
-    attrs->name = clusters[i]->best_query_name;
     attrs->semantic_feature = clusters[i]->feature;
-    attrs->semantic_label = clusters[i]->best_query;
+    attrs->semantic_label = clusters[i]->best_query + 1;
     graph.emplaceNode(config.target_layer, new_node_id, std::move(attrs));
 
     for (const auto node_id : clusters[i]->nodes) {

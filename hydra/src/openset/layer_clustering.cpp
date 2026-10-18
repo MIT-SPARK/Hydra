@@ -17,14 +17,13 @@ void declare_config(LayerClustering::Config& config) {
 LayerClustering::LayerClustering(const Config& config)
     : config(config::checkValid(config)),
       queries_(config.queries.create()),
-      metric_(config.metric.create()) {}
-
-std::vector<std::string> LayerClustering::labels() const {
+      metric_(config.metric.create()) {
+  labels_.push_back("unknown");
   if (queries_) {
-    return queries_->names;
-  } else {
-    return {};
+    labels_.insert(labels_.end(), queries_->names.begin(), queries_->names.end());
   }
 }
+
+std::vector<std::string> LayerClustering::labels() const { return labels_; }
 
 }  // namespace hydra
