@@ -106,6 +106,7 @@ void declare_config(BackendModule::Config& config) {
   field(config.pgmo, "pgmo");
   field(config.optimize_on_lc, "optimize_on_lc");
   field(config.optimize_every_update, "optimize_every_update");
+  field(config.finalize_on_shutdown, "finalize_on_shutdown");
   field(config.external_loop_closures, "external_loop_closures");
   field(config.optimization_hooks, "optimization_hooks");
   field(config.sinks, "sinks");
@@ -149,9 +150,11 @@ void BackendModule::stopImpl() {
     VLOG(2) << "[Hydra Backend] stopped!";
   }
 
-  auto info = getUpdateInfo(0);
-  info->full_update = true;
-  dsg_updater_->finalize(info);
+  if (config.finalize_on_shutdown) {
+    auto info = getUpdateInfo(0);
+    info->full_update = true;
+    dsg_updater_->finalize(info);
+  }
 }
 
 void BackendModule::stop() { stopImpl(); }

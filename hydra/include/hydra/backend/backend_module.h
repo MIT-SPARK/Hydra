@@ -91,6 +91,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     bool optimize_on_lc = true;
     //! Optimize after every update after first loop closure
     bool optimize_every_update = true;
+    //! Run final update pass before save
+    bool finalize_on_shutdown = true;
     //! PGMO backend configuration
     kimera_pgmo::KimeraPgmoConfig pgmo;
     //! Configuration for associating loop closures to pose graph
