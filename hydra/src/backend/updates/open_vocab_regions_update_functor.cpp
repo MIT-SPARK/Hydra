@@ -5,6 +5,7 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/labelspace.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
@@ -61,6 +62,9 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
   ScopedTimer timer("backend/region_clustering", info->timestamp_ns);
 
   auto& graph = *dsg.graph;
+  const spark_dsg::Labelspace labelspace(clustering_->labels());
+  labelspace.save(graph, config.target_layer);
+
   const auto& places = graph.getLayer(config.source_layer);
   clearRegions(graph, config.target_layer);
 

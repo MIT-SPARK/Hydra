@@ -19,4 +19,12 @@ LayerClustering::LayerClustering(const Config& config)
       queries_(config.queries.create()),
       metric_(config.metric.create()) {}
 
+std::vector<std::string> LayerClustering::labels() const {
+  if (queries_) {
+    return queries_->names;
+  } else {
+    return {};
+  }
+}
+
 }  // namespace hydra

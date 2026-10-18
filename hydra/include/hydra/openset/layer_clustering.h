@@ -63,6 +63,8 @@ class LayerClustering {
 
   virtual Clusters cluster(const spark_dsg::SceneGraphLayer& layer) const = 0;
 
+  std::vector<std::string> labels() const;
+
  protected:
   EmbeddingGroup::Ptr queries_;
   std::unique_ptr<EmbeddingDistance> metric_;
