@@ -75,6 +75,8 @@ HydraRosPipeline::HydraRosPipeline(const Config& config)
 HydraRosPipeline::~HydraRosPipeline() {}
 
 void HydraRosPipeline::init() {
+  HydraPipeline::init();
+
   auto nh = ianvs::NodeHandle::this_node("~");
   backend_->addSink(std::make_shared<RosBackendPublisher>(nh / "backend"));
   frontend_->addSink(std::make_shared<RosFrontendPublisher>(nh / "frontend"));
