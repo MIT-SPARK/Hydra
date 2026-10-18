@@ -5,6 +5,7 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/labelspace.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
@@ -61,6 +62,9 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
   ScopedTimer timer("backend/region_clustering", info->timestamp_ns);
 
   auto& graph = *dsg.graph;
+  const spark_dsg::Labelspace labelspace(clustering_->labels());
+  labelspace.save(graph, config.target_layer);
+
   const auto& places = graph.getLayer(config.source_layer);
   clearRegions(graph, config.target_layer);
 
@@ -77,9 +81,8 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
     NodeSymbol new_node_id(config.id_prefix, i);
     auto attrs = std::make_unique<SemanticNodeAttributes>();
     attrs->semantic_label = 0;
-    attrs->name = clusters[i]->best_query_name;
     attrs->semantic_feature = clusters[i]->feature;
-    attrs->semantic_label = clusters[i]->best_query;
+    attrs->semantic_label = clusters[i]->best_query + 1;
     graph.emplaceNode(config.target_layer, new_node_id, std::move(attrs));
 
     for (const auto node_id : clusters[i]->nodes) {

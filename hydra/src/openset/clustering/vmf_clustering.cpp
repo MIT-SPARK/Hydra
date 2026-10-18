@@ -138,7 +138,6 @@ VmfClustering::Clusters buildClusters(const SceneGraphLayer& layer,
     const auto info = queries.getBestScore(metric, cluster->feature);
     cluster->score = info.score;
     cluster->best_query = info.index;
-    cluster->best_query_name = queries.names.at(info.index);
     to_return.push_back(cluster);
   }
 
