@@ -56,6 +56,15 @@ static const auto footprint_registration =
                                    RobotFootprintTraversability,
                                    RobotFootprintTraversability::Config>(
         "RobotFootprintTraversability");
+
+// Block index of a global 2D voxel index. Uses floor division to also handle negative
+// indices correctly.
+BlockIndex blockFromGlobal(const Index2D& index, int voxels_per_side) {
+  const auto floor_div = [voxels_per_side](int i) {
+    return i >= 0 ? i / voxels_per_side : (i - voxels_per_side + 1) / voxels_per_side;
+  };
+  return BlockIndex(floor_div(index.x()), floor_div(index.y()), 0);
+}
 }  // namespace
 
 void declare_config(ErosionDilation::Config& config) {
@@ -145,8 +154,22 @@ RobotFootprintTraversability::RobotFootprintTraversability(const Config& config)
 
 void RobotFootprintTraversability::apply(const ActiveWindowOutput& msg,
                                          TraversabilityLayer& layer) {
+  // Archive before adding so that voxels in not yet allocated blocks are kept until
+  // the next update.
+  archive(layer);
   addFootprint(msg.world_T_body<float>(), layer);
   markTraversable(layer);
+}
+
+void RobotFootprintTraversability::archive(const TraversabilityLayer& layer) {
+  const int vps = static_cast<int>(layer.voxels_per_side);
+  for (auto it = footprint_.begin(); it != footprint_.end();) {
+    if (layer.hasBlock(blockFromGlobal(*it, vps))) {
+      ++it;
+    } else {
+      it = footprint_.erase(it);
+    }
+  }
 }
 
 void RobotFootprintTraversability::addFootprint(const Eigen::Isometry3f& world_T_body,
@@ -191,13 +214,9 @@ void RobotFootprintTraversability::addFootprint(const Eigen::Isometry3f& world_T
 }
 
 void RobotFootprintTraversability::markTraversable(TraversabilityLayer& layer) const {
-  // Floor division to also handle negative indices correctly.
   const int vps = static_cast<int>(layer.voxels_per_side);
-  const auto floor_div = [vps](int i) {
-    return i >= 0 ? i / vps : (i - vps + 1) / vps;
-  };
   for (const auto& index : footprint_) {
-    const BlockIndex block_index(floor_div(index.x()), floor_div(index.y()), 0);
+    const auto block_index = blockFromGlobal(index, vps);
     auto block = layer.getBlockPtr(block_index);
     if (!block) {
       continue;
