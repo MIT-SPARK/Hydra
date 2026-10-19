@@ -42,34 +42,12 @@
 
 #include "hydra/active_window/reconstruction_module.h"
 #include "hydra/backend/backend_module.h"
+#include "hydra/common/global_info.h"
 #include "hydra/frontend/graph_builder.h"
 #include "hydra/loop_closure/loop_closure_module.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
-namespace {
-
-std::string makeBanner(const std::string& msg,
-                       size_t print_width,
-                       char fill,
-                       bool with_header = true,
-                       bool with_footer = false) {
-  std::stringstream ss;
-  if (with_header) {
-    ss << std::string(print_width, fill) << "\n";
-  }
-
-  const auto msg_size = msg.size() + 3;
-  const auto spacing = msg_size >= print_width ? 0 : print_width - msg_size;
-  ss << fill << " " << msg << (spacing ? std::string(spacing, ' ') + fill : "") << "\n";
-  if (with_footer) {
-    ss << std::string(print_width, fill) << "\n";
-  }
-
-  return ss.str();
-}
-
-}  // namespace
 
 using hydra::timing::ElapsedTimeRecorder;
 
@@ -77,7 +55,6 @@ void declare_config(HydraPipeline::Config& config) {
   using namespace config;
   name("HydraPipeline::Config");
   base<VerbosityConfig>(config);
-  field(config.robot_id, "robot_id");
   field(config.active_window, "active_window");
   field(config.frontend, "frontend");
   field(config.backend, "backend");
@@ -91,17 +68,13 @@ HydraPipeline::Config::Config()
       frontend(GraphBuilder::Config()),
       backend(BackendModule::Config()) {}
 
-HydraPipeline::HydraPipeline(const Config& config,
-                             const PipelineConfig& pipeline_config)
-    : config(config) {
-  const auto& info = GlobalInfo::init(pipeline_config, config.robot_id);
+HydraPipeline::HydraPipeline(const Config& config) : config(config) {
+  auto& info = GlobalInfo::instance();
   frontend_dsg_ = info.createSharedDsg();
   backend_dsg_ = info.createSharedDsg();
   shared_state_.reset(new SharedModuleState());
   shared_state_->lcd_graph = info.createSharedDsg();
   shared_state_->backend_graph = info.createSharedDsg();
-  MLOG(0) << "[Hydra] Initialized pipeline with:\n"
-          << config::toString(info.getConfig());
 }
 
 void HydraPipeline::init() {
@@ -116,26 +89,12 @@ void HydraPipeline::init() {
 
 HydraPipeline::~HydraPipeline() {}
 
-std::string HydraPipeline::getModuleInfo(const std::string& name,
-                                         const Module& mod) const {
-  const auto print_width = config::Settings().printing.width;
-  std::stringstream ss;
-  ss << makeBanner(name, print_width, '*', false, true);
-  const auto info = mod.printInfo();
-  if (!info.empty()) {
-    ss << info << "\n";
-  }
-
-  ss << std::string(print_width, '*') << "\n";
-  return ss.str();
-}
-
 void HydraPipeline::showModules() const {
-  MLOG(1) << getModuleInfo("Active Window", *active_window_);
-  MLOG(1) << getModuleInfo("Frontend", *frontend_);
-  MLOG(1) << getModuleInfo("Backend", *backend_);
+  MLOG(1) << "Active Window:\n" << active_window_->printInfo();
+  MLOG(1) << "Frontend:\n" << frontend_->printInfo();
+  MLOG(1) << "Backend:\n" << backend_->printInfo();
   if (lcd_) {
-    MLOG(1) << getModuleInfo("Loop Closures", *lcd_);
+    MLOG(1) << "Loop Closure Detection:\n" << lcd_->printInfo();
   }
 }
 

@@ -63,8 +63,7 @@ void declare_config(HydraRosPipeline::Config& config) {
 }
 
 HydraRosPipeline::HydraRosPipeline(const Config& config)
-    : HydraPipeline(config, config::fromContext<PipelineConfig>()),
-      config(config::checkValid(config)) {
+    : HydraPipeline(config), config(config::checkValid(config)) {
   if (config.preprint_config) {
     LOG(INFO) << "Using configuration to start Hydra\n" << config::toString(config);
   }

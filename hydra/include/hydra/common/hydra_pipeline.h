@@ -33,9 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/global_info.h"
-#include "hydra/common/module.h"
+#include <config_utilities/virtual_config.h>
+
 #include "hydra/common/shared_module_state.h"
+#include "hydra/utils/data_directory.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra {
@@ -50,8 +51,6 @@ class HydraPipeline {
   struct Config : public VerbosityConfig {
     Config();
 
-    //! Robot ID to use
-    int robot_id = 0;
     //! Configuration for active window and reconstruction
     config::VirtualConfig<ActiveWindowModule> active_window;
     //! Configuration for frontend module
@@ -62,7 +61,7 @@ class HydraPipeline {
     config::VirtualConfig<LoopClosureModule> lcd;
   } const config;
 
-  HydraPipeline(const Config& config, const PipelineConfig& pipeline_config);
+  explicit HydraPipeline(const Config& config);
 
   virtual ~HydraPipeline();
 
@@ -76,8 +75,6 @@ class HydraPipeline {
 
  protected:
   void showModules() const;
-
-  std::string getModuleInfo(const std::string& name, const Module& mod) const;
 
  protected:
   SharedDsgInfo::Ptr frontend_dsg_;

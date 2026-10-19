@@ -65,17 +65,8 @@ namespace hydra::python {
 
 class PythonPipeline : public HydraPipeline {
  public:
-  struct Config : PipelineConfig, HydraPipeline::Config {
-    Config with_id(int robot_id) const {
-      auto new_config = *this;
-      new_config.robot_id = robot_id;
-      return new_config;
-    }
-  } const config;
-
-  PythonPipeline(const Config& config,
+  PythonPipeline(const HydraPipeline::Config& config,
                  const Sensor::Ptr& sensor,
-                 int robot_id = 0,
                  int config_verbosity = 0,
                  bool step_mode_only = true,
                  std::string zmq_url = "");
@@ -107,18 +98,15 @@ class PythonPipeline : public HydraPipeline {
 void declare_config(PythonPipeline::Config& config) {
   using namespace config;
   name("PythonPipeline::Config");
-  base<PipelineConfig>(config);
   base<HydraPipeline::Config>(config);
 }
 
-PythonPipeline::PythonPipeline(const Config& _config,
+PythonPipeline::PythonPipeline(const HydraPipeline::Config& config,
                                const Sensor::Ptr& sensor,
-                               int robot_id,
                                int config_verbosity,
                                bool step_mode_only,
                                std::string zmq_url)
-    : HydraPipeline(_config.with_id(robot_id), _config),
-      config(_config),
+    : HydraPipeline(config),
       sensor(sensor),
       zmq_url(zmq_url),
       step_mode_only_(step_mode_only) {
@@ -229,13 +217,11 @@ void addBindings(pybind11::module_& m) {
              bool step_mode_only,
              const std::string zmq_url) {
             const auto node = YAML::Load(contents);
+            const auto global_config = config::fromYaml<PipelineConfig>(node);
+            const auto base_config = config::fromYaml<HydraPipeline::Config>(node);
+            GlobalInfo::init(global_config, robot_id);
             return std::make_unique<PythonPipeline>(
-                config::fromYaml<PythonPipeline::Config>(node),
-                sensor,
-                robot_id,
-                config_verbosity,
-                step_mode_only,
-                zmq_url);
+                base_config, sensor, config_verbosity, step_mode_only, zmq_url);
           },
           "config"_a,
           "camera"_a,
@@ -252,13 +238,11 @@ void addBindings(pybind11::module_& m) {
              bool step_mode_only,
              const std::string& zmq_url) {
             const auto node = YAML::LoadFile(filepath);
+            const auto global_config = config::fromYaml<PipelineConfig>(node);
+            const auto base_config = config::fromYaml<HydraPipeline::Config>(node);
+            GlobalInfo::init(global_config, robot_id);
             return std::make_unique<PythonPipeline>(
-                config::fromYaml<PythonPipeline::Config>(node),
-                sensor,
-                robot_id,
-                config_verbosity,
-                step_mode_only,
-                zmq_url);
+                base_config, sensor, config_verbosity, step_mode_only, zmq_url);
           },
           "config"_a,
           "camera"_a,
