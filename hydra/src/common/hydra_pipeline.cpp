@@ -41,6 +41,7 @@
 #include <glog/logging.h>
 
 #include "hydra/active_window/reconstruction_module.h"
+#include "hydra/active_window/volumetric_window.h"
 #include "hydra/backend/backend_module.h"
 #include "hydra/common/global_info.h"
 #include "hydra/frontend/graph_builder.h"
@@ -55,6 +56,8 @@ void declare_config(HydraPipeline::Config& config) {
   using namespace config;
   name("HydraPipeline::Config");
   base<VerbosityConfig>(config);
+  config.map_window.setOptional();
+  field(config.map_window, "map_window");
   field(config.active_window, "active_window");
   field(config.frontend, "frontend");
   field(config.backend, "backend");
@@ -64,6 +67,7 @@ void declare_config(HydraPipeline::Config& config) {
 
 HydraPipeline::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("pipeline")),
+      map_window(SpatialWindowChecker::Config()),
       active_window(ReconstructionModule::Config()),
       frontend(GraphBuilder::Config()),
       backend(BackendModule::Config()) {}
@@ -72,16 +76,17 @@ HydraPipeline::HydraPipeline(const Config& config) : config(config) {
   auto& info = GlobalInfo::instance();
   frontend_dsg_ = info.createSharedDsg();
   backend_dsg_ = info.createSharedDsg();
-  shared_state_.reset(new SharedModuleState());
-  shared_state_->lcd_graph = info.createSharedDsg();
-  shared_state_->backend_graph = info.createSharedDsg();
+  state_.reset(new SharedModuleState());
+  state_->lcd_graph = info.createSharedDsg();
+  state_->backend_graph = info.createSharedDsg();
 }
 
 void HydraPipeline::init() {
-  frontend_ = config.frontend.create(frontend_dsg_, shared_state_);
-  backend_ = config.backend.create(backend_dsg_, shared_state_);
-  active_window_ = config.active_window.create(frontend_->queue());
-  lcd_ = config.lcd.create(shared_state_);
+  frontend_ = config.frontend.create(frontend_dsg_, state_, config.map_window.create());
+  backend_ = config.backend.create(backend_dsg_, state_);
+  const auto queue = frontend_->queue();
+  active_window_ = config.active_window.create(queue, config.map_window.create());
+  lcd_ = config.lcd.create(state_);
   if (lcd_) {
     frontend_->setLcdQueue(lcd_->queue());
   }

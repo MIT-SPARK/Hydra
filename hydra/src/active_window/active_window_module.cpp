@@ -61,15 +61,18 @@ ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
       max_input_queue_size(0),
       volumetric_map({0.1, 16, 0.3, with_semantics, with_tracking}) {}
 
+using WindowPtr = std::unique_ptr<VolumetricWindow>;
+
 ActiveWindowModule::ActiveWindowModule(const Config& config,
-                                       const OutputQueue::Ptr& queue)
+                                       const OutputQueue::Ptr& queue,
+                                       WindowPtr&& global_window)
     : config(config::checkValid(config)),
       input_queue_(new InputQueue(config.max_input_queue_size)),
       output_queue_(queue),
       sinks_(Sink::instantiate(config.sinks)),
       map_(config.volumetric_map),
       map_window_(config.map_window ? config.map_window.create()
-                                    : GlobalInfo::instance().createVolumetricWindow()) {
+                                    : std::move(global_window)) {
   const auto mesh_config = GlobalInfo::instance().getConfig().mesh;
   if (config.validate_mesh_fields) {
     if (config.volumetric_map.with_semantics && !mesh_config.with_labels) {

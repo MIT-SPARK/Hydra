@@ -163,9 +163,9 @@ void PythonPipeline::reset() {
   backend_dsg_ = config.createSharedDsg();
 
   // setup dependent graphs
-  shared_state_.reset(new SharedModuleState());
-  shared_state_->lcd_graph = config.createSharedDsg();
-  shared_state_->backend_graph = config.createSharedDsg();
+  state_.reset(new SharedModuleState());
+  state_->lcd_graph = config.createSharedDsg();
+  state_->backend_graph = config.createSharedDsg();
 
   PipelineQueues::instance().clear();
 

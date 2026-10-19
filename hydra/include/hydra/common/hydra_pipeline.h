@@ -45,12 +45,15 @@ class ActiveWindowModule;
 class GraphBuilder;
 class BackendModule;
 class LoopClosureModule;
+struct VolumetricWindow;
 
 class HydraPipeline {
  public:
   struct Config : public VerbosityConfig {
     Config();
 
+    //! Windowing function for active window and frontend
+    config::VirtualConfig<VolumetricWindow> map_window;
     //! Configuration for active window and reconstruction
     config::VirtualConfig<ActiveWindowModule> active_window;
     //! Configuration for frontend module
@@ -79,7 +82,7 @@ class HydraPipeline {
  protected:
   SharedDsgInfo::Ptr frontend_dsg_;
   SharedDsgInfo::Ptr backend_dsg_;
-  SharedModuleState::Ptr shared_state_;
+  SharedModuleState::Ptr state_;
 
   std::shared_ptr<ActiveWindowModule> active_window_;
   std::shared_ptr<GraphBuilder> frontend_;

@@ -129,7 +129,7 @@ PythonReconstruction::PythonReconstruction(const Config& config,
   }
 
   queue_ = std::make_shared<ActiveWindowModule::OutputQueue>();
-  module_ = std::make_shared<ReconstructionModule>(config.reconstruction, queue_);
+  module_ = std::make_shared<ReconstructionModule>(config.reconstruction, queue_, nullptr);
   if (compressor_) {
     mesh_ = std::make_shared<Mesh>();
   }
