@@ -6,6 +6,19 @@
 -- node ids ((robot_id << 48) | sequence) so stores from different robots never collide.
 -- Masks are run-length encoded as a JSON array of counts over the row-major image,
 -- starting with a run of background pixels.
+--
+-- Sessions: scene graph node ids and track ids restart with every Hydra process, so a
+-- store only describes the session that wrote it. By default (image_store.on_existing:
+-- append) Hydra keeps writing into an existing store (ids can collide). With rotate,
+-- when Hydra first opens a non-empty store directory, it moves it aside and starts an
+-- empty store at the configured path:
+--   <run>/image_store/                  live store of the current session
+--   <run>/sessions/<k>/image_store/     store of the k-th earlier session (k = 1, 2, ...)
+--   <run>/sessions/<k>/hydra/           copy of that session's saved scene graphs/meshes
+--                                       (image_store.session_artifacts_dir/_artifacts)
+--   <run>/sessions/<k>/session.json     rotation time, source paths, counts, robot ids
+-- so <run>/sessions/<k> has the layout of a run directory. on_existing: fail refuses to
+-- open a non-empty store. Other writers (e.g. the python package) never rotate.
 
 PRAGMA journal_mode = WAL;
 
