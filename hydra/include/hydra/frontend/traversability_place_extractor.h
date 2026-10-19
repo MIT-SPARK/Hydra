@@ -79,7 +79,6 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
 
  protected:
   TraversabilityEstimator::Ptr estimator_;
-  //! Persistent traversability layer, allocated on the first update.
   std::unique_ptr<TraversabilityLayer> layer_;
   const PersistentTraversabilityProcessors persistent_processing_;
   const TransientTraversabilityProcessors transient_processing_;

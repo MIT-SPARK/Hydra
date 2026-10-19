@@ -44,10 +44,7 @@
 
 namespace hydra::places {
 
-/**
- * @brief Interface for various traversability post processing functions that can be
- * applied to the traversability layer.
- */
+//! Interface for post-processing functions applied to the traversability layer.
 class TraversabilityProcessor {
  public:
   using Ptr = std::shared_ptr<TraversabilityProcessor>;
@@ -64,29 +61,21 @@ class TraversabilityProcessor {
   virtual void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) = 0;
 };
 
-/**
- * @brief Processor whose changes are one-off and do not persist, i.e., applied to a
- * copy of the traversability layer.
- */
+//! Processor whose changes do not persist, i.e., applied to a copy of the layer.
 class TransientTraversabilityProcessor : public TraversabilityProcessor {
  public:
   using Ptr = std::shared_ptr<TransientTraversabilityProcessor>;
   using ConstPtr = std::shared_ptr<const TransientTraversabilityProcessor>;
 };
 
-/**
- * @brief Processor whose changes persist, i.e., applied to the stored traversability
- * layer.
- */
+//! Processor whose changes persist, i.e., applied to the stored layer.
 class PersistentTraversabilityProcessor : public TraversabilityProcessor {
  public:
   using Ptr = std::shared_ptr<PersistentTraversabilityProcessor>;
   using ConstPtr = std::shared_ptr<const PersistentTraversabilityProcessor>;
 };
 
-/**
- * @brief Utility container for several processors.
- */
+//! Utility container for several processors.
 template <typename ProcessorT>
 struct TraversabilityProcessors {
   using Config = std::vector<config::VirtualConfig<ProcessorT>>;
@@ -100,7 +89,8 @@ struct TraversabilityProcessors {
     }
   }
 
-  /** @brief Apply all processors to the traversability layer.
+  /**
+   * @brief Apply all processors to the traversability layer.
    * @param msg The active window output that triggered the update.
    * @param layer The traversability layer to process.
    */
@@ -119,13 +109,11 @@ using TransientTraversabilityProcessors =
 using PersistentTraversabilityProcessors =
     TraversabilityProcessors<PersistentTraversabilityProcessor>;
 
-/**
- * @brief Dilate intraversable space in the traversability layer.
- */
+//! Dilate intraversable space in the traversability layer.
 class ErosionDilation : public TransientTraversabilityProcessor {
  public:
   struct Config {
-    //! @brief Number of dilation steps to apply.
+    //! Number of dilation steps to apply.
     size_t num_dilations = 1;
   };
 
@@ -142,20 +130,16 @@ class ErosionDilation : public TransientTraversabilityProcessor {
 
 void declare_config(ErosionDilation::Config& config);
 
-/**
- * @brief Guarantee that all voxels the robot footprint has ever intersected are
- * traversable. Footprint voxels are accumulated over time and re-applied on every
- * update, since the estimator resets the state of updated blocks.
- */
+//! Mark all voxels the robot footprint has ever intersected as traversable.
+//! Footprint voxels are accumulated and re-applied every update, since the
+//! estimator resets the state of updated blocks.
 class RobotFootprintTraversability : public PersistentTraversabilityProcessor {
  public:
   struct Config {
-    //! @brief Minimum corner of the robot footprint in body frame [m]. Only x/y are
-    //! used.
-    Eigen::Vector3f bbox_min = Eigen::Vector3f::Zero();
-    //! @brief Maximum corner of the robot footprint in body frame [m]. Only x/y are
-    //! used.
-    Eigen::Vector3f bbox_max = Eigen::Vector3f::Zero();
+    //! Minimum xy corner of the robot footprint in body frame [m].
+    Eigen::Vector2f bbox_min = Eigen::Vector2f::Zero();
+    //! Maximum xy corner of the robot footprint in body frame [m].
+    Eigen::Vector2f bbox_max = Eigen::Vector2f::Zero();
   };
 
   RobotFootprintTraversability(const Config& config);
@@ -163,11 +147,11 @@ class RobotFootprintTraversability : public PersistentTraversabilityProcessor {
 
   void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) override;
 
-  //! @brief Add all voxels intersecting the footprint at the given pose.
+  //! Add all voxels intersecting the footprint at the given pose.
   void addFootprint(const Eigen::Isometry3f& world_T_body,
                     const TraversabilityLayer& layer);
 
-  //! @brief Mark all accumulated footprint voxels as traversable.
+  //! Mark all accumulated footprint voxels as traversable.
   void markTraversable(TraversabilityLayer& layer) const;
 
   const Index2DSet& footprint() const { return footprint_; }

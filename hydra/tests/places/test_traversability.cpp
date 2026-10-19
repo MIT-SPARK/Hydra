@@ -113,8 +113,8 @@ TEST(TraversabilityPlaces, RobotFootprintTraversability) {
 
   // 0.24m x 0.24m footprint centered on the robot.
   RobotFootprintTraversability::Config config;
-  config.bbox_min = Eigen::Vector3f(-0.12f, -0.12f, -1.0f);
-  config.bbox_max = Eigen::Vector3f(0.12f, 0.12f, 1.0f);
+  config.bbox_min = Eigen::Vector2f(-0.12f, -0.12f);
+  config.bbox_max = Eigen::Vector2f(0.12f, 0.12f);
   RobotFootprintTraversability processor(config);
 
   // Robot in voxel (-1, 0), so the footprint straddles the block boundary at x = 0.
@@ -146,8 +146,8 @@ TEST(TraversabilityPlaces, RobotFootprintTraversability) {
   EXPECT_EQ(state_at(3, 3), State::UNKNOWN);
 
   // Elongated robot rotated by 90 degrees about z: long axis along world y.
-  config.bbox_min = Eigen::Vector3f(-0.32f, -0.07f, -1.0f);
-  config.bbox_max = Eigen::Vector3f(0.32f, 0.07f, 1.0f);
+  config.bbox_min = Eigen::Vector2f(-0.32f, -0.07f);
+  config.bbox_max = Eigen::Vector2f(0.32f, 0.07f);
   RobotFootprintTraversability rotated(config);
   Eigen::Isometry3f rotated_pose = Eigen::Isometry3f::Identity();
   rotated_pose.linear() =

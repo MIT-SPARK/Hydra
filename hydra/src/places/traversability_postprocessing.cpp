@@ -155,8 +155,8 @@ void RobotFootprintTraversability::addFootprint(const Eigen::Isometry3f& world_T
   // Inflate the footprint by half a voxel so that every voxel intersecting the
   // footprint is included, not only those whose center lies inside it.
   const Eigen::Vector2f half_voxel = Eigen::Vector2f::Constant(voxel_size / 2.0f);
-  const Eigen::Vector2f min = config.bbox_min.head<2>() - half_voxel;
-  const Eigen::Vector2f max = config.bbox_max.head<2>() + half_voxel;
+  const Eigen::Vector2f min = config.bbox_min - half_voxel;
+  const Eigen::Vector2f max = config.bbox_max + half_voxel;
 
   // Compute the world frame xy extent of the footprint.
   Eigen::Vector2f world_min =

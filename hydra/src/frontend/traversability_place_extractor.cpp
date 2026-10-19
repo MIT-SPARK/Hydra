@@ -101,8 +101,6 @@ void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
     return;
   }
 
-  // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
-  // expensive though.
   Timer timer("traversability/transient_processing", msg.timestamp_ns);
   auto layer = *layer_;
   transient_processing_.apply(msg, layer);
