@@ -232,7 +232,15 @@ class ImageStore:
 
     @staticmethod
     def open_writer(path: str | os.PathLike, robot_id: int = 0) -> "ImageStoreWriter":
+        """Writer into the store at ``path`` as it is (never rotates, see sessions.py)."""
         return ImageStoreWriter(path, robot_id)
+
+    @staticmethod
+    def sessions(run_dir: str | os.PathLike, include_live: bool = True):
+        """Hydra sessions of a run directory, oldest first (see :func:`list_sessions`)."""
+        from .sessions import list_sessions
+
+        return list_sessions(run_dir, include_live=include_live)
 
     def close(self) -> None:
         for db in self._dbs:

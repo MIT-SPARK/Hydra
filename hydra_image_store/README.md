@@ -16,6 +16,44 @@ Dependencies: `numpy`. Optional: `Pillow` (mask PNGs, mask export) and `spark_ds
 <store>/masks/r<robot>/<obs_id>.png   # kept object observations only
 ```
 
+### Sessions
+
+Scene graph node ids and track ids restart with every Hydra process, so a store only
+describes the session that wrote it. When Hydra's C++ writer first opens a non-empty
+store directory, `image_store.on_existing` decides what happens:
+- `append` (default) keeps writing into it and logs a warning, because ids can collide.
+- `rotate` moves it aside and starts an empty store at the configured path.
+- `fail` refuses to open it.
+
+A rotated run looks like this:
+
+```
+<run>/image_store/                 # live store (current session); path unchanged
+<run>/hydra/backend/dsg.json       # its scene graph (written when Hydra shuts down)
+<run>/sessions/<k>/image_store/    # store of the k-th earlier session, k = 1, 2, ...
+<run>/sessions/<k>/hydra/{backend,frontend}/dsg*.json, mesh.ply, ...
+                                   # copy of that session's saved scene graphs
+<run>/sessions/<k>/session.json    # rotated_at, source paths, counts, robot_ids, artifacts
+```
+
+`<run>/sessions/<k>` has the same layout as a run directory, so tools that take a run
+directory work on it unchanged. Hydra copies the files listed in
+`image_store.session_artifacts` (default: backend and frontend `dsg.json`,
+`dsg_with_mesh.json` and `mesh.ply`, plus the backend `deformation_graph.dgrf`,
+`trajectory.csv` and `loop_closures.csv`) from `image_store.session_artifacts_dir`
+(ADT4: `$ADT4_OUTPUT_DIR/hydra`, Hydra's `log_path`). Rotation happens at most once
+per process: Khronos and Hydra share the instance, so whichever opens it first
+triggers it. The python writer (`open_writer`) never rotates, because SAM3 write-back
+deliberately writes into the live store.
+
+```python
+for s in ImageStore.sessions("run"):      # oldest first, live session last
+    s.index, s.live, s.store, s.info       # info = session.json
+    with s.open() as store:
+        dsg = s.load_dsg()                 # hydra/backend/dsg.json of that session
+        store.frame_pose(frame, dsg)
+```
+
 Encodings (shared with the C++ writer): transforms are 16 little-endian float64,
 row-major. Frame, observation and sensor ids are `(robot_id << 48) | seq`. Masks are a
 JSON array of run lengths over the row-major image, starting with a background run.
@@ -89,6 +127,7 @@ work on the same file at the same time.
 
 ```
 hydra-image-store info <store>... [--json]
+hydra-image-store sessions <run> [--json]          # rotated sessions + live store, with DSGs
 hydra-image-store export <store>... --out DIR [--dsg dsg.json] [--copy] [--kept-only]
 hydra-image-store gc <store> [--max-images-per-object N] [--orphans] [--dry-run]
 hydra-image-store import-legacy --run-dir RUN --out STORE [--dsg dsg.json] [--robot-id 0]

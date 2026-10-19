@@ -16,6 +16,7 @@ from .codec import (
     transform_to_blob,
 )
 from .poses import JsonDsg, as_pose_lookup, load_dsg
+from .sessions import Session, list_sessions
 from .store import (
     SCHEMA_VERSION,
     Calib,
@@ -40,10 +41,12 @@ __all__ = [
     "JsonDsg",
     "Observation",
     "SchemaVersionError",
+    "Session",
     "as_pose_lookup",
     "blob_to_transform",
     "id_robot",
     "id_seq",
+    "list_sessions",
     "load_dsg",
     "make_id",
     "make_node_id",

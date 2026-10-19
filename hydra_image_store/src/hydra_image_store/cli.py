@@ -29,6 +29,38 @@ def _cmd_info(args) -> int:
     return 0
 
 
+def _cmd_sessions(args) -> int:
+    from .sessions import list_sessions
+
+    sessions = list_sessions(args.run_dir)
+    if args.json:
+        out = []
+        for session in sessions:
+            entry = session.to_json()
+            if session.store.joinpath("store.sqlite").exists():
+                with session.open() as store:
+                    entry["store_info"] = store.info()[0]
+            out.append(entry)
+        print(json.dumps(out, indent=2))
+        return 0
+    if not sessions:
+        print(f"no image store sessions under {args.run_dir}")
+        return 1
+    for session in sessions:
+        print(f"session {session.name}: {session.store}")
+        if session.store.joinpath("store.sqlite").exists():
+            with session.open() as store:
+                s = store.info()[0]
+            frames = ", ".join(f"{k} {v}" for k, v in s["frames"].items()) or "none"
+            print(f"  frames: {frames}; observations {s['observations']} (kept {s['observations_kept']}); "
+                  f"bindings {s['track_bindings']}, aliases {s['node_aliases']}")
+        dsg = session.dsg_path("backend") or session.dsg_path("frontend")
+        print(f"  dsg: {dsg if dsg else 'not saved' + (' yet' if session.live else '')}")
+        if session.info.get("rotated_at"):
+            print(f"  rotated at {session.info['rotated_at']}")
+    return 0
+
+
 def _cmd_export(args) -> int:
     from .export import export_store
     from .poses import load_dsg
@@ -80,6 +112,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("store", nargs="+", help="store directory or store.sqlite")
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=_cmd_info)
+
+    s = sub.add_parser("sessions", help="list the Hydra sessions of a run directory "
+                       "(rotated sessions/<k> and the live store) with their scene graphs")
+    s.add_argument("run_dir", help="run directory (or its live store)")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=_cmd_sessions)
 
     s = sub.add_parser("export", help="write browsable per-node folders")
     s.add_argument("store", nargs="+")
