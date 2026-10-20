@@ -44,7 +44,6 @@
 #include <stdexcept>
 #include <utility>
 
-#include "hydra/common/global_info.h"
 #include "hydra/input/input_data_io.h"
 
 namespace hydra {
@@ -105,11 +104,6 @@ bool convertLabels(InputData& data) {
     cv::Mat new_label_image(data.label_image.size(), InputData::LabelMatType);
     data.label_image.convertTo(new_label_image, InputData::LabelMatType);
     data.label_image = new_label_image;
-  }
-
-  const auto remap = GlobalInfo::instance().getLabelRemapper();
-  if (remap) {
-    remap.remapImage(data.label_image);
   }
 
   return true;
