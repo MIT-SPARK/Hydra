@@ -52,6 +52,11 @@ class HydraPipeline {
   struct Config : public VerbosityConfig {
     Config();
 
+    //! Layer names for the scene graph that Hydra builds
+    SharedDsgInfo::Config graph;
+    //! @brief Layers in the scene graph that use the labelspace
+    std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
+                                             spark_dsg::DsgLayers::MESH_PLACES};
     //! Windowing function for active window and frontend
     config::VirtualConfig<VolumetricWindow> map_window;
     //! Configuration for active window and reconstruction
@@ -77,7 +82,12 @@ class HydraPipeline {
   virtual void save(const DataDirectory& output) const;
 
  protected:
+  virtual void initState();
+
   void showModules() const;
+
+ private:
+  void initStateImpl();
 
  protected:
   SharedDsgInfo::Ptr frontend_dsg_;
