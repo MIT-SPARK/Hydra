@@ -127,6 +127,10 @@ class TraversabilityEstimator {
 
 void declare_config(TraversabilityEstimator::Config& config);
 
+//! Classify a voxel from its confidence and traversability using the given thresholds.
+void classifyTraversabilityVoxel(const TraversabilityEstimator::Config& config,
+                                 TraversabilityVoxel& voxel);
+
 /**
  * @brief Simple traversability estimator which checks a specified volume in the TSDF
  * map for obstacles.

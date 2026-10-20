@@ -197,8 +197,8 @@ GradientMap computeGradientMap(const HeightMap& height_map, float voxel_size) {
   return gradient_map;
 }
 
-void TraversabilityEstimator::classifyTraversabilityVoxel(
-    TraversabilityVoxel& voxel) const {
+void classifyTraversabilityVoxel(const TraversabilityEstimator::Config& config,
+                                 TraversabilityVoxel& voxel) {
   if (voxel.confidence <= 0.0f) {
     voxel.state = TraversabilityState::UNKNOWN;
     return;
@@ -215,6 +215,11 @@ void TraversabilityEstimator::classifyTraversabilityVoxel(
   } else {
     voxel.state = TraversabilityState::UNKNOWN;
   }
+}
+
+void TraversabilityEstimator::classifyTraversabilityVoxel(
+    TraversabilityVoxel& voxel) const {
+  places::classifyTraversabilityVoxel(config, voxel);
 }
 
 void declare_config(TraversabilityEstimator::Config& config) {
