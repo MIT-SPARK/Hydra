@@ -59,15 +59,15 @@ class ExternalTraversabilityEstimator : public TraversabilityEstimator {
   ExternalTraversabilityEstimator(const Config& config);
   ~ExternalTraversabilityEstimator() override = default;
 
-  void updateTraversability(const ActiveWindowOutput& msg) override;
+  void updateTraversability(const ActiveWindowOutput& msg,
+                            TraversabilityLayer& layer) override;
 
   void callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
-
-  const TraversabilityLayer& getTraversabilityLayer() const override;
 
  protected:
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr sub_;
   mutable std::mutex mutex_;
+  std::unique_ptr<TraversabilityLayer> grid_layer_;
 
  protected:
   State occupancyToTraversability(int8_t occupancy) const;

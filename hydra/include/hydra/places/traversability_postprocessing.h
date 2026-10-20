@@ -36,16 +36,15 @@
 
 #include <config_utilities/virtual_config.h>
 
+#include <Eigen/Core>
 #include <memory>
 
+#include "hydra/active_window/active_window_output.h"
 #include "hydra/places/traversability_layer.h"
 
 namespace hydra::places {
 
-/**
- * @brief Interface for various traversability post processing functions that can be
- * applied to the traversability layer.
- */
+//! Interface for post-processing functions applied to the traversability layer.
 class TraversabilityProcessor {
  public:
   using Ptr = std::shared_ptr<TraversabilityProcessor>;
@@ -56,42 +55,72 @@ class TraversabilityProcessor {
 
   /**
    * @brief Apply the post processing to the traversability layer.
+   * @param msg The active window output that triggered the update.
    * @param layer The traversability layer to process.
    */
-  virtual void apply(TraversabilityLayer& layer) = 0;
+  virtual void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) = 0;
 };
 
-/**
- * @brief Utility container for several processors.
- */
+//! Processor whose changes do not persist, i.e., applied to a copy of the layer.
+class TransientTraversabilityProcessor : public TraversabilityProcessor {
+ public:
+  using Ptr = std::shared_ptr<TransientTraversabilityProcessor>;
+  using ConstPtr = std::shared_ptr<const TransientTraversabilityProcessor>;
+};
+
+//! Processor whose changes persist, i.e., applied to the stored layer.
+class PersistentTraversabilityProcessor : public TraversabilityProcessor {
+ public:
+  using Ptr = std::shared_ptr<PersistentTraversabilityProcessor>;
+  using ConstPtr = std::shared_ptr<const PersistentTraversabilityProcessor>;
+};
+
+//! Utility container for several processors.
+template <typename ProcessorT>
 struct TraversabilityProcessors {
-  using Config = std::vector<config::VirtualConfig<TraversabilityProcessor>>;
+  using Config = std::vector<config::VirtualConfig<ProcessorT>>;
 
-  explicit TraversabilityProcessors(const Config& config);
+  explicit TraversabilityProcessors(const Config& config) {
+    for (const auto& processor_config : config) {
+      auto processor = processor_config.create();
+      if (processor) {
+        processors_.emplace_back(std::move(processor));
+      }
+    }
+  }
 
-  /** @brief Apply all processors to the traversability layer.
+  /**
+   * @brief Apply all processors to the traversability layer.
+   * @param msg The active window output that triggered the update.
    * @param layer The traversability layer to process.
    */
-  void apply(TraversabilityLayer& layer) const;
+  void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) const {
+    for (const auto& processor : processors_) {
+      processor->apply(msg, layer);
+    }
+  }
 
  private:
-  std::vector<TraversabilityProcessor::Ptr> processors_;
+  std::vector<std::shared_ptr<ProcessorT>> processors_;
 };
 
-/**
- * @brief Dilate intraversable space in the traversability layer.
- */
-class ErosionDilation : public TraversabilityProcessor {
+using TransientTraversabilityProcessors =
+    TraversabilityProcessors<TransientTraversabilityProcessor>;
+using PersistentTraversabilityProcessors =
+    TraversabilityProcessors<PersistentTraversabilityProcessor>;
+
+//! Dilate intraversable space in the traversability layer.
+class ErosionDilation : public TransientTraversabilityProcessor {
  public:
   struct Config {
-    //! @brief Number of dilation steps to apply.
+    //! Number of dilation steps to apply.
     size_t num_dilations = 1;
   };
 
   ErosionDilation(const Config& config);
   ~ErosionDilation() override = default;
 
-  void apply(TraversabilityLayer& layer) override;
+  void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) override;
 
   const Config config;
 
@@ -100,5 +129,43 @@ class ErosionDilation : public TraversabilityProcessor {
 };
 
 void declare_config(ErosionDilation::Config& config);
+
+//! Mark all voxels the robot footprint intersected as traversable. Footprint voxels
+//! are accumulated while their block is in the active window and re-applied every
+//! update, since the estimator resets the state of updated blocks.
+class RobotFootprintTraversability : public PersistentTraversabilityProcessor {
+ public:
+  struct Config {
+    //! Minimum xy corner of the robot footprint in body frame [m].
+    Eigen::Vector2f bbox_min = Eigen::Vector2f::Zero();
+    //! Maximum xy corner of the robot footprint in body frame [m].
+    Eigen::Vector2f bbox_max = Eigen::Vector2f::Zero();
+  };
+
+  RobotFootprintTraversability(const Config& config);
+  ~RobotFootprintTraversability() override = default;
+
+  void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) override;
+
+  //! Drop footprint voxels whose block is no longer in the layer, i.e., archived.
+  void archive(const TraversabilityLayer& layer);
+
+  //! Add all voxels intersecting the footprint at the given pose.
+  void addFootprint(const Eigen::Isometry3f& world_T_body,
+                    const TraversabilityLayer& layer);
+
+  //! Mark all accumulated footprint voxels as traversable.
+  void markTraversable(TraversabilityLayer& layer) const;
+
+  const Index2DSet& footprint() const { return footprint_; }
+
+  const Config config;
+
+ protected:
+  //! Global 2D voxel indices that were covered by the footprint at any time.
+  Index2DSet footprint_;
+};
+
+void declare_config(RobotFootprintTraversability::Config& config);
 
 }  // namespace hydra::places
