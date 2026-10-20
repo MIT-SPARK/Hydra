@@ -136,9 +136,9 @@ void UpdateObjectsFunctor::call(const SceneGraph& unmerged,
   // we want to use the unmerged graph for most things
   const auto& objects = unmerged.getLayer(DsgLayers::OBJECTS);
   // we want to iterate over the unmerged graph
-  const auto new_loopclosure = info->loop_closure_detected;
   active_tracker.clear();  // reset from previous pass
-  LayerView view = new_loopclosure ? LayerView(objects) : active_tracker.view(objects);
+  LayerView view =
+      info->full_update ? LayerView(objects) : active_tracker.view(objects);
 
   // apply updates to every attribute that may have changed since the last call
   size_t num_changed = 0;
@@ -176,10 +176,10 @@ MergeList UpdateObjectsFunctor::findMerges(const SceneGraph& graph,
     return {};
   }
 
-  const auto new_lcd = info->loop_closure_detected;
   const auto& objects = graph.getLayer(DsgLayers::OBJECTS);
   // freeze layer view to avoid messing with tracker
-  LayerView view = new_lcd ? LayerView(objects) : active_tracker.view(objects, true);
+  LayerView view =
+      info->full_update ? LayerView(objects) : active_tracker.view(objects, true);
 
   MergeList proposals;
   merge_proposer.findMerges(

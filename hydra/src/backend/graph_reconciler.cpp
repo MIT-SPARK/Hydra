@@ -68,7 +68,7 @@ auto Reconciler::reconcile(Graph& graph) const -> Graph::Ptr {
   target.graph = graph.clone();
 
   auto info = std::make_shared<UpdateInfo>();
-  info->loop_closure_detected = true;
+  info->full_update = true;
   GroupedMergeTracker merge_tracker;
   std::list<UpdateFunctor::Hooks::CleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : functors) {

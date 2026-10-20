@@ -40,6 +40,12 @@
 #include <config_utilities/settings.h>
 #include <glog/logging.h>
 
+#include "hydra/active_window/reconstruction_module.h"
+#include "hydra/active_window/volumetric_window.h"
+#include "hydra/backend/backend_module.h"
+#include "hydra/common/global_info.h"
+#include "hydra/frontend/graph_builder.h"
+#include "hydra/loop_closure/loop_closure_module.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -50,110 +56,70 @@ void declare_config(HydraPipeline::Config& config) {
   using namespace config;
   name("HydraPipeline::Config");
   base<VerbosityConfig>(config);
-  field(config.robot_id, "robot_id");
+  config.map_window.setOptional();
+  field(config.map_window, "map_window");
+  field(config.active_window, "active_window");
+  field(config.frontend, "frontend");
+  field(config.backend, "backend");
+  config.lcd.setOptional();
+  field(config.lcd, "lcd");
 }
 
-HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
-                             int robot_id,
-                             int config_verbosity)
-    : HydraPipeline(Config{config_verbosity, robot_id}, pipeline_config) {}
+HydraPipeline::Config::Config()
+    : VerbosityConfig(VerbosityConfig::default_verbosity("pipeline")),
+      map_window(SpatialWindowChecker::Config()),
+      active_window(ReconstructionModule::Config()),
+      frontend(GraphBuilder::Config()),
+      backend(BackendModule::Config()) {}
 
-HydraPipeline::HydraPipeline(const Config& config,
-                             const PipelineConfig& pipeline_config)
-    : config(config) {
-  const auto& info = GlobalInfo::init(pipeline_config, config.robot_id);
+HydraPipeline::HydraPipeline(const Config& config) : config(config) {
+  auto& info = GlobalInfo::instance();
   frontend_dsg_ = info.createSharedDsg();
   backend_dsg_ = info.createSharedDsg();
-  shared_state_.reset(new SharedModuleState());
-  shared_state_->lcd_graph = info.createSharedDsg();
-  shared_state_->backend_graph = info.createSharedDsg();
-  MLOG(0) << "[Hydra] Initialized pipeline with:\n"
-          << config::toString(info.getConfig());
+  state_.reset(new SharedModuleState());
+  state_->lcd_graph = info.createSharedDsg();
+  state_->backend_graph = info.createSharedDsg();
 }
 
-void HydraPipeline::init() {}
+void HydraPipeline::init() {
+  frontend_ = config.frontend.create(frontend_dsg_, state_, config.map_window.create());
+  backend_ = config.backend.create(backend_dsg_, state_);
+  const auto queue = frontend_->queue();
+  active_window_ = config.active_window.create(queue, config.map_window.create());
+  lcd_ = config.lcd.create(state_);
+  if (lcd_) {
+    frontend_->setLcdQueue(lcd_->queue());
+  }
+}
 
 HydraPipeline::~HydraPipeline() {}
 
-std::string makeBanner(const std::string& message,
-                       size_t print_width,
-                       char fill,
-                       bool with_header = true,
-                       bool with_footer = false) {
-  std::stringstream ss;
-  if (with_header) {
-    ss << std::string(print_width, fill) << std::endl;
-  }
-
-  const auto msg_size = message.size() + 3;
-  const auto spacing = msg_size >= print_width ? 0 : print_width - msg_size;
-  ss << fill << " " << message << (spacing ? std::string(spacing, ' ') + fill : "")
-     << std::endl;
-  if (with_footer) {
-    ss << std::string(print_width, fill) << std::endl;
-  }
-
-  return ss.str();
-}
-
-std::string HydraPipeline::getModuleInfo(const std::string& name,
-                                         const Module* mod) const {
-  const auto print_width = config::Settings().printing.width;
-  std::stringstream ss;
-  ss << makeBanner(name, print_width, '*', true, true);
-  if (!mod) {
-    ss << "UNITIALIZED MODULE!" << std::endl;
-  } else {
-    const auto info = mod->printInfo();
-    if (!info.empty()) {
-      ss << info << std::endl;
-    }
-  }
-
-  ss << std::string(print_width, '*') << std::endl;
-  return ss.str();
-}
-
 void HydraPipeline::showModules() const {
-  const auto print_width = config::Settings().printing.width;
-  std::stringstream ss;
-  ss << std::endl << makeBanner("Modules", print_width, '=', true, true);
-  for (auto&& [name, mod] : modules_) {
-    ss << std::endl << getModuleInfo(name, mod.get());
+  MLOG(1) << "Active Window:\n" << active_window_->printInfo();
+  MLOG(1) << "Frontend:\n" << frontend_->printInfo();
+  MLOG(1) << "Backend:\n" << backend_->printInfo();
+  if (lcd_) {
+    MLOG(1) << "Loop Closure Detection:\n" << lcd_->printInfo();
   }
-  MLOG(1) << ss.str();
 }
 
 void HydraPipeline::start() {
-  MLOG(2) << std::endl << getModuleInfo("input", input_module_.get());
   showModules();
 
-  if (input_module_) {
-    input_module_->start();
-  }
-
-  for (auto&& [name, mod] : modules_) {
-    if (!mod) {
-      LOG(FATAL) << "Found unitialized module: " << name;
-      continue;
-    }
-
-    mod->start();
-  }
-
-  if (input_module_) {
-    modules_["input"] = input_module_;
+  active_window_->start();
+  frontend_->start();
+  backend_->start();
+  if (lcd_) {
+    lcd_->start();
   }
 }
 
 void HydraPipeline::stop() {
-  for (auto&& [name, mod] : modules_) {
-    if (!mod) {
-      LOG(FATAL) << "Found unitialized module: " << name;
-      continue;
-    }
-
-    mod->stop();
+  active_window_->stop();
+  frontend_->stop();
+  backend_->stop();
+  if (lcd_) {
+    lcd_->stop();
   }
 }
 
@@ -169,21 +135,19 @@ void HydraPipeline::save(const DataDirectory& logs) const {
   std::ofstream fout(log_dir / "hydra_config.yaml");
   fout << node;
 
-  for (auto&& [name, mod] : modules_) {
-    if (!mod) {
-      LOG(FATAL) << "Found unitialized module: " << name;
-      continue;
-    }
-
-    mod->save(logs);
+  active_window_->save(logs);
+  frontend_->save(logs);
+  backend_->save(logs);
+  if (lcd_) {
+    lcd_->save(logs);
   }
 
   // save timing information to avoid destructor weirdness with singletons
-  LOG(INFO) << "[Hydra] saving timing information to " << log_dir;
+  MLOG(0) << "Saving timing information to " << log_dir;
   const auto& timer = ElapsedTimeRecorder::instance();
   timer.logTimers(logs.path("timing"));
   timer.logStats(log_dir / "timing_stats.csv");
-  LOG(INFO) << "[Hydra] saved timing information";
+  MLOG(0) << "Saved timing information";
 }
 
 }  // namespace hydra

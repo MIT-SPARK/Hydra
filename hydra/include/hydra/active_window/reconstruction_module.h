@@ -53,7 +53,9 @@ class ReconstructionModule : public ActiveWindowModule {
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
   } const config;
 
-  ReconstructionModule(const Config& config, const OutputQueue::Ptr& output_queue);
+  ReconstructionModule(const Config& config,
+                       const OutputQueue::Ptr& output_queue,
+                       std::unique_ptr<VolumetricWindow>&& window);
 
   virtual ~ReconstructionModule();
 

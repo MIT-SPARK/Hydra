@@ -38,12 +38,9 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/active_window/reconstruction_module.h>
-#include <hydra/backend/backend_module.h>
-#include <hydra/backend/zmq_interfaces.h>
+#include <glog/logging.h>
+#include <hydra/active_window/active_window_module.h>
 #include <hydra/common/global_info.h>
-#include <hydra/frontend/graph_builder.h>
-#include <hydra/loop_closure/loop_closure_module.h>
 #include <pose_graph_tools_ros/conversions.h>
 
 #include <cstdint>
@@ -59,48 +56,25 @@ namespace hydra {
 void declare_config(HydraRosPipeline::Config& config) {
   using namespace config;
   name("HydraRosConfig");
-  base<VerbosityConfig>(config);
+  base<HydraPipeline::Config>(config);
   field(config.preprint_config, "preprint_config");
   field(config.input, "input");
-  field(config.active_window, "active_window");
-  field(config.frontend, "frontend");
-  field(config.backend, "backend");
-  config.lcd.setOptional();
-  field(config.lcd, "lcd");
   field(config.status_monitor, "status_monitor");
 }
 
-HydraRosPipeline::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("pipeline")) {}
-
-HydraRosPipeline::HydraRosPipeline(int robot_id, int config_verbosity)
-    : HydraPipeline(config::fromContext<PipelineConfig>(), robot_id, config_verbosity),
-      config(config::checkValid(config::fromContext<Config>())) {
+HydraRosPipeline::HydraRosPipeline(const Config& config)
+    : HydraPipeline(config), config(config::checkValid(config)) {
   if (config.preprint_config) {
     LOG(INFO) << "Using configuration to start Hydra\n" << config::toString(config);
   }
 
-  MLOG(1) << "Starting Hydra-ROS with input configuration\n"
-          << config::toString(config.input);
+  MLOG(1) << "Starting Hydra-ROS with input\n" << config::toString(config.input);
 }
 
 HydraRosPipeline::~HydraRosPipeline() {}
 
 void HydraRosPipeline::init() {
-  backend_ = config.backend.create(backend_dsg_, shared_state_);
-  modules_["backend"] = CHECK_NOTNULL(backend_);
-
-  frontend_ = config.frontend.create(frontend_dsg_, shared_state_);
-  modules_["frontend"] = CHECK_NOTNULL(frontend_);
-
-  active_window_ = config.active_window.create(frontend_->queue());
-  modules_["active_window"] = CHECK_NOTNULL(active_window_);
-
-  auto lcd = config.lcd.create(shared_state_);
-  if (lcd) {
-    frontend_->setLcdQueue(lcd->queue());
-    modules_["lcd"] = std::move(lcd);
-  }
+  HydraPipeline::init();
 
   auto nh = ianvs::NodeHandle::this_node("~");
   backend_->addSink(std::make_shared<RosBackendPublisher>(nh / "backend"));
@@ -119,22 +93,18 @@ void HydraRosPipeline::init() {
         monitor_->recordModuleCallback("active_window", nanoseconds(stamp));
       }));
 
-  input_module_ =
-      std::make_shared<RosInputModule>(config.input, active_window_->queue());
+  input_ = std::make_unique<RosInputModule>(config.input, active_window_->queue());
 }
 
 void HydraRosPipeline::start() {
+  input_->start();
   HydraPipeline::start();
   monitor_->start();
 }
 
 void HydraRosPipeline::stop() {
   // enforce stop order to make sure every data packet is processed
-  input_module_->stop();
-  active_window_->stop();
-  frontend_->stop();
-  backend_->stop();
-
+  input_->stop();
   HydraPipeline::stop();
 }
 

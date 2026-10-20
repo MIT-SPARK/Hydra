@@ -53,7 +53,8 @@ static const auto registration =
     config::RegistrationWithConfig<ActiveWindowModule,
                                    ReconstructionModule,
                                    ReconstructionModule::Config,
-                                   ActiveWindowModule::OutputQueue::Ptr>(
+                                   ActiveWindowModule::OutputQueue::Ptr,
+                                   std::unique_ptr<VolumetricWindow>>(
         "ReconstructionModule");
 
 double diffInSeconds(uint64_t lhs, uint64_t rhs) {
@@ -86,8 +87,9 @@ void declare_config(ReconstructionModule::Config& config) {
 }
 
 ReconstructionModule::ReconstructionModule(const Config& config,
-                                           const OutputQueue::Ptr& queue)
-    : ActiveWindowModule(config, queue),
+                                           const OutputQueue::Ptr& queue,
+                                           std::unique_ptr<VolumetricWindow>&& window)
+    : ActiveWindowModule(config, queue, std::move(window)),
       config(config::checkValid(config)),
       last_update_ns_(std::nullopt),
       tsdf_integrators_(config.tsdf),

@@ -62,7 +62,8 @@ static const auto registration =
                                    GraphBuilder,
                                    GraphBuilder::Config,
                                    SharedDsgInfo::Ptr,
-                                   SharedModuleState::Ptr>("GraphBuilder");
+                                   SharedModuleState::Ptr,
+                                   std::unique_ptr<VolumetricWindow>>("GraphBuilder");
 
 }
 
@@ -110,7 +111,8 @@ GraphBuilder::Config::Config()
 
 GraphBuilder::GraphBuilder(const Config& config,
                            const SharedDsgInfo::Ptr& dsg,
-                           const SharedModuleState::Ptr& state)
+                           const SharedModuleState::Ptr& state,
+                           std::unique_ptr<VolumetricWindow>&& window)
     : config(config::checkValid(config)),
       queue_(std::make_shared<InputQueue>()),
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
@@ -119,7 +121,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       mesh_compression_(config.mesh_compression.create()),
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
-      map_window_(GlobalInfo::instance().createVolumetricWindow()),
+      map_window_(std::move(window)),
       surface_places_(config.surface_places.create(
           GlobalInfo::instance().labelspace().surface_places_labels)),
       sinks_(Sink::instantiate(config.sinks)) {

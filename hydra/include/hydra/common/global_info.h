@@ -44,9 +44,6 @@
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
 
-// TODO(nathan) bad....
-#include "hydra/active_window/volumetric_window.h"
-
 namespace hydra {
 
 class SemanticColorMap;
@@ -94,8 +91,6 @@ struct PipelineConfig {
   FrameConfig frames;
   //! Layer names for the scene graph that Hydra builds
   SharedDsgInfo::Config graph;
-  //! Default windowing function that determines the active window
-  config::VirtualConfig<VolumetricWindow> map_window{SpatialWindowChecker::Config()};
   //! Closed-set labelspace information
   config::VirtualConfig<Labelspace> labelspace{Labelspace{}};
   //! Optional remapping for input labels
@@ -133,8 +128,6 @@ class GlobalInfo {
   const LabelRemapper& getLabelRemapper() const;
 
   SharedDsgInfo::Ptr createSharedDsg() const;
-
-  std::unique_ptr<VolumetricWindow> createVolumetricWindow() const;
 
   spark_dsg::Mesh::Ptr createMesh() const;
 

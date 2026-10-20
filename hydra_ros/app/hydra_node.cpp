@@ -52,12 +52,11 @@
 namespace hydra {
 
 struct RunSettings {
-  bool show_run_settings = true;
   size_t robot_id = 0;
+  bool show_run_settings = true;
   bool exit_after_clock = false;
   bool force_shutdown = false;
   std::vector<std::string> paths;
-  int config_verbosity = 1;
   bool forward_glog_to_ros = true;
   int glog_level = 0;
   int glog_verbosity = 0;
@@ -71,12 +70,11 @@ struct RunSettings {
 void declare_config(RunSettings& config) {
   using namespace config;
   name("RunSettings");
-  field(config.show_run_settings, "show_run_settings");
   field(config.robot_id, "robot_id");
+  field(config.show_run_settings, "show_run_settings");
   field(config.exit_after_clock, "exit_after_clock");
   field(config.force_shutdown, "force_shutdown");
   field(config.paths, "paths");
-  field(config.config_verbosity, "config_verbosity");
   field(config.forward_glog_to_ros, "forward_glog_to_ros");
   field(config.glog_level, "glog_level");
   field(config.glog_verbosity, "glog_verbosity");
@@ -157,8 +155,13 @@ int main(int argc, char* argv[]) {
       node_plugins.push_back(plugin.create());
     }
 
-    hydra::GlobalInfo::instance().setForceShutdown(settings.force_shutdown);
-    hydra::HydraRosPipeline hydra(settings.robot_id, settings.config_verbosity);
+    const auto global_config = config::fromContext<hydra::PipelineConfig>();
+    auto& info = hydra::GlobalInfo::init(global_config, settings.robot_id);
+    info.setForceShutdown(settings.force_shutdown);
+    LOG(INFO) << "Loaded pipeline config:\n" << config::toString(info.getConfig());
+
+    auto config = config::fromContext<hydra::HydraRosPipeline::Config>();
+    hydra::HydraRosPipeline hydra(config);
     hydra.init();
 
     hydra.start();

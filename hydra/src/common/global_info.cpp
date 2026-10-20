@@ -78,8 +78,6 @@ void declare_config(PipelineConfig& config) {
   field(config.default_verbosity, "default_verbosity");
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
-  config.map_window.setOptional();
-  field(config.map_window, "map_window");
   config.labelspace.setOptional();
   field(config.labelspace, "labelspace");
   field<Path::Absolute>(config.label_remap_filepath, "semantic_label_remap_filepath");
@@ -171,10 +169,6 @@ SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   }
 
   return graph_info;
-}
-
-std::unique_ptr<VolumetricWindow> GlobalInfo::createVolumetricWindow() const {
-  return config_.map_window.create();
 }
 
 spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {

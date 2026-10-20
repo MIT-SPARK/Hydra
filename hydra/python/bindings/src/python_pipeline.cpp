@@ -65,16 +65,8 @@ namespace hydra::python {
 
 class PythonPipeline : public HydraPipeline {
  public:
-  struct Config : PipelineConfig {
-    config::VirtualConfig<ActiveWindowModule> active_window{
-        ReconstructionModule::Config()};
-    config::VirtualConfig<GraphBuilder> frontend{GraphBuilder::Config()};
-    config::VirtualConfig<BackendModule> backend{BackendModule::Config()};
-  } const config;
-
-  PythonPipeline(const Config& config,
+  PythonPipeline(const HydraPipeline::Config& config,
                  const Sensor::Ptr& sensor,
-                 int robot_id = 0,
                  int config_verbosity = 0,
                  bool step_mode_only = true,
                  std::string zmq_url = "");
@@ -97,11 +89,6 @@ class PythonPipeline : public HydraPipeline {
 
  protected:
   bool step_mode_only_;
-  std::shared_ptr<ActiveWindowModule> active_window_;
-  std::shared_ptr<GraphBuilder> frontend_;
-  std::shared_ptr<BackendModule> backend_;
-  std::shared_ptr<LoopClosureModule> loop_closure_;
-
   SceneGraph::Ptr graph_;
 
  private:
@@ -111,20 +98,15 @@ class PythonPipeline : public HydraPipeline {
 void declare_config(PythonPipeline::Config& config) {
   using namespace config;
   name("PythonPipeline::Config");
-  base<PipelineConfig>(config);
-  field(config.active_window, "active_window");
-  field(config.frontend, "frontend");
-  field(config.backend, "backend");
+  base<HydraPipeline::Config>(config);
 }
 
-PythonPipeline::PythonPipeline(const Config& _config,
+PythonPipeline::PythonPipeline(const HydraPipeline::Config& config,
                                const Sensor::Ptr& sensor,
-                               int robot_id,
                                int config_verbosity,
                                bool step_mode_only,
                                std::string zmq_url)
-    : HydraPipeline(_config, robot_id, config_verbosity),
-      config(_config),
+    : HydraPipeline(config),
       sensor(sensor),
       zmq_url(zmq_url),
       step_mode_only_(step_mode_only) {
@@ -149,23 +131,11 @@ void PythonPipeline::start() {
 }
 
 void PythonPipeline::initModules() {
-  frontend_ = config.frontend.create(frontend_dsg_, shared_state_);
-  if (!frontend_) {
-    throw std::runtime_error("Invalid frontend config!");
-  }
-
-  modules_["frontend"] = frontend_;
-  backend_ = config.backend.create(backend_dsg_, shared_state_);
-  modules_["backend"] = backend_;
-  active_window_ = config.active_window.create(frontend_->queue());
-  modules_["reconstruction"] = active_window_;
-
+  init();
   if (!zmq_url.empty()) {
     ZmqSink::Config zmq_config{zmq_url, true};
     backend_->addSink(std::make_shared<ZmqSink>(zmq_config));
   }
-
-  // TODO(nathan) LCD
 
   showModules();
 }
@@ -185,11 +155,7 @@ void PythonPipeline::reset() {
   active_window_.reset();
   frontend_.reset();
   backend_.reset();
-  loop_closure_.reset();
-
-  // reset any other modules (will actually deconstruct specific module instances given
-  // shared_ptr usage)
-  modules_.clear();
+  lcd_.reset();
 
   // reset state
   const auto& config = GlobalInfo::instance();
@@ -197,9 +163,9 @@ void PythonPipeline::reset() {
   backend_dsg_ = config.createSharedDsg();
 
   // setup dependent graphs
-  shared_state_.reset(new SharedModuleState());
-  shared_state_->lcd_graph = config.createSharedDsg();
-  shared_state_->backend_graph = config.createSharedDsg();
+  state_.reset(new SharedModuleState());
+  state_->lcd_graph = config.createSharedDsg();
+  state_->backend_graph = config.createSharedDsg();
 
   PipelineQueues::instance().clear();
 
@@ -251,13 +217,11 @@ void addBindings(pybind11::module_& m) {
              bool step_mode_only,
              const std::string zmq_url) {
             const auto node = YAML::Load(contents);
+            const auto global_config = config::fromYaml<PipelineConfig>(node);
+            const auto base_config = config::fromYaml<HydraPipeline::Config>(node);
+            GlobalInfo::init(global_config, robot_id);
             return std::make_unique<PythonPipeline>(
-                config::fromYaml<PythonPipeline::Config>(node),
-                sensor,
-                robot_id,
-                config_verbosity,
-                step_mode_only,
-                zmq_url);
+                base_config, sensor, config_verbosity, step_mode_only, zmq_url);
           },
           "config"_a,
           "camera"_a,
@@ -274,13 +238,11 @@ void addBindings(pybind11::module_& m) {
              bool step_mode_only,
              const std::string& zmq_url) {
             const auto node = YAML::LoadFile(filepath);
+            const auto global_config = config::fromYaml<PipelineConfig>(node);
+            const auto base_config = config::fromYaml<HydraPipeline::Config>(node);
+            GlobalInfo::init(global_config, robot_id);
             return std::make_unique<PythonPipeline>(
-                config::fromYaml<PythonPipeline::Config>(node),
-                sensor,
-                robot_id,
-                config_verbosity,
-                step_mode_only,
-                zmq_url);
+                base_config, sensor, config_verbosity, step_mode_only, zmq_url);
           },
           "config"_a,
           "camera"_a,

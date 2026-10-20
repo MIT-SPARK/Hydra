@@ -91,6 +91,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     bool optimize_on_lc = true;
     //! Optimize after every update after first loop closure
     bool optimize_every_update = true;
+    //! Run final update pass before save
+    bool finalize_on_shutdown = true;
     //! PGMO backend configuration
     kimera_pgmo::KimeraPgmoConfig pgmo;
     //! Configuration for associating loop closures to pose graph
@@ -157,6 +159,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
  protected:
   void stopImpl();
+
+  UpdateInfo::Ptr getUpdateInfo(uint64_t timestamp_ns);
 
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};

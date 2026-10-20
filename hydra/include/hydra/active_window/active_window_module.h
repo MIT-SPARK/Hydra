@@ -67,7 +67,9 @@ class ActiveWindowModule : public Module {
     Config(bool with_semantics = true, bool with_tracking = false);
   } const config;
 
-  ActiveWindowModule(const Config& config, const OutputQueue::Ptr& output_queue);
+  ActiveWindowModule(const Config& config,
+                     const OutputQueue::Ptr& output_queue,
+                     std::unique_ptr<VolumetricWindow>&& global_window);
 
   virtual ~ActiveWindowModule() = default;
 

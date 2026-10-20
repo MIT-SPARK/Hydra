@@ -33,23 +33,38 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/global_info.h"
-#include "hydra/common/module.h"
+#include <config_utilities/virtual_config.h>
+
 #include "hydra/common/shared_module_state.h"
+#include "hydra/utils/data_directory.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra {
 
+class ActiveWindowModule;
+class GraphBuilder;
+class BackendModule;
+class LoopClosureModule;
+struct VolumetricWindow;
+
 class HydraPipeline {
  public:
   struct Config : public VerbosityConfig {
-    int robot_id = 0;
+    Config();
+
+    //! Windowing function for active window and frontend
+    config::VirtualConfig<VolumetricWindow> map_window;
+    //! Configuration for active window and reconstruction
+    config::VirtualConfig<ActiveWindowModule> active_window;
+    //! Configuration for frontend module
+    config::VirtualConfig<GraphBuilder> frontend;
+    //! Configuration for backend module
+    config::VirtualConfig<BackendModule> backend;
+    //! Optional config for loop closure module
+    config::VirtualConfig<LoopClosureModule> lcd;
   } const config;
 
-  // TODO(nathan) deprecate and/or drop this
-  HydraPipeline(const PipelineConfig& config, int robot_id = 0, int verbosity = 1);
-
-  HydraPipeline(const Config& config, const PipelineConfig& pipeline_config);
+  explicit HydraPipeline(const Config& config);
 
   virtual ~HydraPipeline();
 
@@ -59,31 +74,20 @@ class HydraPipeline {
 
   virtual void stop();
 
-  // TODO(nathan) expand API?
   virtual void save(const DataDirectory& output) const;
-
-  template <typename Derived = Module>
-  Derived* getModule(const std::string& name) {
-    auto iter = modules_.find(name);
-    if (iter == modules_.end()) {
-      return nullptr;
-    }
-
-    return dynamic_cast<Derived*>(iter->second.get());
-  }
 
  protected:
   void showModules() const;
 
-  std::string getModuleInfo(const std::string& name, const Module* mod) const;
-
  protected:
   SharedDsgInfo::Ptr frontend_dsg_;
   SharedDsgInfo::Ptr backend_dsg_;
-  SharedModuleState::Ptr shared_state_;
+  SharedModuleState::Ptr state_;
 
-  Module::Ptr input_module_;
-  std::map<std::string, Module::Ptr> modules_;
+  std::shared_ptr<ActiveWindowModule> active_window_;
+  std::shared_ptr<GraphBuilder> frontend_;
+  std::shared_ptr<BackendModule> backend_;
+  std::shared_ptr<LoopClosureModule> lcd_;
 };
 
 void declare_config(HydraPipeline::Config& config);

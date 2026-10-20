@@ -137,10 +137,9 @@ void UpdatePlacesFunctor::call(const SceneGraph& unmerged,
     return;
   }
 
-  const auto new_loopclosure = info->loop_closure_detected;
   const auto& places = unmerged.getLayer(config.layer);
   active_tracker.clear();  // reset from previous pass
-  const auto view = new_loopclosure ? LayerView(places) : active_tracker.view(places);
+  const auto view = info->full_update ? LayerView(places) : active_tracker.view(places);
 
   size_t num_changed = 0;
   if (config.use_temp_values) {
@@ -154,10 +153,10 @@ void UpdatePlacesFunctor::call(const SceneGraph& unmerged,
 
 MergeList UpdatePlacesFunctor::findMerges(const SceneGraph& graph,
                                           const UpdateInfo::ConstPtr& info) const {
-  const auto new_lcd = info->loop_closure_detected;
   const auto& places = graph.getLayer(config.layer);
   // freeze layer view to avoid messing with tracker
-  const auto view = new_lcd ? LayerView(places) : active_tracker.view(places, true);
+  const auto view =
+      info->full_update ? LayerView(places) : active_tracker.view(places, true);
 
   MergeList proposals;
   merge_proposer.findMerges(

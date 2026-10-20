@@ -98,7 +98,11 @@ void declare_config(DsgUpdater::Config& config) {
 DsgUpdater::DsgUpdater(const Config& config,
                        SceneGraph::Ptr source,
                        SharedDsgInfo::Ptr target)
-    : config(config::checkValid(config)), source_graph_(source), target_dsg_(target) {
+    : config(config::checkValid(config)),
+      exhaustive_names_(config.exhaustive_functors.begin(),
+                        config.exhaustive_functors.end()),
+      source_graph_(source),
+      target_dsg_(target) {
   for (const auto& [name, functor] : config.update_functors) {
     update_functors_.emplace(name, functor.create());
     merge_tracker.initializeTracker(name);
@@ -118,7 +122,7 @@ void DsgUpdater::save(const DataDirectory& output, const std::string& label) con
   }
 }
 
-void DsgUpdater::resetBackendDsg(uint64_t timestamp_ns) {
+void DsgUpdater::reset(uint64_t timestamp_ns) {
   ScopedTimer timer("dsg_updater/reset_dsg", timestamp_ns, true, 1, false);
   constexpr bool reset_mesh = false;
   {
@@ -154,41 +158,36 @@ void DsgUpdater::handleMeshUpdate(uint64_t timestamp_ns,
   launchCallbacks(funcs, std::cref(*target_dsg_->graph), offsets);
 }
 
-void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info) {
-  ScopedTimer spin_timer("dsg_updater/update_layers", timestamp_ns);
-
-  // TODO(nathan) chance that this causes weirdness when we have multiple nodes but no
-  // accepted reconciliation merges
-  const bool enable_merging =
-      info->given_merges.empty() ? config.enable_node_merging : false;
-
-  // merge topological changes to private dsg, respecting merges
-  // attributes may be overwritten, but ideally we don't bother
-  if (config.reset_dsg_on_loop_closure && info->loop_closure_detected) {
-    resetBackendDsg(timestamp_ns);
-  }
-
-  GraphMergeConfig merge_config;
-  merge_config.previous_merges = &target_dsg_->merges;
-  target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
-
+void DsgUpdater::markNewNodes() {
   // TODO(nathan) fix!
   // Nodes occasionally get added to the backend after they've left the active window,
   // which means they never get deformed or updated correctly. This forces them to be
   // active for at least one update
-  std::vector<NodeId> active_nodes_to_restore;
   for (const auto& layer : source_graph_->layers()) {
     for (const auto& node : layer.nodes()) {
       auto& attrs = node.attributes();
       if (source_graph_->checkNode(node.id) == NodeStatus::NEW && !attrs.is_active) {
         attrs.is_active = true;
-        active_nodes_to_restore.push_back(node.id);
+        active_nodes_to_restore_.push_back(node.id);
       }
     }
   }
+}
 
-  const std::set<std::string> exhaustive_names(config.exhaustive_functors.begin(),
-                                               config.exhaustive_functors.end());
+void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info) {
+  ScopedTimer spin_timer("dsg_updater/update_layers", timestamp_ns);
+  // merge topological changes to private dsg, respecting merges
+  // attributes may be overwritten, but ideally we don't bother
+  GraphMergeConfig merge_config;
+  merge_config.previous_merges = &target_dsg_->merges;
+  target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
+
+  markNewNodes();
+  callFunctors(info);
+  clearNewNodes();
+}
+
+void DsgUpdater::callFunctors(UpdateInfo::ConstPtr info) {
   std::list<UpdateFunctor::Hooks::CleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : update_functors_) {
     if (!functor) {
@@ -201,7 +200,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
     }
 
     functor->call(*source_graph_, *target_dsg_, info);
-    if (hooks.find_merges && enable_merging) {
+    if (hooks.find_merges && config.enable_node_merging) {
       auto& tracker = merge_tracker.getMergeGroup(name);
       findAndApplyMerges(config.functor_logging.with_name(name),
                          hooks,
@@ -209,33 +208,49 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
                          *source_graph_,
                          *target_dsg_,
                          tracker,
-                         exhaustive_names.count(name));
-      if (info->loop_closure_detected && hooks.merge) {
+                         exhaustive_names_.count(name));
+      if (info->full_update && hooks.merge) {
         MLOG(3) << "updating all merge attributes for " << name;
         MLOG(3) << "current tracker: " << tracker.print();
         tracker.updateAllMergeAttributes(
             *source_graph_, *target_dsg_->graph, hooks.merge);
       }
     }
-
-    // TODO(nathan) fix args for multithreading
-    MLOG(2) << "all merges: " << merge_tracker.print();
-    for (const auto& func : cleanup_hooks) {
-      func(info, *source_graph_, target_dsg_.get());
-    }
-
-    // We reset active flags for all new nodes that were inactive after one update
-    for (auto node_id : active_nodes_to_restore) {
-      auto node = source_graph_->findNode(node_id);
-      if (node) {
-        node->attributes().is_active = false;
-      }
-    }
-
-    // clear new node status
-    // TODO(nathan) add API for marking new nodes
-    source_graph_->getNewNodes(true);
   }
+
+  MLOG(2) << "all merges: " << merge_tracker.print();
+  for (const auto& func : cleanup_hooks) {
+    func(info, *source_graph_, target_dsg_.get());
+  }
+}
+
+void DsgUpdater::clearNewNodes() {
+  // We reset active flags for all new nodes that were inactive after one update
+  for (auto node_id : active_nodes_to_restore_) {
+    auto node = source_graph_->findNode(node_id);
+    if (node) {
+      node->attributes().is_active = false;
+    }
+  }
+
+  // clear new node status
+  source_graph_->getNewNodes(true);
+}
+
+void DsgUpdater::finalize(UpdateInfo::ConstPtr info) {
+  for (const auto& layer : source_graph_->all_layers()) {
+    for (const auto& node : layer.nodes()) {
+      node.attributes().is_active = false;
+    }
+  }
+
+  for (const auto& layer : target_dsg_->graph->all_layers()) {
+    for (const auto& node : layer.nodes()) {
+      node.attributes().is_active = false;
+    }
+  }
+
+  callFunctors(info);
 }
 
 }  // namespace hydra
