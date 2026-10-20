@@ -72,10 +72,7 @@ class PythonPipeline : public HydraPipeline {
     std::vector<config::VirtualConfig<InputFilter, true>> filters;
   } const config;
 
-  PythonPipeline(const Config& config,
-                 const Sensor::Ptr& sensor,
-                 int config_verbosity = 0,
-                 bool step_mode_only = true);
+  PythonPipeline(const Config& config, const Sensor::Ptr& sensor);
 
   virtual ~PythonPipeline();
 
@@ -107,14 +104,8 @@ void declare_config(PythonPipeline::Config& config) {
   base<HydraPipeline::Config>(config);
 }
 
-PythonPipeline::PythonPipeline(const HydraPipeline::Config& config,
-                               const Sensor::Ptr& sensor,
-                               int robot_id,
-                               int config_verbosity)
-    : HydraPipeline(_config, robot_id, config_verbosity),
-      config(_config),
-      sensor(sensor),
-      step_mode_only_(step_mode_only) {
+PythonPipeline::PythonPipeline(const Config& _config, const Sensor::Ptr& sensor)
+    : HydraPipeline(_config), config(_config), sensor(sensor) {
   if (!sensor) {
     throw std::runtime_error("Invalid sensor!");
   }
@@ -123,8 +114,7 @@ PythonPipeline::PythonPipeline(const HydraPipeline::Config& config,
     filters_.push_back(filter.create());
   }
 
-  VLOG(config_verbosity) << "Using sensor '" << sensor->name << "':\n"
-                         << sensor->dump();
+  MLOG(0) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
   initModules();
 }
 
@@ -223,13 +213,14 @@ namespace py = pybind11;
 void addBindings(pybind11::module_& m) {
   namespace fs = std::filesystem;
   py::class_<PythonPipeline>(m, "HydraPipeline")
-      .def(py::init([](const Sensor::Ptr& sensor, int id, bool step_mode) {
+      .def(py::init([](const Sensor::Ptr& sensor, int id) {
              const auto config = config::fromContext<PythonPipeline::Config>();
-             return std::make_unique<PythonPipeline>(config, sensor, id, step_mode);
+             const auto global_config = config::fromContext<PipelineConfig>();
+             GlobalInfo::init(global_config, id);
+             return std::make_unique<PythonPipeline>(config, sensor);
            }),
            "sensor"_a,
-           "robot_id"_a = 0,
-           "use_step_mode"_a = true)
+           "robot_id"_a = 0)
       .def(
           "save",
           [](const PythonPipeline& pipeline, const fs::path& output) {

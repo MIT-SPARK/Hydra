@@ -80,7 +80,6 @@ void declare_config(PipelineConfig& config) {
   field(config.store_visualization_details, "store_visualization_details");
   config.labelspace.setOptional();
   field(config.labelspace, "labelspace");
-  field<Path::Absolute>(config.label_remap_filepath, "semantic_label_remap_filepath");
   field(config.mesh, "mesh");
   field(config.semantic_layers, "semantic_layers");
 
@@ -102,10 +101,6 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   labelspace_ = config_.labelspace.create();
   if (!labelspace_) {
     labelspace_ = std::make_unique<Labelspace>();
-  }
-
-  if (!config_.label_remap_filepath.empty()) {
-    label_remapper_ = LabelRemapper(config_.label_remap_filepath);
   }
 
   if (config_.enable_pgmo_logging) {
@@ -148,8 +143,6 @@ const Labelspace& GlobalInfo::labelspace() const {
 
   return *labelspace_;
 }
-
-const LabelRemapper& GlobalInfo::getLabelRemapper() const { return label_remapper_; }
 
 SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   auto graph_info = std::make_shared<SharedDsgInfo>(config_.graph);
