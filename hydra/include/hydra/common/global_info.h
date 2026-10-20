@@ -93,8 +93,6 @@ struct PipelineConfig {
   SharedDsgInfo::Config graph;
   //! Closed-set labelspace information
   config::VirtualConfig<Labelspace> labelspace{Labelspace{}};
-  //! Optional remapping for input labels
-  std::filesystem::path label_remap_filepath;
   //! Configuration for scene graph mesh fields
   MeshFieldConfig mesh;
   //! @brief Layers in the scene graph that use the labelspace
@@ -125,8 +123,6 @@ class GlobalInfo {
 
   const RobotPrefixConfig& getRobotPrefix() const;
 
-  const LabelRemapper& getLabelRemapper() const;
-
   SharedDsgInfo::Ptr createSharedDsg() const;
 
   spark_dsg::Mesh::Ptr createMesh() const;
@@ -142,7 +138,6 @@ class GlobalInfo {
 
   PipelineConfig config_;
   RobotPrefixConfig robot_prefix_;
-  LabelRemapper label_remapper_;
 
   mutable std::unique_ptr<Labelspace> labelspace_;
 };

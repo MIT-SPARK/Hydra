@@ -44,7 +44,6 @@
 #include <stdexcept>
 #include <utility>
 
-#include "hydra/common/global_info.h"
 #include "hydra/input/input_data_io.h"
 
 namespace hydra {
@@ -110,11 +109,6 @@ bool convertLabels(InputData& data) {
   }
 
   convertToLabelType(data.label_image);
-
-  const auto remap = GlobalInfo::instance().getLabelRemapper();
-  if (remap) {
-    remap.remapImage(data.label_image);
-  }
 
   return true;
 }
