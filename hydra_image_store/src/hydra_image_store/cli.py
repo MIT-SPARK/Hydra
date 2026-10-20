@@ -104,6 +104,56 @@ def _cmd_import_legacy(args) -> int:
     return 0
 
 
+def _progress_printer(label: str):
+    def progress(done: int, total: int) -> None:
+        if done == total or done % 50 == 0:
+            print(f"{label} {done}/{total}", file=sys.stderr, flush=True)
+
+    return progress
+
+
+def _cmd_pack(args) -> int:
+    from .pack import pack_store
+
+    stats = pack_store(
+        args.run_dir, args.out, frames=args.frames, compression=args.compression,
+        zstd_level=args.zstd_level, include_masks=not args.no_masks,
+        progress=None if args.quiet else _progress_printer("packed"),
+    )
+    # stdout may carry the archive; report on stderr
+    print(json.dumps(stats, indent=1), file=sys.stderr)
+    return 0
+
+
+def _cmd_unpack(args) -> int:
+    from .pack import unpack_store
+
+    try:
+        stats = unpack_store(
+            args.archive, args.dest, store_name=args.store_name, overwrite=args.overwrite,
+            check=not args.no_check, dsg=args.dsg,
+            progress=None if args.quiet else _progress_printer("unpacked"),
+        )
+    except (RuntimeError, FileExistsError, ValueError) as exc:
+        print(f"unpack failed: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(stats, indent=1, default=str))
+    return 0
+
+
+def _cmd_check(args) -> int:
+    from .pack import check_store
+
+    report = check_store(args.store, dsg=args.dsg)
+    if args.json:
+        print(json.dumps(report, indent=1, default=str))
+    else:
+        for name, ok in report["checks"].items():
+            print(f"  {'PASS' if ok else 'FAIL'}  {name}")
+        print("ALL PASS" if report["ok"] else "FAILURES")
+    return 0 if report["ok"] else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hydra-image-store", description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
@@ -147,6 +197,35 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--copy", action="store_true", help="copy images (default: hardlink)")
     g.add_argument("--symlink", action="store_true", help="symlink images (default: hardlink)")
     s.set_defaults(func=_cmd_import_legacy)
+
+    s = sub.add_parser("pack", help="pack a run's image store into one compressed archive "
+                       "(see hydra_image_store.pack)")
+    s.add_argument("run_dir", help="run directory (uses <run>/image_store) or store directory")
+    s.add_argument("out", help="archive path (.tar, .tar.zst) or - for stdout")
+    s.add_argument("--frames", choices=["keyframes", "all"], default="keyframes",
+                   help="keyframes (+ kept object observation frames) or every frame with images")
+    s.add_argument("--compression", choices=["none", "lossless", "fast"], default="fast")
+    s.add_argument("--zstd-level", type=int, default=None,
+                   help="wrap the tar in zstd (default 3 for .zst paths, else off)")
+    s.add_argument("--no-masks", action="store_true", help="do not ship kept mask PNGs (RLE stays)")
+    s.add_argument("--quiet", action="store_true")
+    s.set_defaults(func=_cmd_pack)
+
+    s = sub.add_parser("unpack", help="rebuild a packed store as <dest>/image_store and check it")
+    s.add_argument("archive", help="archive path or - for stdin (zstd is detected)")
+    s.add_argument("dest", help="destination run directory")
+    s.add_argument("--store-name", default="image_store")
+    s.add_argument("--overwrite", action="store_true")
+    s.add_argument("--no-check", action="store_true")
+    s.add_argument("--dsg", help="scene graph for the checks (default <dest>/hydra/backend/dsg.json)")
+    s.add_argument("--quiet", action="store_true")
+    s.set_defaults(func=_cmd_unpack)
+
+    s = sub.add_parser("check", help="structural consistency checks of a store")
+    s.add_argument("store", help="run directory or store directory")
+    s.add_argument("--dsg", help="also check keyframe anchors / bound nodes against this scene graph")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=_cmd_check)
     return p
 
 

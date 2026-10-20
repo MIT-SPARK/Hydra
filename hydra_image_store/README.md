@@ -161,6 +161,80 @@ as follows:
   nearest imported frame in time. The worst gap is stored in `meta.legacy_obs_max_dt_ns`.
 - Object folders bind by DSG `image_folder`, or else by the NodeSymbol their name encodes.
 
+## Transfer between machines
+
+`hydra_image_store.transfer` encodes one frame (row, calibration, RGB, depth) as a
+self-describing blob (`b"HISF"`, version byte, JSON header, payloads; no msgpack).
+Extras: `pip install hydra_image_store[transfer]` (`zstandard`, `opencv-python-headless`;
+Pillow works instead of cv2). A missing package raises `transfer.MissingDependency`.
+
+| compression | RGB | depth |
+|---|---|---|
+| `none` | stored bytes | stored PNG bytes |
+| `lossless` | stored bytes | uint16 row-delta + zstd-3 (bit-exact) |
+| `fast` (default) | JPEG q75 (~40% smaller) | half resolution + row-delta + zstd-3 |
+
+`fast` halves depth by nearest sampling: half-res pixel `(i, j)` is the full-res sample
+`(2i, 2j)`, so only measured values survive and the scaled intrinsics `fx/2, fy/2, cx/2,
+cy/2` (size `ceil(w/2) x ceil(h/2)`) are exact. The blob carries `depth_downscale` and
+`meta["depth_calib"]`. Writing into a store repeats each sample over its 2x2 block, so
+the depth file is pixel-aligned with RGB and the sensor calibration is unchanged.
+
+```python
+from hydra_image_store import transfer
+frames = transfer.select_frames(store, frames="keyframes"|"all", after=None,
+                                include_kept_observations=False, require_images=True)
+blob = transfer.encode_frame(store, frame_or_id, compression="fast") -> bytes
+d = transfer.decode_frame(blob) -> {"meta", "rgb", "rgb_format", "depth", "depth_png",
+                                    "depth_downscale"}
+transfer.decode_header(blob)                    # meta + parts, no pixel decoding
+transfer.full_res_depth(d)                      # uint16 aligned with RGB / calib
+transfer.write_frame(writer, d) -> frame_id     # mirror: keeps source sensor/frame ids
+transfer.write_decoded_images(store_dir, d)     # just the files -> (rgb_rel, depth_rel)
+```
+
+`meta` holds `frame_id, robot_id, sensor_id, timestamp_ns, kind, world_T_body_odom`
+(16 floats, row-major), `anchor_node_id, anchor_T_body, rgb_path, depth_path` (source
+relative paths), `calib` (`Calib.to_json()` + `robot_id`), `depth_calib`,
+`compression`, `depth_downscale` and, in `fast`, `rgb_quality`. `select_frames` orders by
+`frame_id` (the sqlite rowid), so the max `frame_id` received is a resume watermark
+(ids are per robot). `write_frame` is idempotent: resending a frame only fills missing
+paths.
+
+### Prior-map pack / unpack
+
+```
+hydra-image-store pack RUN_DIR OUT.tar[.zst] [--frames keyframes|all]
+                       [--compression none|lossless|fast] [--zstd-level N] [--no-masks]
+hydra-image-store unpack ARCHIVE DEST_RUN_DIR [--overwrite] [--no-check] [--dsg dsg.json]
+hydra-image-store check STORE_OR_RUN [--dsg dsg.json] [--json]
+```
+
+`OUT` / `ARCHIVE` may be `-` (stdout / stdin), so a copy over ssh streams:
+`ssh robot hydra-image-store pack RUN - | hydra-image-store unpack - DEST`. The pack
+report goes to stderr. The archive is a tar: `manifest.json`, `frames/<id>.hisf`,
+`files/<mask paths>`, then a snapshot of `store.sqlite` with every row kept. Image paths
+of frames that were not shipped are NULL (as after `gc`). `--frames keyframes` ships the
+keyframes plus the frames of kept object observations. `unpack` builds
+`DEST/image_store.partial`, runs `check_store` (with `DEST/hydra/backend/dsg.json` when
+present) and only then renames it to `DEST/image_store`.
+
+Python API (for the console Maps -> Transfer job):
+
+```python
+from hydra_image_store import pack_store, unpack_store, check_store
+stats = pack_store(run_dir, out_path_or_binary_file, frames="keyframes",
+                   compression="fast", zstd_level=None, include_masks=True,
+                   progress=lambda done, total: ...)
+stats = unpack_store(path_or_binary_stream, dest_run_dir, overwrite=False, check=True,
+                     dsg=None, progress=None)   # stats["check"] = check_store report
+report = check_store(store_or_run_dir, dsg=None)  # {"ok", "checks": {name: bool}, "stats"}
+```
+
+Measured on a 640x360 run (`imgstore_lc_on2`, 369 keyframe + kept-observation frames):
+`none` 61 MB, `lossless` 59 MB, `fast` 30 MB (RGB 39 KB/frame, depth 25 KB/frame),
+pack 2.6 s, unpack 1.8 s. `--frames all` (1305 frames) with `fast` and outer zstd: 84 MB.
+
 ## Tests
 
 ```

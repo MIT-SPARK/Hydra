@@ -15,7 +15,8 @@ authors = [{name = "harelb", email = "harelb@mit.edu"}]
 [project.optional-dependencies]
 images = ["Pillow"]
 dsg = ["spark_dsg"]
-test = ["pytest", "Pillow"]
+transfer = ["zstandard", "opencv-python-headless"]
+test = ["pytest", "Pillow", "zstandard"]
 
 [project.scripts]
 hydra-image-store = "hydra_image_store.cli:main"
