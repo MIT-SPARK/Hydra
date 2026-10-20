@@ -145,21 +145,7 @@ void PythonPipeline::stop() {
 void PythonPipeline::reset() {
   stop();
 
-  active_window_.reset();
-  frontend_.reset();
-  backend_.reset();
-  lcd_.reset();
-
-  // reset state
-  const auto& config = GlobalInfo::instance();
-  frontend_dsg_ = config.createSharedDsg();
-  backend_dsg_ = config.createSharedDsg();
-
-  // setup dependent graphs
-  state_.reset(new SharedModuleState());
-  state_->lcd_graph = config.createSharedDsg();
-  state_->backend_graph = config.createSharedDsg();
-
+  initState();  // resets scene graphs
   PipelineQueues::instance().clear();
 
   initModules();

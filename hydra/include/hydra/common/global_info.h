@@ -38,11 +38,9 @@
 
 #include <atomic>
 #include <memory>
-#include <vector>
 
 #include "hydra/common/labelspace.h"
 #include "hydra/common/robot_prefix_config.h"
-#include "hydra/common/shared_dsg_info.h"
 
 namespace hydra {
 
@@ -89,15 +87,10 @@ struct PipelineConfig {
   int default_num_threads = -1;  // -1 means use all available threads.
   //! Frame information for Hydra
   FrameConfig frames;
-  //! Layer names for the scene graph that Hydra builds
-  SharedDsgInfo::Config graph;
   //! Closed-set labelspace information
   config::VirtualConfig<Labelspace> labelspace{Labelspace{}};
   //! Configuration for scene graph mesh fields
   MeshFieldConfig mesh;
-  //! @brief Layers in the scene graph that use the labelspace
-  std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
-                                           spark_dsg::DsgLayers::MESH_PLACES};
 };
 
 void declare_config(PipelineConfig& config);
@@ -122,8 +115,6 @@ class GlobalInfo {
   const FrameConfig& getFrames() const;
 
   const RobotPrefixConfig& getRobotPrefix() const;
-
-  SharedDsgInfo::Ptr createSharedDsg() const;
 
   spark_dsg::Mesh::Ptr createMesh() const;
 

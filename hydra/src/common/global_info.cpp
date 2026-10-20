@@ -81,11 +81,9 @@ void declare_config(PipelineConfig& config) {
   config.labelspace.setOptional();
   field(config.labelspace, "labelspace");
   field(config.mesh, "mesh");
-  field(config.semantic_layers, "semantic_layers");
 
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
-  field(config.graph, "graph", false);
 }
 
 GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
@@ -142,26 +140,6 @@ const Labelspace& GlobalInfo::labelspace() const {
   }
 
   return *labelspace_;
-}
-
-SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
-  auto graph_info = std::make_shared<SharedDsgInfo>(config_.graph);
-  auto& graph = *graph_info->graph;
-
-  CHECK(labelspace_);
-  const spark_dsg::Labelspace labelspace(labelspace_->label_names);
-  if (labelspace) {
-    labelspace.save(graph, "mesh", false);
-    for (const auto& layer_name : config_.semantic_layers) {
-      if (graph.layer_names().count(layer_name)) {
-        labelspace.save(graph, layer_name);
-      } else {
-        LOG(WARNING) << "Skipping saving labelspace for unknown '" << layer_name << "'";
-      }
-    }
-  }
-
-  return graph_info;
 }
 
 spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {

@@ -52,8 +52,10 @@ void optimize_graph(const OptimizationConfig& info) {
   // TODO(nathan) maybe pull robot id from somewhere
   const PipelineConfig global_config;
   GlobalInfo::init(global_config, 0);
+
+  // config is overwritten by loaded graph
   SharedModuleState::Ptr state(new SharedModuleState());
-  state->backend_graph = GlobalInfo::instance().createSharedDsg();
+  state->backend_graph = std::make_shared<SharedDsgInfo>(SharedDsgInfo::Config{});
   state->backend_graph->graph = spark_dsg::SceneGraph::load(info.graph);
 
   auto dsg = state->backend_graph->clone();
