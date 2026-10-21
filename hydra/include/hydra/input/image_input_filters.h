@@ -43,6 +43,8 @@ class InvalidDepthFilter : public InputFilter {
   struct Config {
     //! Ratio of nonfinite to finite depth values to discard frame
     double max_invalid_ratio = 1.0;
+    //! Count +inf depth (no return within the sensor range) as valid
+    bool inf_is_valid = false;
   } const config;
 
   explicit InvalidDepthFilter(const Config& config);

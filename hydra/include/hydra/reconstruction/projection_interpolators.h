@@ -70,6 +70,15 @@ struct InterpolationWeights {
  */
 class ProjectionInterpolator {
  public:
+  struct Config {
+    //! Treat +inf range pixels (no return within the sensor range) as valid, so that
+    //! voxels projecting onto them are integrated as free space. +inf ranges are never
+    //! blended: points near them use the nearest pixel
+    bool inf_is_free_space = false;
+  } const config;
+
+  explicit ProjectionInterpolator(const Config& config) : config(config) {}
+
   virtual ~ProjectionInterpolator() = default;
 
   /**
@@ -119,14 +128,17 @@ class ProjectionInterpolator {
                                const InterpolationWeights& weights) const = 0;
 };
 
+void declare_config(ProjectionInterpolator::Config& config);
+
 /**
  * @brief Interpolates values by selecting the nearest neighbor. Use
  computeWeights() first, then use the other functions to interpolate the relevant data.
  */
 class InterpolatorNearest : public ProjectionInterpolator {
  public:
-  struct Config {};
-  explicit InterpolatorNearest(const Config& = Config{}) {}
+  using Config = ProjectionInterpolator::Config;
+  explicit InterpolatorNearest(const Config& config = Config{})
+      : ProjectionInterpolator(config) {}
 
   InterpolationWeights computeWeights(float u,
                                       float v,
@@ -145,16 +157,15 @@ class InterpolatorNearest : public ProjectionInterpolator {
                        const InterpolationWeights& weights) const override;
 };
 
-void declare_config(InterpolatorNearest::Config& config);
-
 /**
  * @brief Interpolates values using bilinear interpolation. Use computeWeights()
  first, then use the other functions to interpolate relevant data.
  */
 class InterpolatorBilinear : public ProjectionInterpolator {
  public:
-  struct Config {};
-  explicit InterpolatorBilinear(const Config& = Config{}) {}
+  using Config = ProjectionInterpolator::Config;
+  explicit InterpolatorBilinear(const Config& config = Config{})
+      : ProjectionInterpolator(config) {}
 
   InterpolationWeights computeWeights(float u,
                                       float v,
@@ -176,8 +187,6 @@ class InterpolatorBilinear : public ProjectionInterpolator {
   void fillBilinearWeights(float u, float v, InterpolationWeights& weights) const;
 };
 
-void declare_config(InterpolatorBilinear::Config& config);
-
 /**
  * @brief Use bilinear interpolation if the range values are all close,
  * otherwise use nearest neighbor lookup. This behavior should capture surface
@@ -186,9 +195,9 @@ void declare_config(InterpolatorBilinear::Config& config);
  */
 class InterpolatorAdaptive : public InterpolatorBilinear {
  public:
-  struct Config {
+  struct Config : public ProjectionInterpolator::Config {
     float max_depth_difference_m = 0.2;
-  } const config;
+  };
 
   explicit InterpolatorAdaptive(const Config& config);
 
@@ -209,6 +218,7 @@ class InterpolatorAdaptive : public InterpolatorBilinear {
                        const InterpolationWeights& weights) const override;
 
  private:
+  const Config config_;
   const int u_offset_[4] = {0, 0, 1, 1};
   const int v_offset_[4] = {0, 1, 0, 1};
 };
