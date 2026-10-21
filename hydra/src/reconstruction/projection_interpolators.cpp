@@ -84,14 +84,23 @@ inline bool pixelIsValid(int u, int v, const cv::Mat& img) {
   return range >= 1.0e-6f && std::isfinite(range);
 }
 
-inline Weights getNearestWeights(float u, float v, const cv::Mat& img) {
+// +inf range: no return within the sensor range along this pixel's ray
+inline bool pixelIsInf(int u, int v, const cv::Mat& img) {
+  return img.at<InputData::RangeType>(v, u) == std::numeric_limits<float>::infinity();
+}
+
+inline Weights getNearestWeights(float u,
+                                 float v,
+                                 const cv::Mat& img,
+                                 bool inf_is_free_space) {
   Weights weights(std::round(u), std::round(v));
   if (weights.u < 0 || weights.u >= img.cols || weights.v < 0 ||
       weights.v >= img.rows) {
     return weights;
   }
 
-  weights.valid = pixelIsValid(weights.u, weights.v, img);
+  weights.valid = pixelIsValid(weights.u, weights.v, img) ||
+                  (inf_is_free_space && pixelIsInf(weights.u, weights.v, img));
   return weights;
 }
 
@@ -116,14 +125,16 @@ inline void updateConfidences(InputData::LabelType label,
 
 }  // namespace
 
-void declare_config(InterpolatorNearest::Config&) {
-  config::name("InterpolatorNearest::Config");
+void declare_config(ProjectionInterpolator::Config& config) {
+  using namespace config;
+  name("ProjectionInterpolator::Config");
+  field(config.inf_is_free_space, "inf_is_free_space");
 }
 
 Weights InterpolatorNearest::computeWeights(float u,
                                             float v,
                                             const cv::Mat& img) const {
-  return getNearestWeights(u, v, img);
+  return getNearestWeights(u, v, img, config.inf_is_free_space);
 }
 
 float InterpolatorNearest::interpolateRange(const cv::Mat& range_image,
@@ -147,10 +158,6 @@ bool InterpolatorNearest::interpolateMask(const cv::Mat& mask_image,
   return mask_image.at<uint8_t>(weights.v, weights.u) > 0;
 }
 
-void declare_config(InterpolatorBilinear::Config&) {
-  config::name("InterpolatorBilinear::Config");
-}
-
 Weights InterpolatorBilinear::computeWeights(float u,
                                              float v,
                                              const cv::Mat& img) const {
@@ -166,6 +173,14 @@ Weights InterpolatorBilinear::computeWeights(float u,
   weights.valid &= pixelIsValid(weights.u, weights.v + 1, img);
   weights.valid &= pixelIsValid(weights.u + 1, weights.v + 1, img);
   if (!weights.valid) {
+    // +inf can't be blended (0 * inf is NaN), so use the nearest pixel if it is +inf
+    if (config.inf_is_free_space) {
+      const auto nearest = getNearestWeights(u, v, img, true);
+      if (nearest.valid && pixelIsInf(nearest.u, nearest.v, img)) {
+        return nearest;
+      }
+    }
+
     return weights;
   }
 
@@ -175,6 +190,10 @@ Weights InterpolatorBilinear::computeWeights(float u,
 
 float InterpolatorBilinear::interpolateRange(const cv::Mat& range_image,
                                              const Weights& weights) const {
+  if (!weights.use_bilinear) {
+    return range_image.at<InputData::RangeType>(weights.v, weights.u);  // +inf pixel
+  }
+
   return range_image.at<InputData::RangeType>(weights.v, weights.u) * weights.w0 +
          range_image.at<InputData::RangeType>(weights.v + 1, weights.u) * weights.w1 +
          range_image.at<InputData::RangeType>(weights.v, weights.u + 1) * weights.w2 +
@@ -184,6 +203,11 @@ float InterpolatorBilinear::interpolateRange(const cv::Mat& range_image,
 
 Color InterpolatorBilinear::interpolateColor(const cv::Mat& color_image,
                                              const Weights& weights) const {
+  if (!weights.use_bilinear) {
+    const auto color = color_image.at<InputData::ColorType>(weights.v, weights.u);
+    return Color(color[0], color[1], color[2]);
+  }
+
   Eigen::Vector3f color(0, 0, 0);
   const auto c1 = color_image.at<InputData::ColorType>(weights.v, weights.u);
   const auto c2 = color_image.at<InputData::ColorType>(weights.v + 1, weights.u);
@@ -199,6 +223,10 @@ Color InterpolatorBilinear::interpolateColor(const cv::Mat& color_image,
 
 int InterpolatorBilinear::interpolateID(const cv::Mat& id_image,
                                         const Weights& weights) const {
+  if (!weights.use_bilinear) {
+    return id_image.at<InputData::LabelType>(weights.v, weights.u);
+  }
+
   // Since IDs can not be interpolated we assign weights to all IDs in the image
   // based on the corner weights and return the highest weights ID.
 
@@ -238,6 +266,10 @@ int InterpolatorBilinear::interpolateID(const cv::Mat& id_image,
 
 bool InterpolatorBilinear::interpolateMask(const cv::Mat& img,
                                            const Weights& weights) const {
+  if (!weights.use_bilinear) {
+    return img.at<uint8_t>(weights.v, weights.u) > 0;
+  }
+
   float total = 0.0f;
   total += img.at<uint8_t>(weights.v, weights.u) > 0 ? weights.w0 : -weights.w0;
   total += img.at<uint8_t>(weights.v + 1, weights.u) > 0 ? weights.w1 : -weights.w1;
@@ -262,13 +294,13 @@ void InterpolatorBilinear::fillBilinearWeights(float u,
 void declare_config(InterpolatorAdaptive::Config& config) {
   using namespace config;
   config::name("InterpolatorAdaptive::Config");
+  base<ProjectionInterpolator::Config>(config);
   field(config.max_depth_difference_m, "max_depth_difference_m", "m");
   check(config.max_depth_difference_m, GE, 0.0f, "max_depth_difference_m");
 }
 
 InterpolatorAdaptive::InterpolatorAdaptive(const Config& config)
-    : InterpolatorBilinear(InterpolatorBilinear::Config()),
-      config(config::checkValid(config)) {}
+    : InterpolatorBilinear(config), config_(config::checkValid(config)) {}
 
 Weights InterpolatorAdaptive::computeWeights(float u,
                                              float v,
@@ -296,7 +328,7 @@ Weights InterpolatorAdaptive::computeWeights(float u,
 
     max = std::max(range, max);
     min = std::min(range, min);
-    if (max - min > config.max_depth_difference_m) {
+    if (max - min > config_.max_depth_difference_m) {
       use_nearest = true;  // use nearest when adaptive check is hit
       break;
     }
@@ -304,7 +336,7 @@ Weights InterpolatorAdaptive::computeWeights(float u,
 
   if (use_nearest) {
     // will handle validating pixel at [u, v]
-    return getNearestWeights(u, v, ranges);
+    return getNearestWeights(u, v, ranges, config.inf_is_free_space);
   }
 
   Weights weights(col, row);

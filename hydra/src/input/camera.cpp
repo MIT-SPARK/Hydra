@@ -244,7 +244,10 @@ cv::Mat Camera::computeRangeImage(const cv::Mat& depth_image,
       const Eigen::Vector3f p_C(depth * (static_cast<float>(u) - config_.cx) * fx_inv,
                                 depth * (static_cast<float>(v) - config_.cy) * fy_inv,
                                 depth);
-      const float range = p_C.norm();
+      // keep +inf depth (no return) as +inf range: on the principal row / column the
+      // norm would be NaN (0 * inf)
+      const float range =
+          depth == std::numeric_limits<float>::infinity() ? depth : p_C.norm();
       range_image.at<InputData::RangeType>(v, u) = range;
       if (min_range) {
         *min_range = std::min(*min_range, range);

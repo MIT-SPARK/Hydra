@@ -39,6 +39,8 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 
+#include <limits>
+
 namespace hydra {
 namespace {
 
@@ -53,6 +55,7 @@ void declare_config(InvalidDepthFilter::Config& config) {
   using namespace config;
   name("InvalidDepthFilter::Config");
   field(config.max_invalid_ratio, "max_invalid_ratio");
+  field(config.inf_is_valid, "inf_is_valid");
   checkInRange(config.max_invalid_ratio, 0.0, 1.0, "max_invalid_ratio", false);
 }
 
@@ -76,7 +79,10 @@ bool InvalidDepthFilter::valid(const SensorInputPacket& current,
   for (int r = 0; r < depth.rows; r++) {
     for (int c = 0; c < depth.cols; c++) {
       const auto value = depth.at<float>(r, c);
-      num_invalid += std::isfinite(value) ? 0 : 1;
+      const bool valid =
+          std::isfinite(value) ||
+          (config.inf_is_valid && value == std::numeric_limits<float>::infinity());
+      num_invalid += valid ? 0 : 1;
     }
   }
 
