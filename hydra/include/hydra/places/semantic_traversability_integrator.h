@@ -48,26 +48,17 @@
 
 namespace hydra::places {
 
-/**
- * @brief Refines traversability by projecting each floor cell into the semantic label
- * image and recursively fusing the observed labels.
- *
- * Plays the role ProjectiveIntegrator plays for the TSDF, but over the 2D floor cells
- * produced by a TraversabilityEstimator. Each cell's stored surface height gives it a
- * full 3D position, which is projected into the label image; the sampled label is
- * mapped to a traversability probability through `label_traversability` and fused into
- * the semantic fields of the TraversabilityVoxel.
- */
+//! Refines traversability by projecting floor cells into the traversability image.
 class ProjectiveSemanticTraversabilityIntegrator
     : public PersistentTraversabilityProcessor {
  public:
   //! How the semantic estimate combines with the geometric one.
   enum class FusionMode {
-    //! Semantics may only lower traversability. Geometry stays authoritative.
+    //! Semantics may only lower traversability.
     MIN,
     //! Multiply the two probabilities.
     PRODUCT,
-    //! Confidence-weighted mean. Lets semantics raise traversability, e.g. on gravel.
+    //! Confidence-weighted mean of the two probabilities.
     WEIGHTED_MEAN
   };
 
@@ -111,10 +102,7 @@ class ProjectiveSemanticTraversabilityIntegrator
    */
   void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) override;
 
-  /**
-   * @brief A single semantic observation of a floor cell.
-   * @note Analogous to ProjectiveIntegrator::VoxelMeasurement.
-   */
+  //! A single semantic observation of a floor cell.
   struct CellMeasurement {
     bool valid = false;
     InterpolationWeights interpolation_weights;
@@ -151,7 +139,7 @@ class ProjectiveSemanticTraversabilityIntegrator
   //! Resolved occlusion gate in meters. Valid after the first update.
   float maxSurfaceDistance() const { return max_surface_distance_m_; }
 
-  //! The image the labels are read from, as selected by the config.
+  //! The image the labels are read from.
   const cv::Mat& getLabelImage(const InputData& data) const;
 
  protected:
