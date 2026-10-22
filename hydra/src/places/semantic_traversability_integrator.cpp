@@ -60,7 +60,6 @@ void declare_config(ProjectiveSemanticTraversabilityIntegrator::Config& config) 
   field(config.max_surface_distance, "max_surface_distance", "m");
   field(config.min_incidence_cosine, "min_incidence_cosine");
   field(config.max_range, "max_range", "m");
-  field(config.use_traversability_image, "use_traversability_image");
   field(config.min_measurement_weight, "min_measurement_weight");
   field(config.max_weight, "max_weight");
   field(config.weight_half, "weight_half");
@@ -92,7 +91,7 @@ ProjectiveSemanticTraversabilityIntegrator::ProjectiveSemanticTraversabilityInte
 
 const cv::Mat& ProjectiveSemanticTraversabilityIntegrator::getLabelImage(
     const InputData& data) const {
-  return config.use_traversability_image ? data.traversability_image : data.label_image;
+  return data.traversability_image;
 }
 
 ProjectiveSemanticTraversabilityIntegrator::CellMeasurement
@@ -300,9 +299,7 @@ void ProjectiveSemanticTraversabilityIntegrator::apply(const ActiveWindowOutput&
   }
 
   if (!integrated) {
-    LOG_FIRST_N(WARNING, 5) << "No "
-                            << (config.use_traversability_image ? "traversability"
-                                                                : "label")
+    LOG_FIRST_N(WARNING, 5) << "No " << ("traversability")
                             << " image in input data; semantic traversability "
                                "requires a semantic input source.";
   }

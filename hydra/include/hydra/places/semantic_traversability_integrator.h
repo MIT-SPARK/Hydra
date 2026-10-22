@@ -89,10 +89,6 @@ class ProjectiveSemanticTraversabilityIntegrator
     //! apply the sensor range.
     float max_range = 0.0f;
 
-    //! @brief If true, read labels from the traversability image (e.g., a
-    //! traversability segmentation network) instead of the semantic label image.
-    bool use_traversability_image = false;
-
     //! @brief Observations below this weight are discarded.
     float min_measurement_weight = 1.0e-4f;
 
