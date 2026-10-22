@@ -59,6 +59,8 @@ void declare_config(ProjectiveSemanticTraversabilityIntegrator::Config& config) 
   name("ProjectiveSemanticTraversabilityIntegrator::Config");
   field(config.max_surface_distance, "max_surface_distance", "m");
   field(config.min_incidence_cosine, "min_incidence_cosine");
+  field(config.max_range, "max_range", "m");
+  field(config.use_traversability_image, "use_traversability_image");
   field(config.min_measurement_weight, "min_measurement_weight");
   field(config.max_weight, "max_weight");
   field(config.weight_half, "weight_half");
@@ -88,6 +90,11 @@ ProjectiveSemanticTraversabilityIntegrator::ProjectiveSemanticTraversabilityInte
     : config(config::checkValid(config)),
       interpolator_(config.interpolation_method.create()) {}
 
+const cv::Mat& ProjectiveSemanticTraversabilityIntegrator::getLabelImage(
+    const InputData& data) const {
+  return config.use_traversability_image ? data.traversability_image : data.label_image;
+}
+
 ProjectiveSemanticTraversabilityIntegrator::CellMeasurement
 ProjectiveSemanticTraversabilityIntegrator::getCellMeasurement(const InputData& data,
                                                                const Point& p_S,
@@ -96,7 +103,7 @@ ProjectiveSemanticTraversabilityIntegrator::getCellMeasurement(const InputData& 
   CellMeasurement measurement;
 
   const auto range = p_S.norm();
-  if (!data.inRange(range)) {
+  if (!data.inRange(range) || (config.max_range > 0.0f && range > config.max_range)) {
     return measurement;
   }
 
@@ -142,8 +149,8 @@ ProjectiveSemanticTraversabilityIntegrator::getCellMeasurement(const InputData& 
     return measurement;
   }
 
-  measurement.label =
-      interpolator_->interpolateID(data.label_image, measurement.interpolation_weights);
+  measurement.label = interpolator_->interpolateID(getLabelImage(data),
+                                                   measurement.interpolation_weights);
   measurement.weight = weight;
   measurement.valid = true;
   return measurement;
@@ -284,7 +291,7 @@ void ProjectiveSemanticTraversabilityIntegrator::apply(const ActiveWindowOutput&
   // them before applying the result once.
   bool integrated = false;
   for (const auto& data : msg.sensor_data) {
-    if (!data || data->label_image.empty()) {
+    if (!data || getLabelImage(*data).empty()) {
       continue;
     }
 
@@ -293,7 +300,10 @@ void ProjectiveSemanticTraversabilityIntegrator::apply(const ActiveWindowOutput&
   }
 
   if (!integrated) {
-    LOG_FIRST_N(WARNING, 5) << "No label image in input data; semantic traversability "
+    LOG_FIRST_N(WARNING, 5) << "No "
+                            << (config.use_traversability_image ? "traversability"
+                                                                : "label")
+                            << " image in input data; semantic traversability "
                                "requires a semantic input source.";
   }
 

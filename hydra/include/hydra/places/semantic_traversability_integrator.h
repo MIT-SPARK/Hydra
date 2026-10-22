@@ -84,6 +84,15 @@ class ProjectiveSemanticTraversabilityIntegrator
     //! many floor cells.
     float min_incidence_cosine = 0.2f;
 
+    //! @brief Maximum distance from the sensor in meters for an observation to be used,
+    //! as segmentation of distant surfaces tends to be noisy. Non-positive values only
+    //! apply the sensor range.
+    float max_range = 0.0f;
+
+    //! @brief If true, read labels from the traversability image (e.g., a
+    //! traversability segmentation network) instead of the semantic label image.
+    bool use_traversability_image = false;
+
     //! @brief Observations below this weight are discarded.
     float min_measurement_weight = 1.0e-4f;
 
@@ -161,6 +170,9 @@ class ProjectiveSemanticTraversabilityIntegrator
 
   //! @brief Resolved occlusion gate in meters. Valid after the first update.
   float maxSurfaceDistance() const { return max_surface_distance_m_; }
+
+  //! @brief The image the labels are read from, as selected by the config.
+  const cv::Mat& getLabelImage(const InputData& data) const;
 
  protected:
   //! @brief Integrate the labels of a single frame into the layer.
