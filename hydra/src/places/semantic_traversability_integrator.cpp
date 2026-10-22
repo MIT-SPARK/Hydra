@@ -270,6 +270,8 @@ void ProjectiveSemanticTraversabilityIntegrator::integrateFrame(
 void ProjectiveSemanticTraversabilityIntegrator::applyToLayer(
     TraversabilityLayer& layer) const {
   for (auto& block : layer) {
+    // The estimators only recompute updated blocks, so fusing into the others would
+    // apply the semantics on top of an estimate that already contains them.
     if (!block.updated) {
       continue;
     }

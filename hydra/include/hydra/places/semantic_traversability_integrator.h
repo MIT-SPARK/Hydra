@@ -67,49 +67,37 @@ class ProjectiveSemanticTraversabilityIntegrator
     MIN,
     //! Multiply the two probabilities.
     PRODUCT,
-    //! Confidence-weighted mean. Allows semantics to raise traversability, e.g. to
-    //! rescue a rough but drivable surface such as gravel or lawn.
+    //! Confidence-weighted mean. Lets semantics raise traversability, e.g. on gravel.
     WEIGHTED_MEAN
   };
 
   struct Config {
-    //! @brief Maximum |measured range - cell range| for a cell to count as visible in
-    //! the current frame. Negative values are multiples of the voxel size. This is the
-    //! occlusion gate: without it, labels of objects in front of the floor (tables,
-    //! people) are painted onto the floor beneath them.
+    //! Max |measured - cell range| for a cell to be visible [m]. Negative: voxel units.
     float max_surface_distance = -2.0f;
 
-    //! @brief Minimum |cos| of the angle between the viewing ray and the vertical for
-    //! an observation to be used. Rejects grazing views, where a single pixel covers
-    //! many floor cells.
+    //! Minimum |cos| between the viewing ray and the vertical, rejects grazing views.
     float min_incidence_cosine = 0.2f;
 
-    //! @brief Maximum distance from the sensor in meters for an observation to be used,
-    //! as segmentation of distant surfaces tends to be noisy. Non-positive values only
-    //! apply the sensor range.
+    //! Maximum observation range [m]. Non-positive values only apply the sensor range.
     float max_range = 0.0f;
 
-    //! @brief Observations below this weight are discarded.
+    //! Observations below this weight are discarded.
     float min_measurement_weight = 1.0e-4f;
 
-    //! @brief Saturating cap on accumulated per-cell weight. Lower values adapt to
-    //! change faster but forget faster.
+    //! Cap on accumulated per-cell weight. Lower values adapt and forget faster.
     float max_weight = 1.0e4f;
 
-    //! @brief Accumulated weight at which semantic confidence reaches 0.5.
+    //! Accumulated weight at which semantic confidence reaches 0.5.
     float weight_half = 10.0f;
 
-    //! @brief How the semantic and geometric traversability estimates combine.
+    //! How the semantic and geometric traversability estimates combine.
     FusionMode fusion_mode = FusionMode::MIN;
 
-    //! @brief Which interpolation to use when sampling the input images.
+    //! Which interpolation to use when sampling the input images.
     config::VirtualConfig<ProjectionInterpolator> interpolation_method{
         InterpolatorNearest::Config{}};
 
-    //! @brief Probability in [0, 1] that a surface with each label is traversable, e.g.
-    //! {3: 0.98, 12: 0.02}. Labels not listed carry no information and are ignored.
-    //! This is kept separate from the label space: whether stairs or grass are
-    //! traversable is a property of the robot, not of the segmentation model.
+    //! Traversability probability per label, e.g. {3: 0.98, 12: 0.02}. Others ignored.
     std::map<uint32_t, float> label_traversability;
   } const config;
 
@@ -147,9 +135,7 @@ class ProjectiveSemanticTraversabilityIntegrator
                                      float incidence,
                                      float voxel_size) const;
 
-  /**
-   * @brief Fuse a single observation into the semantic fields of a voxel.
-   */
+  //! Fuse a single observation into the semantic fields of a voxel.
   void updateCell(const CellMeasurement& measurement, TraversabilityVoxel& voxel) const;
 
   /**
@@ -159,35 +145,24 @@ class ProjectiveSemanticTraversabilityIntegrator
   std::optional<std::pair<float, float>> evaluate(
       const TraversabilityVoxel& voxel) const;
 
-  /**
-   * @brief Combine a voxel's semantic estimate into its geometric estimate.
-   */
+  //! Combine a voxel's semantic estimate into its geometric estimate.
   void applyToVoxel(TraversabilityVoxel& voxel) const;
 
-  //! @brief Resolved occlusion gate in meters. Valid after the first update.
+  //! Resolved occlusion gate in meters. Valid after the first update.
   float maxSurfaceDistance() const { return max_surface_distance_m_; }
 
-  //! @brief The image the labels are read from, as selected by the config.
+  //! The image the labels are read from, as selected by the config.
   const cv::Mat& getLabelImage(const InputData& data) const;
 
  protected:
-  //! @brief Integrate the labels of a single frame into the layer.
   void integrateFrame(const InputData& data, TraversabilityLayer& layer) const;
 
-  //! @brief Integrate one block of floor cells.
   void updateBlock(const InputData& data,
                    const Eigen::Isometry3f& sensor_T_world,
                    const Point& sensor_p_world,
                    float voxel_size,
                    TraversabilityBlock& block) const;
 
-  /**
-   * @brief Fuse accumulated semantics into the geometric estimate. The estimator
-   * classifies the result once all persistent processing has run.
-   * @note Only blocks marked as updated are touched: the estimators only recompute
-   * those blocks, so fusing into the others would apply the semantics on top of an
-   * estimate that already contains them.
-   */
   void applyToLayer(TraversabilityLayer& layer) const;
 
   const std::unique_ptr<const ProjectionInterpolator> interpolator_;
