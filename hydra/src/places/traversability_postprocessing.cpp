@@ -154,26 +154,11 @@ RobotFootprintTraversability::RobotFootprintTraversability(const Config& config)
 
 void RobotFootprintTraversability::apply(const ActiveWindowOutput& msg,
                                          TraversabilityLayer& layer) {
-  // Archive before adding so that voxels in not yet allocated blocks are kept until
-  // the next update.
-  archive(layer);
   addFootprint(msg.world_T_body<float>(), layer);
-  markTraversable(layer);
-}
-
-void RobotFootprintTraversability::archive(const TraversabilityLayer& layer) {
-  const int vps = static_cast<int>(layer.voxels_per_side);
-  for (auto it = footprint_.begin(); it != footprint_.end();) {
-    if (layer.hasBlock(blockFromGlobal(*it, vps))) {
-      ++it;
-    } else {
-      it = footprint_.erase(it);
-    }
-  }
 }
 
 void RobotFootprintTraversability::addFootprint(const Eigen::Isometry3f& world_T_body,
-                                                const TraversabilityLayer& layer) {
+                                                TraversabilityLayer& layer) const {
   const float voxel_size = layer.voxel_size;
   // Inflate the footprint by half a voxel so that every voxel intersecting the
   // footprint is included, not only those whose center lies inside it.
@@ -197,6 +182,7 @@ void RobotFootprintTraversability::addFootprint(const Eigen::Isometry3f& world_T
 
   const auto body_T_world = world_T_body.inverse();
   const float z = world_T_body.translation().z();
+  const int vps = static_cast<int>(layer.voxels_per_side);
   const int x_min = std::floor(world_min.x() / voxel_size);
   const int x_max = std::floor(world_max.x() / voxel_size);
   const int y_min = std::floor(world_min.y() / voxel_size);
@@ -205,29 +191,23 @@ void RobotFootprintTraversability::addFootprint(const Eigen::Isometry3f& world_T
     for (int y = y_min; y <= y_max; ++y) {
       const Eigen::Vector3f center((x + 0.5f) * voxel_size, (y + 0.5f) * voxel_size, z);
       const Eigen::Vector2f p_body = (body_T_world * center).head<2>();
-      if ((p_body.array() >= min.array()).all() &&
-          (p_body.array() <= max.array()).all()) {
-        footprint_.insert(Index2D(x, y));
+      if ((p_body.array() < min.array()).any() ||
+          (p_body.array() > max.array()).any()) {
+        continue;
       }
-    }
-  }
-}
 
-void RobotFootprintTraversability::markTraversable(TraversabilityLayer& layer) const {
-  const int vps = static_cast<int>(layer.voxels_per_side);
-  for (const auto& index : footprint_) {
-    const auto block_index = blockFromGlobal(index, vps);
-    auto block = layer.getBlockPtr(block_index);
-    if (!block) {
-      continue;
-    }
+      const auto block_index = blockFromGlobal(Index2D(x, y), vps);
+      auto block = layer.getBlockPtr(block_index);
+      if (!block) {
+        continue;
+      }
 
-    const Index2D local(index.x() - block_index.x() * vps,
-                        index.y() - block_index.y() * vps);
-    auto& voxel = block->voxel(local);
-    if (voxel.state != State::TRAVERSABLE) {
-      voxel.state = State::TRAVERSABLE;
-      block->updated = true;
+      auto& voxel =
+          block->voxel(Index2D(x - block_index.x() * vps, y - block_index.y() * vps));
+      if (!voxel.traversed) {
+        voxel.traversed = true;
+        block->updated = true;
+      }
     }
   }
 }

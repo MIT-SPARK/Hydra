@@ -197,8 +197,13 @@ GradientMap computeGradientMap(const HeightMap& height_map, float voxel_size) {
   return gradient_map;
 }
 
-void classifyTraversabilityVoxel(const TraversabilityEstimator::Config& config,
-                                 TraversabilityVoxel& voxel) {
+void TraversabilityEstimator::classifyTraversabilityVoxel(
+    TraversabilityVoxel& voxel) const {
+  if (voxel.traversed) {
+    voxel.state = TraversabilityState::TRAVERSABLE;
+    return;
+  }
+
   if (voxel.confidence <= 0.0f) {
     voxel.state = TraversabilityState::UNKNOWN;
     return;
@@ -215,11 +220,6 @@ void classifyTraversabilityVoxel(const TraversabilityEstimator::Config& config,
   } else {
     voxel.state = TraversabilityState::UNKNOWN;
   }
-}
-
-void TraversabilityEstimator::classifyTraversabilityVoxel(
-    TraversabilityVoxel& voxel) const {
-  places::classifyTraversabilityVoxel(config, voxel);
 }
 
 void declare_config(TraversabilityEstimator::Config& config) {
@@ -315,7 +315,9 @@ void HeightTraversabilityEstimator::computeTraversability(const ActiveWindowOutp
   for (auto& block_idx_2d : updated_blocks_2d) {
     // Reset the traversability.
     auto& traversability_block = layer.allocateBlock(block_idx_2d, voxels_per_side);
-    traversability_block.reset();
+    for (auto& voxel : traversability_block.voxels) {
+      voxel.resetGeometry();
+    }
     traversability_block.updated = true;
     for (int block_z = min_height.first.z(); block_z <= max_height.first.z();
          ++block_z) {
@@ -361,8 +363,6 @@ void HeightTraversabilityEstimator::computeTraversability(const ActiveWindowOutp
         if (iter != height_map.end()) {
           voxel.height = iter->second;
         }
-
-        classifyTraversabilityVoxel(voxel);
       }
     }
   }
@@ -464,7 +464,9 @@ void GradientTraversabilityEstimator::computeTraversability(
   const auto gradient_map = computeGradientMap(height_map, tsdf_layer_->voxel_size);
   for (auto& block_idx : updated) {
     auto& block = layer.allocateBlock(block_idx, voxels_per_side);
-    block.reset();
+    for (auto& voxel : block.voxels) {
+      voxel.resetGeometry();
+    }
     block.updated = true;
 
     for (int x = 0; x < voxels_per_side; ++x) {
@@ -477,7 +479,6 @@ void GradientTraversabilityEstimator::computeTraversability(
         if (iter == gradient_map.end()) {
           voxel.confidence = 0.0f;
           voxel.traversability = 0.0f;
-          classifyTraversabilityVoxel(voxel);
           continue;
         }
 
@@ -485,7 +486,6 @@ void GradientTraversabilityEstimator::computeTraversability(
         voxel.traversability = computeTraversabilityFromGradient(gradient, threshold);
         voxel.confidence = confidence;
         voxel.height = height;
-        classifyTraversabilityVoxel(voxel);
       }
     }
   }

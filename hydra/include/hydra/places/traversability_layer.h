@@ -61,6 +61,32 @@ struct TraversabilityVoxel {
   // TODO(lschmid): Remove this at some point.
   mutable float debug_value = -1.0f;
 
+  //! Fused semantic estimate of the traversability in [0, 1]. Persists across resets of
+  //! the geometric estimate.
+  float semantic_traversability = 0.5f;
+
+  //! Accumulated semantic observation weight. Zero if never observed semantically.
+  float semantic_weight = 0.0f;
+
+  //! Whether the robot footprint covered this voxel at some point.
+  bool traversed = false;
+
+  //! Reset the geometric estimate while keeping the accumulated evidence (semantics and
+  //! robot footprint).
+  void resetGeometry() { resetGeometry(TraversabilityVoxel()); }
+
+  //! Replace the geometric estimate with the one of `geometry` while keeping the
+  //! accumulated evidence.
+  void resetGeometry(const TraversabilityVoxel& geometry) {
+    const auto p = semantic_traversability;
+    const auto w = semantic_weight;
+    const auto t = traversed;
+    *this = geometry;
+    semantic_traversability = p;
+    semantic_weight = w;
+    traversed = t;
+  }
+
   bool operator==(const TraversabilityVoxel& other) const {
     return traversability == other.traversability && confidence == other.confidence &&
            state == other.state;

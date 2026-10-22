@@ -39,109 +39,14 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <utility>
 
 #include "hydra/active_window/active_window_output.h"
-#include "hydra/places/traversability_estimator.h"
 #include "hydra/places/traversability_layer.h"
 #include "hydra/places/traversability_postprocessing.h"
 #include "hydra/reconstruction/projection_interpolators.h"
-#include "hydra/reconstruction/semantic_integrator.h"
 
 namespace hydra::places {
-
-/**
- * @brief Persistent per-cell semantic state for traversability estimation.
- * @note This lives in a layer owned by the integrator rather than in
- * TraversabilityVoxel, because the traversability estimators reset every updated block
- * each frame, which would destroy any accumulated belief.
- */
-struct SemanticTraversabilityCell {
-  //! Fused label belief. Reusing SemanticVoxel means every existing SemanticIntegrator
-  //! (MLE, binary, first-k, single-label) applies without modification.
-  SemanticVoxel semantics;
-
-  //! Total accumulated observation weight. Drives the reported confidence.
-  float weight = 0.0f;
-};
-
-using SemanticTraversabilityBlock = Block2D<SemanticTraversabilityCell>;
-using SemanticTraversabilityLayer = Layer2D<SemanticTraversabilityCell>;
-
-/**
- * @brief Maps a semantic label to the probability that the labelled surface can be
- * traversed.
- * @note This is intentionally separate from the label space: whether stairs or grass
- * are traversable is a property of the robot, not of the segmentation model.
- */
-class TraversabilityPrior {
- public:
-  using Ptr = std::unique_ptr<const TraversabilityPrior>;
-
-  TraversabilityPrior() = default;
-  virtual ~TraversabilityPrior() = default;
-
-  /**
-   * @brief Probability that a surface with the given label is traversable.
-   * @param label Semantic label to look up.
-   * @return The probability in (0, 1), or nullopt if the label carries no information
-   * (in which case no semantic update is performed for the observation).
-   */
-  virtual std::optional<float> probability(uint32_t label) const = 0;
-};
-
-/**
- * @brief Traversability prior from an explicit per-label probability table.
- */
-class LabelTablePrior : public TraversabilityPrior {
- public:
-  struct Config {
-    //! @brief Per-label traversability probabilities, e.g. {3: 0.98, 12: 0.02}.
-    std::map<uint32_t, float> label_traversability;
-
-    //! @brief Probability assigned to labels absent from the table. Only used when
-    //! `ignore_unknown_labels` is false. 0.5 means "no information".
-    float default_traversability = 0.5f;
-
-    //! @brief If true, labels absent from the table are skipped entirely rather than
-    //! fused at `default_traversability`.
-    bool ignore_unknown_labels = true;
-  } const config;
-
-  explicit LabelTablePrior(const Config& config);
-  ~LabelTablePrior() override = default;
-
-  std::optional<float> probability(uint32_t label) const override;
-};
-
-void declare_config(LabelTablePrior::Config& config);
-
-/**
- * @brief Traversability prior for label spaces where only the traversable /
- * untraversable split is known.
- */
-class LabelSetPrior : public TraversabilityPrior {
- public:
-  struct Config {
-    //! @brief Labels considered traversable.
-    std::set<uint32_t> traversable_labels;
-
-    //! @brief Labels considered untraversable.
-    std::set<uint32_t> untraversable_labels;
-
-    //! @brief Probability assigned to a label in either set. Labels in neither set
-    //! carry no information.
-    float confidence = 0.9f;
-  } const config;
-
-  explicit LabelSetPrior(const Config& config);
-  ~LabelSetPrior() override = default;
-
-  std::optional<float> probability(uint32_t label) const override;
-};
-
-void declare_config(LabelSetPrior::Config& config);
 
 /**
  * @brief Refines traversability by projecting each floor cell into the semantic label
@@ -149,9 +54,9 @@ void declare_config(LabelSetPrior::Config& config);
  *
  * Plays the role ProjectiveIntegrator plays for the TSDF, but over the 2D floor cells
  * produced by a TraversabilityEstimator. Each cell's stored surface height gives it a
- * full 3D position, which is projected into the label image; the sampled label is fused
- * through a SemanticIntegrator and reduced to a traversability probability through a
- * TraversabilityPrior.
+ * full 3D position, which is projected into the label image; the sampled label is
+ * mapped to a traversability probability through `label_traversability` and fused into
+ * the semantic fields of the TraversabilityVoxel.
  */
 class ProjectiveSemanticTraversabilityIntegrator
     : public PersistentTraversabilityProcessor {
@@ -192,22 +97,15 @@ class ProjectiveSemanticTraversabilityIntegrator
     //! @brief How the semantic and geometric traversability estimates combine.
     FusionMode fusion_mode = FusionMode::MIN;
 
-    //! @brief Number of threads used for integration (parallelized by block).
-    int num_threads = 1;
-
     //! @brief Which interpolation to use when sampling the input images.
     config::VirtualConfig<ProjectionInterpolator> interpolation_method{
         InterpolatorNearest::Config{}};
 
-    //! @brief How repeated label observations of the same cell are accumulated.
-    config::VirtualConfig<SemanticIntegrator> semantic_integrator{
-        MLESemanticIntegrator::Config{}};
-
-    //! @brief How a fused label is turned into a traversability probability.
-    config::VirtualConfig<TraversabilityPrior> prior;
-
-    //! @brief Thresholds used to reclassify fused voxels. Should match the estimator.
-    TraversabilityEstimator::Config classification;
+    //! @brief Probability in [0, 1] that a surface with each label is traversable, e.g.
+    //! {3: 0.98, 12: 0.02}. Labels not listed carry no information and are ignored.
+    //! This is kept separate from the label space: whether stairs or grass are
+    //! traversable is a property of the robot, not of the segmentation model.
+    std::map<uint32_t, float> label_traversability;
   } const config;
 
   explicit ProjectiveSemanticTraversabilityIntegrator(const Config& config);
@@ -219,9 +117,6 @@ class ProjectiveSemanticTraversabilityIntegrator
    * @param layer Geometric traversability layer to refine in place.
    */
   void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) override;
-
-  //! @brief Accumulated semantic state, for visualization and debugging. May be null.
-  const SemanticTraversabilityLayer* getSemanticLayer() const { return state_.get(); }
 
   /**
    * @brief A single semantic observation of a floor cell.
@@ -248,58 +143,46 @@ class ProjectiveSemanticTraversabilityIntegrator
                                      float voxel_size) const;
 
   /**
-   * @brief Fuse a single observation into the persistent state of a cell.
+   * @brief Fuse a single observation into the semantic fields of a voxel.
    */
-  void updateCell(const CellMeasurement& measurement,
-                  SemanticTraversabilityCell& cell) const;
+  void updateCell(const CellMeasurement& measurement, TraversabilityVoxel& voxel) const;
 
   /**
-   * @brief Reduce accumulated state to a (traversability, confidence) pair.
-   * @return nullopt if the cell has never been observed or carries no information.
+   * @brief Reduce a voxel's semantic fields to a (traversability, confidence) pair.
+   * @return nullopt if the voxel has never been observed semantically.
    */
   std::optional<std::pair<float, float>> evaluate(
-      const SemanticTraversabilityCell& cell) const;
+      const TraversabilityVoxel& voxel) const;
 
   /**
-   * @brief Combine a cell's semantic estimate into the corresponding geometric voxel.
+   * @brief Combine a voxel's semantic estimate into its geometric estimate.
    */
-  void applyToVoxel(const SemanticTraversabilityCell& cell,
-                    TraversabilityVoxel& voxel) const;
+  void applyToVoxel(TraversabilityVoxel& voxel) const;
 
   //! @brief Resolved occlusion gate in meters. Valid after the first update.
   float maxSurfaceDistance() const { return max_surface_distance_m_; }
 
  protected:
-  //! @brief Allocate the state layer to match the geometry layer's grid.
-  void initialize(const TraversabilityLayer& layer);
-
-  //! @brief Drop state for blocks no longer present in the geometry layer.
-  void pruneArchived(const TraversabilityLayer& layer);
-
-  //! @brief Integrate the labels of a single frame into the state layer.
-  void integrateFrame(const InputData& data,
-                      const TraversabilityLayer& layer,
-                      const BlockIndices& block_indices);
+  //! @brief Integrate the labels of a single frame into the layer.
+  void integrateFrame(const InputData& data, TraversabilityLayer& layer) const;
 
   //! @brief Integrate one block of floor cells.
-  void updateBlock(const BlockIndex& block_index,
-                   const InputData& data,
+  void updateBlock(const InputData& data,
                    const Eigen::Isometry3f& sensor_T_world,
                    const Point& sensor_p_world,
-                   const TraversabilityLayer& layer);
+                   float voxel_size,
+                   TraversabilityBlock& block) const;
 
   /**
-   * @brief Write accumulated semantics into the geometry layer and reclassify.
+   * @brief Fuse accumulated semantics into the geometric estimate. The estimator
+   * classifies the result once all persistent processing has run.
    * @note Only blocks marked as updated are touched: the estimators only recompute
    * those blocks, so fusing into the others would apply the semantics on top of an
    * estimate that already contains them.
    */
   void applyToLayer(TraversabilityLayer& layer) const;
 
-  std::unique_ptr<SemanticTraversabilityLayer> state_;
   const std::unique_ptr<const ProjectionInterpolator> interpolator_;
-  const std::unique_ptr<const SemanticIntegrator> semantic_integrator_;
-  const TraversabilityPrior::Ptr prior_;
   float max_surface_distance_m_ = 0.0f;
 };
 

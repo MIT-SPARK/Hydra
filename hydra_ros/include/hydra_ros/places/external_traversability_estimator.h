@@ -62,6 +62,9 @@ class ExternalTraversabilityEstimator : public TraversabilityEstimator {
   void updateTraversability(const ActiveWindowOutput& msg,
                             TraversabilityLayer& layer) override;
 
+  //! Keep the state from the grid, only marking voxels traversed by the robot.
+  void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const override;
+
   void callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
 
  protected:

@@ -35,8 +35,6 @@
 #include <gtest/gtest.h>
 #include <hydra/places/semantic_traversability_integrator.h>
 
-#include "hydra_test/config_guard.h"
-
 namespace hydra::places {
 
 namespace {
@@ -44,26 +42,12 @@ namespace {
 using Integrator = ProjectiveSemanticTraversabilityIntegrator;
 using FusionMode = Integrator::FusionMode;
 
-// Exposes the protected state so tests can seed semantics without a sensor.
-struct TestIntegrator : public Integrator {
-  explicit TestIntegrator(const Config& config) : Integrator(config) {}
-  using Integrator::initialize;
-  using Integrator::state_;
-};
-
 Integrator::Config makeConfig(FusionMode mode) {
-  LabelSetPrior::Config prior;
-  prior.traversable_labels = {1};
-  prior.untraversable_labels = {2};
-  prior.confidence = 0.9f;
-
   Integrator::Config config;
+  config.label_traversability = {{1, 0.9f}, {2, 0.1f}};
   config.fusion_mode = mode;
   config.weight_half = 1.0f;
   config.max_weight = 5.0f;
-  config.prior = prior;
-  config.classification.min_confidence = 0.5f;
-  config.classification.min_traversability = 0.5f;
   return config;
 }
 
@@ -84,34 +68,82 @@ TraversabilityVoxel makeVoxel(float traversability, float confidence) {
 
 }  // namespace
 
-TEST(SemanticTraversability, FusionModes) {
-  const auto guard = test::ConfigGuard::FixedLabels(5);
+TEST(SemanticTraversability, UpdateCell) {
+  const Integrator integrator(makeConfig(FusionMode::MIN));
 
-  SemanticTraversabilityCell traversable;
-  SemanticTraversabilityCell untraversable;
+  // Running mean of the label probabilities, weighted by the measurement weights.
+  TraversabilityVoxel voxel;
+  integrator.updateCell(makeMeasurement(1, 1.0f), voxel);
+  EXPECT_NEAR(voxel.semantic_traversability, 0.9f, 1.0e-6f);
+  EXPECT_NEAR(voxel.semantic_weight, 1.0f, 1.0e-6f);
+
+  integrator.updateCell(makeMeasurement(2, 3.0f), voxel);
+  EXPECT_NEAR(voxel.semantic_traversability, (0.9f + 3.0f * 0.1f) / 4.0f, 1.0e-6f);
+  EXPECT_NEAR(voxel.semantic_weight, 4.0f, 1.0e-6f);
+
+  // Unlisted labels and invalid measurements are ignored.
+  const auto before = voxel;
+  integrator.updateCell(makeMeasurement(3, 1.0f), voxel);
+  auto invalid = makeMeasurement(1, 1.0f);
+  invalid.valid = false;
+  integrator.updateCell(invalid, voxel);
+  EXPECT_EQ(voxel.semantic_traversability, before.semantic_traversability);
+  EXPECT_EQ(voxel.semantic_weight, before.semantic_weight);
+
+  // Weight saturates at max_weight.
+  integrator.updateCell(makeMeasurement(1, 10.0f), voxel);
+  EXPECT_NEAR(voxel.semantic_weight, 5.0f, 1.0e-6f);
+}
+
+TEST(SemanticTraversability, ResetPreservesSemantics) {
+  auto voxel = makeVoxel(0.7f, 0.8f);
+  voxel.height = 1.0f;
+  voxel.state = spark_dsg::TraversabilityState::TRAVERSABLE;
+  voxel.semantic_traversability = 0.2f;
+  voxel.semantic_weight = 3.0f;
+
+  voxel.resetGeometry();
+  EXPECT_EQ(voxel, TraversabilityVoxel());
+  EXPECT_FALSE(voxel.height);
+  EXPECT_EQ(voxel.semantic_traversability, 0.2f);
+  EXPECT_EQ(voxel.semantic_weight, 3.0f);
+}
+
+TEST(SemanticTraversability, FusionModes) {
+  TraversabilityVoxel traversable;
+  TraversabilityVoxel untraversable;
   {
     const Integrator integrator(makeConfig(FusionMode::MIN));
     integrator.updateCell(makeMeasurement(1, 1.0f), traversable);
     integrator.updateCell(makeMeasurement(2, 1.0f), untraversable);
   }
 
+  const auto withSemantics =
+      [](float traversability, float confidence, const TraversabilityVoxel& semantics) {
+        auto voxel = makeVoxel(traversability, confidence);
+        voxel.semantic_traversability = semantics.semantic_traversability;
+        voxel.semantic_weight = semantics.semantic_weight;
+        return voxel;
+      };
+
   // MIN: semantics can lower but never raise traversability.
   {
     const Integrator integrator(makeConfig(FusionMode::MIN));
-    auto voxel = makeVoxel(0.5f, 0.2f);
-    integrator.applyToVoxel(traversable, voxel);
+    auto voxel = withSemantics(0.5f, 0.2f, traversable);
+    integrator.applyToVoxel(voxel);
     EXPECT_NEAR(voxel.traversability, 0.5f, 1.0e-6f);
     EXPECT_NEAR(voxel.confidence, 0.5f, 1.0e-6f);
 
-    integrator.applyToVoxel(untraversable, voxel);
+    voxel = withSemantics(0.5f, 0.2f, untraversable);
+    integrator.applyToVoxel(voxel);
     EXPECT_NEAR(voxel.traversability, 0.1f, 1.0e-6f);
   }
 
   // PRODUCT: multiplies the probabilities.
   {
     const Integrator integrator(makeConfig(FusionMode::PRODUCT));
-    auto voxel = makeVoxel(0.5f, 0.8f);
-    integrator.applyToVoxel(traversable, voxel);
+    auto voxel = withSemantics(0.5f, 0.8f, traversable);
+    integrator.applyToVoxel(voxel);
     EXPECT_NEAR(voxel.traversability, 0.45f, 1.0e-6f);
     EXPECT_NEAR(voxel.confidence, 0.8f, 1.0e-6f);
   }
@@ -119,23 +151,22 @@ TEST(SemanticTraversability, FusionModes) {
   // WEIGHTED_MEAN: semantics can raise traversability.
   {
     const Integrator integrator(makeConfig(FusionMode::WEIGHTED_MEAN));
-    auto voxel = makeVoxel(0.5f, 0.5f);
-    integrator.applyToVoxel(traversable, voxel);
+    auto voxel = withSemantics(0.5f, 0.5f, traversable);
+    integrator.applyToVoxel(voxel);
     EXPECT_NEAR(voxel.traversability, 0.7f, 1.0e-6f);
   }
 
-  // Unobserved cells leave the geometric estimate untouched.
+  // Unobserved voxels leave the geometric estimate untouched.
   {
     const Integrator integrator(makeConfig(FusionMode::PRODUCT));
     auto voxel = makeVoxel(0.5f, 0.2f);
-    integrator.applyToVoxel(SemanticTraversabilityCell(), voxel);
+    integrator.applyToVoxel(voxel);
     EXPECT_EQ(voxel, makeVoxel(0.5f, 0.2f));
   }
 }
 
 TEST(SemanticTraversability, OnlyUpdatedBlocksAreFused) {
-  const auto guard = test::ConfigGuard::FixedLabels(5);
-  TestIntegrator integrator(makeConfig(FusionMode::PRODUCT));
+  Integrator integrator(makeConfig(FusionMode::PRODUCT));
 
   TraversabilityLayer layer(0.1f, 2);
   auto& fresh = layer.allocateBlock(BlockIndex(0, 0, 0), 2);
@@ -143,15 +174,7 @@ TEST(SemanticTraversability, OnlyUpdatedBlocksAreFused) {
   for (auto* block : {&fresh, &stale}) {
     for (auto& voxel : block->voxels) {
       voxel = makeVoxel(0.5f, 0.5f);
-    }
-  }
-
-  // Seed semantic state for both blocks.
-  integrator.initialize(layer);
-  for (const auto& index : layer.allocatedBlockIndices()) {
-    auto& block = integrator.state_->allocateBlock(index, 2);
-    for (auto& cell : block.voxels) {
-      integrator.updateCell(makeMeasurement(1, 1.0f), cell);
+      integrator.updateCell(makeMeasurement(1, 1.0f), voxel);
     }
   }
 
@@ -160,22 +183,23 @@ TEST(SemanticTraversability, OnlyUpdatedBlocksAreFused) {
   // Input data without a label image (the sensor is never accessed).
   const ActiveWindowOutput msg(std::make_shared<InputData>(nullptr));
   for (int i = 0; i < 3; ++i) {
+    // Mimic the estimator: reset the geometry, keeping the semantics.
     for (auto& voxel : fresh.voxels) {
-      voxel = makeVoxel(0.5f, 0.5f);  // Mimic the estimator's reset.
+      voxel.resetGeometry();
+      voxel.traversability = 0.5f;
+      voxel.confidence = 0.5f;
     }
     fresh.updated = true;
     stale.updated = false;
     integrator.apply(msg, layer);
   }
 
-  // Fused 0.5 * 0.9 = 0.45 drops below min_traversability and gets reclassified.
+  // Fused once per recompute: 0.5 * 0.9 = 0.45.
   for (const auto& voxel : fresh.voxels) {
     EXPECT_NEAR(voxel.traversability, 0.45f, 1.0e-6f);
-    EXPECT_EQ(voxel.state, spark_dsg::TraversabilityState::INTRAVERSABLE);
   }
   for (const auto& voxel : stale.voxels) {
     EXPECT_NEAR(voxel.traversability, 0.5f, 1.0e-6f);
-    EXPECT_EQ(voxel.state, spark_dsg::TraversabilityState::UNKNOWN);
   }
 }
 

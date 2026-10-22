@@ -87,11 +87,20 @@ void ExternalTraversabilityEstimator::updateTraversability(
   }
   layer.removeBlocks(to_remove);
 
-  // Copy in the latest grid.
+  // Copy in the latest grid, keeping the accumulated evidence of each voxel.
   for (const auto& grid_block : *grid_layer_) {
     auto& block = layer.allocateBlock(grid_block.index, grid_block.voxels_per_side);
-    block.voxels = grid_block.voxels;
+    for (size_t i = 0; i < block.voxels.size(); ++i) {
+      block.voxels[i].resetGeometry(grid_block.voxels[i]);
+    }
     block.updated = true;
+  }
+}
+
+void ExternalTraversabilityEstimator::classifyTraversabilityVoxel(
+    TraversabilityVoxel& voxel) const {
+  if (voxel.traversed) {
+    voxel.state = State::TRAVERSABLE;
   }
 }
 

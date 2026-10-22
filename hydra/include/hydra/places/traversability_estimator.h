@@ -112,24 +112,23 @@ class TraversabilityEstimator {
    * @param msg The active window output containing the latest sensor data and
    * volumetric map updates.
    * @param layer The traversability layer to update.
+   * @note Estimators only set traversability, confidence, and height and mark the
+   * recomputed blocks as updated. The discrete state is assigned afterwards by
+   * classifyTraversabilityVoxel(), once all persistent processing has run.
    */
   virtual void updateTraversability(const ActiveWindowOutput& msg,
                                     TraversabilityLayer& layer) = 0;
 
   /**
    * @brief Classify a traversability voxel based on its confidence and traversability.
-   * @note Default implementation uses min_confidence_, min_traversability_, and
-   * pessimistic_ set by derived class constructors. Subclasses may override for custom
-   * logic.
+   * @note Default implementation marks voxels traversed by the robot as traversable and
+   * otherwise uses min_confidence, min_traversability, and pessimistic. Subclasses may
+   * override for custom logic.
    */
   virtual void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
 };
 
 void declare_config(TraversabilityEstimator::Config& config);
-
-//! Classify a voxel from its confidence and traversability using the given thresholds.
-void classifyTraversabilityVoxel(const TraversabilityEstimator::Config& config,
-                                 TraversabilityVoxel& voxel);
 
 /**
  * @brief Simple traversability estimator which checks a specified volume in the TSDF

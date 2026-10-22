@@ -41,9 +41,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <future>
-
-#include "hydra/reconstruction/index_getter.h"
 
 namespace hydra::places {
 namespace {
@@ -54,75 +51,7 @@ static const auto registration_projective =
                                    ProjectiveSemanticTraversabilityIntegrator::Config>(
         "ProjectiveSemanticTraversabilityIntegrator");
 
-static const auto registration_table =
-    config::RegistrationWithConfig<TraversabilityPrior,
-                                   LabelTablePrior,
-                                   LabelTablePrior::Config>("LabelTablePrior");
-
-static const auto registration_set =
-    config::RegistrationWithConfig<TraversabilityPrior,
-                                   LabelSetPrior,
-                                   LabelSetPrior::Config>("LabelSetPrior");
-
-//! Keep probabilities strictly inside (0, 1) so that downstream log-odds style updates
-//! remain finite.
-constexpr float kMinProbability = 1.0e-4f;
-constexpr float kMaxProbability = 1.0f - kMinProbability;
-
-float clampProbability(float p) {
-  return std::clamp(p, kMinProbability, kMaxProbability);
-}
-
 }  // namespace
-
-LabelTablePrior::LabelTablePrior(const Config& config)
-    : config(config::checkValid(config)) {}
-
-std::optional<float> LabelTablePrior::probability(uint32_t label) const {
-  const auto iter = config.label_traversability.find(label);
-  if (iter != config.label_traversability.end()) {
-    return clampProbability(iter->second);
-  }
-
-  if (config.ignore_unknown_labels) {
-    return std::nullopt;
-  }
-
-  return clampProbability(config.default_traversability);
-}
-
-void declare_config(LabelTablePrior::Config& config) {
-  using namespace config;
-  name("LabelTablePrior::Config");
-  field(config.label_traversability, "label_traversability");
-  field(config.default_traversability, "default_traversability");
-  field(config.ignore_unknown_labels, "ignore_unknown_labels");
-  checkInRange(config.default_traversability, 0.0f, 1.0f, "default_traversability");
-}
-
-LabelSetPrior::LabelSetPrior(const Config& config)
-    : config(config::checkValid(config)) {}
-
-std::optional<float> LabelSetPrior::probability(uint32_t label) const {
-  if (config.traversable_labels.count(label)) {
-    return clampProbability(config.confidence);
-  }
-
-  if (config.untraversable_labels.count(label)) {
-    return clampProbability(1.0f - config.confidence);
-  }
-
-  return std::nullopt;
-}
-
-void declare_config(LabelSetPrior::Config& config) {
-  using namespace config;
-  name("LabelSetPrior::Config");
-  field(config.traversable_labels, "traversable_labels");
-  field(config.untraversable_labels, "untraversable_labels");
-  field(config.confidence, "confidence");
-  checkInRange(config.confidence, 0.5f, 1.0f, "confidence");
-}
 
 void declare_config(ProjectiveSemanticTraversabilityIntegrator::Config& config) {
   using namespace config;
@@ -138,11 +67,8 @@ void declare_config(ProjectiveSemanticTraversabilityIntegrator::Config& config) 
              {{FusionMode::MIN, "MIN"},
               {FusionMode::PRODUCT, "PRODUCT"},
               {FusionMode::WEIGHTED_MEAN, "WEIGHTED_MEAN"}});
-  field(config.num_threads, "num_threads");
   field(config.interpolation_method, "interpolation_method");
-  field(config.semantic_integrator, "semantic_integrator");
-  field(config.prior, "prior");
-  field(config.classification, "classification");
+  field(config.label_traversability, "label_traversability");
 
   checkCondition(config.max_surface_distance != 0.0f,
                  "'max_surface_distance' must be nonzero");
@@ -150,42 +76,17 @@ void declare_config(ProjectiveSemanticTraversabilityIntegrator::Config& config) 
   check(config.min_measurement_weight, GE, 0.0f, "min_measurement_weight");
   check(config.max_weight, GT, 0.0f, "max_weight");
   check(config.weight_half, GT, 0.0f, "weight_half");
-  check(config.num_threads, GT, 0, "num_threads");
-  checkCondition(config.prior.isSet(), "'prior' must be specified");
+  checkCondition(!config.label_traversability.empty(),
+                 "'label_traversability' must be specified");
+  for (const auto& [label, probability] : config.label_traversability) {
+    checkInRange(probability, 0.0f, 1.0f, "label_traversability");
+  }
 }
 
 ProjectiveSemanticTraversabilityIntegrator::ProjectiveSemanticTraversabilityIntegrator(
     const Config& config)
     : config(config::checkValid(config)),
-      interpolator_(config.interpolation_method.create()),
-      semantic_integrator_(config.semantic_integrator.create()),
-      prior_(config.prior.create()) {}
-
-void ProjectiveSemanticTraversabilityIntegrator::initialize(
-    const TraversabilityLayer& layer) {
-  if (state_) {
-    return;
-  }
-
-  state_ = std::make_unique<SemanticTraversabilityLayer>(layer.voxel_size,
-                                                         layer.voxels_per_side);
-  // Negative values are multiples of the voxel size, mirroring ProjectiveIntegrator.
-  max_surface_distance_m_ = config.max_surface_distance < 0.0f
-                                ? -config.max_surface_distance * layer.voxel_size
-                                : config.max_surface_distance;
-}
-
-void ProjectiveSemanticTraversabilityIntegrator::pruneArchived(
-    const TraversabilityLayer& layer) {
-  BlockIndices to_remove;
-  for (const auto& index : state_->allocatedBlockIndices()) {
-    if (!layer.hasBlock(index)) {
-      to_remove.push_back(index);
-    }
-  }
-
-  state_->removeBlocks(to_remove);
-}
+      interpolator_(config.interpolation_method.create()) {}
 
 ProjectiveSemanticTraversabilityIntegrator::CellMeasurement
 ProjectiveSemanticTraversabilityIntegrator::getCellMeasurement(const InputData& data,
@@ -249,42 +150,43 @@ ProjectiveSemanticTraversabilityIntegrator::getCellMeasurement(const InputData& 
 }
 
 void ProjectiveSemanticTraversabilityIntegrator::updateCell(
-    const CellMeasurement& measurement, SemanticTraversabilityCell& cell) const {
+    const CellMeasurement& measurement, TraversabilityVoxel& voxel) const {
   if (!measurement.valid || measurement.label < 0) {
     return;
   }
 
-  // Only accumulate labels the prior has an opinion about, so that unknown classes do
-  // not dilute the belief.
-  const auto label = static_cast<uint32_t>(measurement.label);
-  if (!prior_->probability(label)) {
+  // Unlisted labels are skipped so they do not dilute the belief.
+  const auto iter =
+      config.label_traversability.find(static_cast<uint32_t>(measurement.label));
+  if (iter == config.label_traversability.end()) {
     return;
   }
 
-  semantic_integrator_->updateLikelihoods(label, measurement.weight, cell.semantics);
-  cell.weight = std::min(cell.weight + measurement.weight, config.max_weight);
+  // Weighted running mean of the observed traversability probabilities.
+  const auto weight = voxel.semantic_weight;
+  const auto total = weight + measurement.weight;
+  voxel.semantic_traversability =
+      (voxel.semantic_traversability * weight + iter->second * measurement.weight) /
+      total;
+  voxel.semantic_weight = std::min(total, config.max_weight);
 }
 
 std::optional<std::pair<float, float>>
 ProjectiveSemanticTraversabilityIntegrator::evaluate(
-    const SemanticTraversabilityCell& cell) const {
-  if (cell.semantics.empty || cell.weight <= 0.0f) {
-    return std::nullopt;
-  }
-
-  const auto probability = prior_->probability(cell.semantics.semantic_label);
-  if (!probability) {
+    const TraversabilityVoxel& voxel) const {
+  if (voxel.semantic_weight <= 0.0f) {
     return std::nullopt;
   }
 
   // Saturating confidence: weight_half is the accumulated weight at half confidence.
-  const auto confidence = cell.weight / (cell.weight + config.weight_half);
-  return std::make_pair(*probability, confidence);
+  const auto confidence =
+      voxel.semantic_weight / (voxel.semantic_weight + config.weight_half);
+  return std::make_pair(voxel.semantic_traversability, confidence);
 }
 
 void ProjectiveSemanticTraversabilityIntegrator::applyToVoxel(
-    const SemanticTraversabilityCell& cell, TraversabilityVoxel& voxel) const {
-  const auto result = evaluate(cell);
+    TraversabilityVoxel& voxel) const {
+  const auto result = evaluate(voxel);
   if (!result) {
     return;  // No semantic information: leave the geometric estimate untouched.
   }
@@ -314,34 +216,24 @@ void ProjectiveSemanticTraversabilityIntegrator::applyToVoxel(
 }
 
 void ProjectiveSemanticTraversabilityIntegrator::updateBlock(
-    const BlockIndex& block_index,
     const InputData& data,
     const Eigen::Isometry3f& sensor_T_world,
     const Point& sensor_p_world,
-    const TraversabilityLayer& layer) {
-  const auto geometry_block = layer.getBlockPtr(block_index);
-  // NOTE(aryannav): State blocks are allocated before integration, as allocation
-  // mutates the layer's block map and therefore cannot happen inside the parallel
-  // section.
-  const auto state_block = state_->getBlockPtr(block_index);
-  if (!geometry_block || !state_block) {
-    return;
-  }
-
-  const auto voxels_per_side = static_cast<int>(state_->voxels_per_side);
-  const auto voxel_size = state_->voxel_size;
+    float voxel_size,
+    TraversabilityBlock& block) const {
+  const auto voxels_per_side = static_cast<int>(block.voxels_per_side);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
-      const auto& geometry_voxel = geometry_block->voxel(x, y);
-      if (!geometry_voxel.height) {
+      auto& voxel = block.voxel(x, y);
+      if (!voxel.height) {
         continue;  // No surface found for this column.
       }
 
       // Lift the cell to a world point. The +0.5 offsets move to the cell center.
-      const auto global = geometry_block->globalFromLocalIndex(Index2D(x, y));
+      const auto global = block.globalFromLocalIndex(Index2D(x, y));
       const Point p_world((global.x() + 0.5f) * voxel_size,
                           (global.y() + 0.5f) * voxel_size,
-                          *geometry_voxel.height);
+                          *voxel.height);
 
       // Incidence relative to the vertical, in the world frame where the floor normal
       // is simply +z.
@@ -354,76 +246,39 @@ void ProjectiveSemanticTraversabilityIntegrator::updateBlock(
       const auto incidence = std::abs(ray_world.z()) / ray_norm;
       const auto measurement =
           getCellMeasurement(data, sensor_T_world * p_world, incidence, voxel_size);
-      if (!measurement.valid) {
-        continue;
-      }
-
-      updateCell(measurement, state_block->voxel(x, y));
-      state_block->updated = true;
+      updateCell(measurement, voxel);
     }
   }
 }
 
 void ProjectiveSemanticTraversabilityIntegrator::integrateFrame(
-    const InputData& data,
-    const TraversabilityLayer& layer,
-    const BlockIndices& block_indices) {
+    const InputData& data, TraversabilityLayer& layer) const {
   const Eigen::Isometry3f world_T_sensor = data.getSensorPose().cast<float>();
   const Eigen::Isometry3f sensor_T_world = world_T_sensor.inverse();
   const Point sensor_p_world = world_T_sensor.translation();
-
-  if (config.num_threads <= 1) {
-    for (const auto& index : block_indices) {
-      updateBlock(index, data, sensor_T_world, sensor_p_world, layer);
-    }
-    return;
-  }
-
-  IndexGetter<BlockIndex> index_getter(block_indices);
-  std::vector<std::future<void>> threads;
-  for (int i = 0; i < config.num_threads; ++i) {
-    threads.emplace_back(std::async(std::launch::async, [&]() {
-      BlockIndex block_index;
-      while (index_getter.getNextIndex(block_index)) {
-        updateBlock(block_index, data, sensor_T_world, sensor_p_world, layer);
-      }
-    }));
-  }
-
-  for (auto& thread : threads) {
-    thread.get();
+  for (auto& block : layer) {
+    updateBlock(data, sensor_T_world, sensor_p_world, layer.voxel_size, block);
   }
 }
 
 void ProjectiveSemanticTraversabilityIntegrator::applyToLayer(
     TraversabilityLayer& layer) const {
-  for (auto& geometry_block : layer) {
-    if (!geometry_block.updated) {
+  for (auto& block : layer) {
+    if (!block.updated) {
       continue;
     }
 
-    const auto state_block = state_->getBlockPtr(geometry_block.index);
-    if (!state_block) {
-      continue;
-    }
-
-    for (size_t i = 0; i < geometry_block.voxels.size(); ++i) {
-      auto& voxel = geometry_block.voxels[i];
-      applyToVoxel(state_block->voxels[i], voxel);
-      classifyTraversabilityVoxel(config.classification, voxel);
+    for (auto& voxel : block.voxels) {
+      applyToVoxel(voxel);
     }
   }
 }
 
 void ProjectiveSemanticTraversabilityIntegrator::apply(const ActiveWindowOutput& msg,
                                                        TraversabilityLayer& layer) {
-  initialize(layer);
-  pruneArchived(layer);
-
-  const auto block_indices = layer.allocatedBlockIndices();
-  for (const auto& index : block_indices) {
-    state_->allocateBlock(index, state_->voxels_per_side);
-  }
+  max_surface_distance_m_ = config.max_surface_distance < 0.0f
+                                ? -config.max_surface_distance * layer.voxel_size
+                                : config.max_surface_distance;
 
   // Messages can collate several frames (e.g. between keyframes), so integrate all of
   // them before applying the result once.
@@ -433,7 +288,7 @@ void ProjectiveSemanticTraversabilityIntegrator::apply(const ActiveWindowOutput&
       continue;
     }
 
-    integrateFrame(*data, layer, block_indices);
+    integrateFrame(*data, layer);
     integrated = true;
   }
 
@@ -442,8 +297,8 @@ void ProjectiveSemanticTraversabilityIntegrator::apply(const ActiveWindowOutput&
                                "requires a semantic input source.";
   }
 
-  // Blocks recomputed by the estimator this update lost their semantics, so re-apply
-  // the accumulated state even if no new labels were observed.
+  // Blocks recomputed by the estimator this update lost their fused traversability, so
+  // re-apply the accumulated semantics even if no new labels were observed.
   applyToLayer(layer);
 }
 
