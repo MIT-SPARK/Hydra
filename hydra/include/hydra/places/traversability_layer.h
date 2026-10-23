@@ -61,6 +61,33 @@ struct TraversabilityVoxel {
   // TODO(lschmid): Remove this at some point.
   mutable float debug_value = -1.0f;
 
+  //! Fused semantic traversability estimate in [0, 1].
+  float semantic_traversability = 0.5f;
+
+  //! Accumulated semantic observation weight. Zero if never observed semantically.
+  float semantic_weight = 0.0f;
+
+  //! Whether the robot footprint covered this voxel at some point.
+  bool traversed = false;
+
+  //! Reset the geometric estimate, keeping the semantic and footprint data.
+  void resetGeometry() {
+    traversability = 0.0f;
+    confidence = 0.0f;
+    height.reset();
+    state = spark_dsg::TraversabilityState::UNKNOWN;
+    debug_value = -1.0f;
+  }
+
+  //! Copy the geometric estimate of `other`, keeping the semantic and footprint data.
+  void resetGeometry(const TraversabilityVoxel& other) {
+    traversability = other.traversability;
+    confidence = other.confidence;
+    height = other.height;
+    state = other.state;
+    debug_value = other.debug_value;
+  }
+
   bool operator==(const TraversabilityVoxel& other) const {
     return traversability == other.traversability && confidence == other.confidence &&
            state == other.state;

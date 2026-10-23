@@ -93,6 +93,18 @@ void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
 
   timer.reset("traversability/persistent_processing");
   persistent_processing_.apply(msg, *layer_);
+
+  // Classify once all persistent processing has refined the estimate.
+  timer.reset("traversability/classification");
+  for (auto& block : *layer_) {
+    if (!block.updated) {
+      continue;
+    }
+
+    for (auto& voxel : block.voxels) {
+      estimator_->classifyTraversabilityVoxel(voxel);
+    }
+  }
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
