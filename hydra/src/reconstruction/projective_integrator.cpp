@@ -352,6 +352,8 @@ void ProjectiveIntegrator::computeSDF(const MapConfig& map_config,
   // NOTE(nathan) If the sdf value is NaN, this should return NaN (min returns a if a <
   // b, a < NaN is false) This is probably the desired behavior if the range image
   // contains NaNs (the only source of non-finite values) but may need to be checked
+  // A +inf range (no return, only passed by interpolators with inf_is_free_space) gives
+  // sdf = +inf, which is clamped to the truncation distance, i.e. a free-space update
   measurement.sdf = std::min(map_config.truncation_distance, sdf);
 }
 
