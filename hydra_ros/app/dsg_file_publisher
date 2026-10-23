@@ -35,7 +35,7 @@ class DsgFilePublisher(Node):
         self.get_logger().info(f"Loaded '{filepath}'!")
         self._pub = hydra_ros.DsgPublisher(self, "dsg")
         if publish_rate > 0.0:
-            self._timer = self._create_timer(1.0 / publish_rate, self._send_graph)
+            self._timer = self.create_timer(1.0 / publish_rate, self._send_graph)
         else:
             self._send_graph()
 
@@ -50,14 +50,14 @@ def main(args=None):
     """Start and run node."""
     parser = argparse.ArgumentParser("Node that publishes a 3SDG from a file")
     parser.add_argument("filepath")
-    parser.add_argument("--publish_rate", default=0.0, help="rate to publish")
+    parser.add_argument("--rate", default=0.0, help="rate to publish")
     parser.add_argument("--frame", "-f", default="map", help="frame ID for publishing")
     args, rest = parser.parse_known_args()
     rclpy.init(args=rest)
 
     try:
         node = DsgFilePublisher(
-            args.filepath, frame=args.frame, publish_rate=args.publish_rate
+            args.filepath, frame=args.frame, publish_rate=float(args.rate)
         )
         rclpy.spin(node)
         node.destroy_node()
