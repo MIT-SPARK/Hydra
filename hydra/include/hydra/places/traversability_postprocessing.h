@@ -130,9 +130,9 @@ class ErosionDilation : public TransientTraversabilityProcessor {
 
 void declare_config(ErosionDilation::Config& config);
 
-//! Mark all voxels the robot footprint intersected as traversable. Footprint voxels
-//! are accumulated while their block is in the active window and re-applied every
-//! update, since the estimator resets the state of updated blocks.
+//! Mark all voxels the robot footprint intersected as traversed, which the estimator
+//! classifies as traversable. The flag persists in the voxel through estimator resets
+//! and is dropped together with archived blocks.
 class RobotFootprintTraversability : public PersistentTraversabilityProcessor {
  public:
   struct Config {
@@ -147,23 +147,11 @@ class RobotFootprintTraversability : public PersistentTraversabilityProcessor {
 
   void apply(const ActiveWindowOutput& msg, TraversabilityLayer& layer) override;
 
-  //! Drop footprint voxels whose block is no longer in the layer, i.e., archived.
-  void archive(const TraversabilityLayer& layer);
-
-  //! Add all voxels intersecting the footprint at the given pose.
+  //! Mark all voxels intersecting the footprint at the given pose as traversed.
   void addFootprint(const Eigen::Isometry3f& world_T_body,
-                    const TraversabilityLayer& layer);
-
-  //! Mark all accumulated footprint voxels as traversable.
-  void markTraversable(TraversabilityLayer& layer) const;
-
-  const Index2DSet& footprint() const { return footprint_; }
+                    TraversabilityLayer& layer) const;
 
   const Config config;
-
- protected:
-  //! Global 2D voxel indices that were covered by the footprint at any time.
-  Index2DSet footprint_;
 };
 
 void declare_config(RobotFootprintTraversability::Config& config);

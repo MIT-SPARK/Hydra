@@ -95,17 +95,21 @@ bool convertColor(InputData& data) {
   return true;
 }
 
+void convertToLabelType(cv::Mat& image) {
+  // Enforcing requirement for int32_t at this point
+  if (!image.empty() && image.type() != InputData::LabelMatType) {
+    cv::Mat new_image(image.size(), InputData::LabelMatType);
+    image.convertTo(new_image, InputData::LabelMatType);
+    image = new_image;
+  }
+}
+
 bool convertLabels(InputData& data) {
   if (data.label_image.empty()) {
     return false;
   }
 
-  // Enforcing requirement for int32_t at this point
-  if (data.label_image.type() != InputData::LabelMatType) {
-    cv::Mat new_label_image(data.label_image.size(), InputData::LabelMatType);
-    data.label_image.convertTo(new_label_image, InputData::LabelMatType);
-    data.label_image = new_label_image;
-  }
+  convertToLabelType(data.label_image);
 
   const auto remap = GlobalInfo::instance().getLabelRemapper();
   if (remap) {
@@ -203,6 +207,9 @@ bool InputData::finalize(bool vertices_in_world_frame, bool normalize_labels) {
     instance_image.convertTo(instances, InputData::InstanceMatType);
     instance_image = instances;
   }
+
+  // Traversability ids are not in the semantic label space, so they are not remapped.
+  convertToLabelType(traversability_image);
 
   if (!vertex_map.empty() && vertex_map.type() != InputData::VertexMatType) {
     LOG(ERROR) << "[Input Conversion] pointcloud must be CV_32FC3, not "
