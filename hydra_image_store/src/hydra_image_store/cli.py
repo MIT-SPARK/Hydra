@@ -154,6 +154,34 @@ def _cmd_check(args) -> int:
     return 0 if report["ok"] else 1
 
 
+def _cmd_fuse(args) -> int:
+    from .fuse import FuseSource, fuse_stores, load_node_map, load_world_T_robot
+
+    fused_dir = pathlib.Path(args.fused)
+    node_map, merges = load_node_map(args.node_map or fused_dir / "backend" / "fusion_node_map.json")
+    sources = []
+    for spec in args.source:
+        robot, _, rest = spec.partition("=")
+        store, _, session = rest.partition(":")
+        if not store:
+            print(f"bad --source {spec!r}; expected ROBOT_ID=STORE[:SESSION]", file=sys.stderr)
+            return 1
+        world_T_robot = None
+        pose_path = fused_dir / "interfaces" / f"robot_{robot}" / "world_T_robot.txt"
+        if pose_path.exists():
+            world_T_robot = load_world_T_robot(pose_path)
+        sources.append(FuseSource(pathlib.Path(store), int(robot), session or None, world_T_robot))
+
+    link = "copy" if args.copy else ("symlink" if args.symlink else "hardlink")
+    try:
+        stats = fuse_stores(args.out, sources, node_map, merges, link=link, overwrite=args.overwrite)
+    except (FileExistsError, ValueError) as exc:
+        print(f"fuse failed: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(stats, indent=1, default=str))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hydra-image-store", description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
@@ -226,6 +254,20 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--dsg", help="also check keyframe anchors / bound nodes against this scene graph")
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=_cmd_check)
+
+    s = sub.add_parser("fuse", help="merge per-robot / per-session stores into one store keyed "
+                       "by a Hydra-Multi fused scene graph")
+    s.add_argument("fused", help="Hydra-Multi output directory (backend/fusion_node_map.json, "
+                   "interfaces/robot_<id>/world_T_robot.txt)")
+    s.add_argument("--source", action="append", required=True,
+                   help="ROBOT_ID=STORE[:SESSION]: a source store and its robot id in the fused graph")
+    s.add_argument("--out", required=True, help="fused store directory")
+    s.add_argument("--node-map", help="default: <fused>/backend/fusion_node_map.json")
+    s.add_argument("--overwrite", action="store_true")
+    g = s.add_mutually_exclusive_group()
+    g.add_argument("--copy", action="store_true", help="copy images (default: hardlink)")
+    g.add_argument("--symlink", action="store_true", help="symlink images (default: hardlink)")
+    s.set_defaults(func=_cmd_fuse)
     return p
 
 
