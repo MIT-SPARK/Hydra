@@ -41,6 +41,7 @@
 #include <thread>
 
 #include "hydra/active_window/volumetric_window.h"
+#include "hydra/common/labelspace.h"
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
@@ -101,6 +102,7 @@ class GraphBuilder : public Module {
   } const config;
 
   GraphBuilder(const Config& config,
+               const Labelspace& labelspace,
                const SharedDsgInfo::Ptr& dsg,
                const SharedModuleState::Ptr& state,
                std::unique_ptr<VolumetricWindow>&& window);

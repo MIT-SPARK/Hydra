@@ -37,6 +37,7 @@
 #include <queue>
 #include <thread>
 
+#include "hydra/common/labelspace.h"
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
@@ -65,7 +66,11 @@ class LoopClosureModule : public Module {
     double descriptor_creation_horizon_m = 10.0;
   } const config;
 
-  LoopClosureModule(const Config& config, const SharedModuleState::Ptr& state);
+  // TODO(nathan) make object label histogram have flexible dimension instead of
+  // requiring fixed size vectors
+  LoopClosureModule(const Config& config,
+                    const Labelspace& labelspace,
+                    const SharedModuleState::Ptr& state);
 
   virtual ~LoopClosureModule();
 
