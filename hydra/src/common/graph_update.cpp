@@ -238,6 +238,10 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
 
   if (config.mark_active) {
     merged->is_active = true;
+  } else {
+    // Nodes stays active while any of the merged attributes are
+    merged->is_active = std::any_of(
+        attrs.begin(), attrs.end(), [](const auto* attr) { return attr->is_active; });
   }
 
   // TODO: aryannav --> add logic to handle checking for invalid tracks given new merge.
