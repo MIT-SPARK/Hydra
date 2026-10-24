@@ -46,12 +46,15 @@ class GraphBuilder;
 class BackendModule;
 class LoopClosureModule;
 struct VolumetricWindow;
+struct Labelspace;
 
 class HydraPipeline {
  public:
   struct Config : public VerbosityConfig {
     Config();
 
+    //! Closed-set labelspace information
+    config::VirtualConfig<Labelspace> labelspace;
     //! Layer names for the scene graph that Hydra builds
     SharedDsgInfo::Config graph;
     //! @brief Layers in the scene graph that use the labelspace
@@ -90,6 +93,7 @@ class HydraPipeline {
   void initStateImpl();
 
  protected:
+  std::unique_ptr<Labelspace> labelspace_;
   SharedDsgInfo::Ptr frontend_dsg_;
   SharedDsgInfo::Ptr backend_dsg_;
   SharedModuleState::Ptr state_;

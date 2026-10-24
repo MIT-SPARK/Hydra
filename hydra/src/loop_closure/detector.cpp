@@ -41,11 +41,11 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 
 #include <fstream>
 
-#include "hydra/common/global_info.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace teaser {
@@ -185,7 +185,6 @@ void declare_config(LcdDetector::Config& config) {
   field(config.enable_agent_registration, "enable_agent_registration");
   field(config.object_extraction, "object_extraction");
   field(config.places_extraction, "places_extraction");
-  field(config.num_semantic_classes, "num_semantic_classes");
   field(config.place_histogram_config, "place_histogram_config");
   field(config.agent_search_config, "agent");
   field(config.variances, "variances");
@@ -194,17 +193,10 @@ void declare_config(LcdDetector::Config& config) {
   if (config.use_gnn_descriptors) {
     field(config.gnn_lcd, "gnn_lcd");
   }
-
-  check(config.num_semantic_classes,
-        GE,
-        GlobalInfo::instance().labelspace().total_labels,
-        "num_semantic_classes");
 }
 
-LcdDetector::Config::Config()
-    : num_semantic_classes(GlobalInfo::instance().labelspace().total_labels) {}
-
-LcdDetector::LcdDetector(const LcdDetector::Config& config) : config(config) {
+LcdDetector::LcdDetector(const LcdDetector::Config& config, size_t num_semantic_classes)
+    : config(config::checkValid(config)), num_semantic_classes(num_semantic_classes) {
   makeDefaultDescriptorFactories();
   if (config.use_gnn_descriptors) {
     configureDescriptorFactories(*this, config);
@@ -308,7 +300,7 @@ void LcdDetector::dumpDescriptors(const std::string& log_path) const {
 void LcdDetector::makeDefaultDescriptorFactories() {
   layer_factories_.emplace(DsgLayers::OBJECTS,
                            std::make_unique<ObjectDescriptorFactory>(
-                               config.object_extraction, config.num_semantic_classes));
+                               config.object_extraction, num_semantic_classes));
   layer_factories_.emplace(
       DsgLayers::PLACES,
       std::make_unique<PlaceDescriptorFactory>(config.places_extraction,
