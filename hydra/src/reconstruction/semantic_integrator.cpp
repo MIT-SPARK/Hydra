@@ -41,7 +41,7 @@
 #include <cmath>
 #include <cstdint>
 
-#include "hydra/common/global_info.h"
+#include "hydra/common/labelspace.h"
 
 namespace hydra {
 namespace {
@@ -49,31 +49,40 @@ namespace {
 static const auto registration_mle =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    MLESemanticIntegrator,
-                                   MLESemanticIntegrator::Config>(
-        "MLESemanticIntegrator");
+                                   MLESemanticIntegrator::Config,
+                                   Labelspace*>("MLESemanticIntegrator");
 
 static const auto registration_binary =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    BinarySemanticIntegrator,
-                                   BinarySemanticIntegrator::Config>(
-        "BinarySemanticIntegrator");
+                                   BinarySemanticIntegrator::Config,
+                                   Labelspace*>("BinarySemanticIntegrator");
 
 static const auto registration_firstk =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    FirstKSemanticIntegrator,
-                                   FirstKSemanticIntegrator::Config>(
-        "FirstKSemanticIntegrator");
+                                   FirstKSemanticIntegrator::Config,
+                                   Labelspace*>("FirstKSemanticIntegrator");
 
 static const auto registration_single =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    SingleLabelIntegrator,
-                                   SingleLabelIntegrator::Config>(
-        "SingleLabelIntegrator");
+                                   SingleLabelIntegrator::Config,
+                                   Labelspace*>("SingleLabelIntegrator");
+
+size_t getTotalLabels(const Labelspace* labelspace) {
+  if (!labelspace || labelspace->total_labels == 0) {
+    throw std::invalid_argument("Labelspace required for MLE integrator");
+  }
+
+  return labelspace->total_labels;
+}
 
 }  // namespace
 
-MLESemanticIntegrator::MLESemanticIntegrator(const Config& config) : config(config) {
-  total_labels_ = GlobalInfo::instance().labelspace().total_labels;
+MLESemanticIntegrator::MLESemanticIntegrator(const Config& config,
+                                             const Labelspace* labelspace)
+    : config(config), total_labels_(getTotalLabels(labelspace)) {
   init_likelihood_ = std::log(1.0f / static_cast<float>(total_labels_));
 
   const auto match_likelihood = std::log(config.label_confidence);
@@ -116,8 +125,10 @@ void declare_config(MLESemanticIntegrator::Config& config) {
                true);
 }
 
+BinarySemanticIntegrator::BinarySemanticIntegrator(const Config&, const Labelspace*) {}
+
 void BinarySemanticIntegrator::updateLikelihoods(uint32_t label,
-                                                 float /* weight */,
+                                                 float,
                                                  SemanticVoxel& voxel) const {
   // Use the semantic_likelihoods to store the counts of the observations.
   if (voxel.empty) {
@@ -129,12 +140,13 @@ void BinarySemanticIntegrator::updateLikelihoods(uint32_t label,
   voxel.semantic_likelihoods[idx] += 1;
 }
 
-void declare_config(BinarySemanticIntegrator::Config& /* config */) {
+void declare_config(BinarySemanticIntegrator::Config&) {
   using namespace config;
   name("BinarySemanticIntegrator::Config");
 }
 
-FirstKSemanticIntegrator::FirstKSemanticIntegrator(const Config& config)
+FirstKSemanticIntegrator::FirstKSemanticIntegrator(const Config& config,
+                                                   const Labelspace*)
     : config(config) {}
 
 void FirstKSemanticIntegrator::updateLikelihoods(uint32_t label,
@@ -184,7 +196,8 @@ void declare_config(FirstKSemanticIntegrator::Config& config) {
   check(config.k, GT, 0, "k");
 }
 
-SingleLabelIntegrator::SingleLabelIntegrator(const Config& config) : config(config) {}
+SingleLabelIntegrator::SingleLabelIntegrator(const Config& config, const Labelspace*)
+    : config(config) {}
 
 void SingleLabelIntegrator::updateLikelihoods(uint32_t label,
                                               float weight,

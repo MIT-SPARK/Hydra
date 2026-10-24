@@ -94,7 +94,7 @@ ReconstructionModule::ReconstructionModule(const Config& config,
     : ActiveWindowModule(config, labelspace, queue, std::move(window)),
       config(config::checkValid(config)),
       last_update_ns_(std::nullopt),
-      tsdf_integrators_(config.tsdf),
+      tsdf_integrators_(config.tsdf, &labelspace),
       mesh_integrator_(std::make_unique<MeshIntegrator>(config.mesh)),
       footprint_integrator_(config.robot_footprint.create()) {
   for (const auto& [name, tsdf_config] : config.tsdf.sensors) {
