@@ -11,8 +11,9 @@ indices, agent layers move to the fused robot's prefix) and writes the bookkeepi
 
 * frame / sensor / observation ids and ``robot_id`` are re-keyed to the fused robot id
   (ids are ``robot_id << 48 | seq``, so the sequence part is kept),
-* ``anchor_node_id``, ``track_bindings.node_id`` and node aliases are rewritten into fused
-  node ids (source merges are resolved first, the fused merges are added as aliases),
+* ``anchor_node_id`` and ``track_bindings.node_id`` are rewritten into fused node ids
+  (source merges are only followed for nodes missing from the fused graph) and the fused
+  merges are added as aliases,
 * odometric poses are moved into the fused world frame (``world_T_robot``) so the
   fallback pose of unanchored frames stays meaningful,
 * image files are hardlinked (or copied / symlinked) under ``robot_<id>/``,
@@ -108,17 +109,25 @@ class _NodeMapper:
             node_id = self.parents[node_id]
         return node_id
 
-    def __call__(self, node_id: int | None) -> int | None:
-        if node_id is None:
-            return None
-
-        node_id = self.canonical(node_id)
+    def _lookup(self, node_id: int) -> int | None:
         fused = self.node_map.get(node_id)
         if fused is None:
             # agent layers are moved to the fused robot's prefix before renumbering
             category, _ = _symbol(node_id)
             if category in ROBOT_PREFIXES:
                 fused = self.node_map.get(_with_prefix(node_id, self.prefix))
+        return fused
+
+    def __call__(self, node_id: int | None) -> int | None:
+        if node_id is None:
+            return None
+
+        # the fused graph may be built from a graph where a source merge was not applied
+        # (e.g. the frontend graph); only follow source merges for nodes it does not have
+        fused = self._lookup(node_id)
+        if fused is None:
+            node_id = self.canonical(node_id)
+            fused = self._lookup(node_id)
 
         if fused is None:
             self.missing.add(node_id)

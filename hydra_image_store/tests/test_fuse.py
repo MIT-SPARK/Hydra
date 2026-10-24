@@ -116,6 +116,22 @@ def test_fuse_rekeys_ids_and_nodes(tmp_path, two_robots):
         assert len(seqs) == 2  # sequence numbers are kept, robot bits differ
 
 
+def test_source_merge_not_in_fused_graph(tmp_path, two_robots):
+    # the fused graph kept O3 of the second robot although its backend merged it into O2
+    O = lambda i: make_node_id("O", i)  # noqa: E731
+    node_map = dict(two_robots["node_map"])
+    node_map[1] = dict(node_map[1])
+    node_map[1][O(3)] = O(5)
+    fuse_stores(
+        tmp_path / "fused",
+        [FuseSource(two_robots["first"], 0), FuseSource(two_robots["second"], 1)],
+        node_map,
+    )
+    with ImageStore.open(tmp_path / "fused") as store:
+        assert [(o.robot_id, o.track_id) for o in store.observations(O(5))] == [(1, 12)]
+        assert [(o.robot_id, o.track_id) for o in store.observations(O(4))] == [(1, 11)]
+
+
 def test_fuse_refuses_duplicates_and_existing(tmp_path, two_robots):
     out = tmp_path / "fused"
     sources = [FuseSource(two_robots["first"], 0), FuseSource(two_robots["second"], 0)]
