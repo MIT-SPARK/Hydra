@@ -78,8 +78,6 @@ void declare_config(PipelineConfig& config) {
   field(config.default_verbosity, "default_verbosity");
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
-  config.labelspace.setOptional();
-  field(config.labelspace, "labelspace");
   field(config.mesh, "mesh");
 
   // the following subconfigs should not be namespaced
@@ -95,11 +93,6 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   auto& timer = ElapsedTimeRecorder::instance();
   timer.timing_disabled = config_.timing_disabled;
   timer.disable_output = config_.disable_timer_output;
-
-  labelspace_ = config_.labelspace.create();
-  if (!labelspace_) {
-    labelspace_ = std::make_unique<Labelspace>();
-  }
 
   if (config_.enable_pgmo_logging) {
     logging::Logger::addSink("glog", std::make_shared<PgmoGlogSink>());
@@ -133,14 +126,6 @@ const PipelineConfig& GlobalInfo::getConfig() const { return config_; }
 const FrameConfig& GlobalInfo::getFrames() const { return config_.frames; }
 
 const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefix_; }
-
-const Labelspace& GlobalInfo::labelspace() const {
-  if (!labelspace_) {
-    labelspace_.reset(new Labelspace());
-  }
-
-  return *labelspace_;
-}
 
 spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {
   // we force the mesh to have last seen stamps
