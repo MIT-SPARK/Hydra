@@ -48,6 +48,7 @@
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/common/global_info.h"
+#include "hydra/common/labelspace.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/input/input_filter.h"
 #include "hydra/utils/data_directory.h"
@@ -78,7 +79,9 @@ class PythonReconstruction {
     config::VirtualConfig<MeshCompressor> compression{MeshCompression::Config{}};
   } const config;
 
-  PythonReconstruction(const Config& config, const Sensor::Ptr& sensor);
+  PythonReconstruction(const Config& config,
+                       const Sensor::Ptr& sensor,
+                       const Labelspace& labelspace);
 
   bool step(size_t timestamp_ns,
             const Eigen::Vector4d& odom_R_body,
@@ -116,7 +119,8 @@ void declare_config(PythonReconstruction::Config& config) {
 }
 
 PythonReconstruction::PythonReconstruction(const Config& config,
-                                           const Sensor::Ptr& sensor)
+                                           const Sensor::Ptr& sensor,
+                                           const Labelspace& labelspace)
     : config(config::checkValid(config)),
       sensor(sensor),
       compressor_(config.compression.create()) {
@@ -129,8 +133,8 @@ PythonReconstruction::PythonReconstruction(const Config& config,
   }
 
   queue_ = std::make_shared<ActiveWindowModule::OutputQueue>();
-  module_ =
-      std::make_shared<ReconstructionModule>(config.reconstruction, queue_, nullptr);
+  module_ = std::make_shared<ReconstructionModule>(
+      config.reconstruction, labelspace, queue_, nullptr);
   if (compressor_) {
     mesh_ = std::make_shared<Mesh>();
   }
@@ -210,11 +214,14 @@ using namespace pybind11::literals;
 
 void addBindings(pybind11::module_& m) {
   py::class_<PythonReconstruction>(m, "ReconstructionPipeline")
-      .def(py::init([](const Sensor::Ptr& sensor, const std::string& ns) {
+      .def(py::init([](const Sensor::Ptr& sensor,
+                       const Labelspace& labelspace,
+                       const std::string& ns) {
              const auto config = config::fromContext<PythonReconstruction::Config>(ns);
-             return std::make_unique<PythonReconstruction>(config, sensor);
+             return std::make_unique<PythonReconstruction>(config, sensor, labelspace);
            }),
            "sensor"_a,
+           "labelspace"_a = Labelspace{},
            "ns"_a = "")
       .def("save", &PythonReconstruction::save)
       .def_property_readonly("mesh", &PythonReconstruction::mesh)
