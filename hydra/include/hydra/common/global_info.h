@@ -39,7 +39,6 @@
 #include <atomic>
 #include <memory>
 
-#include "hydra/common/labelspace.h"
 #include "hydra/common/robot_prefix_config.h"
 
 namespace hydra {
@@ -87,8 +86,6 @@ struct PipelineConfig {
   int default_num_threads = -1;  // -1 means use all available threads.
   //! Frame information for Hydra
   FrameConfig frames;
-  //! Closed-set labelspace information
-  config::VirtualConfig<Labelspace> labelspace{Labelspace{}};
   //! Configuration for scene graph mesh fields
   MeshFieldConfig mesh;
 };
@@ -105,8 +102,6 @@ class GlobalInfo {
   static void reset();
 
   bool force_shutdown() const;
-
-  const Labelspace& labelspace() const;
 
   void setForceShutdown(bool force_shutdown);
 
@@ -129,8 +124,6 @@ class GlobalInfo {
 
   PipelineConfig config_;
   RobotPrefixConfig robot_prefix_;
-
-  mutable std::unique_ptr<Labelspace> labelspace_;
 };
 
 }  // namespace hydra

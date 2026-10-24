@@ -61,6 +61,7 @@ static const auto registration =
     config::RegistrationWithConfig<GraphBuilder,
                                    GraphBuilder,
                                    GraphBuilder::Config,
+                                   Labelspace,
                                    SharedDsgInfo::Ptr,
                                    SharedModuleState::Ptr,
                                    std::unique_ptr<VolumetricWindow>>("GraphBuilder");
@@ -110,6 +111,7 @@ GraphBuilder::Config::Config()
       deformation_graph_builder(DeformationGraphBuilder::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
+                           const Labelspace& labelspace,
                            const SharedDsgInfo::Ptr& dsg,
                            const SharedModuleState::Ptr& state,
                            std::unique_ptr<VolumetricWindow>&& window)
@@ -122,17 +124,16 @@ GraphBuilder::GraphBuilder(const Config& config,
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(std::move(window)),
-      surface_places_(config.surface_places.create(
-          GlobalInfo::instance().labelspace().surface_places_labels)),
+      surface_places_(config.surface_places.create(labelspace.surface_places_labels)),
       sinks_(Sink::instantiate(config.sinks)) {
-  const auto& global_info = GlobalInfo::instance();
   if (config.enable_mesh_objects) {
-    segmenter_ = std::make_unique<MeshSegmenter>(
-        config.object_config, global_info.labelspace().object_labels);
+    segmenter_ =
+        std::make_unique<MeshSegmenter>(config.object_config, labelspace.object_labels);
   }
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
+  const auto& global_info = GlobalInfo::instance();
   dsg_->graph->setMesh(global_info.createMesh());
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));

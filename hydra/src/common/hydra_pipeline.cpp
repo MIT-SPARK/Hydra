@@ -45,6 +45,7 @@
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/backend/backend_module.h"
 #include "hydra/common/global_info.h"
+#include "hydra/common/labelspace.h"
 #include "hydra/frontend/graph_builder.h"
 #include "hydra/loop_closure/loop_closure_module.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
@@ -81,6 +82,8 @@ void declare_config(HydraPipeline::Config& config) {
   using namespace config;
   name("HydraPipeline::Config");
   base<VerbosityConfig>(config);
+  config.labelspace.setOptional();
+  field(config.labelspace, "labelspace");
   field(config.semantic_layers, "semantic_layers");
   field(config.graph, "graph");
   config.map_window.setOptional();
@@ -94,12 +97,20 @@ void declare_config(HydraPipeline::Config& config) {
 
 HydraPipeline::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("pipeline")),
+      labelspace(Labelspace{}),
       map_window(SpatialWindowChecker::Config()),
       active_window(ReconstructionModule::Config()),
       frontend(GraphBuilder::Config()),
       backend(BackendModule::Config()) {}
 
-HydraPipeline::HydraPipeline(const Config& config) : config(config) { initStateImpl(); }
+HydraPipeline::HydraPipeline(const Config& config) : config(config) {
+  labelspace_ = config.labelspace.create();
+  if (!labelspace_) {
+    labelspace_ = std::make_unique<Labelspace>();
+  }
+
+  initStateImpl();
+}
 
 HydraPipeline::~HydraPipeline() {}
 
@@ -178,12 +189,12 @@ void HydraPipeline::initStateImpl() {
   backend_.reset();
   lcd_.reset();
 
-  const auto& labelspace = GlobalInfo::instance().labelspace();
-  frontend_dsg_ = buildGraph(labelspace, config.graph, config.semantic_layers);
-  backend_dsg_ = buildGraph(labelspace, config.graph, config.semantic_layers);
+  frontend_dsg_ = buildGraph(*labelspace_, config.graph, config.semantic_layers);
+  backend_dsg_ = buildGraph(*labelspace_, config.graph, config.semantic_layers);
   state_.reset(new SharedModuleState());
-  state_->lcd_graph = buildGraph(labelspace, config.graph, config.semantic_layers);
-  state_->backend_graph = buildGraph(labelspace, config.graph, config.semantic_layers);
+  state_->lcd_graph = buildGraph(*labelspace_, config.graph, config.semantic_layers);
+  state_->backend_graph =
+      buildGraph(*labelspace_, config.graph, config.semantic_layers);
 }
 
 }  // namespace hydra

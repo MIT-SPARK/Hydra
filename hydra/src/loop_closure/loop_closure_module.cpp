@@ -54,6 +54,7 @@ static const auto registration =
     config::RegistrationWithConfig<LoopClosureModule,
                                    LoopClosureModule,
                                    LoopClosureModule::Config,
+                                   Labelspace,
                                    SharedModuleState::Ptr>("LoopClosureModule");
 
 }
@@ -75,12 +76,13 @@ LoopClosureModule::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("lcd")) {}
 
 LoopClosureModule::LoopClosureModule(const Config& config,
+                                     const Labelspace& labelspace,
                                      const SharedModuleState::Ptr& state)
     : config(config),
       queue_(std::make_shared<InputQueue>()),
       state_(state),
       lcd_graph_(new SceneGraph()) {
-  lcd_detector_.reset(new lcd::LcdDetector(config.detector));
+  lcd_detector_.reset(new lcd::LcdDetector(config.detector, labelspace.total_labels));
 }
 
 LoopClosureModule::~LoopClosureModule() { stopImpl(); }

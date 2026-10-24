@@ -54,6 +54,7 @@ class ReconstructionModule : public ActiveWindowModule {
   } const config;
 
   ReconstructionModule(const Config& config,
+                       const Labelspace& labelspace,
                        const OutputQueue::Ptr& output_queue,
                        std::unique_ptr<VolumetricWindow>&& window);
 
