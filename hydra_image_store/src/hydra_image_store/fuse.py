@@ -38,7 +38,7 @@ from .store import DB_NAME, _place_file, _resolve_db, schema_sql
 logger = logging.getLogger(__name__)
 
 #: robot id -> agent layer prefix used by Kimera-PGMO / Hydra
-ROBOT_PREFIXES = "abcdefgh"
+ROBOT_PREFIXES = "abcdefghijkmnoq"  # kimera_pgmo robot_id_to_prefix (robots 0-14)
 
 SOURCES_SQL = """
 CREATE TABLE IF NOT EXISTS sources (
