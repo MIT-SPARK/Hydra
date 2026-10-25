@@ -50,25 +50,25 @@ static const auto registration_mle =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    MLESemanticIntegrator,
                                    MLESemanticIntegrator::Config,
-                                   Labelspace*>("MLESemanticIntegrator");
+                                   const Labelspace*>("MLESemanticIntegrator");
 
 static const auto registration_binary =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    BinarySemanticIntegrator,
                                    BinarySemanticIntegrator::Config,
-                                   Labelspace*>("BinarySemanticIntegrator");
+                                   const Labelspace*>("BinarySemanticIntegrator");
 
 static const auto registration_firstk =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    FirstKSemanticIntegrator,
                                    FirstKSemanticIntegrator::Config,
-                                   Labelspace*>("FirstKSemanticIntegrator");
+                                   const Labelspace*>("FirstKSemanticIntegrator");
 
 static const auto registration_single =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    SingleLabelIntegrator,
                                    SingleLabelIntegrator::Config,
-                                   Labelspace*>("SingleLabelIntegrator");
+                                   const Labelspace*>("SingleLabelIntegrator");
 
 size_t getTotalLabels(const Labelspace* labelspace) {
   if (!labelspace || labelspace->total_labels == 0) {
