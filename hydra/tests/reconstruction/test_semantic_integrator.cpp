@@ -33,17 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/common/global_info.h>
-#include <hydra/reconstruction/semantic_integrator.h>
 
 #include "hydra/common/labelspace.h"
-#include "hydra_test/config_guard.h"
+#include "hydra/reconstruction/semantic_integrator.h"
 
 namespace hydra {
 
 TEST(SemanticIntegrator, MLEIntegrationCorrect) {
-  const test::ConfigGuard guard;
-
   Labelspace labelspace;
   labelspace.total_labels = 5;
   MLESemanticIntegrator::Config config;
