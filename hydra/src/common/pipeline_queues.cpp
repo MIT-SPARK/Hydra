@@ -39,7 +39,6 @@
 namespace hydra {
 
 PipelineQueues::~PipelineQueues() {
-  VLOG(2) << "backend_queue: " << backend_queue.size();
   VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
   VLOG(2) << "external_loop_closure_queue: " << external_loop_closure_queue.size();
 }
@@ -53,7 +52,6 @@ PipelineQueues& PipelineQueues::instance() {
 }
 
 void PipelineQueues::clear() {
-  backend_queue.clear();
   backend_lcd_queue.clear();
   external_loop_closure_queue.clear();
 }
