@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/config.h>
+#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/enum.h>
 
 namespace hydra {
@@ -76,31 +77,36 @@ class SensorMap {
 
 template <typename T>
 template <typename... Args>
-SensorMap<T>::SensorMap(const Config& config, Args... args) : config(config) {
-  for (const auto& [name, sensor] : config.sensors) {
-    elements_.emplace(name, std::make_unique<T>(sensor, args...));
+SensorMap<T>::SensorMap(const Config& config, Args... args)
+    : config(config),
+      default_(std::make_unique<T>(config::fromYaml<typename T::Config>(YAML::Node()),
+                                   args...)) {
+  // NOTE(nathan) the above field initializer is janky because there are configs that by
+  // default are initialized to invalid values that get resolved through parsing (even
+  // if there is nothing to parse). Would be ideal to be able to do this without pulling
+  // in YAML
+  if (config.mode == SensorMapMode::Single) {
+    if (!config.sensors.empty()) {
+      default_ = std::make_unique<T>(config.sensors.front().second, args...);
+    }
+
+    return;
   }
 
-  if (config.mode == SensorMapMode::Permissive) {
-    default_ = std::make_unique<T>(typename T::Config(), args...);
+  for (const auto& [name, sensor] : config.sensors) {
+    elements_.emplace(name, std::make_unique<T>(sensor, args...));
   }
 }
 
 template <typename T>
 T* SensorMap<T>::get(const std::string& name) {
+  if (config.mode == SensorMapMode::Single) {
+    return default_.get();
+  }
+
   auto iter = elements_.find(name);
   if (iter == elements_.end()) {
-    switch (config.mode) {
-      case SensorMapMode::Single:
-        // this should be unreachable given how the sensor map works
-        throw std::runtime_error("Single mode requires a config!");
-      case SensorMapMode::Permissive:
-        return default_.get();
-        break;
-      case SensorMapMode::Strict:
-      default:
-        return nullptr;
-    }
+    return config.mode == SensorMapMode::Permissive ? default_.get() : nullptr;
   }
 
   return iter->second.get();

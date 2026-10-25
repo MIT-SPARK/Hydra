@@ -114,17 +114,19 @@ HydraPipeline::HydraPipeline(const Config& config,
 HydraPipeline::~HydraPipeline() {}
 
 void HydraPipeline::init() {
-  frontend_ = config.frontend.create(frontend_dsg_, state_, config.map_window.create());
+  frontend_ = config.frontend.create(
+      *labelspace_, frontend_dsg_, state_, config.map_window.create());
+
+  const auto queue = frontend_->queue();
+  active_window_ =
+      config.active_window.create(*labelspace_, queue, config.map_window.create());
 
   backend_ = config.backend.create(backend_dsg_, state_);
   if (frontend_ && backend_) {
     frontend_->setBackendQueue(backend_->queue());
   }
 
-  const auto queue = frontend_->queue();
-  active_window_ = config.active_window.create(queue, config.map_window.create());
-
-  lcd_ = config.lcd.create(state_);
+  lcd_ = config.lcd.create(*labelspace_, state_);
   if (frontend_ && lcd_) {
     frontend_->setLcdQueue(lcd_->queue());
   }
