@@ -117,6 +117,7 @@ BackendModule::BackendModule(const Config& config,
                              const SharedModuleState::Ptr& state)
     : KimeraPgmoInterface(config.pgmo),
       config(config::checkValid(config)),
+      queue_(new InputQueue()),
       private_dsg_(dsg),
       state_(state),
       external_lc_receiver_(config.external_loop_closures,
@@ -200,8 +201,7 @@ std::string BackendModule::printInfo() const {
 void BackendModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
-    auto& queue = PipelineQueues::instance().backend_queue;
-    bool has_data = queue.poll();
+    bool has_data = queue_->poll();
     if (GlobalInfo::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
@@ -224,8 +224,7 @@ bool BackendModule::step(bool force_optimize) {
 }
 
 bool BackendModule::spinOnce(bool force_update) {
-  auto& queue = PipelineQueues::instance().backend_queue;
-  bool has_data = queue.poll();
+  bool has_data = queue_->poll();
   if (!has_data && !force_update) {
     return false;
   }
@@ -235,8 +234,7 @@ bool BackendModule::spinOnce(bool force_update) {
 
   std::lock_guard<std::mutex> lock(mutex_);
   if (has_data) {
-    const auto packet = queue.front();
-    queue.pop();
+    const auto packet = queue_->pop();
     const auto& input = *packet;
     timestamp_ns = input.timestamp_ns;
     last_sequence_number_ = input.sequence_number;
@@ -344,6 +342,8 @@ void BackendModule::addSink(const Sink::Ptr& sink) {
     sinks_.push_back(sink);
   }
 }
+
+auto BackendModule::queue() const -> InputQueue::Ptr { return queue_; }
 
 void BackendModule::updateFactorGraph(const FrontendOutput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);

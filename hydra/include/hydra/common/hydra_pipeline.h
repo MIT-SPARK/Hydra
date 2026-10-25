@@ -53,8 +53,6 @@ class HydraPipeline {
   struct Config : public VerbosityConfig {
     Config();
 
-    //! Closed-set labelspace information
-    config::VirtualConfig<Labelspace> labelspace;
     //! Layer names for the scene graph that Hydra builds
     SharedDsgInfo::Config graph;
     //! @brief Layers in the scene graph that use the labelspace
@@ -72,7 +70,8 @@ class HydraPipeline {
     config::VirtualConfig<LoopClosureModule> lcd;
   } const config;
 
-  explicit HydraPipeline(const Config& config);
+  explicit HydraPipeline(const Config& config,
+                         std::unique_ptr<Labelspace>&& labelspace);
 
   virtual ~HydraPipeline();
 
