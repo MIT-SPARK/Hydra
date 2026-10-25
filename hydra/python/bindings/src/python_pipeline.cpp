@@ -72,7 +72,9 @@ class PythonPipeline : public HydraPipeline {
     std::vector<config::VirtualConfig<InputFilter, true>> filters;
   } const config;
 
-  PythonPipeline(const Config& config, const Sensor::Ptr& sensor);
+  PythonPipeline(const Config& config,
+                 const Sensor::Ptr& sensor,
+                 std::unique_ptr<Labelspace>&& labelspace);
 
   virtual ~PythonPipeline();
 
@@ -104,8 +106,10 @@ void declare_config(PythonPipeline::Config& config) {
   base<HydraPipeline::Config>(config);
 }
 
-PythonPipeline::PythonPipeline(const Config& _config, const Sensor::Ptr& sensor)
-    : HydraPipeline(_config), config(_config), sensor(sensor) {
+PythonPipeline::PythonPipeline(const Config& _config,
+                               const Sensor::Ptr& sensor,
+                               std::unique_ptr<Labelspace>&& labelspace)
+    : HydraPipeline(_config, std::move(labelspace)), config(_config), sensor(sensor) {
   if (!sensor) {
     throw std::runtime_error("Invalid sensor!");
   }
@@ -199,14 +203,17 @@ namespace py = pybind11;
 void addBindings(pybind11::module_& m) {
   namespace fs = std::filesystem;
   py::class_<PythonPipeline>(m, "HydraPipeline")
-      .def(py::init([](const Sensor::Ptr& sensor, int id) {
-             const auto config = config::fromContext<PythonPipeline::Config>();
-             const auto global_config = config::fromContext<PipelineConfig>();
-             GlobalInfo::init(global_config, id);
-             return std::make_unique<PythonPipeline>(config, sensor);
-           }),
-           "sensor"_a,
-           "robot_id"_a = 0)
+      .def(
+          py::init([](const Sensor::Ptr& sensor, const Labelspace& labelspace, int id) {
+            const auto config = config::fromContext<PythonPipeline::Config>();
+            const auto global_config = config::fromContext<PipelineConfig>();
+            GlobalInfo::init(global_config, id);
+            return std::make_unique<PythonPipeline>(
+                config, sensor, std::make_unique<Labelspace>(labelspace));
+          }),
+          "sensor"_a,
+          "labelspace"_a = Labelspace{},
+          "robot_id"_a = 0)
       .def(
           "save",
           [](const PythonPipeline& pipeline, const fs::path& output) {

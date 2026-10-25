@@ -9,6 +9,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/node_matchers.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pipeline_queues.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/robot_prefix_config.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/run_context.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_color_map.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/shared_dsg_info.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/shared_module_state.cpp

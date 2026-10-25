@@ -44,7 +44,6 @@
 
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
-#include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
@@ -268,6 +267,10 @@ void GraphBuilder::addSink(const Sink::Ptr& sink) {
   }
 }
 
+void GraphBuilder::setBackendQueue(const OutputQueue::Ptr& queue) {
+  backend_input_queue_ = queue;
+}
+
 void GraphBuilder::setLcdQueue(const OutputQueue::Ptr& queue) {
   lcd_input_queue_ = queue;
 }
@@ -316,7 +319,10 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
-  PipelineQueues::instance().backend_queue.push(curr_output_);
+  if (backend_input_queue_) {
+    backend_input_queue_->push(curr_output_);
+  }
+
   if (lcd_input_queue_) {
     lcd_input_queue_->push(curr_output_);
   }

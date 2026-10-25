@@ -58,12 +58,15 @@ void declare_config(HydraRosPipeline::Config& config) {
   name("HydraRosConfig");
   base<HydraPipeline::Config>(config);
   field(config.preprint_config, "preprint_config");
+  config.labelspace.setOptional();
+  field(config.labelspace, "labelspace");
   field(config.input, "input");
   field(config.status_monitor, "status_monitor");
 }
 
 HydraRosPipeline::HydraRosPipeline(const Config& config)
-    : HydraPipeline(config), config(config::checkValid(config)) {
+    : HydraPipeline(config, config.labelspace.create()),
+      config(config::checkValid(config)) {
   if (config.preprint_config) {
     LOG(INFO) << "Using configuration to start Hydra\n" << config::toString(config);
   }

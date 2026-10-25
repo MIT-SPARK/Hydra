@@ -127,6 +127,8 @@ class GraphBuilder : public Module {
 
   void setLcdQueue(const OutputQueue::Ptr& queue);
 
+  void setBackendQueue(const OutputQueue::Ptr& queue);
+
  protected:
   void addInputCallback(InputCallback callback);
 
@@ -169,6 +171,7 @@ class GraphBuilder : public Module {
   std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
 
   OutputQueue::Ptr lcd_input_queue_;
+  OutputQueue::Ptr backend_input_queue_;
 
   Sink::List sinks_;
 

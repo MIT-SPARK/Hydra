@@ -82,8 +82,6 @@ void declare_config(HydraPipeline::Config& config) {
   using namespace config;
   name("HydraPipeline::Config");
   base<VerbosityConfig>(config);
-  config.labelspace.setOptional();
-  field(config.labelspace, "labelspace");
   field(config.semantic_layers, "semantic_layers");
   field(config.graph, "graph");
   config.map_window.setOptional();
@@ -97,14 +95,15 @@ void declare_config(HydraPipeline::Config& config) {
 
 HydraPipeline::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("pipeline")),
-      labelspace(Labelspace{}),
       map_window(SpatialWindowChecker::Config()),
       active_window(ReconstructionModule::Config()),
       frontend(GraphBuilder::Config()),
       backend(BackendModule::Config()) {}
 
-HydraPipeline::HydraPipeline(const Config& config) : config(config) {
-  labelspace_ = config.labelspace.create();
+HydraPipeline::HydraPipeline(const Config& config,
+                             std::unique_ptr<Labelspace>&& labelspace)
+    : config(config) {
+  labelspace_ = std::move(labelspace);
   if (!labelspace_) {
     labelspace_ = std::make_unique<Labelspace>();
   }
@@ -116,11 +115,17 @@ HydraPipeline::~HydraPipeline() {}
 
 void HydraPipeline::init() {
   frontend_ = config.frontend.create(frontend_dsg_, state_, config.map_window.create());
+
   backend_ = config.backend.create(backend_dsg_, state_);
+  if (frontend_ && backend_) {
+    frontend_->setBackendQueue(backend_->queue());
+  }
+
   const auto queue = frontend_->queue();
   active_window_ = config.active_window.create(queue, config.map_window.create());
+
   lcd_ = config.lcd.create(state_);
-  if (lcd_) {
+  if (frontend_ && lcd_) {
     frontend_->setLcdQueue(lcd_->queue());
   }
 }

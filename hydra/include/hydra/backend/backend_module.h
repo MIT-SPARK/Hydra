@@ -82,6 +82,7 @@ using BackendInput = FrontendOutput;
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
   using Ptr = std::shared_ptr<BackendModule>;
+  using InputQueue = MessageQueue<std::shared_ptr<const FrontendOutput>>;
   using Sink = OutputSink<uint64_t,
                           const spark_dsg::SceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
@@ -131,6 +132,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void addSink(const Sink::Ptr& sink);
 
+  InputQueue::Ptr queue() const;
+
  protected:
   virtual bool spinOnce(bool force_update = true);
 
@@ -161,6 +164,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   void stopImpl();
 
   UpdateInfo::Ptr getUpdateInfo(uint64_t timestamp_ns);
+
+  InputQueue::Ptr queue_;
 
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};
