@@ -57,8 +57,7 @@ class ExternalLoopClosureReceiver {
   using Queue = MessageQueue<pose_graph_tools::PoseGraph>;
   using Callback = std::function<void(
       spark_dsg::NodeId to, spark_dsg::NodeId from, const gtsam::Pose3 to_T_from)>;
-  using OrderedPreviousLoops =
-      std::set<pose_graph_tools::PoseGraphEdge, KeyFromComparator>;
+  using PreviousLoops = std::set<pose_graph_tools::PoseGraphEdge, KeyFromComparator>;
 
   struct LookupResult {
     enum class Status {
@@ -86,24 +85,28 @@ class ExternalLoopClosureReceiver {
     double rotation_scale = 1.0;
   } const config;
 
-  ExternalLoopClosureReceiver(const Config& config, Queue* const queue);
+  explicit ExternalLoopClosureReceiver(const Config& config);
   void update(const spark_dsg::SceneGraph& graph, const Callback& callback);
   LookupResult findClosest(const spark_dsg::SceneGraph& graph,
                            uint64_t timestamp_ns,
                            int robot_id,
                            double max_diff_s = 0.0) const;
 
-  OrderedPreviousLoops& getPreviousLoopsForRobotPair(size_t, size_t);
+  Queue::Ptr queue() const;
 
- protected:
-  bool should_add_lc(const OrderedPreviousLoops& added_lcs,
+ private:
+  PreviousLoops& previous_loops(size_t robot_a, size_t robot_b);
+
+  bool should_add_lc(const PreviousLoops& added_lcs,
                      const uint64_t stamp_ns_from,
                      const uint64_t stamp_ns_to,
                      const Eigen::Affine3d& to_T_from);
-  Queue* const input_queue_;
+
+ private:
+  Queue::Ptr const input_queue_;
   std::list<pose_graph_tools::PoseGraphEdge> loop_closures_;
   // Maps robot ID pairs to previous loop closures between those robots
-  std::map<std::pair<size_t, size_t>, OrderedPreviousLoops> added_loop_closures_;
+  std::map<std::pair<size_t, size_t>, PreviousLoops> added_loop_closures_;
 };
 
 void declare_config(ExternalLoopClosureReceiver::Config& config);

@@ -82,7 +82,8 @@ void HydraRosPipeline::init() {
   auto nh = ianvs::NodeHandle::this_node("~");
   backend_->addSink(std::make_shared<RosBackendPublisher>(nh / "backend"));
   frontend_->addSink(std::make_shared<RosFrontendPublisher>(nh / "frontend"));
-  external_loop_closure_sub_.reset(new ExternalLoopClosureSubscriber(nh));
+  external_loop_closure_sub_ = std::make_unique<ExternalLoopClosureSubscriber>(
+      nh, [this](const auto& lc) { backend_->addExternalLoopClosure(lc); });
 
   using std::chrono::nanoseconds;
   monitor_ = std::make_unique<StatusMonitor>(config.status_monitor, nh);

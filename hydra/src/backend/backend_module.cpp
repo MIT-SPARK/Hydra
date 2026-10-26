@@ -47,7 +47,6 @@
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/common/global_info.h"
-#include "hydra/common/pipeline_queues.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -118,10 +117,10 @@ BackendModule::BackendModule(const Config& config,
     : KimeraPgmoInterface(config.pgmo),
       config(config::checkValid(config)),
       queue_(new InputQueue()),
+      lcd_queue_(new LcdQueue()),
       private_dsg_(dsg),
       state_(state),
-      external_lc_receiver_(config.external_loop_closures,
-                            &PipelineQueues::instance().external_loop_closure_queue),
+      external_lc_receiver_(config.external_loop_closures),
       sinks_(Sink::instantiate(config.sinks)) {
   for (const auto& hook : config.optimization_hooks) {
     optimization_hooks_.push_back(hook.create());
@@ -343,7 +342,13 @@ void BackendModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
+void BackendModule::addExternalLoopClosure(const PoseGraph& pose_graph) {
+  external_lc_receiver_.queue()->push(pose_graph);
+}
+
 auto BackendModule::queue() const -> InputQueue::Ptr { return queue_; }
+
+auto BackendModule::lcd_queue() const -> LcdQueue::Ptr { return lcd_queue_; }
 
 void BackendModule::updateFactorGraph(const FrontendOutput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
@@ -420,10 +425,13 @@ void BackendModule::updateFactorGraph(const FrontendOutput& input) {
 }
 
 bool BackendModule::updateFromLcdQueue() {
+  if (!lcd_queue_) {
+    return false;
+  }
+
   bool added_new_loop_closure = false;
-  auto& queue = PipelineQueues::instance().backend_lcd_queue;
-  while (!queue.empty()) {
-    const auto result = queue.pop();
+  while (!lcd_queue_->empty()) {
+    const auto result = lcd_queue_->pop();
     // note that pose graph convention is pose = src.between(dest) where the edge
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
     const gtsam::Pose3 to_T_from(gtsam::Rot3(result.to_R_from), result.to_p_from);
