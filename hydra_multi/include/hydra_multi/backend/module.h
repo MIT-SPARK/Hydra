@@ -159,7 +159,6 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
   std::vector<MultiBackendModuleStatus> status_log_;
 
   std::list<LoopClosureLog> loop_closures_;
-  hydra::MessageQueue<pose_graph_tools::PoseGraph> lc_queue_;
   hydra::MessageQueue<LoopClosureLog> interrobot_lc_queue_;
   hydra::ExternalLoopClosureReceiver lc_receiver_;
 

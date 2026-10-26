@@ -1,5 +1,4 @@
 ---
-lcd_visualizer_ns: /dsg/lcd_visualizer
 lcd_agent_horizon_s: 3.5
 descriptor_creation_horizon_m: 8.0
 lcd:

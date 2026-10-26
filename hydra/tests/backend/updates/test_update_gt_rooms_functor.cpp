@@ -40,7 +40,6 @@
 
 #include <limits>
 
-#include "hydra_test/config_guard.h"
 #include "hydra_test/resources.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
@@ -63,8 +62,6 @@ void addPlace(SceneGraph& graph, NodeId id, double x, NodeAttributes::Ptr attrs)
 }  // namespace
 
 TEST(UpdateGtRoomsFunctorTests, AssignsWithoutDistancesAndExcludesFrontiers) {
-  test::ConfigGuard guard(false);
-  GlobalInfo::init(PipelineConfig{});
   auto dsg = test::makeSharedDsg();
   auto& graph = *dsg->graph;
   addPlace(graph, "x0"_id, 0.0, std::make_unique<NodeAttributes>());
@@ -102,8 +99,6 @@ TEST(UpdateGtRoomsFunctorTests, AssignsWithoutDistancesAndExcludesFrontiers) {
 }
 
 TEST(UpdateGtRoomsFunctorTests, ReplacesAssignmentsAndRemovesUnoccupiedRooms) {
-  test::ConfigGuard guard(false);
-  GlobalInfo::init(PipelineConfig{});
   auto dsg = test::makeSharedDsg();
   auto& graph = *dsg->graph;
   addPlace(graph, "p0"_id, 0.0, std::make_unique<PlaceNodeAttributes>());
