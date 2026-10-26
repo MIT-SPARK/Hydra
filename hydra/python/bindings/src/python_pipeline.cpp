@@ -44,7 +44,6 @@
 #include <hydra/backend/zmq_interfaces.h>
 #include <hydra/common/global_info.h>
 #include <hydra/common/hydra_pipeline.h>
-#include <hydra/common/pipeline_queues.h>
 #include <hydra/frontend/graph_builder.h>
 #include <hydra/input/camera.h>
 #include <hydra/loop_closure/loop_closure_module.h>
@@ -78,8 +77,6 @@ class PythonPipeline : public HydraPipeline {
 
   virtual ~PythonPipeline() = default;
 
-  void start() override;
-
   void reset();
 
   bool step(const std::shared_ptr<SensorInputPacket>& packet,
@@ -88,12 +85,8 @@ class PythonPipeline : public HydraPipeline {
   const Sensor::ConstPtr sensor;
 
  protected:
-  bool step_mode_only_;
   SensorInputPacket::Ptr last_input_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
-
- private:
-  void initModules();
 };
 
 void declare_config(PythonPipeline::Config& config) {
@@ -115,19 +108,6 @@ PythonPipeline::PythonPipeline(const Config& _config,
   }
 
   MLOG(0) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
-  initModules();
-}
-
-void PythonPipeline::start() {
-  if (step_mode_only_) {
-    LOG(INFO) << "Running in step mode!";
-  } else {
-    LOG(INFO) << "Running in parallel";
-    HydraPipeline::start();
-  }
-}
-
-void PythonPipeline::initModules() {
   init();
   showModules();
 }
@@ -136,12 +116,7 @@ void PythonPipeline::reset() {
   stop();
 
   initState();  // resets scene graphs
-  PipelineQueues::instance().clear();
-
-  initModules();
-  if (!step_mode_only_) {
-    start();
-  }
+  init();       // created modules
 }
 
 bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,

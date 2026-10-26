@@ -50,6 +50,7 @@
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_output.h"
+#include "hydra/loop_closure/registration_solution.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra {
@@ -83,6 +84,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
   using Ptr = std::shared_ptr<BackendModule>;
   using InputQueue = MessageQueue<std::shared_ptr<const FrontendOutput>>;
+  using LcdQueue = MessageQueue<lcd::RegistrationSolution>;
   using Sink = OutputSink<uint64_t,
                           const spark_dsg::SceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
@@ -132,7 +134,11 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void addSink(const Sink::Ptr& sink);
 
+  void addExternalLoopClosure(const pose_graph_tools::PoseGraph& pose_graph);
+
   InputQueue::Ptr queue() const;
+
+  LcdQueue::Ptr lcd_queue() const;
 
  protected:
   virtual bool spinOnce(bool force_update = true);
@@ -166,6 +172,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   UpdateInfo::Ptr getUpdateInfo(uint64_t timestamp_ns);
 
   InputQueue::Ptr queue_;
+
+  LcdQueue::Ptr lcd_queue_;
 
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};

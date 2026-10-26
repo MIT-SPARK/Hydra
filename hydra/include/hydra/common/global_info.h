@@ -43,8 +43,6 @@
 
 namespace hydra {
 
-class SemanticColorMap;
-
 /**
  * @brief Configuration struct for spark_dsg::Mesh
  * Note that per-vertex timestamps are required and can not be turned off
