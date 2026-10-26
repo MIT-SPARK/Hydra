@@ -76,18 +76,14 @@ class PythonPipeline : public HydraPipeline {
                  const Sensor::Ptr& sensor,
                  std::unique_ptr<Labelspace>&& labelspace);
 
-  virtual ~PythonPipeline();
+  virtual ~PythonPipeline() = default;
 
   void start() override;
-
-  void stop() override;
 
   void reset();
 
   bool step(const std::shared_ptr<SensorInputPacket>& packet,
             const Eigen::Isometry3d& world_T_body);
-
-  SceneGraph::Ptr getSceneGraph() const;
 
   const Sensor::ConstPtr sensor;
 
@@ -122,8 +118,6 @@ PythonPipeline::PythonPipeline(const Config& _config,
   initModules();
 }
 
-PythonPipeline::~PythonPipeline() { stop(); }
-
 void PythonPipeline::start() {
   if (step_mode_only_) {
     LOG(INFO) << "Running in step mode!";
@@ -136,14 +130,6 @@ void PythonPipeline::start() {
 void PythonPipeline::initModules() {
   init();
   showModules();
-}
-
-void PythonPipeline::stop() {
-  if (step_mode_only_) {
-    return;
-  }
-
-  HydraPipeline::stop();
 }
 
 void PythonPipeline::reset() {
@@ -191,10 +177,6 @@ bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
   return true;
 }
 
-SceneGraph::Ptr PythonPipeline::getSceneGraph() const {
-  return backend_dsg_->graph->clone();
-}
-
 namespace python_pipeline {
 
 using namespace pybind11::literals;
@@ -214,6 +196,8 @@ void addBindings(pybind11::module_& m) {
           "sensor"_a,
           "labelspace"_a = Labelspace{},
           "robot_id"_a = 0)
+      .def("start", &PythonPipeline::start)
+      .def("stop", &PythonPipeline::stop)
       .def(
           "save",
           [](const PythonPipeline& pipeline, const fs::path& output) {
