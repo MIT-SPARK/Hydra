@@ -61,12 +61,21 @@ struct MessageQueue {
    */
   MessageQueue() : MessageQueue(0) {}
 
-  /**
-   * @brief Check whether the queue is empty
-   */
+  //! Check whether the queue is empty
   bool empty() const {
     std::lock_guard<std::mutex> lock(mutex);
     return queue.empty();
+  }
+
+  //! Get size of the queue
+  size_t size() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return queue.size();
+  }
+
+  void set_max_size(size_t _max_size) {
+    std::lock_guard<std::mutex> lock(mutex);
+    max_size = _max_size;
   }
 
   /**
@@ -198,15 +207,6 @@ struct MessageQueue {
     // let writers know that queue has decreased in size
     cv.notify_all();
     return value;
-  }
-
-  /**
-   * @brief Get size of the queue
-   * @returns The size of the queue
-   */
-  size_t size() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return queue.size();
   }
 
   /**

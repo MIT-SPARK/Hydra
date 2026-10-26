@@ -77,6 +77,10 @@ class PythonPipeline : public HydraPipeline {
 
   virtual ~PythonPipeline() = default;
 
+  void start() override;
+
+  void stop() override;
+
   void reset();
 
   bool step(const std::shared_ptr<SensorInputPacket>& packet,
@@ -85,6 +89,7 @@ class PythonPipeline : public HydraPipeline {
   const Sensor::ConstPtr sensor;
 
  protected:
+  bool running_;
   SensorInputPacket::Ptr last_input_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
 };
@@ -98,7 +103,10 @@ void declare_config(PythonPipeline::Config& config) {
 PythonPipeline::PythonPipeline(const Config& _config,
                                const Sensor::Ptr& sensor,
                                std::unique_ptr<Labelspace>&& labelspace)
-    : HydraPipeline(_config, std::move(labelspace)), config(_config), sensor(sensor) {
+    : HydraPipeline(_config, std::move(labelspace)),
+      config(_config),
+      sensor(sensor),
+      running_(false) {
   if (!sensor) {
     throw std::runtime_error("Invalid sensor!");
   }
@@ -110,6 +118,16 @@ PythonPipeline::PythonPipeline(const Config& _config,
   MLOG(0) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
   init();
   showModules();
+}
+
+void PythonPipeline::start() {
+  running_ = true;
+  HydraPipeline::start();
+}
+
+void PythonPipeline::stop() {
+  HydraPipeline::stop();
+  running_ = false;
 }
 
 void PythonPipeline::reset() {
@@ -138,6 +156,10 @@ bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
   }
 
   last_input_ = packet;
+
+  if (running_) {
+    return false;
+  }
 
   if (!active_window_->step(input)) {
     return false;
