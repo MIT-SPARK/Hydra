@@ -73,9 +73,12 @@ class PythonPipeline : public HydraPipeline {
 
   PythonPipeline(const Config& config,
                  const Sensor::Ptr& sensor,
-                 std::unique_ptr<Labelspace>&& labelspace);
+                 std::unique_ptr<Labelspace>&& labelspace,
+                 size_t max_queue_size);
 
   virtual ~PythonPipeline() = default;
+
+  void init() override;
 
   void start() override;
 
@@ -89,7 +92,10 @@ class PythonPipeline : public HydraPipeline {
   const Sensor::ConstPtr sensor;
 
  protected:
+  bool stepImpl(const InputData::Ptr& input);
+
   bool running_;
+  const size_t max_queue_size_;
   SensorInputPacket::Ptr last_input_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
 };
@@ -102,11 +108,13 @@ void declare_config(PythonPipeline::Config& config) {
 
 PythonPipeline::PythonPipeline(const Config& _config,
                                const Sensor::Ptr& sensor,
-                               std::unique_ptr<Labelspace>&& labelspace)
+                               std::unique_ptr<Labelspace>&& labelspace,
+                               size_t max_queue_size)
     : HydraPipeline(_config, std::move(labelspace)),
       config(_config),
       sensor(sensor),
-      running_(false) {
+      running_(false),
+      max_queue_size_(max_queue_size) {
   if (!sensor) {
     throw std::runtime_error("Invalid sensor!");
   }
@@ -120,6 +128,11 @@ PythonPipeline::PythonPipeline(const Config& _config,
   showModules();
 }
 
+void PythonPipeline::init() {
+  HydraPipeline::init();
+  active_window_->queue()->set_max_size(max_queue_size_);
+}
+
 void PythonPipeline::start() {
   running_ = true;
   HydraPipeline::start();
@@ -131,8 +144,7 @@ void PythonPipeline::stop() {
 }
 
 void PythonPipeline::reset() {
-  stop();
-
+  stop();       // make sure everything is done
   initState();  // resets scene graphs
   init();       // created modules
 }
@@ -143,7 +155,6 @@ bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
   input->timestamp_ns = packet->timestamp_ns;
   input->world_T_body = odom_T_body;
   packet->fillInputData(*input);
-
   for (const auto& filter : filters_) {
     if (!filter) {
       continue;
@@ -158,9 +169,14 @@ bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
   last_input_ = packet;
 
   if (running_) {
+    active_window_->queue()->push(input, true);
     return false;
   }
 
+  return stepImpl(input);
+}
+
+bool PythonPipeline::stepImpl(const InputData::Ptr& input) {
   if (!active_window_->step(input)) {
     return false;
   }
@@ -182,17 +198,23 @@ namespace py = pybind11;
 void addBindings(pybind11::module_& m) {
   namespace fs = std::filesystem;
   py::class_<PythonPipeline>(m, "HydraPipeline")
-      .def(
-          py::init([](const Sensor::Ptr& sensor, const Labelspace& labelspace, int id) {
-            const auto config = config::fromContext<PythonPipeline::Config>();
-            const auto global_config = config::fromContext<PipelineConfig>();
-            GlobalInfo::init(global_config, id);
-            return std::make_unique<PythonPipeline>(
-                config, sensor, std::make_unique<Labelspace>(labelspace));
-          }),
-          "sensor"_a,
-          "labelspace"_a = Labelspace{},
-          "robot_id"_a = 0)
+      .def(py::init([](const Sensor::Ptr& sensor,
+                       const Labelspace& labelspace,
+                       int id,
+                       size_t max_queue_size) {
+             const auto config = config::fromContext<PythonPipeline::Config>();
+             const auto global_config = config::fromContext<PipelineConfig>();
+             GlobalInfo::init(global_config, id);
+             return std::make_unique<PythonPipeline>(
+                 config,
+                 sensor,
+                 std::make_unique<Labelspace>(labelspace),
+                 max_queue_size);
+           }),
+           "sensor"_a,
+           "labelspace"_a = Labelspace{},
+           "robot_id"_a = 0,
+           "max_queue_size"_a = 5)
       .def("start", &PythonPipeline::start)
       .def("stop", &PythonPipeline::stop)
       .def(
