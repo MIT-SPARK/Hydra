@@ -74,7 +74,8 @@ class PythonPipeline : public HydraPipeline {
   PythonPipeline(const Config& config,
                  const Sensor::Ptr& sensor,
                  std::unique_ptr<Labelspace>&& labelspace,
-                 size_t max_queue_size);
+                 size_t max_queue_size,
+                 bool show_config);
 
   virtual ~PythonPipeline() = default;
 
@@ -109,7 +110,8 @@ void declare_config(PythonPipeline::Config& config) {
 PythonPipeline::PythonPipeline(const Config& _config,
                                const Sensor::Ptr& sensor,
                                std::unique_ptr<Labelspace>&& labelspace,
-                               size_t max_queue_size)
+                               size_t max_queue_size,
+                               bool show_config)
     : HydraPipeline(_config, std::move(labelspace)),
       config(_config),
       sensor(sensor),
@@ -123,9 +125,12 @@ PythonPipeline::PythonPipeline(const Config& _config,
     filters_.push_back(filter.create());
   }
 
-  MLOG(0) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
   init();
-  showModules();
+
+  if (show_config) {
+    MLOG(0) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
+    showModules();
+  }
 }
 
 void PythonPipeline::init() {
@@ -201,7 +206,8 @@ void addBindings(pybind11::module_& m) {
       .def(py::init([](const Sensor::Ptr& sensor,
                        const Labelspace& labelspace,
                        int id,
-                       size_t max_queue_size) {
+                       size_t max_queue_size,
+                       bool show_config) {
              const auto config = config::fromContext<PythonPipeline::Config>();
              const auto global_config = config::fromContext<PipelineConfig>();
              GlobalInfo::init(global_config, id);
@@ -209,12 +215,14 @@ void addBindings(pybind11::module_& m) {
                  config,
                  sensor,
                  std::make_unique<Labelspace>(labelspace),
-                 max_queue_size);
+                 max_queue_size,
+                 show_config);
            }),
            "sensor"_a,
            "labelspace"_a = Labelspace{},
            "robot_id"_a = 0,
-           "max_queue_size"_a = 5)
+           "max_queue_size"_a = 5,
+           "show_config"_a = true)
       .def("start", &PythonPipeline::start)
       .def("stop", &PythonPipeline::stop)
       .def(

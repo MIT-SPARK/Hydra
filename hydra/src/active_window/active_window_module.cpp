@@ -135,6 +135,7 @@ void ActiveWindowModule::spin() {
     }
 
     const auto msg = input_queue_->pop();
+    MLOG(3) << "Processing " << msg->timestamp_ns << " [ns]";
     auto output = spinOnce(msg);
     if (!output) {
       continue;
