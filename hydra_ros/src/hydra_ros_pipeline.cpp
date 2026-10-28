@@ -60,6 +60,8 @@ void declare_config(HydraRosPipeline::Config& config) {
   field(config.preprint_config, "preprint_config");
   field(config.input, "input");
   field(config.status_monitor, "status_monitor");
+  config.sub_keyframe.setOptional();
+  field(config.sub_keyframe, "sub_keyframe");
 }
 
 HydraRosPipeline::HydraRosPipeline(const Config& config)
@@ -93,10 +95,20 @@ void HydraRosPipeline::init() {
         monitor_->recordModuleCallback("active_window", nanoseconds(stamp));
       }));
 
+  // has to exist before the input module receives images
+  sub_keyframe_ = config.sub_keyframe.create();
+  if (sub_keyframe_) {
+    MLOG(1) << "Sub-keyframes:\n" << sub_keyframe_->printInfo();
+  }
+
   input_ = std::make_unique<RosInputModule>(config.input, active_window_->queue());
 }
 
 void HydraRosPipeline::start() {
+  if (sub_keyframe_) {
+    sub_keyframe_->start();
+  }
+
   input_->start();
   HydraPipeline::start();
   monitor_->start();
@@ -105,6 +117,10 @@ void HydraRosPipeline::start() {
 void HydraRosPipeline::stop() {
   // enforce stop order to make sure every data packet is processed
   input_->stop();
+  if (sub_keyframe_) {
+    sub_keyframe_->stop();
+  }
+
   HydraPipeline::stop();
 }
 

@@ -40,6 +40,7 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/common/global_info.h"
@@ -48,6 +49,7 @@
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/subkeyframe_anchor.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
@@ -98,6 +100,12 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.traversability_places, "traversability_places");
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
+  config.agent_extractor.setOptional();
+  field(config.agent_extractor, "agent_extractor");
+  field(config.frame_anchor_max_dist_m, "frame_anchor_max_dist_m", "m");
+  check(config.frame_anchor_max_dist_m, GE, 0.0, "frame_anchor_max_dist_m");
+  field(config.frame_anchor_window_s, "frame_anchor_window_s", "s");
+  check(config.frame_anchor_window_s, GT, 0.0, "frame_anchor_window_s");
 
   field(config.sinks, "sinks");
 }
@@ -124,6 +132,11 @@ GraphBuilder::GraphBuilder(const Config& config,
       map_window_(std::move(window)),
       surface_places_(config.surface_places.create(
           GlobalInfo::instance().labelspace().surface_places_labels)),
+      image_store_(GlobalInfo::instance().imageStore()),
+      frame_anchors_(static_cast<uint64_t>(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::duration<double>(config.frame_anchor_window_s))
+              .count())),
       sinks_(Sink::instantiate(config.sinks)) {
   const auto& global_info = GlobalInfo::instance();
   if (config.enable_mesh_objects) {
@@ -145,6 +158,8 @@ GraphBuilder::GraphBuilder(const Config& config,
   functors_.emplace("freespace_places", config.freespace_places.create());
   functors_.emplace("traversability_places", config.traversability_places.create());
   functors_.emplace("frontier_places", config.frontier_places.create());
+  graph_updater_.setImageStore(image_store_, global_info.getRobotPrefix().id);
+  functors_.emplace("agent_extractor", config.agent_extractor.create());
   for (const auto& [_, functor] : functors_) {
     callbacks_.push_back([&](auto msg) {
       if (msg && functor) {
@@ -180,6 +195,9 @@ void GraphBuilder::stopImpl() {
     spin_thread_.reset();
     MLOG(1) << "stopped!";
     MLOG(1) << queue_->size() << " messages left";
+    // frames written after the last agent node (e.g., objects extracted at shutdown)
+    // still have anchors on both sides in time
+    anchorPendingFrames(true);
   }
 }
 
@@ -247,6 +265,11 @@ void GraphBuilder::spin() {
   while (!spin_finished_) {
     // wait for current spin to finish before shutting down
     std::this_thread::sleep_for(10ms);
+  }
+
+  if (input) {
+    // the last (collated) packet arrived while a spin was still running
+    spinOnce(input);
   }
 }
 
@@ -363,6 +386,9 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
       functor->callPostUpdate(*dsg_, *curr_output_);
     }
   }
+
+  // runs after the pose graph tracker added this update's agent nodes
+  anchorPendingFrames();
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
@@ -414,6 +440,74 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
   surface_places_->updateGraph(input, mesh_offsets_, *dsg_->graph);
+}
+
+void GraphBuilder::anchorPendingFrames(bool force) {
+  if (!image_store_ || !curr_output_) {
+    return;
+  }
+
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+  std::vector<NodeId> new_anchors;
+  for (const auto node_id : curr_output_->new_agent_nodes) {
+    // a forced pass only revisits frames; the last update already added its anchors
+    if (!force && NodeSymbol(node_id).category() == prefix.key) {
+      new_anchors.push_back(node_id);
+    }
+  }
+
+  if (new_anchors.empty() && !force) {
+    return;  // frames newer than the newest anchor wait for the next agent node
+  }
+
+  struct Decision {
+    uint64_t frame_id;
+    std::optional<NodeId> anchor;
+    Eigen::Isometry3d anchor_T_body;
+  };
+
+  // the store blocks when its queue is full, so it is only called after the graph is
+  // released
+  std::vector<Decision> decisions;
+  {
+    std::lock_guard<std::mutex> lock(dsg_->mutex);
+    const auto& graph = *dsg_->graph;
+    frame_anchors_.update(graph, new_anchors);
+    const auto newest = frame_anchors_.newest();
+    if (!newest) {
+      return;
+    }
+
+    // only frames with an anchor on both sides in time are decided
+    for (const auto& frame : image_store_->unanchoredFrames(prefix.id, *newest)) {
+      const auto anchors = frame_anchors_.neighbors(graph, frame.timestamp_ns);
+      const auto anchor_idx = selectNearestAnchor(anchors,
+                                                  frame.timestamp_ns,
+                                                  frame.world_T_body.translation(),
+                                                  config.frame_anchor_max_dist_m);
+      if (!anchor_idx) {
+        MLOG(2) << "No anchor within " << config.frame_anchor_max_dist_m
+                << " [m] for frame @ " << frame.timestamp_ns << " [ns]";
+        decisions.push_back({frame.frame_id, std::nullopt, {}});
+        continue;
+      }
+
+      const auto& anchor = anchors[*anchor_idx];
+      decisions.push_back(
+          {frame.frame_id,
+           anchor.id,
+           computeRelativeTransform(anchor.world_T_anchor, frame.world_T_body)});
+    }
+  }
+
+  for (const auto& decision : decisions) {
+    if (decision.anchor) {
+      image_store_->setAnchor(
+          decision.frame_id, *decision.anchor, decision.anchor_T_body);
+    } else {
+      image_store_->abandonAnchor(decision.frame_id);
+    }
+  }
 }
 
 }  // namespace hydra
