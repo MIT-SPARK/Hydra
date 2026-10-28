@@ -43,6 +43,14 @@ using spark_dsg::Color;
 
 namespace {
 
+InterpolatorAdaptive::Config adaptiveConfig(float max_depth_difference_m,
+                                            bool inf_is_free_space = false) {
+  InterpolatorAdaptive::Config config;
+  config.max_depth_difference_m = max_depth_difference_m;
+  config.inf_is_free_space = inf_is_free_space;
+  return config;
+}
+
 std::optional<float> getRange(const ProjectionInterpolator& interp,
                               const cv::Mat& mat,
                               float u,
@@ -227,9 +235,9 @@ TEST(ProjectionInterpolators, BilinearCorrectNonRange) {
 
 TEST(ProjectionInterpolators, AdaptiveCorrect) {
   // forces bilinear (max diff is 3)
-  InterpolatorAdaptive interp_bilinear({3.5});
+  InterpolatorAdaptive interp_bilinear(adaptiveConfig(3.5));
   // forces nearest
-  InterpolatorAdaptive interp_nearest({0.2});
+  InterpolatorAdaptive interp_nearest(adaptiveConfig(0.2));
   cv::Mat img = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
 
   {  // outside of image -> invalid range
@@ -267,7 +275,7 @@ TEST(ProjectionInterpolators, AdaptiveCorrectNonRange) {
   cv::Mat mask = (cv::Mat_<bool>(2, 2) << false, true, false, true);
 
   {  // bilinear interpolation results
-    InterpolatorAdaptive interp(InterpolatorAdaptive::Config{3.5});
+    InterpolatorAdaptive interp(adaptiveConfig(3.5));
     const auto color = getColor(interp, ranges, colors, 0.0, 0.5);
     EXPECT_EQ(color, Color(2, 3, 4));
 
@@ -279,7 +287,7 @@ TEST(ProjectionInterpolators, AdaptiveCorrectNonRange) {
   }
 
   {  // nearest interpolation results
-    InterpolatorAdaptive interp(InterpolatorAdaptive::Config{0.2});
+    InterpolatorAdaptive interp(adaptiveConfig(0.2));
 
     const auto color = getColor(interp, ranges, colors, 0.0, 0.6);
     EXPECT_EQ(color, Color(3, 4, 5));
@@ -295,7 +303,7 @@ TEST(ProjectionInterpolators, AdaptiveCorrectNonRange) {
 TEST(ProjectionInterpolators, AdaptiveCorrectInvalidRange) {
   cv::Mat ranges = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
 
-  InterpolatorAdaptive interp(InterpolatorAdaptive::Config{3.5});
+  InterpolatorAdaptive interp(adaptiveConfig(3.5));
   ASSERT_TRUE(getRange(interp, ranges, 0.3, 0.4));
 
   ranges.at<float>(0, 0) = 0.0;
@@ -326,10 +334,45 @@ TEST(ProjectionInterpolators, LabelVotingCorrect) {
 
 TEST(ProjectionInterpolators, AdaptiveOutOfRange) {
   // force nearest interpolation outside of image
-  InterpolatorAdaptive interp({0.5});
+  InterpolatorAdaptive interp(adaptiveConfig(0.5));
   cv::Mat img = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
   const auto range = getRange(interp, img, 1.9, 0.9);
   ASSERT_FALSE(range);
+}
+
+TEST(ProjectionInterpolators, InfIsFreeSpace) {
+  const auto inf = std::numeric_limits<float>::infinity();
+  cv::Mat ranges = (cv::Mat_<float>(2, 2) << 1.0, inf, 3.0, 4.0);
+
+  {  // +inf pixels are invalid by default
+    EXPECT_FALSE(getRange(InterpolatorNearest(), ranges, 0.8, 0.2));
+    EXPECT_FALSE(getRange(InterpolatorBilinear(), ranges, 0.8, 0.2));
+    EXPECT_FALSE(getRange(InterpolatorAdaptive(adaptiveConfig(3.5)), ranges, 0.8, 0.2));
+  }
+
+  {  // nearest pixel is +inf -> +inf range for all interpolators
+    EXPECT_EQ(getRange(InterpolatorNearest({true}), ranges, 0.8, 0.2), inf);
+    EXPECT_EQ(getRange(InterpolatorBilinear({true}), ranges, 0.8, 0.2), inf);
+    EXPECT_EQ(
+        getRange(InterpolatorAdaptive(adaptiveConfig(3.5, true)), ranges, 0.8, 0.2),
+        inf);
+  }
+
+  {  // +inf is never blended: bilinear stays invalid, adaptive uses the nearest pixel
+    EXPECT_EQ(getRange(InterpolatorNearest({true}), ranges, 0.2, 0.2), 1.0f);
+    EXPECT_FALSE(getRange(InterpolatorBilinear({true}), ranges, 0.2, 0.2));
+    EXPECT_EQ(
+        getRange(InterpolatorAdaptive(adaptiveConfig(3.5, true)), ranges, 0.2, 0.2),
+        1.0f);
+  }
+
+  {  // NaN stays invalid
+    ranges.at<float>(0, 1) = std::numeric_limits<float>::quiet_NaN();
+    EXPECT_FALSE(getRange(InterpolatorNearest({true}), ranges, 0.8, 0.2));
+    EXPECT_FALSE(getRange(InterpolatorBilinear({true}), ranges, 0.8, 0.2));
+    EXPECT_FALSE(
+        getRange(InterpolatorAdaptive(adaptiveConfig(3.5, true)), ranges, 0.8, 0.2));
+  }
 }
 
 }  // namespace hydra
