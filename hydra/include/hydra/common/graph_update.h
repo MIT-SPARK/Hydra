@@ -89,9 +89,14 @@ struct LayerTracker {
   std::unordered_map<size_t, spark_dsg::NodeId> track_to_node;
   std::unordered_map<spark_dsg::NodeId, std::unordered_set<size_t>> node_to_tracks;
   std::unordered_map<size_t, spark_dsg::NodeAttributes::Ptr> attribute_cache;
+  //! Whether the tracks are object tracks that are bound to their node in the image
+  //! store (only the objects layer: track ids are only unique per layer)
+  bool bind_tracks = false;
 };
 
 void declare_config(LayerTracker::Config& config);
+
+class ImageStore;
 
 struct GraphUpdater {
   struct Config {
@@ -103,8 +108,22 @@ struct GraphUpdater {
   explicit GraphUpdater(const Config& config);
   void update(const GraphUpdate& update, spark_dsg::SceneGraph& graph);
 
+  /**
+   * @brief Record which node each object track becomes in an image store.
+   * @param store Image store to record track bindings in (nullptr disables)
+   * @param robot_id Robot that the tracks belong to
+   */
+  void setImageStore(std::shared_ptr<ImageStore> store, int robot_id);
+
  private:
   std::map<std::string, LayerTracker> trackers_;
+  std::shared_ptr<ImageStore> image_store_;
+  int robot_id_ = 0;
+
+  //! Record the node of a track (whenever the mapping is created or changes)
+  void bindTrack(const LayerTracker& tracker,
+                 size_t track_id,
+                 spark_dsg::NodeId node_id);
 
   void addNode(spark_dsg::SceneGraph& graph,
                LayerTracker& tracker,

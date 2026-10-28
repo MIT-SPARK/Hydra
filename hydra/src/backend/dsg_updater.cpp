@@ -43,6 +43,7 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 
+#include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
@@ -101,6 +102,7 @@ DsgUpdater::DsgUpdater(const Config& config,
     : config(config::checkValid(config)),
       exhaustive_names_(config.exhaustive_functors.begin(),
                         config.exhaustive_functors.end()),
+      image_store_(GlobalInfo::instance().imageStore()),
       source_graph_(source),
       target_dsg_(target) {
   for (const auto& [name, functor] : config.update_functors) {
@@ -188,6 +190,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
 }
 
 void DsgUpdater::callFunctors(UpdateInfo::ConstPtr info) {
+  target_dsg_->new_merges.clear();
   std::list<UpdateFunctor::Hooks::CleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : update_functors_) {
     if (!functor) {
@@ -221,6 +224,42 @@ void DsgUpdater::callFunctors(UpdateInfo::ConstPtr info) {
   MLOG(2) << "all merges: " << merge_tracker.print();
   for (const auto& func : cleanup_hooks) {
     func(info, *source_graph_, target_dsg_.get());
+  }
+
+  reportMerges();
+}
+
+void DsgUpdater::reportMerges() {
+  // merges are cumulative (child -> final parent): merging a parent re-parents its
+  // children and resetting the backend graph clears them, so both additions and
+  // removals are reported relative to the last report
+  const auto& merges = target_dsg_->merges;
+  auto& updates = target_dsg_->new_merges;
+  std::map<NodeId, NodeId> changed;
+  for (const auto& [child, parent] : merges) {
+    const auto iter = reported_merges_.find(child);
+    if (iter == reported_merges_.end() || iter->second != parent) {
+      changed.emplace(child, parent);
+      updates.push_back({child, parent});
+    }
+  }
+
+  std::vector<NodeId> removed;
+  for (const auto& [child, parent] : reported_merges_) {
+    if (!merges.count(child)) {
+      removed.push_back(child);
+      updates.push_back({child, std::nullopt});
+    }
+  }
+
+  reported_merges_ = merges;
+  if (!updates.empty()) {
+    MLOG(1) << "merge updates: " << changed.size() << " changed, " << removed.size()
+            << " removed";
+  }
+
+  if (image_store_ && !updates.empty()) {
+    image_store_->recordMerges(changed, removed);
   }
 }
 

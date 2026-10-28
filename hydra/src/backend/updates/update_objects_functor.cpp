@@ -62,6 +62,7 @@ using SemanticLabel = SemanticNodeAttributes::Label;
 using MergeId = std::optional<NodeId>;
 
 NodeAttributes::Ptr mergeObjectAttributes(const VerbosityConfig& config,
+                                          const DeformationInterpolator& interpolator,
                                           const SceneGraph& graph,
                                           const std::vector<NodeId>& nodes) {
   if (nodes.empty()) {
@@ -72,6 +73,9 @@ NodeAttributes::Ptr mergeObjectAttributes(const VerbosityConfig& config,
   auto attrs_ptr = graph.getNode(*iter).attributes().clone();
   auto& new_attrs =
       *CHECK_NOTNULL(dynamic_cast<ObjectNodeAttributes*>(attrs_ptr.get()));
+  // brings the orientation (and the geometry of objects without mesh connections)
+  // into the optimized frame; the geometry is recomputed from the mesh below
+  interpolator.applyLastTransform(*iter, new_attrs);
   ++iter;
   while (iter != nodes.end()) {
     const auto& from_attrs = graph.getNode(*iter).attributes<ObjectNodeAttributes>();
@@ -98,10 +102,13 @@ void declare_config(UpdateObjectsFunctor::Config& config) {
   base<VerbosityConfig>(config);
   field(config.allow_connection_merging, "allow_connection_merging");
   field(config.merge_proposer, "merge_proposer");
+  field(config.deformation_interpolator, "deformation_interpolator");
 }
 
 UpdateObjectsFunctor::UpdateObjectsFunctor(const Config& config)
-    : config(config::checkValid(config)), merge_proposer(config.merge_proposer) {}
+    : config(config::checkValid(config)),
+      merge_proposer(config.merge_proposer),
+      deformation_interpolator(config.deformation_interpolator) {}
 
 UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
@@ -112,7 +119,7 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   if (config.allow_connection_merging) {
     my_hooks.merge = [this](const auto& graph, const auto& nodes) {
       merged_nodes_.insert(nodes.begin(), nodes.end());
-      return mergeObjectAttributes(config, graph, nodes);
+      return mergeObjectAttributes(config, deformation_interpolator, graph, nodes);
     };
 
     // merging indices means that we have archived objects with active vertices
@@ -139,6 +146,12 @@ void UpdateObjectsFunctor::call(const SceneGraph& unmerged,
   active_tracker.clear();  // reset from previous pass
   LayerView view =
       info->full_update ? LayerView(objects) : active_tracker.view(objects);
+
+  // The geometry (position and bounding box) is recomputed from the optimized mesh
+  // below, but the orientation of an object can only come from the deformation
+  // graph. The interpolator writes the full deformed pose into both graphs; the mesh
+  // then overrides position and bounding box for objects with mesh connections.
+  deformation_interpolator.interpolate(unmerged, *dsg.graph, info, view);
 
   // apply updates to every attribute that may have changed since the last call
   size_t num_changed = 0;
