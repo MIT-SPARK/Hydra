@@ -35,7 +35,7 @@
 #include "hydra/bindings/python_pipeline.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/parsing/yaml.h>
+#include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
@@ -44,7 +44,6 @@
 #include <hydra/backend/zmq_interfaces.h>
 #include <hydra/common/global_info.h>
 #include <hydra/common/hydra_pipeline.h>
-#include <hydra/common/pipeline_queues.h>
 #include <hydra/frontend/graph_builder.h>
 #include <hydra/input/camera.h>
 #include <hydra/loop_closure/loop_closure_module.h>
@@ -58,6 +57,7 @@
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
+#include "hydra/input/input_filter.h"
 
 using namespace spark_dsg;
 
@@ -65,13 +65,21 @@ namespace hydra::python {
 
 class PythonPipeline : public HydraPipeline {
  public:
-  PythonPipeline(const HydraPipeline::Config& config,
-                 const Sensor::Ptr& sensor,
-                 int config_verbosity = 0,
-                 bool step_mode_only = true,
-                 std::string zmq_url = "");
+  struct Config : HydraPipeline::Config {
+    template <typename T>
+    using VirtualConfig = config::VirtualConfig<T>;
+    std::vector<config::VirtualConfig<InputFilter, true>> filters;
+  } const config;
 
-  virtual ~PythonPipeline();
+  PythonPipeline(const Config& config,
+                 const Sensor::Ptr& sensor,
+                 std::unique_ptr<Labelspace>&& labelspace,
+                 size_t max_queue_size,
+                 bool show_config);
+
+  virtual ~PythonPipeline() = default;
+
+  void init() override;
 
   void start() override;
 
@@ -82,17 +90,15 @@ class PythonPipeline : public HydraPipeline {
   bool step(const std::shared_ptr<SensorInputPacket>& packet,
             const Eigen::Isometry3d& world_T_body);
 
-  SceneGraph::Ptr getSceneGraph() const;
-
   const Sensor::ConstPtr sensor;
-  const std::string zmq_url;
 
  protected:
-  bool step_mode_only_;
-  SceneGraph::Ptr graph_;
+  bool stepImpl(const InputData::Ptr& input);
 
- private:
-  void initModules();
+  bool running_;
+  const size_t max_queue_size_;
+  SensorInputPacket::Ptr last_input_;
+  std::vector<std::unique_ptr<InputFilter>> filters_;
 };
 
 void declare_config(PythonPipeline::Config& config) {
@@ -101,80 +107,51 @@ void declare_config(PythonPipeline::Config& config) {
   base<HydraPipeline::Config>(config);
 }
 
-PythonPipeline::PythonPipeline(const HydraPipeline::Config& config,
+PythonPipeline::PythonPipeline(const Config& _config,
                                const Sensor::Ptr& sensor,
-                               int config_verbosity,
-                               bool step_mode_only,
-                               std::string zmq_url)
-    : HydraPipeline(config),
+                               std::unique_ptr<Labelspace>&& labelspace,
+                               size_t max_queue_size,
+                               bool show_config)
+    : HydraPipeline(_config, std::move(labelspace)),
+      config(_config),
       sensor(sensor),
-      zmq_url(zmq_url),
-      step_mode_only_(step_mode_only) {
+      running_(false),
+      max_queue_size_(max_queue_size) {
   if (!sensor) {
     throw std::runtime_error("Invalid sensor!");
   }
 
-  VLOG(config_verbosity) << "Using sensor '" << sensor->name << "':\n"
-                         << sensor->dump();
-  initModules();
+  for (const auto& filter : config.filters) {
+    filters_.push_back(filter.create());
+  }
+
+  init();
+
+  if (show_config) {
+    MLOG(0) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
+    showModules();
+  }
 }
 
-PythonPipeline::~PythonPipeline() { stop(); }
+void PythonPipeline::init() {
+  HydraPipeline::init();
+  active_window_->queue()->set_max_size(max_queue_size_);
+}
 
 void PythonPipeline::start() {
-  if (step_mode_only_) {
-    LOG(INFO) << "[Hydra Python] Running in step mode!";
-  } else {
-    LOG(INFO) << "[Hydra Python] Running in parallel";
-    HydraPipeline::start();
-  }
-}
-
-void PythonPipeline::initModules() {
-  init();
-  if (!zmq_url.empty()) {
-    ZmqSink::Config zmq_config{zmq_url, true};
-    backend_->addSink(std::make_shared<ZmqSink>(zmq_config));
-  }
-
-  showModules();
+  running_ = true;
+  HydraPipeline::start();
 }
 
 void PythonPipeline::stop() {
-  if (step_mode_only_) {
-    return;
-  }
-
   HydraPipeline::stop();
+  running_ = false;
 }
 
 void PythonPipeline::reset() {
-  stop();
-
-  // reset specific module instances
-  active_window_.reset();
-  frontend_.reset();
-  backend_.reset();
-  lcd_.reset();
-
-  // reset state
-  const auto& config = GlobalInfo::instance();
-  frontend_dsg_ = config.createSharedDsg();
-  backend_dsg_ = config.createSharedDsg();
-
-  // setup dependent graphs
-  state_.reset(new SharedModuleState());
-  state_->lcd_graph = config.createSharedDsg();
-  state_->backend_graph = config.createSharedDsg();
-
-  PipelineQueues::instance().clear();
-
-  initModules();
-
-  if (!step_mode_only_) {
-    // avoid spamming config
-    start();
-  }
+  stop();       // make sure everything is done
+  initState();  // resets scene graphs
+  init();       // created modules
 }
 
 bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
@@ -183,7 +160,28 @@ bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
   input->timestamp_ns = packet->timestamp_ns;
   input->world_T_body = odom_T_body;
   packet->fillInputData(*input);
+  for (const auto& filter : filters_) {
+    if (!filter) {
+      continue;
+    }
 
+    if (!filter->valid(*packet, last_input_.get())) {
+      LOG(ERROR) << "Skipping input!";
+      return false;
+    }
+  }
+
+  last_input_ = packet;
+
+  if (running_) {
+    active_window_->queue()->push(input, true);
+    return false;
+  }
+
+  return stepImpl(input);
+}
+
+bool PythonPipeline::stepImpl(const InputData::Ptr& input) {
   if (!active_window_->step(input)) {
     return false;
   }
@@ -197,134 +195,90 @@ bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
   return true;
 }
 
-SceneGraph::Ptr PythonPipeline::getSceneGraph() const {
-  return backend_dsg_->graph->clone();
-}
-
 namespace python_pipeline {
 
 using namespace pybind11::literals;
 namespace py = pybind11;
 
 void addBindings(pybind11::module_& m) {
+  namespace fs = std::filesystem;
   py::class_<PythonPipeline>(m, "HydraPipeline")
-      .def_static(
-          "from_config",
-          [](const std::string& contents,
-             const Sensor::Ptr& sensor,
-             int robot_id,
-             int config_verbosity,
-             bool step_mode_only,
-             const std::string zmq_url) {
-            const auto node = YAML::Load(contents);
-            const auto global_config = config::fromYaml<PipelineConfig>(node);
-            const auto base_config = config::fromYaml<HydraPipeline::Config>(node);
-            GlobalInfo::init(global_config, robot_id);
-            return std::make_unique<PythonPipeline>(
-                base_config, sensor, config_verbosity, step_mode_only, zmq_url);
-          },
-          "config"_a,
-          "camera"_a,
-          "robot_id"_a = 0,
-          "config_verbosity"_a = 0,
-          "use_step_mode"_a = true,
-          "zmq_url"_a = "")
-      .def_static(
-          "from_file",
-          [](const std::filesystem::path& filepath,
-             const Sensor::Ptr& sensor,
-             int robot_id,
-             int config_verbosity,
-             bool step_mode_only,
-             const std::string& zmq_url) {
-            const auto node = YAML::LoadFile(filepath);
-            const auto global_config = config::fromYaml<PipelineConfig>(node);
-            const auto base_config = config::fromYaml<HydraPipeline::Config>(node);
-            GlobalInfo::init(global_config, robot_id);
-            return std::make_unique<PythonPipeline>(
-                base_config, sensor, config_verbosity, step_mode_only, zmq_url);
-          },
-          "config"_a,
-          "camera"_a,
-          "robot_id"_a = 0,
-          "config_verbosity"_a = 0,
-          "use_step_mode"_a = true,
-          "zmq_url"_a = "")
-      .def_static("default_config",
-                  []() {
-                    std::stringstream ss;
-                    ss << config::toYaml(PythonPipeline::Config());
-                    return ss.str();
-                  })
+      .def(py::init([](const Sensor::Ptr& sensor,
+                       const Labelspace& labelspace,
+                       int id,
+                       size_t max_queue_size,
+                       bool show_config) {
+             const auto config = config::fromContext<PythonPipeline::Config>();
+             const auto global_config = config::fromContext<PipelineConfig>();
+             GlobalInfo::init(global_config, id);
+             return std::make_unique<PythonPipeline>(
+                 config,
+                 sensor,
+                 std::make_unique<Labelspace>(labelspace),
+                 max_queue_size,
+                 show_config);
+           }),
+           "sensor"_a,
+           "labelspace"_a = Labelspace{},
+           "robot_id"_a = 0,
+           "max_queue_size"_a = 5,
+           "show_config"_a = true)
+      .def("start", &PythonPipeline::start)
+      .def("stop", &PythonPipeline::stop)
       .def(
           "save",
-          [](const PythonPipeline& pipeline, const std::filesystem::path& output) {
+          [](const PythonPipeline& pipeline, const fs::path& output) {
             pipeline.save(DataDirectory(output));
           },
           "output"_a)
-      .def(
-          "save_graph",
-          [](PythonPipeline& pipeline, const std::string& path, bool include_mesh) {
-            pipeline.getSceneGraph()->save(path, include_mesh);
-          },
-          "path"_a,
-          "include_mesh"_a = true)
       .def("reset", &PythonPipeline::reset)
       .def(
           "step",
           [](PythonPipeline& pipeline,
-             size_t timestamp_ns,
-             const Eigen::Vector3d& odom_t_body,
-             const Eigen::Vector4d& odom_R_body,
-             const py::buffer& depth,
-             const py::buffer& labels,
+             size_t stamp,
+             const Eigen::Vector4d& rot,
+             const Eigen::Vector3d& pos,
              const py::buffer& rgb,
+             const py::buffer& depth,
              const FeatureVector& feature) {
-            auto packet =
-                std::make_shared<PythonImageInput>(timestamp_ns, rgb, depth, labels);
+            const Eigen::Quaterniond q(rot[0], rot[1], rot[2], rot[3]);
+            const Eigen::Isometry3d pose = Eigen::Translation<double, 3>(pos) * q;
+            auto packet = std::make_shared<PythonImageInput>(stamp, rgb, depth);
             packet->input_feature = feature;
-            const Eigen::Quaterniond q(
-                odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
-            const Eigen::Isometry3d odom_T_body =
-                Eigen::Translation<double, 3>(odom_t_body) * q;
-            return pipeline.step(packet, odom_T_body);
+
+            return pipeline.step(packet, pose);
           },
           "timestamp_ns"_a,
-          "odom_t_body"_a,
           "odom_R_body"_a,
-          "depth"_a,
-          "labels"_a,
+          "odom_t_body"_a,
           "rgb"_a,
+          "depth"_a,
           "feature"_a = FeatureVector())
       .def(
           "step",
           [](PythonPipeline& pipeline,
-             size_t timestamp_ns,
-             const Eigen::Vector3d& odom_t_body,
-             const Eigen::Vector4d& odom_R_body,
-             const PythonCloudInput::PointVec& points,
-             const PythonCloudInput::LabelVec& labels,
-             const PythonCloudInput::ColorVec& colors,
+             size_t stamp,
+             const Eigen::Vector4d& rot,
+             const Eigen::Vector3d& pos,
+             const py::buffer& rgb,
+             const py::buffer& depth,
+             const py::buffer& labels,
              const FeatureVector& feature) {
-            auto packet = std::make_shared<PythonCloudInput>(
-                timestamp_ns, points, labels, colors);
+            const Eigen::Quaterniond q(rot[0], rot[1], rot[2], rot[3]);
+            const Eigen::Isometry3d pose = Eigen::Translation<double, 3>(pos) * q;
+            auto packet = std::make_shared<PythonImageInput>(stamp, rgb, depth, labels);
             packet->input_feature = feature;
-            const Eigen::Quaterniond q(
-                odom_R_body[0], odom_R_body[1], odom_R_body[2], odom_R_body[3]);
-            const Eigen::Isometry3d odom_T_body =
-                Eigen::Translation<double, 3>(odom_t_body) * q;
-            return pipeline.step(packet, odom_T_body);
+
+            return pipeline.step(packet, pose);
           },
           "timestamp_ns"_a,
-          "odom_t_body"_a,
           "odom_R_body"_a,
-          "points"_a,
+          "odom_t_body"_a,
+          "rgb"_a,
+          "depth"_a,
           "labels"_a,
-          "colors"_a,
-          "feature"_a = FeatureVector())
-      .def_property_readonly("graph", &PythonPipeline::getSceneGraph);
+          "feature"_a = FeatureVector());
 }
 
 }  // namespace python_pipeline
-
-};  // namespace hydra::python
+}  // namespace hydra::python

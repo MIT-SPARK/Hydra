@@ -36,42 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
-#include <yaml-cpp/yaml.h>
 
-#include <opencv2/core/mat.hpp>
 #include <string>
-
-#include "hydra/input/input_data.h"
-
-namespace {
-
-struct LabelRemapRow {
-  uint32_t sub_id;
-  uint32_t super_id;
-};
-
-}  // namespace
-
-namespace YAML {
-
-template <>
-struct convert<LabelRemapRow> {
-  static Node encode(const LabelRemapRow& row) {
-    Node node;
-    node["sub_id"] = row.sub_id;
-    node["super_id"] = row.super_id;
-    return node;
-  }
-
-  static bool decode(const Node& node, LabelRemapRow& row) {
-    row.sub_id = node["sub_id"].as<uint32_t>();
-    row.super_id = node["super_id"].as<uint32_t>();
-    return true;
-  }
-};
-
-}  // namespace YAML
 
 namespace hydra {
 namespace {
@@ -127,44 +93,6 @@ void declare_config(Labelspace& config) {
   field(config.object_labels, "object_labels");
   field(config.surface_places_labels, "surface_places_labels");
   field<LabelNameConversion>(config.label_names, "label_names");
-}
-
-LabelRemapper::LabelRemapper() {}
-
-LabelRemapper::LabelRemapper(const std::filesystem::path& filepath) {
-  if (!filepath.empty() && !std::filesystem::exists(filepath)) {
-    LOG(ERROR) << "Invalid filepath " << filepath << " for label remapping!";
-    return;
-  }
-
-  const auto node = YAML::LoadFile(filepath);
-  const auto remappings = node.as<std::vector<LabelRemapRow>>();
-  for (const auto& [sub, super] : remappings) {
-    label_remapping_[sub] = super;
-  }
-}
-
-std::optional<uint32_t> LabelRemapper::remapLabel(const uint32_t from) const {
-  const auto it = label_remapping_.find(from);
-  return it != label_remapping_.end() ? std::optional<uint32_t>(it->second)
-                                      : std::nullopt;
-}
-
-bool LabelRemapper::empty() const { return label_remapping_.empty(); }
-
-LabelRemapper::operator bool() const { return !empty(); }
-
-void LabelRemapper::remapImage(cv::Mat& img) const {
-  if (label_remapping_.empty()) {
-    return;
-  }
-
-  for (int r = 0; r < img.rows; ++r) {
-    for (int c = 0; c < img.cols; ++c) {
-      const auto pixel = img.at<InputData::LabelType>(r, c);
-      img.at<InputData::LabelType>(r, c) = remapLabel(pixel).value_or(-1);
-    }
-  }
 }
 
 }  // namespace hydra

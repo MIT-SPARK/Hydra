@@ -7,7 +7,6 @@
 #include <hydra/backend/backend_utilities.h>
 #include <hydra/backend/mst_factors.h>
 #include <hydra/common/launch_callbacks.h>
-#include <hydra/common/pipeline_queues.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <hydra/utils/timing_utilities.h>
 #include <kimera_pgmo/deformation_graph_4dof.h>
@@ -144,7 +143,7 @@ MultiBackendModule::MultiBackendModule(
     const Config& config, const InterfaceContainer::StatesPtr& shared_states)
     : KimeraPgmoInterface(config.pgmo),
       config(config::checkValid(config)),
-      lc_receiver_(config.external_loop_closures, &lc_queue_),
+      lc_receiver_(config.external_loop_closures),
       unmerged_dsg_(MultiGlobalInfo::instance().createMultiDsg()),
       merged_dsg_(MultiGlobalInfo::instance().createMultiDsg()),
       shared_states_(shared_states),
@@ -241,7 +240,7 @@ void MultiBackendModule::addSink(const Sink::Ptr& sink) {
 }
 
 void MultiBackendModule::addLoopClosures(const pose_graph_tools::PoseGraph& info) {
-  lc_queue_.push(info);
+  lc_receiver_.queue()->push(info);
 }
 
 bool MultiBackendModule::optimizeOnce(Timestamp stamp) {

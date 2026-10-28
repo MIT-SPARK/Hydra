@@ -112,23 +112,8 @@ double computePoseDiff(const Eigen::Affine3d& pose1,
   return translation_diff + rotation_scale * abs(rotation_diff);
 }
 
-ExternalLoopClosureReceiver::ExternalLoopClosureReceiver(const Config& config,
-                                                         Queue* const queue)
-    : config(config), input_queue_(queue) {
-  LOG_IF(WARNING, !input_queue_) << "External loop closures disabled!";
-}
-
-ExternalLoopClosureReceiver::OrderedPreviousLoops&
-ExternalLoopClosureReceiver::getPreviousLoopsForRobotPair(size_t robot_a,
-                                                          size_t robot_b) {
-  std::pair<size_t, size_t> key = {std::min(robot_a, robot_b),
-                                   std::max(robot_a, robot_b)};
-  if (!added_loop_closures_.count(key)) {
-    added_loop_closures_.insert({key, {}});
-  }
-
-  return added_loop_closures_.at(key);
-}
+ExternalLoopClosureReceiver::ExternalLoopClosureReceiver(const Config& config)
+    : config(config), input_queue_(new Queue()) {}
 
 LookupResult ExternalLoopClosureReceiver::findClosest(const SceneGraph& graph,
                                                       uint64_t stamp_ns,
@@ -181,7 +166,20 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const SceneGraph& graph,
   return {LookupResult::Status::VALID, best_id};
 }
 
-bool ExternalLoopClosureReceiver::should_add_lc(const OrderedPreviousLoops& added_lcs,
+auto ExternalLoopClosureReceiver::queue() const -> Queue::Ptr { return input_queue_; }
+
+auto ExternalLoopClosureReceiver::previous_loops(size_t robot_a, size_t robot_b)
+    -> PreviousLoops& {
+  std::pair<size_t, size_t> key = {std::min(robot_a, robot_b),
+                                   std::max(robot_a, robot_b)};
+  if (!added_loop_closures_.count(key)) {
+    added_loop_closures_.insert({key, {}});
+  }
+
+  return added_loop_closures_.at(key);
+}
+
+bool ExternalLoopClosureReceiver::should_add_lc(const PreviousLoops& added_lcs,
                                                 const uint64_t stamp_ns_from,
                                                 const uint64_t stamp_ns_to,
                                                 const Eigen::Affine3d& to_T_from) {
@@ -273,8 +271,7 @@ void ExternalLoopClosureReceiver::update(const SceneGraph& graph,
 
     const auto to_ns = getAgentTimestamp(graph.getNode(to_node.id)).count();
     const auto from_ns = getAgentTimestamp(graph.getNode(from_node.id)).count();
-    auto& previous_loops_for_pair =
-        getPreviousLoopsForRobotPair(edge.robot_from, edge.robot_to);
+    auto& previous_loops_for_pair = previous_loops(edge.robot_from, edge.robot_to);
     bool should_add = should_add_lc(previous_loops_for_pair, from_ns, to_ns, edge.pose);
     if (should_add) {
       MLOG(1) << "Added external loop closure " << NodeSymbol(to_node.id).str()

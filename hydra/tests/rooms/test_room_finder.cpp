@@ -39,8 +39,6 @@
 
 #include <limits>
 
-#include "hydra_test/config_guard.h"
-
 using namespace spark_dsg;
 
 namespace hydra {
@@ -115,10 +113,6 @@ TEST(RoomFinderTests, TestRoomPlaceEdges) {
 }
 
 TEST(RoomFinderTests, TestMakeRoomLayer) {
-  test::ConfigGuard guard(false);
-  PipelineConfig pipeline_config;
-  GlobalInfo::init(pipeline_config);
-
   SceneGraphLayer places(DsgLayers::PLACES);
   addNode(places, 0, 3);
   addNode(places, 1, 4);

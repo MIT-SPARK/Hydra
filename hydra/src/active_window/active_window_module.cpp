@@ -44,6 +44,8 @@
 
 namespace hydra {
 
+using WindowPtr = std::unique_ptr<VolumetricWindow>;
+
 void declare_config(ActiveWindowModule::Config& config) {
   using namespace config;
   name("ActiveWindowModule::Config");
@@ -61,9 +63,8 @@ ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
       max_input_queue_size(0),
       volumetric_map({0.1, 16, 0.3, with_semantics, with_tracking}) {}
 
-using WindowPtr = std::unique_ptr<VolumetricWindow>;
-
 ActiveWindowModule::ActiveWindowModule(const Config& config,
+                                       const Labelspace& labelspace,
                                        const OutputQueue::Ptr& queue,
                                        WindowPtr&& global_window)
     : config(config::checkValid(config)),
@@ -73,6 +74,11 @@ ActiveWindowModule::ActiveWindowModule(const Config& config,
       map_(config.volumetric_map),
       map_window_(config.map_window ? config.map_window.create()
                                     : std::move(global_window)) {
+  invalid_labels_.insert(labelspace.invalid_labels.begin(),
+                         labelspace.invalid_labels.end());
+  invalid_labels_.insert(labelspace.dynamic_labels.begin(),
+                         labelspace.dynamic_labels.end());
+
   const auto mesh_config = GlobalInfo::instance().getConfig().mesh;
   if (config.validate_mesh_fields) {
     if (config.volumetric_map.with_semantics && !mesh_config.with_labels) {
@@ -129,6 +135,7 @@ void ActiveWindowModule::spin() {
     }
 
     const auto msg = input_queue_->pop();
+    MLOG(3) << "Processing " << msg->timestamp_ns << " [ns]";
     auto output = spinOnce(msg);
     if (!output) {
       continue;
@@ -166,14 +173,8 @@ void ActiveWindowModule::addSink(const Sink::Ptr& sink) {
 }
 
 cv::Mat ActiveWindowModule::getDefaultIntegrationMask(const InputData& data) const {
-  // TODO(nathan) cache somewhere
   const auto& sensor = data.getSensor();
-  const auto& labelspace = GlobalInfo::instance().labelspace();
-  std::set<int32_t> invalid_labels;
-  invalid_labels.insert(labelspace.invalid_labels.begin(),
-                        labelspace.invalid_labels.end());
-  invalid_labels.insert(labelspace.dynamic_labels.begin(),
-                        labelspace.dynamic_labels.end());
+  auto invalid_labels = invalid_labels_;
   invalid_labels.insert(sensor.config.invalid_labels.begin(),
                         sensor.config.invalid_labels.end());
 

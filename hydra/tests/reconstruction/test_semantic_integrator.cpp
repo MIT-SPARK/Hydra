@@ -33,19 +33,18 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/common/global_info.h>
-#include <hydra/reconstruction/semantic_integrator.h>
 
-#include "hydra_test/config_guard.h"
+#include "hydra/common/labelspace.h"
+#include "hydra/reconstruction/semantic_integrator.h"
 
 namespace hydra {
 
 TEST(SemanticIntegrator, MLEIntegrationCorrect) {
-  const auto guard = test::ConfigGuard::FixedLabels(5);
-
+  Labelspace labelspace;
+  labelspace.total_labels = 5;
   MLESemanticIntegrator::Config config;
   config.label_confidence = 0.8;
-  MLESemanticIntegrator integrator(config);
+  MLESemanticIntegrator integrator(config, &labelspace);
 
   SemanticVoxel voxel;
   EXPECT_TRUE(voxel.empty);

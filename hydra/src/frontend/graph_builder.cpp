@@ -44,7 +44,6 @@
 
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
-#include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
@@ -61,6 +60,7 @@ static const auto registration =
     config::RegistrationWithConfig<GraphBuilder,
                                    GraphBuilder,
                                    GraphBuilder::Config,
+                                   Labelspace,
                                    SharedDsgInfo::Ptr,
                                    SharedModuleState::Ptr,
                                    std::unique_ptr<VolumetricWindow>>("GraphBuilder");
@@ -110,6 +110,7 @@ GraphBuilder::Config::Config()
       deformation_graph_builder(DeformationGraphBuilder::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
+                           const Labelspace& labelspace,
                            const SharedDsgInfo::Ptr& dsg,
                            const SharedModuleState::Ptr& state,
                            std::unique_ptr<VolumetricWindow>&& window)
@@ -122,17 +123,16 @@ GraphBuilder::GraphBuilder(const Config& config,
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(std::move(window)),
-      surface_places_(config.surface_places.create(
-          GlobalInfo::instance().labelspace().surface_places_labels)),
+      surface_places_(config.surface_places.create(labelspace.surface_places_labels)),
       sinks_(Sink::instantiate(config.sinks)) {
-  const auto& global_info = GlobalInfo::instance();
   if (config.enable_mesh_objects) {
-    segmenter_ = std::make_unique<MeshSegmenter>(
-        config.object_config, global_info.labelspace().object_labels);
+    segmenter_ =
+        std::make_unique<MeshSegmenter>(config.object_config, labelspace.object_labels);
   }
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
+  const auto& global_info = GlobalInfo::instance();
   dsg_->graph->setMesh(global_info.createMesh());
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
@@ -267,6 +267,10 @@ void GraphBuilder::addSink(const Sink::Ptr& sink) {
   }
 }
 
+void GraphBuilder::setBackendQueue(const OutputQueue::Ptr& queue) {
+  backend_input_queue_ = queue;
+}
+
 void GraphBuilder::setLcdQueue(const OutputQueue::Ptr& queue) {
   lcd_input_queue_ = queue;
 }
@@ -315,7 +319,10 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
-  PipelineQueues::instance().backend_queue.push(curr_output_);
+  if (backend_input_queue_) {
+    backend_input_queue_->push(curr_output_);
+  }
+
   if (lcd_input_queue_) {
     lcd_input_queue_->push(curr_output_);
   }
