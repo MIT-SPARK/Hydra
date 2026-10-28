@@ -368,7 +368,8 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     Region& region,
     const ActiveWindowOutput& msg,
     const TraversabilityLayer& layer) const {
-  // Position.
+  // Position. Remember the previous height since the 2D position below clobbers z.
+  const double prev_z = attrs.position.z();
   const auto centroid_index = region.centroid.cast<int>();
   if (region.voxels.count(centroid_index)) {
     attrs.position = region.centroid.cast<double>() * layer.voxel_size;
@@ -435,11 +436,12 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     ++num_valid;
   }
 
-  // fallback to current robot height
   if (num_valid) {
     attrs.position.z() = z_value / num_valid;
   } else if (num_active) {
     attrs.position.z() = msg.world_T_body().translation().z();
+  } else {
+    attrs.position.z() = prev_z;
   }
 }
 
