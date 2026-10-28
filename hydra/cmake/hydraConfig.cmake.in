@@ -13,6 +13,7 @@ find_dependency(spark_dsg REQUIRED)
 find_dependency(teaserpp REQUIRED)
 find_dependency(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
 find_dependency(PkgConfig REQUIRED)
+find_dependency(SQLite3 REQUIRED)
 pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
 
 if(NOT TARGET hydra::hydra)

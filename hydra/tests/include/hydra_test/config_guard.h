@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include <hydra/common/global_info.h>
 
+#include <filesystem>
+
 namespace hydra::test {
 
 struct ConfigGuard {
@@ -52,6 +54,15 @@ struct ConfigGuard {
     config.labelspace = labelspace;
 
     GlobalInfo::init(config);
+    return ConfigGuard(false);
+  }
+
+  //! Configure the image store returned by GlobalInfo::imageStore()
+  [[nodiscard]] static ConfigGuard WithImageStore(const std::filesystem::path& path,
+                                                  int robot_id = 0) {
+    PipelineConfig config;
+    config.image_store.path = path;
+    GlobalInfo::init(config, robot_id);
     return ConfigGuard(false);
   }
 

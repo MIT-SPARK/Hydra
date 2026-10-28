@@ -43,9 +43,11 @@
 #include "hydra/common/labelspace.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
+#include "hydra/utils/image_store_config.h"
 
 namespace hydra {
 
+class ImageStore;
 class SemanticColorMap;
 
 /**
@@ -97,6 +99,9 @@ struct PipelineConfig {
   std::filesystem::path label_remap_filepath;
   //! Configuration for scene graph mesh fields
   MeshFieldConfig mesh;
+  //! Image store shared by the modules that record images (see GlobalInfo::imageStore).
+  //! An empty path disables all image writers
+  ImageStoreConfig image_store;
   //! @brief Layers in the scene graph that use the labelspace
   std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
                                            spark_dsg::DsgLayers::MESH_PLACES};
@@ -130,6 +135,14 @@ class GlobalInfo {
   SharedDsgInfo::Ptr createSharedDsg() const;
 
   spark_dsg::Mesh::Ptr createMesh() const;
+
+  /**
+   * @brief Image store configured by PipelineConfig::image_store.
+   *
+   * All callers share one instance (see ImageStore::open).
+   * @returns The store, or nullptr if its path is empty or it cannot be opened
+   */
+  std::shared_ptr<ImageStore> imageStore() const;
 
  private:
   GlobalInfo();
