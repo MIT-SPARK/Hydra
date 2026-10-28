@@ -55,11 +55,11 @@ struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
 
     //! Merge two overlapping places if either covers at least this fraction of the
     //! other's area.
-    double pairwise_overlap = 0.5;
+    double pairwise_overlap = 0.4;
 
     //! Merge a place into its overlapping neighbors if their union covers at least this
     //! fraction of its area. Set to > 1 to disable.
-    double union_overlap = 0.8;
+    double union_overlap = 0.4;
 
     //! Number of radial samples per boundary ray used to estimate area coverage.
     size_t overlap_samples = 4;
