@@ -52,6 +52,17 @@ struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
     std::string layer = spark_dsg::DsgLayers::TRAVERSABILITY;
 
     DeformationInterpolator::Config deformation;
+
+    //! Merge two overlapping places if either covers at least this fraction of the
+    //! other's area.
+    double pairwise_overlap = 0.5;
+
+    //! Merge a place into its overlapping neighbors if their union covers at least this
+    //! fraction of its area. Set to > 1 to disable.
+    double union_overlap = 0.8;
+
+    //! Number of radial samples per boundary ray used to estimate area coverage.
+    size_t overlap_samples = 4;
   } const config;
 
   using EdgeSet = std::set<spark_dsg::EdgeKey>;
