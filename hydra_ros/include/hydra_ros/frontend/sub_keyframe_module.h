@@ -36,7 +36,6 @@
 
 #include <hydra/common/module.h>
 #include <hydra/frontend/keyframe_gate.h>
-#include <hydra/utils/image_store.h>
 #include <hydra/utils/logging.h>
 
 #include <atomic>
@@ -48,6 +47,7 @@
 
 namespace hydra {
 
+class ImageStore;
 struct SubKeyframeInput;
 
 /**
@@ -103,7 +103,7 @@ class SubKeyframeModule : public Module {
   void stopImpl();
 
   KeyframeGate gate_;
-  ImageStore::Ptr store_;
+  std::shared_ptr<ImageStore> store_;
   std::unique_ptr<TFLookup> lookup_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;

@@ -41,6 +41,7 @@
 #include <hydra/frontend/agent_image_extractor.h>
 #include <hydra/input/camera.h>
 #include <hydra/input/input_data.h>
+#include <hydra/utils/image_store.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 

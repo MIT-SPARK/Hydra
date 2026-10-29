@@ -19,6 +19,7 @@ option(BUILD_SHARED_LIBS "Build shared libs" ON)
 option(CMAKE_INTERPROCEDURAL_OPTIMIZATION "Enable interprocedural optimization" ON)
 option(HYDRA_ENABLE_GNN "Build GNN interface" OFF)
 option(HYDRA_ENABLE_PYTHON "Build Hydra python bindings" OFF)
+option(HYDRA_ENABLE_IMAGE_STORE "Build the image store (requires SQLite3)" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -33,7 +34,6 @@ find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
 find_package(PkgConfig REQUIRED)
-find_package(SQLite3 REQUIRED)
 pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
 # we turn off PCL precompile internally to get around having vtk linked. Note: kdtree is
 # REQUIRED to make sure we link against FLANN (used by euclidean extraction)
@@ -60,23 +60,28 @@ target_link_libraries(
          spatial_hash::spatial_hash
          teaserpp::teaser_registration
          ${OpenCV_LIBRARIES}
-  PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES} PkgConfig::LIBZIP SQLite::SQLite3
+  PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES} PkgConfig::LIBZIP
 )
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(hydra::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
-# the image store schema is compiled in from the canonical sql file
-set(HYDRA_IMAGE_STORE_SCHEMA_FILE
-    ${CMAKE_CURRENT_SOURCE_DIR}/resources/image_store/schema.sql
-)
-set_property(
-  DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${HYDRA_IMAGE_STORE_SCHEMA_FILE}
-)
-file(READ ${HYDRA_IMAGE_STORE_SCHEMA_FILE} HYDRA_IMAGE_STORE_SCHEMA)
-configure_file(
-  cmake/image_store_schema.h.in
-  ${CMAKE_CURRENT_BINARY_DIR}/hydra/image_store_schema.h @ONLY
-)
+if(HYDRA_ENABLE_IMAGE_STORE)
+  find_package(SQLite3 REQUIRED)
+  target_link_libraries(${PROJECT_NAME} PRIVATE SQLite::SQLite3)
+
+  # the image store schema is compiled in from the canonical sql file
+  set(HYDRA_IMAGE_STORE_SCHEMA_FILE
+      ${CMAKE_CURRENT_SOURCE_DIR}/resources/image_store/schema.sql
+  )
+  set_property(
+    DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${HYDRA_IMAGE_STORE_SCHEMA_FILE}
+  )
+  file(READ ${HYDRA_IMAGE_STORE_SCHEMA_FILE} HYDRA_IMAGE_STORE_SCHEMA)
+  configure_file(
+    cmake/image_store_schema.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/hydra/image_store_schema.h @ONLY
+  )
+endif()
 
 add_subdirectory(src)
 if(HYDRA_ENABLE_GNN)
@@ -104,9 +109,11 @@ install(
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(FILES ${HYDRA_IMAGE_STORE_SCHEMA_FILE}
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/image_store
-)
+if(HYDRA_ENABLE_IMAGE_STORE)
+  install(FILES ${HYDRA_IMAGE_STORE_SCHEMA_FILE}
+          DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/image_store
+  )
+endif()
 install(EXPORT hydra-targets FILE hydraTargets.cmake NAMESPACE hydra::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
 )

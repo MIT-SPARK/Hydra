@@ -43,6 +43,7 @@
 #include <hydra/common/pipeline_queues.h>
 #include <hydra/input/camera.h>
 #include <hydra/input/sensor_input_packet.h>
+#include <hydra/utils/image_store.h>
 
 namespace hydra {
 namespace {

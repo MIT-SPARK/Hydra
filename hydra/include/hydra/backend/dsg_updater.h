@@ -44,10 +44,11 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/utils/data_directory.h"
-#include "hydra/utils/image_store.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra {
+
+class ImageStore;
 
 class DsgUpdater {
  public:
@@ -109,7 +110,7 @@ class DsgUpdater {
   const std::set<std::string> exhaustive_names_;
   //! Merges as of the last report
   std::map<spark_dsg::NodeId, spark_dsg::NodeId> reported_merges_;
-  ImageStore::Ptr image_store_;
+  std::shared_ptr<ImageStore> image_store_;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
   std::vector<spark_dsg::NodeId> active_nodes_to_restore_;

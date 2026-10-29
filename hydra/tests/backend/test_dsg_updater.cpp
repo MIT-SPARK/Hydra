@@ -39,9 +39,14 @@
 #include <spark_dsg/node_attributes.h>
 
 #include "hydra_test/config_guard.h"
-#include "hydra_test/image_store_query.h"
 #include "hydra_test/shared_dsg_fixture.h"
 #include "hydra_test/temp_directory.h"
+
+#ifdef HYDRA_ENABLE_IMAGE_STORE
+#include <hydra/utils/image_store.h>
+
+#include "hydra_test/image_store_query.h"
+#endif
 
 namespace hydra {
 
@@ -150,6 +155,7 @@ TEST(DsgUpdater, ReportsNewMerges) {
   EXPECT_TRUE(target->new_merges.empty());
 }
 
+#ifdef HYDRA_ENABLE_IMAGE_STORE
 TEST(DsgUpdater, MirrorsMergesIntoImageStore) {
   const test::TempDirectory tmp("dsg_updater_store");
   const auto aliases = [&]() {
@@ -176,5 +182,6 @@ TEST(DsgUpdater, MirrorsMergesIntoImageStore) {
   EXPECT_EQ(aliases(), test::StoreRows({{"2", "3"}}));
   EXPECT_EQ(target->new_merges, Updates({{0, std::nullopt}, {1, std::nullopt}}));
 }
+#endif
 
 }  // namespace hydra

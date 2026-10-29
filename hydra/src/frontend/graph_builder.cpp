@@ -51,6 +51,7 @@
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/subkeyframe_anchor.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
+#include "hydra/utils/image_store.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 

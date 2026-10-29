@@ -44,6 +44,7 @@
 #include "hydra/common/global_info.h"
 #include "hydra/frontend/subkeyframe_anchor.h"
 #include "hydra/input/camera.h"
+#include "hydra/utils/image_store.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {

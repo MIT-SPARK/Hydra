@@ -39,6 +39,7 @@
 #include <Eigen/Geometry>
 #include <deque>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <opencv2/core/mat.hpp>
 #include <optional>
@@ -47,10 +48,12 @@
 
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/frontend/keyframe_gate.h"
-#include "hydra/utils/image_store.h"
+#include "hydra/utils/keyframe_images.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra {
+
+class ImageStore;
 
 /**
  * @brief Saves color and depth images for agent (pose graph) nodes to the image store
@@ -125,7 +128,7 @@ class AgentImageExtractor : public GraphBuilderFunctor {
                                         const std::vector<BufferedFrame>& frames);
 
   KeyframeGate gate_;
-  ImageStore::Ptr store_;
+  std::shared_ptr<ImageStore> store_;
 
   //! New agent nodes that were not paired with a frame yet (oldest first)
   std::deque<spark_dsg::NodeId> pending_nodes_;

@@ -35,8 +35,6 @@
 #include "hydra/utils/image_store.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/types/enum.h>
-#include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <sqlite3.h>
@@ -53,7 +51,6 @@
 #include <mutex>
 #include <opencv2/imgcodecs.hpp>
 #include <set>
-#include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <unordered_map>
@@ -66,32 +63,10 @@ namespace hydra {
 namespace fs = std::filesystem;
 using spark_dsg::NodeId;
 
-void declare_config(ImageStoreConfig& config) {
-  using namespace config;
-  name("ImageStoreConfig");
-  field<Path>(config.path, "path");
-  enum_field(config.on_existing,
-             "on_existing",
-             {{ImageStoreConfig::OnExisting::Append, "append"},
-              {ImageStoreConfig::OnExisting::Rotate, "rotate"},
-              {ImageStoreConfig::OnExisting::Fail, "fail"}});
-  field<Path>(config.session_artifacts_dir, "session_artifacts_dir");
-  field(config.session_artifacts, "session_artifacts");
-  field(config.max_images_per_object, "max_images_per_object");
-  field(config.jpeg_quality, "jpeg_quality");
-  field(config.write_depth, "write_depth");
-  field(config.flush_period_ms, "flush_period_ms", "ms");
-  field(config.max_queue_size, "max_queue_size");
-  checkInRange(config.jpeg_quality, 0, 100, "jpeg_quality");
-  check(config.max_queue_size, GT, size_t(0), "max_queue_size");
-}
-
 namespace {
 
 static_assert(std::endian::native == std::endian::little,
               "transforms are stored as little-endian doubles");
-
-constexpr uint64_t kSequenceMask = (uint64_t(1) << 48) - 1;
 
 std::string transformBlob(const Eigen::Isometry3d& transform) {
   // row-major 4x4
@@ -411,7 +386,7 @@ void loadSequences(sqlite3* db,
                    std::map<int, uint64_t>& sequences) {
   Statement query(db,
                   "SELECT " + column + " >> 48, MAX(" + column + " & " +
-                      std::to_string(kSequenceMask) + ") FROM " + table +
+                      std::to_string(ImageStore::kSequenceMask) + ") FROM " + table +
                       " GROUP BY 1");
   while (query.step()) {
     auto& next = sequences[static_cast<int>(query.integer(0))];
@@ -870,47 +845,7 @@ ImageStore::Ptr ImageStore::open(const Config& config) {
   }
 }
 
-ImageStore::Ptr ImageStore::open(const fs::path& path) {
-  Config config;
-  config.path = path;
-  return open(config);
-}
-
-uint64_t ImageStore::makeId(int robot_id, uint64_t sequence) {
-  return (static_cast<uint64_t>(robot_id) << 48) | (sequence & kSequenceMask);
-}
-
-std::string ImageStore::encodeMaskRle(const cv::Mat& mask) {
-  std::stringstream ss;
-  ss << "[";
-  if (mask.empty()) {
-    ss << "]";
-    return ss.str();
-  }
-
-  CV_Assert(mask.type() == CV_8UC1);
-  bool foreground = false;
-  size_t run = 0;
-  bool first = true;
-  for (int r = 0; r < mask.rows; ++r) {
-    const auto row = mask.ptr<uint8_t>(r);
-    for (int c = 0; c < mask.cols; ++c) {
-      const bool value = row[c] != 0;
-      if (value == foreground) {
-        ++run;
-        continue;
-      }
-
-      ss << (first ? "" : ",") << run;
-      first = false;
-      foreground = value;
-      run = 1;
-    }
-  }
-
-  ss << (first ? "" : ",") << run << "]";
-  return ss.str();
-}
+bool ImageStore::enabled() { return true; }
 
 ImageStore::ImageStore(const Config& config)
     : config(config), impl_(std::make_unique<Impl>(config)) {}

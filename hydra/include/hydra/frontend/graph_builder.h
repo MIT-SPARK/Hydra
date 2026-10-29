@@ -53,7 +53,6 @@
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/subkeyframe_anchor.h"
 #include "hydra/frontend/surface_place_extractor.h"
-#include "hydra/utils/image_store.h"
 #include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
@@ -62,6 +61,7 @@ class MeshDelta;
 
 namespace hydra {
 
+class ImageStore;
 struct VolumetricWindow;
 
 class GraphBuilder : public Module {
@@ -179,7 +179,7 @@ class GraphBuilder : public Module {
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
   std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
   //! Image store (if configured), which also records which node each track became
-  ImageStore::Ptr image_store_;
+  std::shared_ptr<ImageStore> image_store_;
   //! Recent agent nodes of this robot that frames can be anchored to
   AnchorWindow frame_anchors_;
 

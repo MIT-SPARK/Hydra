@@ -88,6 +88,8 @@ class ImageStore {
   //! Track ids written by the pipeline are below this value; larger ids are reserved
   //! for external writers
   static constexpr uint64_t kMaxTrackId = uint64_t(1) << 40;
+  //! Bits of an id that hold the per-robot sequence number (see makeId)
+  static constexpr uint64_t kSequenceMask = (uint64_t(1) << 48) - 1;
   //! Name of the database file in the store directory
   static constexpr char kDatabaseName[] = "store.sqlite";
 
@@ -154,6 +156,10 @@ class ImageStore {
 
   //! @brief Open a directory with the default configuration
   static Ptr open(const std::filesystem::path& path);
+
+  //! @brief Whether Hydra was built with the image store (HYDRA_ENABLE_IMAGE_STORE).
+  //! Without it, open() always returns nullptr
+  static bool enabled();
 
   //! @brief Make an id from a robot id and a per-robot sequence number
   static uint64_t makeId(int robot_id, uint64_t sequence);

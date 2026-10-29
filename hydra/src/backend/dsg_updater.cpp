@@ -45,6 +45,7 @@
 
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
+#include "hydra/utils/image_store.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 

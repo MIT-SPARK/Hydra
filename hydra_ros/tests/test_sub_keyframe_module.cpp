@@ -39,6 +39,7 @@
 #include <hydra/common/pipeline_queues.h>
 #include <hydra/input/camera.h>
 #include <hydra/input/sensor_input_packet.h>
+#include <hydra/utils/image_store.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -141,6 +142,10 @@ TEST(SubKeyframeModule, NoStoreDisables) {
 
 // The module enables the hand-off queue and writes gated images as unanchored frames
 TEST(SubKeyframeModule, WritesUnanchoredFrames) {
+  if (!ImageStore::enabled()) {
+    GTEST_SKIP() << "built without the image store";
+  }
+
   TempDirectory tmp;
   const auto output = tmp.path / "image_store";
 
@@ -186,6 +191,10 @@ TEST(SubKeyframeModule, WritesUnanchoredFrames) {
 
 // Images rejected by the gate are never parsed
 TEST(SubKeyframeModule, ParsesOnlyGatedImages) {
+  if (!ImageStore::enabled()) {
+    GTEST_SKIP() << "built without the image store";
+  }
+
   TempDirectory tmp;
   const StoreGuard guard(tmp.path / "image_store");
   SubKeyframeModule::Config config;

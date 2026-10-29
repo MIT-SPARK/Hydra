@@ -13,8 +13,12 @@ find_dependency(spark_dsg REQUIRED)
 find_dependency(teaserpp REQUIRED)
 find_dependency(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
 find_dependency(PkgConfig REQUIRED)
-find_dependency(SQLite3 REQUIRED)
 pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
+
+set(hydra_IMAGE_STORE_ENABLED @HYDRA_ENABLE_IMAGE_STORE@)
+if(hydra_IMAGE_STORE_ENABLED)
+  find_dependency(SQLite3 REQUIRED)
+endif()
 
 if(NOT TARGET hydra::hydra)
   include("${hydra_CMAKE_DIR}/hydraTargets.cmake")
