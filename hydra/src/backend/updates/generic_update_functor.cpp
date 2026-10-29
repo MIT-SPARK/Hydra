@@ -81,6 +81,9 @@ UpdateFunctor::Hooks GenericUpdateFunctor::hooks() const {
     my_hooks.find_merges = [this](const auto& graph, const auto& info) {
       return findMerges(graph, info);
     };
+    my_hooks.merge = [this](const auto& graph, const auto& nodes) {
+      return mergeAttributes(graph, nodes);
+    };
   }
 
   return my_hooks;
@@ -100,6 +103,25 @@ void GenericUpdateFunctor::call(const SceneGraph& unmerged,
   deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
   MLOG(1) << "[Hydra Backend] " << config.layer << " update: " << layer.numNodes()
           << " nodes";
+}
+
+NodeAttributes::Ptr GenericUpdateFunctor::mergeAttributes(
+    const SceneGraph& unmerged, const std::vector<NodeId>& nodes) const {
+  if (nodes.empty()) {
+    return nullptr;
+  }
+
+  const auto parent = unmerged.findNode(nodes.front());
+  if (!parent) {
+    return nullptr;
+  }
+
+  // the unmerged parent may hold odometric or already deformed values; the pose is
+  // re-derived from the cached odometric values so the merged node always ends up
+  // in the optimized frame
+  auto attrs = parent->attributes().clone();
+  deformation_interpolator.applyLastTransform(nodes.front(), *attrs);
+  return attrs;
 }
 
 MergeList GenericUpdateFunctor::findMerges(const SceneGraph& graph,

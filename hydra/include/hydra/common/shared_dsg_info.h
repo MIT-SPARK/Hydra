@@ -40,12 +40,27 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace hydra {
 
 struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
+
+  //! Change to the merge state of a node (see new_merges)
+  struct MergeUpdate {
+    //! Node that was merged away
+    spark_dsg::NodeId child;
+    //! Node that the child is now merged into (unset if the merge was undone)
+    std::optional<spark_dsg::NodeId> parent;
+
+    bool operator==(const MergeUpdate& other) const {
+      return child == other.child && parent == other.parent;
+    }
+  };
+
   struct Config {
     std::map<std::string, spark_dsg::LayerKey> layers{
         {spark_dsg::DsgLayers::OBJECTS, 2},
@@ -66,7 +81,11 @@ struct SharedDsgInfo {
   std::atomic<bool> updated;
   uint64_t sequence_number = 0;
   std::shared_ptr<spark_dsg::SceneGraph> graph;
+  //! All current merges as child -> surviving node
   std::map<spark_dsg::NodeId, spark_dsg::NodeId> merges;
+  //! Changes to merges made by the most recent backend update: new merges,
+  //! re-parented children and undone merges (e.g., when the merges are reset)
+  std::vector<MergeUpdate> new_merges;
 };
 
 void declare_config(SharedDsgInfo::Config& config);

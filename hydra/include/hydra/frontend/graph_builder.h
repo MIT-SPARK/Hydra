@@ -51,6 +51,7 @@
 #include "hydra/frontend/graph_connector.h"
 #include "hydra/frontend/mesh_compressor.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/subkeyframe_anchor.h"
 #include "hydra/frontend/surface_place_extractor.h"
 #include "hydra/utils/logging.h"
 
@@ -60,6 +61,7 @@ class MeshDelta;
 
 namespace hydra {
 
+class ImageStore;
 struct VolumetricWindow;
 
 class GraphBuilder : public Module {
@@ -95,6 +97,14 @@ class GraphBuilder : public Module {
     config::VirtualConfig<GraphBuilderFunctor> freespace_places;
     config::VirtualConfig<GraphBuilderFunctor> traversability_places;
     config::VirtualConfig<GraphBuilderFunctor> frontier_places;
+    //! Optional functor saving images for agent nodes (e.g., AgentImageExtractor)
+    config::VirtualConfig<GraphBuilderFunctor> agent_extractor;
+    //! Maximum distance [m] between a frame and its anchor agent node. Unanchored
+    //! frames of the image store (e.g., sub-keyframes and object observations, see
+    //! GlobalInfo::imageStore) are anchored to agent nodes
+    double frame_anchor_max_dist_m = 2.0;
+    //! Time window [s] of recent agent nodes considered as frame anchors
+    double frame_anchor_window_s = 120.0;
 
     //! Output sinks and visualization
     std::vector<Sink::Factory> sinks;
@@ -143,6 +153,9 @@ class GraphBuilder : public Module {
 
   void updatePlaces2d(const ActiveWindowOutput& msg);
 
+  //! Anchor the frames of the image store that are waiting for an agent node
+  void anchorPendingFrames(bool force = false);
+
  protected:
   InputQueue::Ptr queue_;
   uint64_t sequence_number_;
@@ -165,6 +178,10 @@ class GraphBuilder : public Module {
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
   std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
+  //! Image store (if configured), which also records which node each track became
+  std::shared_ptr<ImageStore> image_store_;
+  //! Recent agent nodes of this robot that frames can be anchored to
+  AnchorWindow frame_anchors_;
 
   OutputQueue::Ptr lcd_input_queue_;
 

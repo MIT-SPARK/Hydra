@@ -48,6 +48,8 @@
 
 namespace hydra {
 
+class ImageStore;
+
 class DsgUpdater {
  public:
   using Ptr = std::shared_ptr<DsgUpdater>;
@@ -89,6 +91,11 @@ class DsgUpdater {
   void handleMeshUpdate(uint64_t timestamp_ns,
                         const kimera_pgmo::MeshOffsetInfo& offsets);
 
+  /**
+   * @brief Update the target graph from the source graph and apply all update
+   * functors. Changes to the node merges are reported in the new_merges field of the
+   * target and mirrored into the image store (see GlobalInfo::imageStore).
+   */
   void callUpdateFunctions(uint64_t timestamp_ns, UpdateInfo::ConstPtr info);
 
   void finalize(UpdateInfo::ConstPtr info);
@@ -97,9 +104,13 @@ class DsgUpdater {
   void callFunctors(UpdateInfo::ConstPtr info);
   void markNewNodes();
   void clearNewNodes();
+  void reportMerges();
 
   GroupedMergeTracker merge_tracker;
   const std::set<std::string> exhaustive_names_;
+  //! Merges as of the last report
+  std::map<spark_dsg::NodeId, spark_dsg::NodeId> reported_merges_;
+  std::shared_ptr<ImageStore> image_store_;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
   std::vector<spark_dsg::NodeId> active_nodes_to_restore_;

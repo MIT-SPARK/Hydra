@@ -25,6 +25,7 @@ MultiDsgInfo::Ptr MultiDsgInfo::clone() const {
   other->robot_vertex_offset = robot_vertex_offset;
   other->robot_num_vertices = robot_num_vertices;
   other->merges = merges;
+  other->new_merges = new_merges;
   return other;
 }
 
@@ -40,6 +41,7 @@ void MultiDsgInfo::update(const MultiDsgInfo& dsg) {
   updated = dsg.updated.load();
   sequence_number = dsg.sequence_number;
   merges = dsg.merges;
+  new_merges = dsg.new_merges;
   robot_node_map = dsg.robot_node_map;
   node_robot_map = dsg.node_robot_map;
   robot_vertex_offset = dsg.robot_vertex_offset;
@@ -53,6 +55,7 @@ void MultiDsgInfo::clear() {
   robot_vertex_offset.clear();
   robot_num_vertices.clear();
   merges.clear();
+  new_merges.clear();
   layer_partition_next_node_idx.clear();
   updated = false;
 }

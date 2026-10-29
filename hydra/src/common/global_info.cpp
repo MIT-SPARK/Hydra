@@ -43,6 +43,7 @@
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/semantic_color_map.h"
+#include "hydra/utils/image_store.h"
 #include "hydra/utils/pgmo_glog_sink.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -83,6 +84,7 @@ void declare_config(PipelineConfig& config) {
   field<Path::Absolute>(config.label_remap_filepath, "semantic_label_remap_filepath");
   field(config.mesh, "mesh");
   field(config.semantic_layers, "semantic_layers");
+  field(config.image_store, "image_store");
 
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
@@ -177,6 +179,10 @@ spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {
                                            true,
                                            config_.mesh.with_labels,
                                            config_.mesh.with_first_seen_stamps);
+}
+
+std::shared_ptr<ImageStore> GlobalInfo::imageStore() const {
+  return ImageStore::open(config_.image_store);
 }
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {
