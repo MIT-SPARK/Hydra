@@ -37,6 +37,7 @@
 
 #include <memory>
 
+#include "hydra_ros/frontend/sub_keyframe_module.h"
 #include "hydra_ros/input/ros_input_module.h"
 #include "hydra_ros/utils/status_monitor.h"
 
@@ -53,6 +54,8 @@ class HydraRosPipeline : public HydraPipeline {
     RosInputModule::Config input;
     //! Monitor to report whether or Hydra is running normally
     StatusMonitor::Config status_monitor;
+    //! @brief Optional config for full-rate sub-keyframe capture
+    config::VirtualConfig<SubKeyframeModule> sub_keyframe;
   } const config;
 
   explicit HydraRosPipeline(const Config& config);
@@ -69,6 +72,7 @@ class HydraRosPipeline : public HydraPipeline {
   std::unique_ptr<RosInputModule> input_;
   std::unique_ptr<StatusMonitor> monitor_;
   std::unique_ptr<ExternalLoopClosureSubscriber> external_loop_closure_sub_;
+  std::unique_ptr<SubKeyframeModule> sub_keyframe_;
 };
 
 void declare_config(HydraRosPipeline::Config& config);

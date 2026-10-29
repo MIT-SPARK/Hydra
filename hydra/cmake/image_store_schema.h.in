@@ -1,0 +1,8 @@
+// Generated from resources/image_store/schema.sql. Do not edit.
+#pragma once
+
+namespace hydra::image_store {
+
+inline constexpr char kSchema[] = R"hydra_schema(@HYDRA_IMAGE_STORE_SCHEMA@)hydra_schema";
+
+}  // namespace hydra::image_store

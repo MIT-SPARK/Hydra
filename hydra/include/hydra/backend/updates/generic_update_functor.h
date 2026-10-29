@@ -69,6 +69,14 @@ struct GenericUpdateFunctor : public UpdateFunctor {
   MergeList findMerges(const spark_dsg::SceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
+  /**
+   * @brief Build the attributes of a merged node from the surviving node (the first
+   * entry of nodes), with its most recent deformation applied.
+   */
+  spark_dsg::NodeAttributes::Ptr mergeAttributes(
+      const spark_dsg::SceneGraph& unmerged,
+      const std::vector<spark_dsg::NodeId>& nodes) const;
+
   std::optional<spark_dsg::NodeId> proposeMerge(
       const spark_dsg::SceneGraphLayer& layer,
       const spark_dsg::SceneGraphNode& node) const;

@@ -6,6 +6,8 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/disjoint_set.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/display_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/id_tracker.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/image_store_common.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/keyframe_images.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/logging.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/minimum_spanning_tree.cpp
@@ -17,3 +19,12 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/timing_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/zip_archive.cpp
 )
+
+if(HYDRA_ENABLE_IMAGE_STORE)
+  target_sources(
+    ${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/image_store.cpp
+                            ${CMAKE_CURRENT_SOURCE_DIR}/image_store_session.cpp
+  )
+else()
+  target_sources(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/image_store_disabled.cpp)
+endif()

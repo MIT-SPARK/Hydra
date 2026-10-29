@@ -41,8 +41,10 @@
 #include <spark_dsg/scene_graph.h>
 
 #include <algorithm>
+#include <unordered_set>
 
 #include "hydra/common/attribute_merger.h"
+#include "hydra/utils/image_store.h"
 
 namespace YAML {
 
@@ -114,7 +116,22 @@ LayerTracker::LayerTracker(const Config& config)
 
 GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(config)) {
   for (const auto& [layer_name, tracker_config] : config.layer_updates) {
-    trackers_.emplace(layer_name, LayerTracker(tracker_config));
+    auto iter = trackers_.emplace(layer_name, LayerTracker(tracker_config)).first;
+    iter->second.bind_tracks = layer_name == spark_dsg::DsgLayers::OBJECTS;
+  }
+}
+
+void GraphUpdater::setImageStore(std::shared_ptr<ImageStore> store, int robot_id) {
+  image_store_ = std::move(store);
+  robot_id_ = robot_id;
+}
+
+void GraphUpdater::bindTrack(const LayerTracker& tracker,
+                             size_t track_id,
+                             NodeId node_id) {
+  if (image_store_ && tracker.bind_tracks) {
+    // idempotent, so re-binding after re-activation or double archival is harmless
+    image_store_->bindTrack(robot_id_, track_id, node_id);
   }
 }
 
@@ -142,6 +159,7 @@ void GraphUpdater::addNode(SceneGraph& graph,
             << " for " << source;
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
+      bindTrack(tracker, *entry.track_id, *to_merge);
     }
 
     tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
@@ -161,6 +179,7 @@ void GraphUpdater::addNode(SceneGraph& graph,
   graph.emplaceNode(target, new_id, std::move(attrs));
   if (entry.track_id) {
     tracker.track_to_node[*entry.track_id] = new_id;
+    bindTrack(tracker, *entry.track_id, new_id);
   }
 
   tracker.node_to_tracks[new_id] = {*entry.track_id};
@@ -180,6 +199,12 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
   if (map_iter == tracker.track_to_node.end()) {
     VLOG(5) << "Delete for unknown track_id " << *entry.track_id;
     return;
+  }
+
+  if (image_store_ && tracker.bind_tracks) {
+    // the track never became an object (extraction dropped it), so it has no images
+    // and must not keep pointing at a node that may be deleted below
+    image_store_->unbindTrack(robot_id_, *entry.track_id);
   }
 
   tracker.attribute_cache.erase(*entry.track_id);
