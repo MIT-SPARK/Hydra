@@ -89,7 +89,9 @@ def quat_to_rot(w: float, x: float, y: float, z: float) -> np.ndarray:
     )
 
 
-def pose_matrix(position: Sequence[float], rotation: np.ndarray | None = None) -> np.ndarray:
+def pose_matrix(
+    position: Sequence[float], rotation: np.ndarray | None = None
+) -> np.ndarray:
     T = np.eye(4)
     if rotation is not None:
         T[:3, :3] = rotation

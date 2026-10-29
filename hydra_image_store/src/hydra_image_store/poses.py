@@ -94,8 +94,13 @@ def as_pose_lookup(source) -> PoseLookup | None:
     if hasattr(source, "has_node") and hasattr(source, "get_node"):
         return _spark_lookup(source)
     if isinstance(source, Mapping):
-        return lambda nid: None if source.get(int(nid)) is None else np.asarray(source[int(nid)], float)
+        return (
+            lambda nid: None
+            if source.get(int(nid)) is None
+            else np.asarray(source[int(nid)], float)
+        )
     if callable(source):
+
         def lookup(nid):
             try:
                 T = source(int(nid))

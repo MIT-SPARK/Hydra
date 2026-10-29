@@ -12,7 +12,13 @@ from collections import Counter
 
 import numpy as np
 
-from .codec import LEGACY_TRACK_BASE, make_node_id, pose_matrix, quat_to_rot, sam3_track_id
+from .codec import (
+    LEGACY_TRACK_BASE,
+    make_node_id,
+    pose_matrix,
+    quat_to_rot,
+    sam3_track_id,
+)
 from .poses import JsonDsg
 from .store import FrameKind, ImageStoreWriter
 
@@ -79,7 +85,10 @@ class _DsgIndex:
         if anchor is None:
             return None
         q = a.get("anchor_R_subframe") or {"w": 1, "x": 0, "y": 0, "z": 0}
-        anchor_T_body = pose_matrix(a.get("anchor_t_subframe", [0, 0, 0]), quat_to_rot(q["w"], q["x"], q["y"], q["z"]))
+        anchor_T_body = pose_matrix(
+            a.get("anchor_t_subframe", [0, 0, 0]),
+            quat_to_rot(q["w"], q["x"], q["y"], q["z"]),
+        )
         world_T_anchor = self.dsg.pose(anchor)
         if world_T_anchor is not None:
             world_T_body = world_T_anchor @ anchor_T_body
@@ -112,7 +121,11 @@ class _AnchorIndex:
 
 
 def _calib(run: pathlib.Path) -> dict | None:
-    for rel in ("agents/camera_calib.json", "subkeyframes/camera_calib.json", "camera_calib.json"):
+    for rel in (
+        "agents/camera_calib.json",
+        "subkeyframes/camera_calib.json",
+        "camera_calib.json",
+    ):
         p = run / rel
         if p.exists():
             return _load_json(p)
@@ -120,7 +133,12 @@ def _calib(run: pathlib.Path) -> dict | None:
 
 
 def find_dsg(run: pathlib.Path) -> pathlib.Path | None:
-    for rel in ("hydra/backend/dsg.json", "hydra/backend/dsg_with_mesh.json", "hydra/frontend/dsg.json", "dsg.json"):
+    for rel in (
+        "hydra/backend/dsg.json",
+        "hydra/backend/dsg_with_mesh.json",
+        "hydra/frontend/dsg.json",
+        "dsg.json",
+    ):
         if (run / rel).exists():
             return run / rel
     return None
@@ -157,7 +175,9 @@ def import_legacy(
     try:
         with writer.batch():
             if calib is None:
-                logger.warning("%s: no camera_calib.json; sensor intrinsics are zero", run)
+                logger.warning(
+                    "%s: no camera_calib.json; sensor intrinsics are zero", run
+                )
                 calib = {}
             sensor = writer.add_sensor(
                 "camera",
@@ -180,11 +200,21 @@ def import_legacy(
                 node = index.agent_by_folder.get(stem, index.agent_by_ts.get(node_ts))
                 odom = _matrix16(meta.get("world_T_body"))
                 odom = np.eye(4) if odom is None else odom
-                rgb = _existing(meta_path.parent / meta.get("rgb_file", f"{stem}_rgb.jpg"))
-                depth = _existing(meta_path.parent / meta.get("depth_file", f"{stem}_depth.png"))
+                rgb = _existing(
+                    meta_path.parent / meta.get("rgb_file", f"{stem}_rgb.jpg")
+                )
+                depth = _existing(
+                    meta_path.parent / meta.get("depth_file", f"{stem}_depth.png")
+                )
                 writer.add_frame_ref(
-                    sensor, frame_ts, kind=FrameKind.KEYFRAME, world_T_body_odom=odom, rgb=rgb,
-                    depth=depth, anchor_node_id=node, anchor_T_body=np.eye(4) if node is not None else None,
+                    sensor,
+                    frame_ts,
+                    kind=FrameKind.KEYFRAME,
+                    world_T_body_odom=odom,
+                    rgb=rgb,
+                    depth=depth,
+                    anchor_node_id=node,
+                    anchor_T_body=np.eye(4) if node is not None else None,
                     link=link,
                 )
                 stats["keyframes"] += 1
@@ -198,8 +228,12 @@ def import_legacy(
                 meta = _load_json(meta_path)
                 stem = meta_path.name[: -len("_meta.json")]
                 ts = int(meta["timestamp_ns"])
-                rgb = _existing(meta_path.parent / meta.get("rgb_file", f"{stem}_rgb.jpg"))
-                depth = _existing(meta_path.parent / meta.get("depth_file", f"{stem}_depth.png"))
+                rgb = _existing(
+                    meta_path.parent / meta.get("rgb_file", f"{stem}_rgb.jpg")
+                )
+                depth = _existing(
+                    meta_path.parent / meta.get("depth_file", f"{stem}_depth.png")
+                )
                 found = index.subkf_anchor(stem, ts) if index.dsg is not None else None
                 own_odom = _matrix16(meta.get("world_T_body"))
                 if found is not None:
@@ -212,14 +246,31 @@ def import_legacy(
                     if near is not None:
                         anchor, a_T_b, a_odom = near
                         odom = own_odom if own_odom is not None else a_odom
-                        anchor_T_body = np.linalg.inv(a_odom) @ odom if own_odom is not None else a_T_b
-                    stats["subkeyframes_nearest_anchor" if anchor is not None else "subkeyframes_unanchored"] += 1
+                        anchor_T_body = (
+                            np.linalg.inv(a_odom) @ odom
+                            if own_odom is not None
+                            else a_T_b
+                        )
+                    stats[
+                        "subkeyframes_nearest_anchor"
+                        if anchor is not None
+                        else "subkeyframes_unanchored"
+                    ] += 1
                 subkf_rows.append((ts, anchor, anchor_T_body, odom))
                 if _frame_kind(writer, sensor, ts) is not None:
-                    stats["subkeyframes_deduped"] += 1  # same timestamp as an imported keyframe
+                    stats["subkeyframes_deduped"] += (
+                        1  # same timestamp as an imported keyframe
+                    )
                 writer.add_frame_ref(
-                    sensor, ts, kind=FrameKind.SUBKEYFRAME, world_T_body_odom=odom, rgb=rgb, depth=depth,
-                    anchor_node_id=anchor, anchor_T_body=anchor_T_body, link=link,
+                    sensor,
+                    ts,
+                    kind=FrameKind.SUBKEYFRAME,
+                    world_T_body_odom=odom,
+                    rgb=rgb,
+                    depth=depth,
+                    anchor_node_id=anchor,
+                    anchor_T_body=anchor_T_body,
+                    link=link,
                 )
                 stats["subkeyframes"] += 1
             for row in subkf_rows:
@@ -234,13 +285,24 @@ def import_legacy(
                         stats["object_dirs_skipped"] += 1
                     continue
                 idx = int(m.group(2))
-                node = index.object_by_folder.get(folder.name, make_node_id(m.group(1), idx))
+                node = index.object_by_folder.get(
+                    folder.name, make_node_id(m.group(1), idx)
+                )
                 if index.dsg is not None and not index.has(node):
                     stats["object_dirs_without_node"] += 1
                 track = LEGACY_TRACK_BASE | idx
                 writer.bind_track(track, node)
                 stats["objects"] += 1
-                n, dt = _import_obs_dir(writer, sensor, folder, track, anchors, link, stats, "object_observations")
+                n, dt = _import_obs_dir(
+                    writer,
+                    sensor,
+                    folder,
+                    track,
+                    anchors,
+                    link,
+                    stats,
+                    "object_observations",
+                )
                 max_dt = max(max_dt, dt)
 
             # --- SAM3-discovered objects -----------------------------------------------------
@@ -254,7 +316,16 @@ def import_legacy(
                     track = sam3_track_id(node)
                     writer.bind_track(track, node)
                     stats["sam3_objects"] += 1
-                    n, dt = _import_obs_dir(writer, sensor, folder, track, anchors, link, stats, "sam3_observations")
+                    n, dt = _import_obs_dir(
+                        writer,
+                        sensor,
+                        folder,
+                        track,
+                        anchors,
+                        link,
+                        stats,
+                        "sam3_observations",
+                    )
                     max_dt = max(max_dt, dt)
 
             if index.dsg is not None and index.dsg.merges:
@@ -271,12 +342,22 @@ def import_legacy(
 
 
 def _frame_kind(writer: ImageStoreWriter, sensor: int, ts: int):
-    row = writer.conn.execute("SELECT kind FROM frames WHERE sensor_id = ? AND timestamp_ns = ?", (sensor, ts)).fetchone()
+    row = writer.conn.execute(
+        "SELECT kind FROM frames WHERE sensor_id = ? AND timestamp_ns = ?", (sensor, ts)
+    ).fetchone()
     return None if row is None else FrameKind(row[0])
 
 
-def _import_obs_dir(writer, sensor, folder: pathlib.Path, track: int, anchors: _AnchorIndex,
-                    link: str, stats: Counter, counter: str) -> tuple[int, int]:
+def _import_obs_dir(
+    writer,
+    sensor,
+    folder: pathlib.Path,
+    track: int,
+    anchors: _AnchorIndex,
+    link: str,
+    stats: Counter,
+    counter: str,
+) -> tuple[int, int]:
     n, max_dt = 0, 0
     for meta_path in sorted(folder.glob("frame_*_meta.json")):
         meta = _load_json(meta_path)
@@ -289,17 +370,34 @@ def _import_obs_dir(writer, sensor, folder: pathlib.Path, track: int, anchors: _
         anchor, anchor_T_body, odom = (None, None, None) if near is None else near
         max_dt = max(max_dt, dt or 0)
         fid = writer.add_frame_ref(
-            sensor, ts, kind=FrameKind.OBSERVATION, world_T_body_odom=odom, rgb=rgb, depth=depth,
-            anchor_node_id=anchor, anchor_T_body=anchor_T_body, link=link,
+            sensor,
+            ts,
+            kind=FrameKind.OBSERVATION,
+            world_T_body_odom=odom,
+            rgb=rgb,
+            depth=depth,
+            anchor_node_id=anchor,
+            anchor_T_body=anchor_T_body,
+            link=link,
         )
         b2 = meta.get("bbox_2d")
-        bbox2d = None if not b2 else (b2["min_x"], b2["min_y"], b2["max_x"], b2["max_y"])
+        bbox2d = (
+            None if not b2 else (b2["min_x"], b2["min_y"], b2["max_x"], b2["max_y"])
+        )
         bbox3d = None
         if meta.get("bbox_min") is not None and meta.get("bbox_max") is not None:
             bbox3d = (meta["bbox_min"], meta["bbox_max"])
         writer.add_observation(
-            track, fid, timestamp_ns=ts, bbox2d=bbox2d, bbox3d=bbox3d, mask_rle=meta.get("mask_rle"),
-            mask_path=mask, score=float(meta.get("score", 0.0)), kept=True, link=link,
+            track,
+            fid,
+            timestamp_ns=ts,
+            bbox2d=bbox2d,
+            bbox3d=bbox3d,
+            mask_rle=meta.get("mask_rle"),
+            mask_path=mask,
+            score=float(meta.get("score", 0.0)),
+            kept=True,
+            link=link,
         )
         n += 1
         stats[counter] += 1
@@ -314,7 +412,9 @@ def strip_legacy_dsg(src, dst) -> dict:
     """
     data = _load_json(pathlib.Path(src))
     nodes = data.get("nodes", [])
-    removed = {n["id"] for n in nodes if n.get("attributes", {}).get("type") in _SUBKF_TYPES}
+    removed = {
+        n["id"] for n in nodes if n.get("attributes", {}).get("type") in _SUBKF_TYPES
+    }
     kept_nodes = [n for n in nodes if n["id"] not in removed]
     image_folders = 0
     for node in kept_nodes:
@@ -322,14 +422,18 @@ def strip_legacy_dsg(src, dst) -> dict:
             image_folders += 1
 
     edges = data.get("edges", [])
-    kept_edges = [e for e in edges if e["source"] not in removed and e["target"] not in removed]
+    kept_edges = [
+        e for e in edges if e["source"] not in removed and e["target"] not in removed
+    ]
 
     used = {(n.get("layer"), n.get("partition", 0)) for n in kept_nodes}
     named = {(v["layer"], v["partition"]) for v in data.get("layer_names", {}).values()}
     if "layer_keys" in data:
         data["layer_keys"] = [
-            k for k in data["layer_keys"]
-            if (k["layer"], k["partition"]) in used or (k["layer"], k["partition"]) in named
+            k
+            for k in data["layer_keys"]
+            if (k["layer"], k["partition"]) in used
+            or (k["layer"], k["partition"]) in named
         ]
 
     data["nodes"] = kept_nodes

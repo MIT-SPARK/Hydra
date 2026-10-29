@@ -49,7 +49,9 @@ class _Exporter:
 
     def pose_meta(self, frame: Frame) -> dict:
         world_T_body, source = self.store.body_pose(frame, self.pose_source)
-        world_T_sensor, _ = self.store.frame_pose(frame, self.pose_source, with_source=True)
+        world_T_sensor, _ = self.store.frame_pose(
+            frame, self.pose_source, with_source=True
+        )
         return {
             "world_T_body": world_T_body.reshape(16).tolist(),
             "world_T_sensor": world_T_sensor.reshape(16).tolist(),
@@ -57,8 +59,14 @@ class _Exporter:
             "anchor_node_id": frame.anchor_node_id,
         }
 
-    def write_frame(self, folder: pathlib.Path, prefix: str, frame: Frame, extra: dict,
-                    obs: Observation | None = None) -> None:
+    def write_frame(
+        self,
+        folder: pathlib.Path,
+        prefix: str,
+        frame: Frame,
+        extra: dict,
+        obs: Observation | None = None,
+    ) -> None:
         meta = {
             "timestamp_ns": frame.timestamp_ns,
             "frame_id": frame.frame_id,
@@ -68,13 +76,25 @@ class _Exporter:
             "calib": self.calib_json(frame.sensor_id),
             **extra,
         }
-        if frame.rgb_path is not None and _link(frame.rgb_path, folder / f"{prefix}_rgb{frame.rgb_path.suffix}", self.copy, self.stats):
+        if frame.rgb_path is not None and _link(
+            frame.rgb_path,
+            folder / f"{prefix}_rgb{frame.rgb_path.suffix}",
+            self.copy,
+            self.stats,
+        ):
             meta["rgb_file"] = f"{prefix}_rgb{frame.rgb_path.suffix}"
-        if frame.depth_path is not None and _link(frame.depth_path, folder / f"{prefix}_depth{frame.depth_path.suffix}", self.copy, self.stats):
+        if frame.depth_path is not None and _link(
+            frame.depth_path,
+            folder / f"{prefix}_depth{frame.depth_path.suffix}",
+            self.copy,
+            self.stats,
+        ):
             meta["depth_file"] = f"{prefix}_depth{frame.depth_path.suffix}"
         if obs is not None:
             mask_file = f"{prefix}_mask.png"
-            if obs.mask_path is not None and _link(obs.mask_path, folder / mask_file, self.copy, self.stats):
+            if obs.mask_path is not None and _link(
+                obs.mask_path, folder / mask_file, self.copy, self.stats
+            ):
                 meta["mask_file"] = mask_file
             elif obs.mask_rle:
                 written = False
@@ -83,7 +103,9 @@ class _Exporter:
 
                     m = self.store.mask(obs)
                     if m is not None:
-                        Image.fromarray(m.astype(np.uint8) * 255).save(folder / mask_file)
+                        Image.fromarray(m.astype(np.uint8) * 255).save(
+                            folder / mask_file
+                        )
                         written = True
                         self.stats["masks_decoded"] += 1
                 except ImportError:
@@ -99,8 +121,14 @@ class _Exporter:
     def export_objects(self, kept_only: bool) -> dict[str, int]:
         index = {}
         for node in self.store.object_nodes():
-            observations = self.store.observations(node, kept_only=kept_only, order="time")
-            observations = [o for o in observations if o.kept or o.rgb_path is not None or o.mask_path is not None]
+            observations = self.store.observations(
+                node, kept_only=kept_only, order="time"
+            )
+            observations = [
+                o
+                for o in observations
+                if o.kept or o.rgb_path is not None or o.mask_path is not None
+            ]
             if not observations:
                 continue
             name = node_label(node)
@@ -110,7 +138,11 @@ class _Exporter:
             for o in observations:
                 i = per_ts[o.timestamp_ns]
                 per_ts[o.timestamp_ns] += 1
-                prefix = f"frame_{o.timestamp_ns}" if i == 0 else f"frame_{o.timestamp_ns}_{i}"
+                prefix = (
+                    f"frame_{o.timestamp_ns}"
+                    if i == 0
+                    else f"frame_{o.timestamp_ns}_{i}"
+                )
                 extra = {
                     "node_id": node,
                     "source_node_id": o.node_id,
@@ -120,7 +152,9 @@ class _Exporter:
                     "kept": o.kept,
                 }
                 if o.bbox2d is not None:
-                    extra["bbox_2d"] = dict(zip(("min_x", "min_y", "max_x", "max_y"), o.bbox2d))
+                    extra["bbox_2d"] = dict(
+                        zip(("min_x", "min_y", "max_x", "max_y"), o.bbox2d)
+                    )
                 if o.bbox3d is not None:
                     extra["bbox_min"] = o.bbox3d[0].tolist()
                     extra["bbox_max"] = o.bbox3d[1].tolist()
@@ -135,12 +169,20 @@ class _Exporter:
         for node in self.store.agent_nodes(include_subkeyframe_anchors=True):
             frames = self.store.frames_for_agent(node, include_subkeyframes=True)
             keyframes = [f for f in frames if f.kind == FrameKind.KEYFRAME]
-            name = f"agent_{keyframes[0].timestamp_ns}" if keyframes else f"agent_{node_label(node)}"
+            name = (
+                f"agent_{keyframes[0].timestamp_ns}"
+                if keyframes
+                else f"agent_{node_label(node)}"
+            )
             folder = self.out / name
             folder.mkdir(parents=True, exist_ok=True)
             for f in frames:
-                self.write_frame(folder, f"frame_{f.timestamp_ns}", f, {"node_id": node})
-                self.stats["subkeyframes" if f.kind == FrameKind.SUBKEYFRAME else "keyframes"] += 1
+                self.write_frame(
+                    folder, f"frame_{f.timestamp_ns}", f, {"node_id": node}
+                )
+                self.stats[
+                    "subkeyframes" if f.kind == FrameKind.SUBKEYFRAME else "keyframes"
+                ] += 1
             index[name] = node
             self.stats["agent_folders"] += 1
         return index

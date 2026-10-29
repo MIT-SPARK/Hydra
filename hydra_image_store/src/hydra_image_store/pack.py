@@ -81,7 +81,9 @@ class _TarOut:
         self._zw = None
         if zstd_level is not None:
             zstd = transfer._zstd()
-            self._zw = zstd.ZstdCompressor(level=zstd_level, threads=-1).stream_writer(raw, closefd=False)
+            self._zw = zstd.ZstdCompressor(level=zstd_level, threads=-1).stream_writer(
+                raw, closefd=False
+            )
             raw = self._zw
         self.tar = tarfile.open(fileobj=raw, mode="w|", format=tarfile.PAX_FORMAT)
 
@@ -147,7 +149,11 @@ def pack_store(
     db_path = store_dir / DB_NAME
     if not db_path.exists():
         raise FileNotFoundError(f"no image store at {store_dir}")
-    if zstd_level is None and isinstance(out, (str, os.PathLike)) and str(out).endswith((".zst", ".tzst")):
+    if (
+        zstd_level is None
+        and isinstance(out, (str, os.PathLike))
+        and str(out).endswith((".zst", ".tzst"))
+    ):
         zstd_level = 3
     t0 = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="his_pack_") as tmp:
@@ -158,14 +164,26 @@ def pack_store(
         store = ImageStore([db])
         selected = transfer.select_frames(store, frames, include_kept_observations=True)
         manifest = {
-            "format": FORMAT, "version": FORMAT_VERSION, "source": str(store_dir),
-            "frames": frames, "compression": compression, "created": time.time(),
-            "frame_count": len(selected), "info": store.info()[0],
+            "format": FORMAT,
+            "version": FORMAT_VERSION,
+            "source": str(store_dir),
+            "frames": frames,
+            "compression": compression,
+            "created": time.time(),
+            "frame_count": len(selected),
+            "info": store.info()[0],
         }
         manifest["info"]["path"] = str(store_dir)
         tar = _TarOut(out, zstd_level)
-        stats = {"frames": 0, "frame_bytes": 0, "rgb_bytes": 0, "depth_bytes": 0, "masks": 0,
-                 "mask_bytes": 0, "missing_files": 0}
+        stats = {
+            "frames": 0,
+            "frame_bytes": 0,
+            "rgb_bytes": 0,
+            "depth_bytes": 0,
+            "masks": 0,
+            "mask_bytes": 0,
+            "missing_files": 0,
+        }
         try:
             tar.add(MANIFEST, json.dumps(manifest, indent=1).encode())
             conn = db.conn
@@ -178,8 +196,10 @@ def pack_store(
                     stats["missing_files"] += 1
                     continue
                 rgb_rel, depth_rel = _paths_from_header(header)
-                conn.execute("UPDATE frames SET rgb_path = ?, depth_path = ? WHERE frame_id = ?",
-                             (rgb_rel, depth_rel, frame.frame_id))
+                conn.execute(
+                    "UPDATE frames SET rgb_path = ?, depth_path = ? WHERE frame_id = ?",
+                    (rgb_rel, depth_rel, frame.frame_id),
+                )
                 shipped.add(frame.frame_id)
                 tar.add(f"frames/{frame.frame_id}.hisf", blob)
                 stats["frames"] += 1
@@ -191,9 +211,13 @@ def pack_store(
             # rows whose images were not shipped lose their paths
             conn.execute("CREATE TEMP TABLE shipped (frame_id INTEGER PRIMARY KEY)")
             conn.executemany("INSERT INTO shipped VALUES (?)", [(f,) for f in shipped])
-            conn.execute("UPDATE frames SET rgb_path = NULL, depth_path = NULL "
-                         "WHERE frame_id NOT IN (SELECT frame_id FROM shipped)")
-            masks = conn.execute("SELECT obs_id, mask_path FROM observations WHERE mask_path IS NOT NULL").fetchall()
+            conn.execute(
+                "UPDATE frames SET rgb_path = NULL, depth_path = NULL "
+                "WHERE frame_id NOT IN (SELECT frame_id FROM shipped)"
+            )
+            masks = conn.execute(
+                "SELECT obs_id, mask_path FROM observations WHERE mask_path IS NOT NULL"
+            ).fetchall()
             for obs_id, rel in masks:
                 path = store_dir / rel if rel else None
                 safe = transfer._safe_rel(rel)
@@ -203,14 +227,25 @@ def pack_store(
                     stats["masks"] += 1
                     stats["mask_bytes"] += len(data)
                     if safe != rel:
-                        conn.execute("UPDATE observations SET mask_path = ? WHERE obs_id = ?", (safe, obs_id))
+                        conn.execute(
+                            "UPDATE observations SET mask_path = ? WHERE obs_id = ?",
+                            (safe, obs_id),
+                        )
                 else:
-                    conn.execute("UPDATE observations SET mask_path = NULL WHERE obs_id = ?", (obs_id,))
-            for k, v in (("transfer_source", str(store_dir)), ("transfer_frames", frames),
-                         ("transfer_compression", compression),
-                         ("transfer_depth_downscale", "2" if compression == "fast" else "1"),
-                         ("transfer_packed_at", f"{time.time():.3f}")):
-                conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (k, v))
+                    conn.execute(
+                        "UPDATE observations SET mask_path = NULL WHERE obs_id = ?",
+                        (obs_id,),
+                    )
+            for k, v in (
+                ("transfer_source", str(store_dir)),
+                ("transfer_frames", frames),
+                ("transfer_compression", compression),
+                ("transfer_depth_downscale", "2" if compression == "fast" else "1"),
+                ("transfer_packed_at", f"{time.time():.3f}"),
+            ):
+                conn.execute(
+                    "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (k, v)
+                )
             conn.execute("COMMIT")
             conn.execute("DROP TABLE shipped")
             conn.execute("VACUUM")
@@ -224,7 +259,13 @@ def pack_store(
 
 
 def _paths_from_header(header: dict) -> tuple[str | None, str | None]:
-    fake = {"meta": header["meta"], "rgb": None, "rgb_format": None, "depth": None, "depth_png": None}
+    fake = {
+        "meta": header["meta"],
+        "rgb": None,
+        "rgb_format": None,
+        "depth": None,
+        "depth_png": None,
+    }
     for p in header["parts"]:
         if p["name"] == "rgb":
             fake["rgb"], fake["rgb_format"] = b"", p["codec"]
@@ -305,7 +346,11 @@ def unpack_store(
         head = raw.read(4)
         stream = _Prefixed(head, raw)
         if head == _ZSTD_MAGIC:
-            stream = transfer._zstd().ZstdDecompressor().stream_reader(stream, read_across_frames=True)
+            stream = (
+                transfer._zstd()
+                .ZstdDecompressor()
+                .stream_reader(stream, read_across_frames=True)
+            )
         stream = io.BufferedReader(stream, 1 << 20)
         got_db = False
         with tarfile.open(fileobj=stream, mode="r|") as tar:
@@ -320,14 +365,16 @@ def unpack_store(
                     if manifest.get("format") != FORMAT:
                         raise ValueError("not a hydra-image-store pack archive")
                     if int(manifest.get("version", 0)) > FORMAT_VERSION:
-                        raise ValueError(f"archive version {manifest['version']} is newer than {FORMAT_VERSION}")
+                        raise ValueError(
+                            f"archive version {manifest['version']} is newer than {FORMAT_VERSION}"
+                        )
                 elif name.startswith("frames/") and name.endswith(".hisf"):
                     transfer.write_decoded_images(staging, transfer.decode_frame(data))
                     stats["frames"] += 1
                     if progress is not None and manifest:
                         progress(stats["frames"], int(manifest.get("frame_count", 0)))
                 elif name.startswith("files/"):
-                    rel = name[len("files/"):]
+                    rel = name[len("files/") :]
                     out = staging / _safe_member(rel)
                     out.parent.mkdir(parents=True, exist_ok=True)
                     out.write_bytes(data)
@@ -340,19 +387,26 @@ def unpack_store(
         # the snapshot was stored with journal_mode=DELETE; switch the copy back to WAL
         conn = sqlite3.connect(str(staging / DB_NAME))
         conn.execute("PRAGMA journal_mode = WAL")
-        conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('transfer_unpacked_at', ?)",
-                     (f"{time.time():.3f}",))
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('transfer_unpacked_at', ?)",
+            (f"{time.time():.3f}",),
+        )
         conn.commit()
         conn.close()
-        stats["manifest"] = {k: manifest[k] for k in ("source", "frames", "compression", "frame_count")}
+        stats["manifest"] = {
+            k: manifest[k] for k in ("source", "frames", "compression", "frame_count")
+        }
         if check:
             if dsg is None and (dest / "hydra/backend/dsg.json").exists():
                 dsg = dest / "hydra/backend/dsg.json"
             report = check_store(staging, dsg=dsg)
             stats["check"] = report
             if not report["ok"]:
-                raise RuntimeError("unpacked store failed checks: " + ", ".join(
-                    k for k, v in report["checks"].items() if not v) + f" (left in {staging})")
+                raise RuntimeError(
+                    "unpacked store failed checks: "
+                    + ", ".join(k for k, v in report["checks"].items() if not v)
+                    + f" (left in {staging})"
+                )
         if final.exists():
             shutil.rmtree(final)
         os.replace(staging, final)
@@ -383,21 +437,33 @@ def check_store(store: str | os.PathLike, *, dsg=None, sample_images: int = 20) 
         one = lambda sql: conn.execute(sql).fetchone()[0]  # noqa: E731
         stats["info"] = s.info()[0]
         stats["frames_without_sensor"] = one(
-            "SELECT COUNT(*) FROM frames WHERE sensor_id NOT IN (SELECT sensor_id FROM sensors)")
-        checks["frames reference existing sensors"] = stats["frames_without_sensor"] == 0
+            "SELECT COUNT(*) FROM frames WHERE sensor_id NOT IN (SELECT sensor_id FROM sensors)"
+        )
+        checks["frames reference existing sensors"] = (
+            stats["frames_without_sensor"] == 0
+        )
         stats["observations_without_frame"] = one(
-            "SELECT COUNT(*) FROM observations WHERE frame_id NOT IN (SELECT frame_id FROM frames)")
-        checks["observations reference existing frames"] = stats["observations_without_frame"] == 0
-        refs = [r[0] for r in conn.execute(
-            "SELECT rgb_path FROM frames WHERE rgb_path IS NOT NULL UNION ALL "
-            "SELECT depth_path FROM frames WHERE depth_path IS NOT NULL UNION ALL "
-            "SELECT mask_path FROM observations WHERE mask_path IS NOT NULL")]
+            "SELECT COUNT(*) FROM observations WHERE frame_id NOT IN (SELECT frame_id FROM frames)"
+        )
+        checks["observations reference existing frames"] = (
+            stats["observations_without_frame"] == 0
+        )
+        refs = [
+            r[0]
+            for r in conn.execute(
+                "SELECT rgb_path FROM frames WHERE rgb_path IS NOT NULL UNION ALL "
+                "SELECT depth_path FROM frames WHERE depth_path IS NOT NULL UNION ALL "
+                "SELECT mask_path FROM observations WHERE mask_path IS NOT NULL"
+            )
+        ]
         missing = [r for r in refs if not (store_dir / r).exists()]
         stats["referenced_files"] = len(refs)
         stats["referenced_files_missing"] = len(missing)
         stats["missing_examples"] = missing[:5]
         checks["all referenced files exist"] = not missing
-        stats["keyframes_unanchored"] = one("SELECT COUNT(*) FROM frames WHERE kind = 0 AND anchor_node_id IS NULL")
+        stats["keyframes_unanchored"] = one(
+            "SELECT COUNT(*) FROM frames WHERE kind = 0 AND anchor_node_id IS NULL"
+        )
         checks["keyframes anchored"] = stats["keyframes_unanchored"] == 0
         # image sizes vs calibration
         try:
@@ -411,14 +477,17 @@ def check_store(store: str | os.PathLike, *, dsg=None, sample_images: int = 20) 
                 "SELECT f.frame_id, f.rgb_path, f.depth_path, s.width, s.height FROM frames f "
                 "JOIN sensors s ON s.sensor_id = f.sensor_id "
                 "WHERE f.rgb_path IS NOT NULL OR f.depth_path IS NOT NULL "
-                f"ORDER BY f.frame_id LIMIT {int(sample_images)}").fetchall()
+                f"ORDER BY f.frame_id LIMIT {int(sample_images)}"
+            ).fetchall()
             for fid, rgb, depth, w, h in rows:
                 for rel, kind in ((rgb, "rgb"), (depth, "depth")):
                     if rel is None or not (store_dir / rel).exists():
                         continue
                     shape = _image_hw(store_dir / rel, kind)
                     if shape is not None and tuple(shape) != (h, w):
-                        bad.append({"frame_id": fid, kind: list(shape), "calib": [h, w]})
+                        bad.append(
+                            {"frame_id": fid, kind: list(shape), "calib": [h, w]}
+                        )
             stats["image_size_mismatches"] = bad[:5]
             stats["images_sampled"] = len(rows)
             checks["sampled images match calibration size"] = not bad
@@ -430,17 +499,37 @@ def check_store(store: str | os.PathLike, *, dsg=None, sample_images: int = 20) 
             else:  # spark_dsg
                 has = lambda n: graph.has_node(int(n))  # noqa: E731
                 merges = {}
-            aliases = dict(conn.execute("SELECT child_id, parent_id FROM node_aliases").fetchall())
-            kf_anchors = [r[0] for r in conn.execute(
-                "SELECT DISTINCT anchor_node_id FROM frames WHERE kind = 0 AND anchor_node_id IS NOT NULL")]
-            bad_kf = [n for n in kf_anchors if not has(n) and n not in aliases and n not in merges]
+            aliases = dict(
+                conn.execute("SELECT child_id, parent_id FROM node_aliases").fetchall()
+            )
+            kf_anchors = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT DISTINCT anchor_node_id FROM frames WHERE kind = 0 AND anchor_node_id IS NOT NULL"
+                )
+            ]
+            bad_kf = [
+                n
+                for n in kf_anchors
+                if not has(n) and n not in aliases and n not in merges
+            ]
             stats["keyframe_anchors_missing_in_dsg"] = len(bad_kf)
             checks["keyframe anchors exist in DSG"] = not bad_kf
-            bound = [r[0] for r in conn.execute("SELECT DISTINCT node_id FROM track_bindings")]
-            bad_bound = [n for n in bound if not has(n) and n not in aliases and n not in merges]
+            bound = [
+                r[0]
+                for r in conn.execute("SELECT DISTINCT node_id FROM track_bindings")
+            ]
+            bad_bound = [
+                n for n in bound if not has(n) and n not in aliases and n not in merges
+            ]
             stats["bound_nodes_missing_in_dsg"] = len(bad_bound)
             checks["bound nodes exist in DSG or are merge children"] = not bad_bound
-    return {"ok": all(checks.values()), "checks": checks, "stats": stats, "store": str(store_dir)}
+    return {
+        "ok": all(checks.values()),
+        "checks": checks,
+        "stats": stats,
+        "store": str(store_dir),
+    }
 
 
 def _image_hw(path: pathlib.Path, kind: str):

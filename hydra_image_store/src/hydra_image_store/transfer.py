@@ -127,7 +127,11 @@ def encode_jpeg(rgb: np.ndarray, quality: int = FAST_JPEG_QUALITY) -> bytes:
     rgb = np.ascontiguousarray(rgb)
     if cv2 is not None:
         img = rgb[..., ::-1] if rgb.ndim == 3 else rgb
-        ok, buf = cv2.imencode(".jpg", np.ascontiguousarray(img), [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)])
+        ok, buf = cv2.imencode(
+            ".jpg",
+            np.ascontiguousarray(img),
+            [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)],
+        )
         if not ok:
             raise ValueError("JPEG encoding failed")
         return buf.tobytes()
@@ -173,8 +177,14 @@ def delta_zstd_encode(depth: np.ndarray, level: int = ZSTD_LEVEL) -> bytes:
     d = np.ascontiguousarray(depth, dtype=np.uint16)
     delta = np.empty_like(d)
     delta[:, :1] = d[:, :1]
-    np.subtract(d[:, 1:], d[:, :-1], out=delta[:, 1:])  # uint16 wraps: exact inverse below
-    return _zstd().ZstdCompressor(level=level).compress(delta.astype("<u2", copy=False).tobytes())
+    np.subtract(
+        d[:, 1:], d[:, :-1], out=delta[:, 1:]
+    )  # uint16 wraps: exact inverse below
+    return (
+        _zstd()
+        .ZstdCompressor(level=level)
+        .compress(delta.astype("<u2", copy=False).tobytes())
+    )
 
 
 def delta_zstd_decode(data: bytes, shape: tuple[int, int]) -> np.ndarray:
@@ -276,23 +286,35 @@ def frame_meta(store: ImageStore, frame: Frame) -> dict:
         "sensor_id": int(frame.sensor_id),
         "timestamp_ns": int(frame.timestamp_ns),
         "kind": int(frame.kind),
-        "world_T_body_odom": np.asarray(frame.world_T_body_odom, float).reshape(16).tolist(),
-        "anchor_node_id": None if frame.anchor_node_id is None else int(frame.anchor_node_id),
-        "anchor_T_body": None if frame.anchor_T_body is None else np.asarray(frame.anchor_T_body, float).reshape(16).tolist(),
+        "world_T_body_odom": np.asarray(frame.world_T_body_odom, float)
+        .reshape(16)
+        .tolist(),
+        "anchor_node_id": None
+        if frame.anchor_node_id is None
+        else int(frame.anchor_node_id),
+        "anchor_T_body": None
+        if frame.anchor_T_body is None
+        else np.asarray(frame.anchor_T_body, float).reshape(16).tolist(),
         "rgb_path": _rel(frame, frame.rgb_path),
         "depth_path": _rel(frame, frame.depth_path),
-        "calib": None if calib is None else {**calib.to_json(), "robot_id": int(calib.robot_id)},
+        "calib": None
+        if calib is None
+        else {**calib.to_json(), "robot_id": int(calib.robot_id)},
     }
 
 
-def encode_frame(store: ImageStore, frame: Frame | int, compression: str = "fast") -> bytes:
+def encode_frame(
+    store: ImageStore, frame: Frame | int, compression: str = "fast"
+) -> bytes:
     """One frame (row, calibration, RGB, depth) as a self-describing blob.
 
     ``frame`` is a :class:`Frame` or a frame id. Missing image files are simply left out
     (``parts`` then lacks that entry).
     """
     if compression not in COMPRESSION_MODES:
-        raise ValueError(f"compression must be one of {COMPRESSION_MODES}, got {compression!r}")
+        raise ValueError(
+            f"compression must be one of {COMPRESSION_MODES}, got {compression!r}"
+        )
     if not isinstance(frame, Frame):
         fid = int(frame)
         frame = store.frame(fid)
@@ -315,8 +337,16 @@ def encode_frame(store: ImageStore, frame: Frame | int, compression: str = "fast
     depth = _read(frame.depth_path)
     if depth is not None:
         if compression == "none":
-            parts.append(({"name": "depth", "codec": "png16" if _sniff(depth) == "png" else "file",
-                           "ext": pathlib.Path(frame.depth_path).suffix}, depth))
+            parts.append(
+                (
+                    {
+                        "name": "depth",
+                        "codec": "png16" if _sniff(depth) == "png" else "file",
+                        "ext": pathlib.Path(frame.depth_path).suffix,
+                    },
+                    depth,
+                )
+            )
         else:
             arr = decode_png16(depth)
             full_shape = list(arr.shape)
@@ -325,14 +355,26 @@ def encode_frame(store: ImageStore, frame: Frame | int, compression: str = "fast
                 meta["depth_downscale"] = 2
                 if meta["calib"] is not None:
                     meta["depth_calib"] = scale_calib(meta["calib"], 2)
-            parts.append(({"name": "depth", "codec": "delta-zstd", "shape": list(arr.shape),
-                           "full_shape": full_shape, "dtype": "<u2"}, delta_zstd_encode(arr)))
+            parts.append(
+                (
+                    {
+                        "name": "depth",
+                        "codec": "delta-zstd",
+                        "shape": list(arr.shape),
+                        "full_shape": full_shape,
+                        "dtype": "<u2",
+                    },
+                    delta_zstd_encode(arr),
+                )
+            )
     if meta.get("depth_calib") is None and meta["calib"] is not None:
         meta["depth_calib"] = dict(meta["calib"])
 
     header = {"meta": meta, "parts": [dict(p, size=len(b)) for p, b in parts]}
     hdr = json.dumps(header, separators=(",", ":")).encode()
-    return b"".join([_HEADER.pack(MAGIC, VERSION, len(hdr)), hdr, *(b for _, b in parts)])
+    return b"".join(
+        [_HEADER.pack(MAGIC, VERSION, len(hdr)), hdr, *(b for _, b in parts)]
+    )
 
 
 def decode_header(blob: bytes) -> dict:
@@ -341,7 +383,9 @@ def decode_header(blob: bytes) -> dict:
     if magic != MAGIC:
         raise ValueError("not an encoded store frame (bad magic)")
     if version != VERSION:
-        raise ValueError(f"encoded frame version {version}, this reader supports {VERSION}")
+        raise ValueError(
+            f"encoded frame version {version}, this reader supports {VERSION}"
+        )
     return json.loads(blob[_HEADER.size : _HEADER.size + n])
 
 
@@ -359,8 +403,14 @@ def decode_frame(blob: bytes, *, decode_depth_png: bool = True) -> dict:
     _, _, n = _HEADER.unpack_from(blob, 0)
     header = decode_header(blob)
     meta = header["meta"]
-    out = {"meta": meta, "rgb": None, "rgb_format": None, "depth": None, "depth_png": None,
-           "depth_downscale": int(meta.get("depth_downscale", 1))}
+    out = {
+        "meta": meta,
+        "rgb": None,
+        "rgb_format": None,
+        "depth": None,
+        "depth_png": None,
+        "depth_downscale": int(meta.get("depth_downscale", 1)),
+    }
     pos = _HEADER.size + n
     for part in header["parts"]:
         data = bytes(blob[pos : pos + int(part["size"])])
@@ -394,7 +444,9 @@ def full_res_depth(decoded: dict) -> np.ndarray | None:
         return depth
     calib = decoded["meta"].get("calib")
     shape = decoded.get("depth_full_shape") or (
-        (calib["height"], calib["width"]) if calib else (depth.shape[0] * factor, depth.shape[1] * factor)
+        (calib["height"], calib["width"])
+        if calib
+        else (depth.shape[0] * factor, depth.shape[1] * factor)
     )
     return restore_depth(depth, factor, shape)
 
@@ -424,15 +476,29 @@ def decoded_paths(decoded: dict) -> tuple[str | None, str | None]:
     if decoded.get("rgb") is not None:
         ext = _RGB_EXT.get(decoded["rgb_format"], ".bin")
         src = _safe_rel(meta.get("rgb_path"))
-        rgb_rel = str(pathlib.PurePosixPath(src).with_suffix(ext)) if src else f"{base}_rgb{ext}"
+        rgb_rel = (
+            str(pathlib.PurePosixPath(src).with_suffix(ext))
+            if src
+            else f"{base}_rgb{ext}"
+        )
     if decoded.get("depth") is not None or decoded.get("depth_png") is not None:
         src = _safe_rel(meta.get("depth_path"))
-        ext = decoded.get("depth_ext", ".png") if decoded.get("depth_png") is not None else ".png"
-        depth_rel = str(pathlib.PurePosixPath(src).with_suffix(ext)) if src else f"{base}_depth{ext}"
+        ext = (
+            decoded.get("depth_ext", ".png")
+            if decoded.get("depth_png") is not None
+            else ".png"
+        )
+        depth_rel = (
+            str(pathlib.PurePosixPath(src).with_suffix(ext))
+            if src
+            else f"{base}_depth{ext}"
+        )
     return rgb_rel, depth_rel
 
 
-def write_decoded_images(root: str | os.PathLike, decoded: dict) -> tuple[str | None, str | None]:
+def write_decoded_images(
+    root: str | os.PathLike, decoded: dict
+) -> tuple[str | None, str | None]:
     """Write a decoded frame's images under the store directory ``root``; returns the
     relative ``(rgb_path, depth_path)``. Downscaled depth is restored to full resolution
     (see :func:`restore_depth`), so the store's single sensor calibration stays valid."""
@@ -445,7 +511,10 @@ def write_decoded_images(root: str | os.PathLike, decoded: dict) -> tuple[str | 
     if depth_rel is not None:
         dst = root / depth_rel
         dst.parent.mkdir(parents=True, exist_ok=True)
-        if decoded.get("depth_png") is not None and int(decoded.get("depth_downscale", 1)) == 1:
+        if (
+            decoded.get("depth_png") is not None
+            and int(decoded.get("depth_downscale", 1)) == 1
+        ):
             data = decoded["depth_png"]
         else:
             data = encode_png16(full_res_depth(decoded))
@@ -476,33 +545,67 @@ def write_frame(writer: ImageStoreWriter, decoded: dict) -> int:
             c.execute(
                 "INSERT OR IGNORE INTO sensors (sensor_id, robot_id, name, width, height, fx, fy, cx, cy, "
                 "depth_scale, body_T_sensor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (int(calib["sensor_id"]), int(calib.get("robot_id", meta["robot_id"])), calib["name"],
-                 int(calib["width"]), int(calib["height"]), float(calib["fx"]), float(calib["fy"]),
-                 float(calib["cx"]), float(calib["cy"]), float(calib["depth_scale"]),
-                 transform_to_blob(np.asarray(calib["body_T_sensor"], float).reshape(4, 4))),
+                (
+                    int(calib["sensor_id"]),
+                    int(calib.get("robot_id", meta["robot_id"])),
+                    calib["name"],
+                    int(calib["width"]),
+                    int(calib["height"]),
+                    float(calib["fx"]),
+                    float(calib["fy"]),
+                    float(calib["cx"]),
+                    float(calib["cy"]),
+                    float(calib["depth_scale"]),
+                    transform_to_blob(
+                        np.asarray(calib["body_T_sensor"], float).reshape(4, 4)
+                    ),
+                ),
             )
         anchor_blob = None
         if meta.get("anchor_T_body") is not None:
-            anchor_blob = transform_to_blob(np.asarray(meta["anchor_T_body"], float).reshape(4, 4))
-        row = c.execute("SELECT frame_id FROM frames WHERE frame_id = ?", (int(meta["frame_id"]),)).fetchone()
+            anchor_blob = transform_to_blob(
+                np.asarray(meta["anchor_T_body"], float).reshape(4, 4)
+            )
+        row = c.execute(
+            "SELECT frame_id FROM frames WHERE frame_id = ?", (int(meta["frame_id"]),)
+        ).fetchone()
         if row is None:
             c.execute(
                 f"INSERT INTO frames ({_FRAME_COLS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (int(meta["frame_id"]), int(meta["robot_id"]), int(meta["sensor_id"]), int(meta["timestamp_ns"]),
-                 int(meta["kind"]), transform_to_blob(np.asarray(meta["world_T_body_odom"], float).reshape(4, 4)),
-                 meta.get("anchor_node_id"), anchor_blob, rgb_rel, depth_rel),
+                (
+                    int(meta["frame_id"]),
+                    int(meta["robot_id"]),
+                    int(meta["sensor_id"]),
+                    int(meta["timestamp_ns"]),
+                    int(meta["kind"]),
+                    transform_to_blob(
+                        np.asarray(meta["world_T_body_odom"], float).reshape(4, 4)
+                    ),
+                    meta.get("anchor_node_id"),
+                    anchor_blob,
+                    rgb_rel,
+                    depth_rel,
+                ),
             )
         else:
             c.execute(
                 "UPDATE frames SET rgb_path = COALESCE(rgb_path, ?), depth_path = COALESCE(depth_path, ?), "
                 "anchor_node_id = COALESCE(anchor_node_id, ?), anchor_T_body = COALESCE(anchor_T_body, ?) "
                 "WHERE frame_id = ?",
-                (rgb_rel, depth_rel, meta.get("anchor_node_id"), anchor_blob, int(meta["frame_id"])),
+                (
+                    rgb_rel,
+                    depth_rel,
+                    meta.get("anchor_node_id"),
+                    anchor_blob,
+                    int(meta["frame_id"]),
+                ),
             )
     return int(meta["frame_id"])
 
 
-def encode_frames(store: ImageStore, frames: Iterable[Frame], compression: str = "fast"):
+def encode_frames(
+    store: ImageStore, frames: Iterable[Frame], compression: str = "fast"
+):
     """Generator of ``(frame, blob)`` for :func:`select_frames` output."""
     for f in frames:
         yield f, encode_frame(store, f, compression)

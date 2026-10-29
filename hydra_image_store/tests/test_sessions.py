@@ -1,21 +1,35 @@
 import json
 
 import numpy as np
-
 from conftest import AGENT0, make_T
-from hydra_image_store import FrameKind, ImageStore, list_sessions
 from hydra_image_store.cli import main
+
+from hydra_image_store import FrameKind, ImageStore, list_sessions
 
 
 def _write_session(root, x, ts):
     """A run-layout directory whose store anchors one keyframe to a(0) at (x, 0, 0)."""
     w = ImageStore.open_writer(root / "image_store")
     sid = w.add_sensor("camera", 8, 6, 5.0, 5.0, 4.0, 3.0)
-    fid = w.add_frame_ref(sid, ts, kind=FrameKind.KEYFRAME, world_T_body_odom=make_T(t=(0, 0, 0)),
-                          anchor_node_id=AGENT0)
+    fid = w.add_frame_ref(
+        sid,
+        ts,
+        kind=FrameKind.KEYFRAME,
+        world_T_body_odom=make_T(t=(0, 0, 0)),
+        anchor_node_id=AGENT0,
+    )
     w.close()
-    nodes = [{"id": AGENT0, "layer": 2, "partition": 97,
-              "attributes": {"position": [x, 0, 0], "world_R_body": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}}}]
+    nodes = [
+        {
+            "id": AGENT0,
+            "layer": 2,
+            "partition": 97,
+            "attributes": {
+                "position": [x, 0, 0],
+                "world_R_body": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0},
+            },
+        }
+    ]
     dsg = root / "hydra/backend/dsg.json"
     dsg.parent.mkdir(parents=True, exist_ok=True)
     dsg.write_text(json.dumps({"nodes": nodes, "edges": []}))
@@ -26,7 +40,9 @@ def _make_run(tmp_path):
     run = tmp_path / "run"
     _write_session(run / "sessions/1", 10.0, 100)
     _write_session(run / "sessions/2", 20.0, 200)
-    (run / "sessions/2/session.json").write_text(json.dumps({"session": "2", "rotated_at": "2026-10-18T00:00:00Z"}))
+    (run / "sessions/2/session.json").write_text(
+        json.dumps({"session": "2", "rotated_at": "2026-10-18T00:00:00Z"})
+    )
     _write_session(run, 30.0, 300)
     (run / "sessions/notes").mkdir()  # ignored
     (run / "sessions/3").mkdir()  # no store: ignored
@@ -37,7 +53,10 @@ def test_sessions_resolve_against_their_own_graph(tmp_path):
     run = _make_run(tmp_path)
     sessions = ImageStore.sessions(run)
     assert [s.name for s in sessions] == ["1", "2", "live"]
-    assert sessions[1].info["rotated_at"] == "2026-10-18T00:00:00Z" and sessions[0].info == {}
+    assert (
+        sessions[1].info["rotated_at"] == "2026-10-18T00:00:00Z"
+        and sessions[0].info == {}
+    )
     assert sessions[-1].live and sessions[-1].store == run / "image_store"
     assert sessions[0].dsg_path() == run / "sessions/1/hydra/backend/dsg.json"
     assert sessions[0].dsg_path("frontend") is None
@@ -54,7 +73,11 @@ def test_sessions_resolve_against_their_own_graph(tmp_path):
 def test_sessions_from_store_path_and_without_live(tmp_path):
     run = _make_run(tmp_path)
     assert [s.name for s in list_sessions(run / "image_store")] == ["1", "2", "live"]
-    assert [s.name for s in list_sessions(run / "image_store/store.sqlite")] == ["1", "2", "live"]
+    assert [s.name for s in list_sessions(run / "image_store/store.sqlite")] == [
+        "1",
+        "2",
+        "live",
+    ]
     assert [s.name for s in ImageStore.sessions(run, include_live=False)] == ["1", "2"]
     assert list_sessions(tmp_path / "missing") == []
 

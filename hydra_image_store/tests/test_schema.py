@@ -4,7 +4,10 @@ import pytest
 
 import hydra_image_store
 
-CPP_SCHEMA = pathlib.Path(__file__).resolve().parents[2] / "hydra/resources/image_store/schema.sql"
+CPP_SCHEMA = (
+    pathlib.Path(__file__).resolve().parents[2]
+    / "hydra/resources/image_store/schema.sql"
+)
 
 
 @pytest.mark.skipif(not CPP_SCHEMA.exists(), reason="not in a Hydra checkout")

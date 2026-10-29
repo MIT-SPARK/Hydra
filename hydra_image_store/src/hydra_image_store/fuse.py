@@ -75,12 +75,17 @@ def _with_prefix(node_id: int, prefix: str) -> int:
     return (ord(prefix) << 56) | (node_id & ((1 << 56) - 1))
 
 
-def load_node_map(path: str | os.PathLike) -> tuple[dict[int, dict[int, int]], dict[int, int]]:
+def load_node_map(
+    path: str | os.PathLike,
+) -> tuple[dict[int, dict[int, int]], dict[int, int]]:
     """Read ``fusion_node_map.json`` as ({robot: {original: fused}}, {child: parent})."""
     with open(path) as fin:
         data = json.load(fin)
 
-    robots = {int(r): {int(o): int(f) for o, f in pairs} for r, pairs in data["robots"].items()}
+    robots = {
+        int(r): {int(o): int(f) for o, f in pairs}
+        for r, pairs in data["robots"].items()
+    }
     merges = {int(c): int(p) for c, p in data.get("merges", [])}
     return robots, merges
 
@@ -96,10 +101,14 @@ def load_world_T_robot(path: str | os.PathLike) -> np.ndarray:
 class _NodeMapper:
     """Maps node ids of one source store into fused node ids."""
 
-    def __init__(self, conn: sqlite3.Connection, node_map: Mapping[int, int], robot_id: int):
+    def __init__(
+        self, conn: sqlite3.Connection, node_map: Mapping[int, int], robot_id: int
+    ):
         self.node_map = node_map
         self.prefix = ROBOT_PREFIXES[robot_id]
-        self.parents = dict(conn.execute("SELECT child_id, parent_id FROM node_aliases"))
+        self.parents = dict(
+            conn.execute("SELECT child_id, parent_id FROM node_aliases")
+        )
         self.missing: set[int] = set()
 
     def canonical(self, node_id: int) -> int:
@@ -138,7 +147,9 @@ def _source_robot_id(conn: sqlite3.Connection, store: pathlib.Path) -> int:
     ids = {r[0] for r in conn.execute("SELECT DISTINCT robot_id FROM sensors")}
     ids |= {r[0] for r in conn.execute("SELECT DISTINCT robot_id FROM frames")}
     if len(ids) > 1:
-        raise ValueError(f"{store} holds several robots {sorted(ids)}; fuse one robot per source")
+        raise ValueError(
+            f"{store} holds several robots {sorted(ids)}; fuse one robot per source"
+        )
     return ids.pop() if ids else 0
 
 
@@ -219,7 +230,9 @@ def _copy_source(
         row = list(row)
         row[0] = _rekey(row[0], robot)
         row[1] = robot
-        dst.execute(f"INSERT INTO sensors ({sensor_cols}) VALUES ({','.join('?' * 11)})", row)
+        dst.execute(
+            f"INSERT INTO sensors ({sensor_cols}) VALUES ({','.join('?' * 11)})", row
+        )
 
     frame_cols = (
         "frame_id, robot_id, sensor_id, timestamp_ns, kind, world_T_body_odom, "
@@ -227,7 +240,18 @@ def _copy_source(
     )
     num_frames = num_unanchored = 0
     for row in src.execute(f"SELECT {frame_cols} FROM frames"):
-        (frame_id, _, sensor_id, stamp, kind, odom, anchor, anchor_T_body, rgb, depth) = row
+        (
+            frame_id,
+            _,
+            sensor_id,
+            stamp,
+            kind,
+            odom,
+            anchor,
+            anchor_T_body,
+            rgb,
+            depth,
+        ) = row
         fused_anchor = mapper(anchor)
         if anchor is not None and fused_anchor is None:
             anchor_T_body = None
@@ -268,11 +292,15 @@ def _copy_source(
             row[9:12] = moved.min(axis=0).tolist()
             row[12:15] = moved.max(axis=0).tolist()
         row[16] = place(row[16])
-        dst.execute(f"INSERT INTO observations ({obs_cols}) VALUES ({','.join('?' * 19)})", row)
+        dst.execute(
+            f"INSERT INTO observations ({obs_cols}) VALUES ({','.join('?' * 19)})", row
+        )
         num_obs += 1
 
     num_bindings = num_dropped = 0
-    for track_id, node_id in src.execute("SELECT track_id, node_id FROM track_bindings"):
+    for track_id, node_id in src.execute(
+        "SELECT track_id, node_id FROM track_bindings"
+    ):
         fused = mapper(node_id)
         if fused is None:
             num_dropped += 1
@@ -292,7 +320,8 @@ def _copy_source(
     if mapper.missing:
         logger.warning(
             "%s: %d node ids are not in the fused graph (bindings / anchors dropped)",
-            src_root, len(mapper.missing),
+            src_root,
+            len(mapper.missing),
         )
 
     return {

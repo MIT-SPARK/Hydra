@@ -1,7 +1,7 @@
 from conftest import AGENT0, OBJ_A, OBJ_B
+from hydra_image_store.viser_adapter import make_image_provider
 
 from hydra_image_store import ImageStore
-from hydra_image_store.viser_adapter import make_image_provider
 
 FIELDS = {"rgb_path", "depth_path", "mask_path", "timestamp_ns", "meta"}
 

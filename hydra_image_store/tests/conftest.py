@@ -50,27 +50,54 @@ def synthetic(tmp_path):
     w = ImageStore.open_writer(store_dir, robot_id=0)
     sid = w.add_sensor("cam", 8, 6, 5.0, 5.0, 4.0, 3.0, 0.001, BODY_T_SENSOR)
     kf0 = w.add_frame_ref(
-        sid, 100, kind=FrameKind.KEYFRAME, world_T_body_odom=make_T(t=(1, 0, 0)),
-        rgb=write_image(src / "kf0.jpg"), depth=write_image(src / "kf0.png", mode="I;16"),
-        anchor_node_id=AGENT0, link="copy",
+        sid,
+        100,
+        kind=FrameKind.KEYFRAME,
+        world_T_body_odom=make_T(t=(1, 0, 0)),
+        rgb=write_image(src / "kf0.jpg"),
+        depth=write_image(src / "kf0.png", mode="I;16"),
+        anchor_node_id=AGENT0,
+        link="copy",
     )
     kf1 = w.add_frame_ref(
-        sid, 200, kind=FrameKind.KEYFRAME, world_T_body_odom=make_T(t=(2, 0, 0)),
-        rgb=write_image(src / "kf1.jpg"), anchor_node_id=AGENT1, link="copy",
+        sid,
+        200,
+        kind=FrameKind.KEYFRAME,
+        world_T_body_odom=make_T(t=(2, 0, 0)),
+        rgb=write_image(src / "kf1.jpg"),
+        anchor_node_id=AGENT1,
+        link="copy",
     )
     skf = w.add_frame_ref(
-        sid, 150, kind=FrameKind.SUBKEYFRAME, world_T_body_odom=make_T(t=(1.5, 0, 0)),
-        rgb=write_image(src / "skf.jpg"), anchor_node_id=AGENT0,
-        anchor_T_body=make_T(rot_z(0.1), (0.5, 0, 0)), link="copy",
+        sid,
+        150,
+        kind=FrameKind.SUBKEYFRAME,
+        world_T_body_odom=make_T(t=(1.5, 0, 0)),
+        rgb=write_image(src / "skf.jpg"),
+        anchor_node_id=AGENT0,
+        anchor_T_body=make_T(rot_z(0.1), (0.5, 0, 0)),
+        link="copy",
     )
     obs_frame = w.add_frame_ref(
-        sid, 160, kind=FrameKind.OBSERVATION, world_T_body_odom=make_T(t=(1.6, 0, 0)),
-        rgb=write_image(src / "obs.jpg"), link="copy",
+        sid,
+        160,
+        kind=FrameKind.OBSERVATION,
+        world_T_body_odom=make_T(t=(1.6, 0, 0)),
+        rgb=write_image(src / "obs.jpg"),
+        link="copy",
     )
     mask = np.zeros((6, 8), bool)
     mask[2:4, 3:6] = True
     o = {}
-    o["a1"] = w.add_observation(10, kf0, bbox2d=(3, 2, 5, 3), bbox3d=((0, 0, 0), (1, 1, 1)), mask=mask, score=0.9, kept=True)
+    o["a1"] = w.add_observation(
+        10,
+        kf0,
+        bbox2d=(3, 2, 5, 3),
+        bbox3d=((0, 0, 0), (1, 1, 1)),
+        mask=mask,
+        score=0.9,
+        kept=True,
+    )
     o["a2"] = w.add_observation(10, obs_frame, mask=mask, score=0.5, kept=True)
     o["b1"] = w.add_observation(11, kf1, mask=~mask, score=0.7, kept=True)
     o["b2"] = w.add_observation(11, skf, score=0.1)
@@ -80,6 +107,13 @@ def synthetic(tmp_path):
     w.bind_track(12, OBJ_C)
     w.close()
     return {
-        "dir": store_dir, "src": src, "sensor": sid, "kf0": kf0, "kf1": kf1, "skf": skf,
-        "obs_frame": obs_frame, "obs": o, "mask": mask,
+        "dir": store_dir,
+        "src": src,
+        "sensor": sid,
+        "kf0": kf0,
+        "kf1": kf1,
+        "skf": skf,
+        "obs_frame": obs_frame,
+        "obs": o,
+        "mask": mask,
     }

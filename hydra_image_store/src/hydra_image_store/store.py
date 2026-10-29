@@ -152,13 +152,17 @@ def _connect(db: pathlib.Path, readonly: bool) -> sqlite3.Connection:
             raise FileNotFoundError(f"no image store at {db}")
         uri = "file:" + urllib.parse.quote(str(db)) + "?mode=ro"
         try:
-            conn = sqlite3.connect(uri, uri=True, check_same_thread=False, isolation_level=None)
+            conn = sqlite3.connect(
+                uri, uri=True, check_same_thread=False, isolation_level=None
+            )
             conn.execute("SELECT 1 FROM meta LIMIT 1").fetchall()
         except sqlite3.OperationalError:
             # WAL readers need to create the -shm file; on a read-only medium fall back
             # to immutable mode (safe only because nobody can be writing there).
             uri = "file:" + urllib.parse.quote(str(db)) + "?mode=ro&immutable=1"
-            conn = sqlite3.connect(uri, uri=True, check_same_thread=False, isolation_level=None)
+            conn = sqlite3.connect(
+                uri, uri=True, check_same_thread=False, isolation_level=None
+            )
     else:
         db.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db), check_same_thread=False, isolation_level=None)
@@ -220,7 +224,9 @@ class ImageStore:
 
     def __init__(self, dbs: list[_Db]):
         self._dbs = dbs
-        self._alias_cache: tuple[tuple, dict[int, int], dict[int, set[int]]] | None = None
+        self._alias_cache: tuple[tuple, dict[int, int], dict[int, set[int]]] | None = (
+            None
+        )
 
     # --- construction -------------------------------------------------------------------
 
@@ -264,9 +270,16 @@ class ImageStore:
     # --- merges -------------------------------------------------------------------------
 
     def _aliases(self) -> tuple[dict[int, int], dict[int, set[int]]]:
-        version = tuple(db.conn.execute("PRAGMA data_version").fetchone()[0] for db in self._dbs)
+        version = tuple(
+            db.conn.execute("PRAGMA data_version").fetchone()[0] for db in self._dbs
+        )
         if self._alias_cache is None or self._alias_cache[0] != version:
-            parents = {c: p for _, (c, p) in self._query("SELECT child_id, parent_id FROM node_aliases")}
+            parents = {
+                c: p
+                for _, (c, p) in self._query(
+                    "SELECT child_id, parent_id FROM node_aliases"
+                )
+            }
             members: dict[int, set[int]] = {}
             canon = {c: self._follow(parents, c) for c in parents}
             for child, root in canon.items():
@@ -300,7 +313,9 @@ class ImageStore:
     # --- frames ---------------------------------------------------------------------------
 
     def frame(self, frame_id: int) -> Frame | None:
-        for db, row in self._query(f"SELECT {_FRAME_COLS} FROM frames WHERE frame_id = ?", (int(frame_id),)):
+        for db, row in self._query(
+            f"SELECT {_FRAME_COLS} FROM frames WHERE frame_id = ?", (int(frame_id),)
+        ):
             return db.frame_from_row(row)
         return None
 
@@ -333,18 +348,29 @@ class ImageStore:
         out.sort(key=lambda f: (f.timestamp_ns, f.frame_id))
         return out
 
-    def frames_for_agent(self, node_id: int, include_subkeyframes: bool = True) -> list[Frame]:
+    def frames_for_agent(
+        self, node_id: int, include_subkeyframes: bool = True
+    ) -> list[Frame]:
         """The agent's keyframe plus (optionally) the sub-keyframes anchored to it."""
-        kinds = [FrameKind.KEYFRAME, FrameKind.SUBKEYFRAME] if include_subkeyframes else [FrameKind.KEYFRAME]
+        kinds = (
+            [FrameKind.KEYFRAME, FrameKind.SUBKEYFRAME]
+            if include_subkeyframes
+            else [FrameKind.KEYFRAME]
+        )
         sql = f"SELECT {_FRAME_COLS} FROM frames WHERE anchor_node_id = ? AND kind IN {_in_clause(kinds)}"
-        out = [db.frame_from_row(r) for db, r in self._query(sql, [int(node_id), *map(int, kinds)])]
+        out = [
+            db.frame_from_row(r)
+            for db, r in self._query(sql, [int(node_id), *map(int, kinds)])
+        ]
         out.sort(key=lambda f: (f.kind, f.timestamp_ns))
         return out
 
     def agent_nodes(self, include_subkeyframe_anchors: bool = False) -> list[int]:
         """Node ids with an agent keyframe (optionally also nodes only sub-keyframes anchor to)."""
         kinds = "(0, 1)" if include_subkeyframe_anchors else "(0)"
-        rows = self._query(f"SELECT DISTINCT anchor_node_id FROM frames WHERE kind IN {kinds} AND anchor_node_id IS NOT NULL")
+        rows = self._query(
+            f"SELECT DISTINCT anchor_node_id FROM frames WHERE kind IN {kinds} AND anchor_node_id IS NOT NULL"
+        )
         return sorted({r[0] for _, r in rows})
 
     # --- sensors / poses --------------------------------------------------------------------
@@ -381,8 +407,12 @@ class ImageStore:
     def body_pose(self, frame: Frame, pose_lookup=None) -> tuple[np.ndarray, str]:
         lookup = as_pose_lookup(pose_lookup)
         if lookup is not None and frame.anchor_node_id is not None:
-            anchor_T_body = np.eye(4) if frame.anchor_T_body is None else frame.anchor_T_body
-            for nid in dict.fromkeys((frame.anchor_node_id, self.canonical(frame.anchor_node_id))):
+            anchor_T_body = (
+                np.eye(4) if frame.anchor_T_body is None else frame.anchor_T_body
+            )
+            for nid in dict.fromkeys(
+                (frame.anchor_node_id, self.canonical(frame.anchor_node_id))
+            ):
                 world_T_anchor = lookup(nid)
                 if world_T_anchor is not None:
                     return np.asarray(world_T_anchor, float) @ anchor_T_body, "anchor"
@@ -450,7 +480,10 @@ class ImageStore:
                 " LEFT JOIN track_bindings b ON b.robot_id = o.robot_id AND b.track_id = o.track_id"
                 " WHERE o.robot_id = ? AND o.track_id = ?"
             )
-            out.extend(self._obs_from_row(db, r) for r in db.conn.execute(sql, (int(robot_id), int(track_id))))
+            out.extend(
+                self._obs_from_row(db, r)
+                for r in db.conn.execute(sql, (int(robot_id), int(track_id)))
+            )
         out.sort(key=lambda o: (o.timestamp_ns, o.obs_id))
         return out
 
@@ -497,21 +530,40 @@ class ImageStore:
         for db in self._dbs:
             c = db.conn
             one = lambda sql: c.execute(sql).fetchone()[0]  # noqa: E731
-            kinds = dict(c.execute("SELECT kind, COUNT(*) FROM frames GROUP BY kind").fetchall())
+            kinds = dict(
+                c.execute("SELECT kind, COUNT(*) FROM frames GROUP BY kind").fetchall()
+            )
             out.append(
                 {
                     "path": str(db.root),
                     "meta": dict(c.execute("SELECT key, value FROM meta").fetchall()),
-                    "robots": [r[0] for r in c.execute("SELECT DISTINCT robot_id FROM frames UNION SELECT DISTINCT robot_id FROM sensors")],
+                    "robots": [
+                        r[0]
+                        for r in c.execute(
+                            "SELECT DISTINCT robot_id FROM frames UNION SELECT DISTINCT robot_id FROM sensors"
+                        )
+                    ],
                     "sensors": one("SELECT COUNT(*) FROM sensors"),
-                    "frames": {FrameKind(k).name.lower(): v for k, v in sorted(kinds.items())},
-                    "frames_with_rgb": one("SELECT COUNT(*) FROM frames WHERE rgb_path IS NOT NULL"),
-                    "frames_unanchored": one("SELECT COUNT(*) FROM frames WHERE anchor_node_id IS NULL"),
+                    "frames": {
+                        FrameKind(k).name.lower(): v for k, v in sorted(kinds.items())
+                    },
+                    "frames_with_rgb": one(
+                        "SELECT COUNT(*) FROM frames WHERE rgb_path IS NOT NULL"
+                    ),
+                    "frames_unanchored": one(
+                        "SELECT COUNT(*) FROM frames WHERE anchor_node_id IS NULL"
+                    ),
                     "observations": one("SELECT COUNT(*) FROM observations"),
-                    "observations_kept": one("SELECT COUNT(*) FROM observations WHERE kept != 0"),
-                    "tracks": one("SELECT COUNT(*) FROM (SELECT DISTINCT robot_id, track_id FROM observations)"),
+                    "observations_kept": one(
+                        "SELECT COUNT(*) FROM observations WHERE kept != 0"
+                    ),
+                    "tracks": one(
+                        "SELECT COUNT(*) FROM (SELECT DISTINCT robot_id, track_id FROM observations)"
+                    ),
                     "track_bindings": one("SELECT COUNT(*) FROM track_bindings"),
-                    "bound_nodes": one("SELECT COUNT(DISTINCT node_id) FROM track_bindings"),
+                    "bound_nodes": one(
+                        "SELECT COUNT(DISTINCT node_id) FROM track_bindings"
+                    ),
                     "node_aliases": one("SELECT COUNT(*) FROM node_aliases"),
                 }
             )
@@ -609,13 +661,17 @@ class ImageStoreWriter:
         lo = make_id(self.robot_id, 0)
         hi = lo | SEQ_MASK
         row = self.conn.execute(
-            f"SELECT MAX({column}) FROM {table} WHERE {column} BETWEEN ? AND ?", (lo, hi)
+            f"SELECT MAX({column}) FROM {table} WHERE {column} BETWEEN ? AND ?",
+            (lo, hi),
         ).fetchone()
         return lo if row[0] is None else row[0] + 1
 
     def set_meta(self, key: str, value) -> None:
         with self.batch():
-            self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, str(value)))
+            self.conn.execute(
+                "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                (key, str(value)),
+            )
 
     # --- rows -------------------------------------------------------------------------------
 
@@ -635,9 +691,19 @@ class ImageStoreWriter:
         blob = transform_to_blob(np.eye(4) if body_T_sensor is None else body_T_sensor)
         with self.batch():
             row = self.conn.execute(
-                "SELECT sensor_id FROM sensors WHERE robot_id = ? AND name = ?", (self.robot_id, name)
+                "SELECT sensor_id FROM sensors WHERE robot_id = ? AND name = ?",
+                (self.robot_id, name),
             ).fetchone()
-            vals = (int(width), int(height), float(fx), float(fy), float(cx), float(cy), float(depth_scale), blob)
+            vals = (
+                int(width),
+                int(height),
+                float(fx),
+                float(fy),
+                float(cx),
+                float(cy),
+                float(depth_scale),
+                blob,
+            )
             if row:
                 self.conn.execute(
                     "UPDATE sensors SET width=?, height=?, fx=?, fy=?, cx=?, cy=?, depth_scale=?, "
@@ -697,11 +763,25 @@ class ImageStoreWriter:
                 "WHERE sensor_id = ? AND timestamp_ns = ?",
                 (int(sensor_id), ts),
             ).fetchone()
-            rgb_rel = None if rgb is None or (row and row[1]) else self._import_file(rgb, f"{base}_rgb{pathlib.Path(rgb).suffix}", link)
-            depth_rel = None if depth is None or (row and row[2]) else self._import_file(depth, f"{base}_depth{pathlib.Path(depth).suffix}", link)
+            rgb_rel = (
+                None
+                if rgb is None or (row and row[1])
+                else self._import_file(
+                    rgb, f"{base}_rgb{pathlib.Path(rgb).suffix}", link
+                )
+            )
+            depth_rel = (
+                None
+                if depth is None or (row and row[2])
+                else self._import_file(
+                    depth, f"{base}_depth{pathlib.Path(depth).suffix}", link
+                )
+            )
             anchor_blob = None
             if anchor_node_id is not None:
-                anchor_blob = transform_to_blob(np.eye(4) if anchor_T_body is None else anchor_T_body)
+                anchor_blob = transform_to_blob(
+                    np.eye(4) if anchor_T_body is None else anchor_T_body
+                )
             if row:
                 fid = row[0]
                 self.conn.execute(
@@ -716,8 +796,18 @@ class ImageStoreWriter:
             odom = np.eye(4) if world_T_body_odom is None else world_T_body_odom
             self.conn.execute(
                 f"INSERT INTO frames ({_FRAME_COLS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (fid, self.robot_id, int(sensor_id), ts, int(kind), transform_to_blob(odom),
-                 None if anchor_node_id is None else int(anchor_node_id), anchor_blob, rgb_rel, depth_rel),
+                (
+                    fid,
+                    self.robot_id,
+                    int(sensor_id),
+                    ts,
+                    int(kind),
+                    transform_to_blob(odom),
+                    None if anchor_node_id is None else int(anchor_node_id),
+                    anchor_blob,
+                    rgb_rel,
+                    depth_rel,
+                ),
             )
             return fid
 
@@ -755,7 +845,10 @@ class ImageStoreWriter:
         """
         with self.batch():
             if timestamp_ns is None:
-                row = self.conn.execute("SELECT timestamp_ns FROM frames WHERE frame_id = ?", (int(frame_id),)).fetchone()
+                row = self.conn.execute(
+                    "SELECT timestamp_ns FROM frames WHERE frame_id = ?",
+                    (int(frame_id),),
+                ).fetchone()
                 if row is None:
                     raise KeyError(f"unknown frame {frame_id}")
                 timestamp_ns = row[0]
@@ -767,25 +860,48 @@ class ImageStoreWriter:
                 rle = json.dumps([int(c) for c in rle], separators=(",", ":"))
             rel_mask = None
             if mask_path is not None:
-                rel_mask = self._import_file(mask_path, f"masks/r{self.robot_id}/{oid}{pathlib.Path(mask_path).suffix}", link)
-            elif mask is not None and (write_mask_png if write_mask_png is not None else kept):
+                rel_mask = self._import_file(
+                    mask_path,
+                    f"masks/r{self.robot_id}/{oid}{pathlib.Path(mask_path).suffix}",
+                    link,
+                )
+            elif mask is not None and (
+                write_mask_png if write_mask_png is not None else kept
+            ):
                 try:
                     from PIL import Image
 
                     rel_mask = f"masks/r{self.robot_id}/{oid}.png"
                     (self.root / rel_mask).parent.mkdir(parents=True, exist_ok=True)
-                    Image.fromarray(np.asarray(mask, bool).astype(np.uint8) * 255).save(self.root / rel_mask)
+                    Image.fromarray(np.asarray(mask, bool).astype(np.uint8) * 255).save(
+                        self.root / rel_mask
+                    )
                 except ImportError:
                     rel_mask = None
             b2 = [None] * 4 if bbox2d is None else [int(v) for v in bbox2d]
-            b3 = [None] * 6 if bbox3d is None else [float(v) for v in (*bbox3d[0], *bbox3d[1])]
+            b3 = (
+                [None] * 6
+                if bbox3d is None
+                else [float(v) for v in (*bbox3d[0], *bbox3d[1])]
+            )
             self.conn.execute(
                 "INSERT INTO observations (obs_id, robot_id, track_id, frame_id, timestamp_ns, "
                 "bbox2d_min_x, bbox2d_min_y, bbox2d_max_x, bbox2d_max_y, bbox3d_min_x, bbox3d_min_y, "
                 "bbox3d_min_z, bbox3d_max_x, bbox3d_max_y, bbox3d_max_z, mask_rle, mask_path, score, kept) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (oid, self.robot_id, int(track_id), int(frame_id), int(timestamp_ns), *b2, *b3,
-                 rle, rel_mask, float(score), int(bool(kept))),
+                (
+                    oid,
+                    self.robot_id,
+                    int(track_id),
+                    int(frame_id),
+                    int(timestamp_ns),
+                    *b2,
+                    *b3,
+                    rle,
+                    rel_mask,
+                    float(score),
+                    int(bool(kept)),
+                ),
             )
             return oid
 
@@ -796,7 +912,9 @@ class ImageStoreWriter:
             self.bind_track(track, node_id)
             return self.add_observation(track, frame_id, **kwargs)
 
-    def bind_track(self, track_id: int, node_id: int, robot_id: int | None = None) -> None:
+    def bind_track(
+        self, track_id: int, node_id: int, robot_id: int | None = None
+    ) -> None:
         robot = self.robot_id if robot_id is None else int(robot_id)
         with self.batch():
             self.conn.execute(
@@ -804,7 +922,9 @@ class ImageStoreWriter:
                 (robot, int(track_id), int(node_id)),
             )
 
-    def record_merges(self, merges: Mapping[int, int] | Iterable[tuple[int, int]]) -> None:
+    def record_merges(
+        self, merges: Mapping[int, int] | Iterable[tuple[int, int]]
+    ) -> None:
         """Record ``child -> parent`` merges (upsert)."""
         items = merges.items() if isinstance(merges, Mapping) else merges
         with self.batch():

@@ -4,11 +4,17 @@ import tarfile
 
 import numpy as np
 import pytest
-
 from conftest import BODY_T_SENSOR, make_T
 
-from hydra_image_store import FrameKind, ImageStore, check_store, make_node_id, pack_store, unpack_store
-from hydra_image_store import transfer
+from hydra_image_store import (
+    FrameKind,
+    ImageStore,
+    check_store,
+    make_node_id,
+    pack_store,
+    transfer,
+    unpack_store,
+)
 
 pytest.importorskip("zstandard")
 PIL = pytest.importorskip("PIL.Image")
@@ -41,19 +47,37 @@ def run(tmp_path):
     w = ImageStore.open_writer(run / "image_store", robot_id=3)
     sid = w.add_sensor("cam", W, H, 50.0, 51.0, 31.5, 18.0, 0.001, BODY_T_SENSOR)
     frames = []
-    for i, (kind, ts) in enumerate([(FrameKind.KEYFRAME, 100), (FrameKind.KEYFRAME, 200),
-                                     (FrameKind.SUBKEYFRAME, 250), (FrameKind.KEYFRAME, 300),
-                                     (FrameKind.OBSERVATION, 320)]):
+    for i, (kind, ts) in enumerate(
+        [
+            (FrameKind.KEYFRAME, 100),
+            (FrameKind.KEYFRAME, 200),
+            (FrameKind.SUBKEYFRAME, 250),
+            (FrameKind.KEYFRAME, 300),
+            (FrameKind.OBSERVATION, 320),
+        ]
+    ):
         rgb, depth = src / f"{i}.jpg", src / f"{i}.png"
         PIL.fromarray(_rgb(i)).save(rgb, quality=95)
         PIL.fromarray(_depth(i)).save(depth)
         anchor = make_node_id("a", i) if kind != FrameKind.OBSERVATION else None
-        frames.append(w.add_frame_ref(sid, ts, kind=kind, world_T_body_odom=make_T(t=(i, 0, 0)),
-                                      rgb=rgb, depth=depth, anchor_node_id=anchor, link="copy"))
+        frames.append(
+            w.add_frame_ref(
+                sid,
+                ts,
+                kind=kind,
+                world_T_body_odom=make_T(t=(i, 0, 0)),
+                rgb=rgb,
+                depth=depth,
+                anchor_node_id=anchor,
+                link="copy",
+            )
+        )
     mask = np.zeros((H, W), bool)
     mask[5:20, 10:30] = True
     obj = make_node_id("O", 7)
-    w.add_sam3_observation(obj, frames[4], mask=mask, score=0.8, kept=True, bbox2d=(10, 5, 29, 19))
+    w.add_sam3_observation(
+        obj, frames[4], mask=mask, score=0.8, kept=True, bbox2d=(10, 5, 29, 19)
+    )
     w.add_sam3_observation(obj, frames[2], mask=mask, score=0.3)
     w.close()
     return {"dir": run, "frames": frames, "sensor": sid, "obj": obj}
@@ -61,7 +85,9 @@ def run(tmp_path):
 
 def test_delta_zstd_roundtrip():
     d = _depth()
-    assert np.array_equal(transfer.delta_zstd_decode(transfer.delta_zstd_encode(d), d.shape), d)
+    assert np.array_equal(
+        transfer.delta_zstd_decode(transfer.delta_zstd_encode(d), d.shape), d
+    )
 
 
 def test_downscale_restore_and_calib():
@@ -71,8 +97,17 @@ def test_downscale_restore_and_calib():
     assert np.array_equal(half, d[::2, ::2])
     full = transfer.restore_depth(half, 2, d.shape)
     assert full.shape == d.shape and np.array_equal(full[::2, ::2], d[::2, ::2])
-    c = transfer.scale_calib({"fx": 50.0, "fy": 51.0, "cx": 31.5, "cy": 18.0, "width": W, "height": H}, 2)
-    assert (c["fx"], c["fy"], c["cx"], c["cy"], c["width"], c["height"]) == (25.0, 25.5, 15.75, 9.0, 32, 19)
+    c = transfer.scale_calib(
+        {"fx": 50.0, "fy": 51.0, "cx": 31.5, "cy": 18.0, "width": W, "height": H}, 2
+    )
+    assert (c["fx"], c["fy"], c["cx"], c["cy"], c["width"], c["height"]) == (
+        25.0,
+        25.5,
+        15.75,
+        9.0,
+        32,
+        19,
+    )
     # a half-resolution pixel back-projects to the same ray as its full-resolution source
     u, v = 7, 5
     ray_half = np.array([(u - c["cx"]) / c["fx"], (v - c["cy"]) / c["fy"]])
@@ -89,9 +124,13 @@ def test_encode_decode_modes(run, mode):
     meta = dec["meta"]
     assert meta["frame_id"] == frame.frame_id and meta["timestamp_ns"] == 100
     assert meta["kind"] == 0 and meta["anchor_node_id"] == make_node_id("a", 0)
-    assert np.allclose(np.reshape(meta["world_T_body_odom"], (4, 4)), frame.world_T_body_odom)
+    assert np.allclose(
+        np.reshape(meta["world_T_body_odom"], (4, 4)), frame.world_T_body_odom
+    )
     assert meta["calib"]["fx"] == 50.0 and meta["calib"]["width"] == W
-    assert np.allclose(np.reshape(meta["calib"]["body_T_sensor"], (4, 4)), BODY_T_SENSOR)
+    assert np.allclose(
+        np.reshape(meta["calib"]["body_T_sensor"], (4, 4)), BODY_T_SENSOR
+    )
     assert dec["rgb_format"] == "jpeg"
     stored_rgb = frame.rgb_path.read_bytes()
     src_depth = np.asarray(PIL.open(frame.depth_path))
@@ -100,7 +139,9 @@ def test_encode_decode_modes(run, mode):
         assert np.array_equal(dec["depth"], src_depth[::2, ::2])
         assert meta["depth_calib"]["fx"] == 25.0 and meta["depth_calib"]["width"] == 32
         assert meta["rgb_quality"] == 75 and dec["rgb"] != stored_rgb
-        assert np.array_equal(transfer.full_res_depth(dec)[::2, ::2], src_depth[::2, ::2])
+        assert np.array_equal(
+            transfer.full_res_depth(dec)[::2, ::2], src_depth[::2, ::2]
+        )
     else:
         assert dec["rgb"] == stored_rgb
         assert dec["depth_downscale"] == 1 and np.array_equal(dec["depth"], src_depth)
@@ -111,7 +152,12 @@ def test_encode_decode_modes(run, mode):
 
 def test_encode_by_id_and_bad_input(run):
     store = ImageStore.open(run["dir"] / "image_store")
-    assert transfer.decode_header(transfer.encode_frame(store, run["frames"][1], "none"))["meta"]["timestamp_ns"] == 200
+    assert (
+        transfer.decode_header(transfer.encode_frame(store, run["frames"][1], "none"))[
+            "meta"
+        ]["timestamp_ns"]
+        == 200
+    )
     with pytest.raises(ValueError):
         transfer.encode_frame(store, run["frames"][1], "zip")
     with pytest.raises(ValueError):
@@ -123,12 +169,24 @@ def test_fast_is_smaller_on_real_sized_images(tmp_path):
     rng = np.random.default_rng(1)
     yy, xx = np.mgrid[0:360, 0:640]
     depth = (2000 + 3 * xx + 2 * yy + rng.integers(0, 4, (360, 640))).astype(np.uint16)
-    rgb = np.clip(np.stack([xx % 256, yy % 256, (xx * yy) % 256], -1) + rng.integers(0, 30, (360, 640, 3)), 0, 255).astype(np.uint8)
+    rgb = np.clip(
+        np.stack([xx % 256, yy % 256, (xx * yy) % 256], -1)
+        + rng.integers(0, 30, (360, 640, 3)),
+        0,
+        255,
+    ).astype(np.uint8)
     PIL.fromarray(rgb).save(tmp_path / "r.jpg", quality=92)
     PIL.fromarray(depth).save(tmp_path / "d.png")
     w = ImageStore.open_writer(tmp_path / "s")
     sid = w.add_sensor("cam", 640, 360, 300, 300, 320, 180)
-    fid = w.add_frame_ref(sid, 1, kind=0, rgb=tmp_path / "r.jpg", depth=tmp_path / "d.png", anchor_node_id=1)
+    fid = w.add_frame_ref(
+        sid,
+        1,
+        kind=0,
+        rgb=tmp_path / "r.jpg",
+        depth=tmp_path / "d.png",
+        anchor_node_id=1,
+    )
     w.close()
     store = ImageStore.open(tmp_path / "s")
     sizes = {}
@@ -144,10 +202,21 @@ def test_fast_is_smaller_on_real_sized_images(tmp_path):
 def test_select_frames(run):
     store = ImageStore.open(run["dir"] / "image_store")
     f = run["frames"]
-    assert [x.frame_id for x in transfer.select_frames(store, "keyframes")] == [f[0], f[1], f[3]]
-    assert [x.frame_id for x in transfer.select_frames(store, "keyframes", include_kept_observations=True)] == [f[0], f[1], f[3], f[4]]
+    assert [x.frame_id for x in transfer.select_frames(store, "keyframes")] == [
+        f[0],
+        f[1],
+        f[3],
+    ]
+    assert [
+        x.frame_id
+        for x in transfer.select_frames(
+            store, "keyframes", include_kept_observations=True
+        )
+    ] == [f[0], f[1], f[3], f[4]]
     assert [x.frame_id for x in transfer.select_frames(store, "all")] == f
-    assert [x.frame_id for x in transfer.select_frames(store, "all", after=f[2])] == f[3:]
+    assert [x.frame_id for x in transfer.select_frames(store, "all", after=f[2])] == f[
+        3:
+    ]
     assert [x.frame_id for x in transfer.select_frames(store, "all", limit=2)] == f[:2]
 
 
@@ -155,22 +224,37 @@ def test_write_frame_mirror_keeps_ids(run, tmp_path):
     store = ImageStore.open(run["dir"] / "image_store")
     mirror = ImageStore.open_writer(tmp_path / "mirror", robot_id=3)
     for frame in transfer.select_frames(store, "keyframes"):
-        transfer.write_frame(mirror, transfer.decode_frame(transfer.encode_frame(store, frame, "fast")))
+        transfer.write_frame(
+            mirror, transfer.decode_frame(transfer.encode_frame(store, frame, "fast"))
+        )
     # idempotent (resend after reconnect)
-    transfer.write_frame(mirror, transfer.decode_frame(transfer.encode_frame(store, run["frames"][0], "fast")))
+    transfer.write_frame(
+        mirror,
+        transfer.decode_frame(transfer.encode_frame(store, run["frames"][0], "fast")),
+    )
     mirror.close()
     m = ImageStore.open(tmp_path / "mirror")
     assert [x.frame_id for x in m.frames()] == [run["frames"][i] for i in (0, 1, 3)]
     assert m.calib(run["sensor"]).fx == 50.0
     f0 = m.frame(run["frames"][0])
     depth = np.asarray(PIL.open(f0.depth_path))
-    assert depth.shape == (H, W) and np.array_equal(depth[::2, ::2], _depth(0)[::2, ::2])
-    assert np.allclose(m.frame_pose(f0), store.frame_pose(store.frame(run["frames"][0])))
+    assert depth.shape == (H, W) and np.array_equal(
+        depth[::2, ::2], _depth(0)[::2, ::2]
+    )
+    assert np.allclose(
+        m.frame_pose(f0), store.frame_pose(store.frame(run["frames"][0]))
+    )
     assert check_store(tmp_path / "mirror")["ok"]
 
 
-@pytest.mark.parametrize("mode,frames,suffix", [("fast", "keyframes", ".tar"), ("lossless", "all", ".tar.zst"),
-                                                ("none", "keyframes", ".tar")])
+@pytest.mark.parametrize(
+    "mode,frames,suffix",
+    [
+        ("fast", "keyframes", ".tar"),
+        ("lossless", "all", ".tar.zst"),
+        ("none", "keyframes", ".tar"),
+    ],
+)
 def test_pack_unpack_roundtrip(run, tmp_path, mode, frames, suffix):
     archive = tmp_path / f"pack{suffix}"
     stats = pack_store(run["dir"], archive, frames=frames, compression=mode)
@@ -184,11 +268,21 @@ def test_pack_unpack_roundtrip(run, tmp_path, mode, frames, suffix):
     src = ImageStore.open(run["dir"] / "image_store")
     dst = ImageStore.open(dest / "image_store")
     # every row survives
-    for key in ("frames", "observations", "observations_kept", "track_bindings", "sensors"):
+    for key in (
+        "frames",
+        "observations",
+        "observations_kept",
+        "track_bindings",
+        "sensors",
+    ):
         assert dst.info()[0][key] == src.info()[0][key], key
     assert dst.info()[0]["meta"]["transfer_compression"] == mode
     shipped = {x.frame_id for x in dst.frames() if x.rgb_path is not None}
-    expected = set(run["frames"]) if frames == "all" else {run["frames"][i] for i in (0, 1, 3, 4)}
+    expected = (
+        set(run["frames"])
+        if frames == "all"
+        else {run["frames"][i] for i in (0, 1, 3, 4)}
+    )
     assert shipped == expected
     for fid in shipped:
         a, b = src.frame(fid), dst.frame(fid)
@@ -201,10 +295,17 @@ def test_pack_unpack_roundtrip(run, tmp_path, mode, frames, suffix):
             assert np.array_equal(da, db)
             assert a.rgb_path.read_bytes() == b.rgb_path.read_bytes()
     obs = dst.observations(run["obj"], kept_only=True)
-    assert len(obs) == 1 and obs[0].mask_path.exists() and dst.mask(obs[0]).sum() == 15 * 20
+    assert (
+        len(obs) == 1
+        and obs[0].mask_path.exists()
+        and dst.mask(obs[0]).sum() == 15 * 20
+    )
     # the unpacked store keeps working as a store
     w = ImageStore.open_writer(dest / "image_store", robot_id=3)
-    assert w.add_frame_ref(run["sensor"], 999, kind=0, anchor_node_id=1) not in run["frames"]
+    assert (
+        w.add_frame_ref(run["sensor"], 999, kind=0, anchor_node_id=1)
+        not in run["frames"]
+    )
     w.close()
 
 
@@ -248,7 +349,10 @@ def test_cli_pack_unpack_check(run, tmp_path, capsys):
     from hydra_image_store.cli import main
 
     assert main(["pack", str(run["dir"]), str(tmp_path / "a.tar.zst"), "--quiet"]) == 0
-    assert main(["unpack", str(tmp_path / "a.tar.zst"), str(tmp_path / "dest"), "--quiet"]) == 0
+    assert (
+        main(["unpack", str(tmp_path / "a.tar.zst"), str(tmp_path / "dest"), "--quiet"])
+        == 0
+    )
     assert main(["check", str(tmp_path / "dest")]) == 0
     assert "ALL PASS" in capsys.readouterr().out
 
@@ -276,4 +380,6 @@ def test_missing_zstandard_is_a_clear_error(run, monkeypatch):
     store = ImageStore.open(run["dir"] / "image_store")
     with pytest.raises(transfer.MissingDependency, match="zstandard"):
         transfer.encode_frame(store, run["frames"][0], "lossless")
-    assert transfer.encode_frame(store, run["frames"][0], "none")  # none needs no extras
+    assert transfer.encode_frame(
+        store, run["frames"][0], "none"
+    )  # none needs no extras

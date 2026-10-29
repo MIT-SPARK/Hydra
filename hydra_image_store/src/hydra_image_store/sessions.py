@@ -48,9 +48,16 @@ class Session:
     def name(self) -> str:
         return "live" if self.live else str(self.index)
 
-    def dsg_path(self, stage: str = "backend", with_mesh: bool = False) -> pathlib.Path | None:
+    def dsg_path(
+        self, stage: str = "backend", with_mesh: bool = False
+    ) -> pathlib.Path | None:
         """Saved scene graph of the session (``stage`` is ``backend`` or ``frontend``)."""
-        path = self.root / DSG_DIR / stage / ("dsg_with_mesh.json" if with_mesh else "dsg.json")
+        path = (
+            self.root
+            / DSG_DIR
+            / stage
+            / ("dsg_with_mesh.json" if with_mesh else "dsg.json")
+        )
         return path if path.exists() else None
 
     def open(self, readonly: bool = True):
@@ -87,8 +94,9 @@ def _run_dir(path: str | os.PathLike) -> pathlib.Path:
     return path
 
 
-def list_sessions(run_dir: str | os.PathLike, store_name: str = STORE_DIR,
-                  include_live: bool = True) -> list[Session]:
+def list_sessions(
+    run_dir: str | os.PathLike, store_name: str = STORE_DIR, include_live: bool = True
+) -> list[Session]:
     """Sessions of a run, oldest first: ``sessions/1``, ``sessions/2``, ..., then live.
 
     ``run_dir`` may also be the live store directory (or its ``store.sqlite``). The live
