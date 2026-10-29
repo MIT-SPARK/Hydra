@@ -368,7 +368,8 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     Region& region,
     const ActiveWindowOutput& msg,
     const TraversabilityLayer& layer) const {
-  // Position.
+  // Position. Remember the previous height since the 2D position below clobbers z.
+  const double prev_z = attrs.position.z();
   const auto centroid_index = region.centroid.cast<int>();
   if (region.voxels.count(centroid_index)) {
     attrs.position = region.centroid.cast<double>() * layer.voxel_size;
@@ -420,20 +421,27 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
 
   // has to come after setting the points because spark-dsg uses position to set radii
   size_t num_valid = 0;
+  size_t num_active = 0;
   float z_value = 0.0f;
   for (const auto& idx : region.voxels) {
     const auto voxel = layer.voxel(idx);
-    if (voxel && voxel->height) {
-      z_value += *voxel->height;
-      ++num_valid;
+    if (!voxel) {
+      continue;
     }
+    ++num_active;
+    if (!voxel->height) {
+      continue;
+    }
+    z_value += *voxel->height;
+    ++num_valid;
   }
 
-  // fallback to current robot height
   if (num_valid) {
     attrs.position.z() = z_value / num_valid;
-  } else {
+  } else if (num_active) {
     attrs.position.z() = msg.world_T_body().translation().z();
+  } else {
+    attrs.position.z() = prev_z;
   }
 }
 
