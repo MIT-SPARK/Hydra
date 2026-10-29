@@ -264,9 +264,6 @@ MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
   MergeList result;
   std::set<NodeId> merged;
   std::map<NodeId, std::vector<NodeId>> neighbors;
-  const auto attrs = [&dsg](NodeId id) -> const TravNodeAttributes& {
-    return dsg.getNode(id).attributes<TravNodeAttributes>();
-  };
 
   // Candidates are all inactive connections, as these already overlap.
   for (const auto& edge_key : merge_candidates_) {
@@ -280,8 +277,8 @@ MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
       continue;
     }
 
-    const auto& from_attrs = attrs(edge_key.k1);
-    const auto& to_attrs = attrs(edge_key.k2);
+    const auto& from_attrs = dsg.getNode(edge_key.k1).attributes<TravNodeAttributes>();
+    const auto& to_attrs = dsg.getNode(edge_key.k2).attributes<TravNodeAttributes>();
 
     // Merge if either centroid is included in the other or either place is largely
     // covered by the other. The more covered place is merged into the other one.
@@ -315,8 +312,9 @@ MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
       to_check.push_back(node_id);
     }
   }
-  std::sort(to_check.begin(), to_check.end(), [&attrs](NodeId lhs, NodeId rhs) {
-    return attrs(lhs).first_observed_ns > attrs(rhs).first_observed_ns;
+  std::sort(to_check.begin(), to_check.end(), [&dsg](NodeId lhs, NodeId rhs) {
+    return dsg.getNode(lhs).attributes<TravNodeAttributes>().first_observed_ns >
+           dsg.getNode(rhs).attributes<TravNodeAttributes>().first_observed_ns;
   });
 
   for (const auto node_id : to_check) {
@@ -327,12 +325,13 @@ MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
     std::vector<const TravNodeAttributes*> others;
     NodeId best_id = node_id;
     double best_covered = 0.0;
-    const auto& node_attrs = attrs(node_id);
+    const auto& node_attrs = dsg.getNode(node_id).attributes<TravNodeAttributes>();
     for (const auto neighbor_id : neighbors.at(node_id)) {
       if (merged.count(neighbor_id)) {
         continue;
       }
-      const auto& neighbor_attrs = attrs(neighbor_id);
+      const auto& neighbor_attrs =
+          dsg.getNode(neighbor_id).attributes<TravNodeAttributes>();
       others.push_back(&neighbor_attrs);
       const double covered =
           coveredFraction(node_attrs, {&neighbor_attrs}, config.overlap_samples);
