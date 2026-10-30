@@ -312,6 +312,22 @@ void MultiBackendModule::stopImpl() {
   }
 }
 
+void MultiBackendModule::finalize(Timestamp timestamp_ns) {
+  ScopedTimer timer("backend/finalize", timestamp_ns);
+  auto lock = deformation_graph_->acquireLock();
+  std::lock_guard<std::mutex> graph_lock(unmerged_dsg_->mutex);
+
+  hydra::UpdateInfo::ConstPtr info(
+      new hydra::UpdateInfo{timestamp_ns,
+                            nullptr,
+                            deformation_graph_->getValues(),
+                            true,
+                            {},
+                            deformation_graph_.get(),
+                            &unmerged_dsg_->node_robot_map});
+  dsg_updater_->finalize(info);
+}
+
 bool MultiBackendModule::pollSharedStates(Timestamp& stamp, bool mark_updated) const {
   bool updated = false;
   stamp = 0;

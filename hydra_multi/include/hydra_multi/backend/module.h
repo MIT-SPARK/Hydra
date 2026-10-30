@@ -106,6 +106,8 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
 
   bool optimizeOnce(Timestamp timestamp_ns);
 
+  void finalize(Timestamp timestamp_ns);
+
  protected:
   void spin();
 
