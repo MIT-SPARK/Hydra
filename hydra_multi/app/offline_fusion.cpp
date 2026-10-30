@@ -218,13 +218,13 @@ class MultiOfflinePipeline : public MultiPipeline {
 
   void fuse(const PoseGraph& loop_closures = {}) {
     backend_->spinOnce(0);
-    if (loop_closures.empty()) {
-      return;
+    if (!loop_closures.empty()) {
+      backend_->addLoopClosures(loop_closures);
+      backend_->optimizeOnce(0);
+      backend_->spinOnce(0);
     }
 
-    backend_->addLoopClosures(loop_closures);
-    backend_->optimizeOnce(0);
-    backend_->spinOnce(0);
+    backend_->finalize(0);
   }
 };
 
