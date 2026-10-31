@@ -106,6 +106,8 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
 
   bool optimizeOnce(Timestamp timestamp_ns);
 
+  void finalize(Timestamp timestamp_ns);
+
  protected:
   void spin();
 
@@ -172,6 +174,8 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
   InterfaceContainer::StatesPtr shared_states_;
   std::map<size_t, MeshData::Ptr> staged_mesh_data_;
   std::map<size_t, gtsam::Pose3> curr_W_T_robot_;
+  // Unit that each robot in the deformation graph belongs to (e.g., fused prior map)
+  std::map<RobotId, RobotId> robot_units_;
 
   InitialAlignModule::Ptr initial_align_;
   hydra::DsgUpdater::Ptr dsg_updater_;

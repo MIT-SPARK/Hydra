@@ -174,6 +174,40 @@ TEST(LoopClosureInitialAlignTests, ComputeInitialTransforms) {
       1e-2));
 }
 
+TEST(LoopClosureInitialAlignTests, ComputeInitialTransformsSharedFrame) {
+  // robots 1-3 are a fused prior map (one frame) and robot 0 only closes with robot 3
+  LoopClosureInitialAlignModule::Config ia_config;
+  ia_config.reference_robot_id = 1;
+  LoopClosureInitialAlignModule ia(ia_config);
+
+  Info::Ptr info(new Info);
+  info->robot_frames = {{1, 1}, {2, 1}, {3, 1}};
+  const gtsam::Pose3 a0_T_d1(gtsam::Rot3(), gtsam::Point3(1, 0, 0));
+  info->loop_closures.push_back(
+      {gtsam::Symbol('a', 0), gtsam::Symbol('d', 1), a0_T_d1});
+  info->loop_closures.push_back(
+      {gtsam::Symbol('c', 0), gtsam::Symbol('d', 0), gtsam::Pose3()});
+
+  auto dgraph = std::make_shared<kimera_pgmo::DeformationGraph>();
+  for (char prefix : {'a', 'b', 'c', 'd'}) {
+    for (size_t i = 0; i < 3; i++) {
+      dgraph->addNewNode(gtsam::Symbol(prefix, i), 0, gtsam::Pose3(), false);
+    }
+  }
+
+  info->dgraph = dgraph;
+  ia.update(info);
+
+  // the loop closure within the prior map is dropped and robot 3 aligns frame 1
+  EXPECT_EQ(1, ia.getLoopClosures().size());
+  EXPECT_EQ(1, ia.getLoopClosures()[0][1].size());
+
+  auto frames = ia.getFrames();
+  EXPECT_EQ(2, frames.size());
+  EXPECT_TRUE(gtsam::assert_equal(gtsam::Pose3(), frames.at(1)));
+  EXPECT_TRUE(gtsam::assert_equal(a0_T_d1.inverse(), frames.at(0), 1e-2));
+}
+
 TEST(LoopClosureInitialAlignTests, ComputeInitialGuess) {
   LoopClosureInitialAlignModule::Config ia_config;
   LoopClosureInitialAlignModule ia(ia_config);
