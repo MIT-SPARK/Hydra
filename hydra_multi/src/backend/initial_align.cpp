@@ -23,7 +23,13 @@ gtsam::Pose3 InitialAlignModule::Info::getPrevRobotPose(size_t robot_id) const {
   return iter == prev_W_T_robot.end() ? gtsam::Pose3() : iter->second;
 }
 
+RobotId InitialAlignModule::getFrame(RobotId robot_id) const {
+  auto iter = robot_frames_.find(robot_id);
+  return iter == robot_frames_.end() ? robot_id : iter->second;
+}
+
 void InitialAlignModule::update(InitialAlignModule::Info::Ptr info) {
+  robot_frames_ = info->robot_frames;
   if (!checkAlignConsistent(info)) {
     LOG(WARNING)
         << "Initial alignment inconsistent with deformation graph. Resetting...";
@@ -48,10 +54,10 @@ gtsam::Values InitialAlignModule::computeInitialGuess(
       robot_id = node_id_robot_map.at(key);
     } else if (kimera_pgmo::robot_prefix_to_id.count(node.chr())) {
       // Agent node
-      robot_id = kimera_pgmo::robot_prefix_to_id.at(node.chr());
+      robot_id = getFrame(kimera_pgmo::robot_prefix_to_id.at(node.chr()));
     } else if (kimera_pgmo::vertex_prefix_to_id.count(node.chr())) {
       // Deformation graph vertex
-      robot_id = kimera_pgmo::vertex_prefix_to_id.at(node.chr());
+      robot_id = getFrame(kimera_pgmo::vertex_prefix_to_id.at(node.chr()));
     } else {
       LOG(ERROR) << "Unrecognized prefix in loopClosureInitialization.";
       continue;

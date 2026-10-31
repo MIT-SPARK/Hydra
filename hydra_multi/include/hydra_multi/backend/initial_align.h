@@ -28,6 +28,9 @@ class InitialAlignModule {
     std::vector<LoopClosure> loop_closures;
     // The W_T_robot_ used to transform the graphs
     std::map<size_t, gtsam::Pose3> prev_W_T_robot;
+    // Frame (unit) that each robot's poses are expressed in, e.g., all robots of a
+    // fused prior map share one frame. Robots not listed are their own frame.
+    std::map<RobotId, RobotId> robot_frames;
 
     gtsam::Pose3 getPrevRobotPose(size_t robot_id) const;
   };
@@ -54,10 +57,17 @@ class InitialAlignModule {
 
   bool checkAlignConsistent(InitialAlignModule::Info::Ptr info);
 
+  //! Frame that a robot's poses are expressed in (from the last Info::robot_frames)
+  //! e.g., robot 2 may be expressed in robot 1's frame if they were fused
+  RobotId getFrame(RobotId robot_id) const;
+
  protected:
   MultiTransforms pairwise_transforms_;
+  // Frames are aligned rather than individual robots
+  // (which may already share a frame, see Info::robot_frames)
   std::set<RobotId> all_robots_;
   std::map<RobotId, gtsam::Pose3> W_T_robot_;
+  std::map<RobotId, RobotId> robot_frames_;
 };
 void declare_config(InitialAlignModule::Config&);
 
