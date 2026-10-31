@@ -647,6 +647,11 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
     if (state->pose_graph_->nodes.size() > 0) {
       std::map<size_t, size_t> id_mapping;
       id_mapping[state->pose_graph_->nodes[0].robot_id] = id;
+      // other robot ids in the pose graph (e.g., a fused prior map) are kept as is
+      for (const auto& node : state->pose_graph_->nodes) {
+        const auto iter = id_mapping.find(node.robot_id);
+        robot_units_[iter == id_mapping.end() ? node.robot_id : iter->second] = id;
+      }
       VLOG(3) << "Remapping " << state->pose_graph_->nodes[0].robot_id << " -> " << id
               << " for pg with " << state->pose_graph_->nodes.size() << " nodes";
       deformation_graph_->processPoseGraph(
@@ -754,6 +759,7 @@ void MultiBackendModule::initialAlignment() {
   auto info = std::make_shared<LoopClosureInitialAlignModule::Info>();
   // W_T_robot only updated during initial
   info->prev_W_T_robot = curr_W_T_robot_;
+  info->robot_frames = robot_units_;
   info->dgraph = deformation_graph_;
   while (!interrobot_lc_queue_.empty()) {
     const auto lc = interrobot_lc_queue_.pop();
