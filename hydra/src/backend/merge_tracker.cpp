@@ -38,6 +38,10 @@
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <sstream>
+
+#include "hydra/utils/data_directory.h"
+
 using namespace spark_dsg;
 
 namespace hydra {
@@ -71,6 +75,36 @@ bool hasParent(const SceneGraph& unmerged, const SceneGraph& merged, NodeId pare
 }
 
 }  // namespace
+
+std::string mergesToJson(const std::map<NodeId, NodeId>& merges) {
+  std::stringstream ss;
+  ss << "{\"version\": 1, \"merges\": [";
+  bool first = true;
+  for (const auto& [child, parent] : merges) {
+    // resolve chains defensively (bounded to avoid cycles)
+    auto final_parent = parent;
+    for (size_t i = 0; i < merges.size(); ++i) {
+      const auto iter = merges.find(final_parent);
+      if (iter == merges.end() || iter->second == final_parent) {
+        break;
+      }
+
+      final_parent = iter->second;
+    }
+
+    ss << (first ? "" : ",") << "\n  {\"child\": " << child
+       << ", \"parent\": " << final_parent << "}";
+    first = false;
+  }
+
+  ss << (first ? "]" : "\n]") << "}\n";
+  return ss.str();
+}
+
+void saveMerges(const std::map<NodeId, NodeId>& merges,
+                const std::filesystem::path& filepath) {
+  writeFileAtomic(filepath, mergesToJson(merges));
+}
 
 size_t MergeTracker::applyMerges(const SceneGraph& unmerged,
                                  const MergeList& proposals,
