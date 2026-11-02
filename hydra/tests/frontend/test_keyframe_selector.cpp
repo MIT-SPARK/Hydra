@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/active_window/volumetric_window.h>
 #include <hydra/frontend/keyframe_selector.h>
 #include <hydra/input/camera.h>
 #include <hydra/input/sensor_extrinsics.h>
@@ -305,6 +306,35 @@ TEST(KeyframeSelector, FlushOnDestruction) {
   }
   EXPECT_EQ(num_files, 20u);
   std::filesystem::remove_all(log_path);
+}
+
+struct KeyframeSelectorAccess : KeyframeSelector {
+  using KeyframeSelector::KeyframeSelector;
+  size_t numActive() const { return keyframes_.size(); }
+  size_t numArchived() const { return to_archive_.size(); }
+};
+
+TEST(KeyframeSelector, ReleasesViewsLeavingWindowWithoutFeatureSelector) {
+  KeyframeSelector::Config config;
+  DistancePolicy::Config policy;
+  policy.min_pose_separation = 1.0;
+  policy.min_time_separation_s = 0.0;
+  config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
+
+  const SpatialWindowChecker window({5.0});
+  const auto sensor = makeCamera();
+  auto dsg = test::makeSharedDsg();
+  FrontendOutput output(0, 0);
+  KeyframeSelectorAccess selector(config);
+  for (size_t i = 0; i < 50; ++i) {
+    ActiveWindowOutput msg(makeInput(sensor, i + 1, 2.0 * i));
+    selector.call(msg, *dsg, output, &window);
+    selector.callPostUpdate(*dsg, output);
+  }
+
+  // only views inside the 5 m window are held; views that left it are dropped
+  EXPECT_LE(selector.numActive(), 3u);
+  EXPECT_EQ(selector.numArchived(), 0u);
 }
 
 }  // namespace hydra
