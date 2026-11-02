@@ -224,8 +224,6 @@ class MultiOfflinePipeline : public MultiPipeline {
       backend_->spinOnce(0);
     }
 
-    // places only merge in an update where both are inactive, which one spin never
-    // gives. finalize runs update functors once over the whole graph
     backend_->finalize(0);
   }
 };
