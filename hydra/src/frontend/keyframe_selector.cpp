@@ -109,9 +109,11 @@ void declare_config(DistancePolicy::Config& config) {
   field(config.min_pose_separation, "min_pose_separation");
   field(config.rotation_separation_weight, "rotation_separation_weight");
   field(config.min_time_separation_s, "min_time_separation_s");
-  check(config.min_pose_separation, GE, 0.0, "rotation_separation_weight");
+  field(config.max_time_separation_s, "max_time_separation_s");
+  check(config.min_pose_separation, GE, 0.0, "min_pose_separation");
   check(config.rotation_separation_weight, GE, 0.0, "rotation_separation_weight");
-  check(config.min_time_separation_s, GE, 0.0, "rotation_separation_weight");
+  check(config.min_time_separation_s, GE, 0.0, "min_time_separation_s");
+  check(config.max_time_separation_s, GE, 0.0, "max_time_separation_s");
 }
 
 bool KeyframePolicy::shouldAdd(const InputData::ConstPtr& candidate,
@@ -147,6 +149,14 @@ bool DistancePolicy::shouldAddImpl(const InputData& candidate,
                          diff_s.count(),
                          config.min_time_separation_s);
     return false;
+  }
+
+  if (config.max_time_separation_s && diff_s.count() >= config.max_time_separation_s) {
+    reason = std::format("Added candidate @ {} [ns] with time diff {} >= {} [s]",
+                         candidate.timestamp_ns,
+                         diff_s.count(),
+                         config.max_time_separation_s);
+    return true;
   }
 
   const Eigen::Isometry3d pose_diff =

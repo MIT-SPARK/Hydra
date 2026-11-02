@@ -67,6 +67,8 @@ class DistancePolicy : public KeyframePolicy {
     double rotation_separation_weight = 0.1;
     //! @brief Minimum time separation to add new keyframe
     double min_time_separation_s = 0.5;
+    //! @brief Add keyframe after this much time even without motion (0 = off)
+    double max_time_separation_s = 0.0;
   } const config;
 
   explicit DistancePolicy(const Config& config);
@@ -77,6 +79,8 @@ class DistancePolicy : public KeyframePolicy {
                      const std::list<InputData::ConstPtr>& keyframes,
                      std::string& reason) const override;
 };
+
+void declare_config(DistancePolicy::Config& config);
 
 class KeyframeSelector : public GraphBuilderFunctor {
  public:
