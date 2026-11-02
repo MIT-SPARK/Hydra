@@ -395,7 +395,10 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
 
     if (!window.inBounds(msg.timestamp_ns, msg.world_T_body(), stamp, pos)) {
       MLOG(3) << "Archival candidate found @ " << stamp << " [ns]";
-      to_archive_.push_back(*iter);
+      // archived views are only used (and only ever released) by feature assignment
+      if (feature_selector_) {
+        to_archive_.push_back(*iter);
+      }
       iter = keyframes_.erase(iter);
       continue;
     }
