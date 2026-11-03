@@ -80,6 +80,7 @@ void declare_config(ReconstructionModule::Config& config) {
   name("ReconstructionModule::Config");
   base<ActiveWindowModule::Config>(config);
   field(config.full_update_separation_s, "full_update_separation_s", "s");
+  field(config.forward_intermediate_inputs, "forward_intermediate_inputs");
   field(config.mesh, "mesh");
   field(config.tsdf, "tsdf");
   config.robot_footprint.setOptional();
@@ -157,10 +158,25 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
   }  // timing scope
 
   auto& tsdf = map_.getTsdfLayer();
-  if (tsdf.numBlocks() == 0 || !do_full_update) {
+  if (!do_full_update) {
+    if (config.forward_intermediate_inputs) {
+      intermediate_inputs_.push_back(data);
+    }
+
     return nullptr;
   }
 
+  if (tsdf.numBlocks() == 0) {
+    intermediate_inputs_.clear();
+    return nullptr;
+  }
+
+  return makeOutput(data);
+}
+
+ActiveWindowOutput::Ptr ReconstructionModule::makeOutput(
+    const InputData::ConstPtr& data) {
+  const auto stamp = data->timestamp_ns;
   last_update_ns_ = stamp;
   {  // timing scope
     ScopedTimer timer("reconstruction/mesh", stamp);
@@ -168,6 +184,11 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
   }  // timing scope
 
   auto output = std::make_shared<ActiveWindowOutput>(data);
+  // intermediate inputs come first to keep sensor_data in chronological order
+  output->sensor_data.insert(output->sensor_data.begin(),
+                             intermediate_inputs_.begin(),
+                             intermediate_inputs_.end());
+  intermediate_inputs_.clear();
   if (map_window_) {
     // this comes before clearing the update flag as we don't archive updated blocks
     output->archived = map_window_->archiveBlocks(stamp, data->world_T_body, map_);
@@ -175,11 +196,38 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
   }
 
   output->setMap(map_.cloneUpdated());
-  for (const auto& block : tsdf) {
+  for (const auto& block : map_.getTsdfLayer()) {
     block.clearUpdated();
   }
 
   return output;
+}
+
+void ReconstructionModule::stop() {
+  ActiveWindowModule::stop();
+  flushIntermediateInputs();
+}
+
+void ReconstructionModule::flushIntermediateInputs() {
+  if (intermediate_inputs_.empty()) {
+    return;
+  }
+
+  if (map_.getTsdfLayer().numBlocks() == 0) {
+    intermediate_inputs_.clear();
+    return;
+  }
+
+  // the newest pending input (already integrated) stands in for the full update
+  const auto last = intermediate_inputs_.back();
+  intermediate_inputs_.pop_back();
+  MLOG(1) << "emitting " << intermediate_inputs_.size() + 1
+          << " pending forwarded input(s) @ " << last->timestamp_ns << " [ns]";
+  const auto output = makeOutput(last);
+  Sink::callAll(sinks_, last->timestamp_ns, map_, *output);
+  if (output_queue_) {
+    output_queue_->push(output);
+  }
 }
 
 }  // namespace hydra

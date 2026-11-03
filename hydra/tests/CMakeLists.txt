@@ -11,6 +11,7 @@ add_executable(
   main.cpp
   eval/test_evaluation.cpp
   src/resources.cpp
+  active_window/test_reconstruction_module.cpp
   backend/test_deformation_interpolator.cpp
   backend/test_external_loop_closure.cpp
   backend/test_merge_tracker.cpp
