@@ -160,6 +160,10 @@ int main(int argc, char* argv[]) {
     info.setForceShutdown(settings.force_shutdown);
     LOG(INFO) << "Loaded pipeline config:\n" << config::toString(info.getConfig());
 
+    // create the output directory before the pipeline so that any overwrite happens
+    // before modules (e.g., keyframe logging) start writing into it
+    const hydra::DataDirectory output(settings.log_path, settings.output);
+
     auto config = config::fromContext<hydra::HydraRosPipeline::Config>();
     hydra::HydraRosPipeline hydra(config);
     hydra.init();
@@ -169,8 +173,6 @@ int main(int argc, char* argv[]) {
                        settings.exit_after_clock,
                        settings.use_multithread_executor ? &executor : nullptr);
     hydra.stop();
-
-    const hydra::DataDirectory output(settings.log_path, settings.output);
     hydra.save(output);
   }  // end hydra scope
 

@@ -34,10 +34,20 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <yaml-cpp/yaml.h>
+
 #include "hydra/input/input_data.h"
 #include "hydra/utils/zip_archive.h"
 
 namespace hydra::input {
+
+/**
+ * @brief Self-contained record of a sensor: {name, config}, where config is
+ * Sensor::dump() with the sensor's extrinsics as parameters and no external mask path.
+ * This is the `sensor` entry of an archive's metadata.yaml.
+ * @throws std::runtime_error if the dump has no registered factory type.
+ */
+YAML::Node writeSensor(const Sensor& sensor);
 
 /**
  * @brief Serialize input data with writer

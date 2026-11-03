@@ -80,6 +80,7 @@ void declare_config(ReconstructionModule::Config& config) {
   name("ReconstructionModule::Config");
   base<ActiveWindowModule::Config>(config);
   field(config.full_update_separation_s, "full_update_separation_s", "s");
+  field(config.forward_intermediate_inputs, "forward_intermediate_inputs");
   field(config.mesh, "mesh");
   field(config.tsdf, "tsdf");
   config.robot_footprint.setOptional();
@@ -157,7 +158,16 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
   }  // timing scope
 
   auto& tsdf = map_.getTsdfLayer();
-  if (tsdf.numBlocks() == 0 || !do_full_update) {
+  if (!do_full_update) {
+    if (config.forward_intermediate_inputs) {
+      intermediate_inputs_.push_back(data);
+    }
+
+    return nullptr;
+  }
+
+  if (tsdf.numBlocks() == 0) {
+    intermediate_inputs_.clear();
     return nullptr;
   }
 
@@ -168,6 +178,8 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
   }  // timing scope
 
   auto output = std::make_shared<ActiveWindowOutput>(data);
+  output->intermediate_inputs = std::move(intermediate_inputs_);
+  intermediate_inputs_.clear();
   if (map_window_) {
     // this comes before clearing the update flag as we don't archive updated blocks
     output->archived = map_window_->archiveBlocks(stamp, data->world_T_body, map_);

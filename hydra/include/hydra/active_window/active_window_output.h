@@ -55,6 +55,10 @@ struct ActiveWindowOutput {
   uint64_t timestamp_ns;
   //! Sensor data from last update
   std::vector<InputData::ConstPtr> sensor_data;
+  //! Inputs since the previous output that did not trigger an update (oldest first),
+  //! if the active window forwards them; only consumers that want every input (e.g.,
+  //! the keyframe selector) read them
+  std::vector<InputData::ConstPtr> intermediate_inputs;
   //! New nodes to add to the scene graph
   GraphUpdate graph_update;
   //! Archived blocks on this pass
@@ -84,7 +88,7 @@ struct ActiveWindowOutput {
   virtual void updateFrom(ActiveWindowOutput&& msg, bool clone_map);
 
   /*
-   * @brief Get the body pose from when this packet was created
+   * @brief Get the body pose from when this packet was created (the latest sensor data)
    */
   template <typename T = double>
   Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
@@ -92,7 +96,7 @@ struct ActiveWindowOutput {
       throw std::runtime_error("Invalid active window output; no sensor data");
     }
 
-    return sensor_data.front()->world_T_body.cast<T>();
+    return sensor_data.back()->world_T_body.cast<T>();
   }
 
  protected:

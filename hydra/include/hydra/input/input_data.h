@@ -50,7 +50,7 @@ struct InputData {
   using ConstPtr = std::shared_ptr<const InputData>;
 
   struct SaveOptions {
-    //! Compression type to apply to exr images
+    //! Compression type to apply to exr images (the vertex map)
     enum class FloatCompression {
       NONE,
       RLE,
@@ -58,7 +58,8 @@ struct InputData {
     } float_compression = FloatCompression::NONE;
     //! PNG compression level in [0, 9]
     int png_compression = 1;
-    //! Amount of compression to apply to input data archive
+    //! Amount of compression to apply to input data archive (also compresses the
+    //! float and integer TIFF images, which OpenCV writes uncompressed)
     int archive_compression = -1;
   };
 
