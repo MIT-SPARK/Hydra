@@ -199,6 +199,7 @@ void declare_config(KeyframeSelector::Config& config) {
   field(config.feature_selector, "feature_selector");
   field(config.layers, "layers");
   field(config.sinks, "sinks");
+  field(config.max_active_keyframes, "max_active_keyframes");
   field<Path>(config.log_path, "log_path");
   field(config.save_fields, "save_fields");
   field(config.max_queue_size, "max_queue_size");
@@ -378,6 +379,8 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
     archiveKeyframes(input, *window);
   }
 
+  limitActiveKeyframes();
+
   Sink::callAll(sinks_, input.timestamp_ns, keyframes_);
 }
 
@@ -395,15 +398,33 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
 
     if (!window.inBounds(msg.timestamp_ns, msg.world_T_body(), stamp, pos)) {
       MLOG(3) << "Archival candidate found @ " << stamp << " [ns]";
-      // archived views are only used (and only ever released) by feature assignment
-      if (feature_selector_) {
-        to_archive_.push_back(*iter);
-      }
+      releaseKeyframe(*iter);
       iter = keyframes_.erase(iter);
       continue;
     }
 
     ++iter;
+  }
+}
+
+void KeyframeSelector::releaseKeyframe(const InputData::ConstPtr& frame) {
+  // archived views are only used (and only ever released) by feature assignment
+  if (feature_selector_) {
+    to_archive_.push_back(frame);
+  }
+}
+
+void KeyframeSelector::limitActiveKeyframes() {
+  if (!config.max_active_keyframes) {
+    return;
+  }
+
+  // policies only compare against the newest keyframe, so evicting the oldest is safe
+  while (keyframes_.size() > config.max_active_keyframes) {
+    MLOG(3) << "Evicting keyframe @ " << keyframes_.front()->timestamp_ns
+            << " [ns] (more than " << config.max_active_keyframes << " active)";
+    releaseKeyframe(keyframes_.front());
+    keyframes_.pop_front();
   }
 }
 
