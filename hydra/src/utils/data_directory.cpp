@@ -38,8 +38,13 @@
 #include <config_utilities/types/path.h>
 #include <glog/logging.h>
 
+#include <cmath>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 
 namespace hydra {
 
@@ -114,6 +119,58 @@ DataDirectory DataDirectory::child(const std::string& sub_path) const {
   Config new_config = config;
   new_config.overwrite = false;  // no need to clear children
   return DataDirectory(sub_path, new_config);
+}
+
+void writeFileAtomic(const std::filesystem::path& filepath,
+                     const std::string& contents) {
+  auto tmp_path = filepath;
+  tmp_path += ".tmp";
+  {
+    std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
+    out << contents;
+    out.close();
+    if (!out) {
+      std::filesystem::remove(tmp_path);
+      throw std::runtime_error("failed to write '" + tmp_path.string() + "'");
+    }
+  }
+
+  std::filesystem::rename(tmp_path, filepath);
+}
+
+std::string jsonString(const std::string& str) {
+  std::stringstream ss;
+  ss << '"';
+  for (const char c : str) {
+    switch (c) {
+      case '"':
+        ss << "\\\"";
+        break;
+      case '\\':
+        ss << "\\\\";
+        break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20) {
+          ss << "\\u" << std::hex << std::setw(4) << std::setfill('0')
+             << static_cast<int>(c) << std::dec;
+        } else {
+          ss << c;
+        }
+    }
+  }
+
+  ss << '"';
+  return ss.str();
+}
+
+std::string jsonNumber(double value) {
+  if (!std::isfinite(value)) {
+    return "null";
+  }
+
+  std::stringstream ss;
+  ss << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
+  return ss.str();
 }
 
 bool DataDirectory::valid() const { return valid_; }
