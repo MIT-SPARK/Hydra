@@ -184,15 +184,24 @@ void GraphBuilder::stopImpl() {
 }
 
 void GraphBuilder::save(const DataDirectory& output) {
-  std::lock_guard<std::mutex> lock(mutex_);
   const auto output_path = output.path("frontend");
+  {  // the graph is only consistent under the frontend lock
+    std::lock_guard<std::mutex> lock(mutex_);
+    dsg_->graph->save(output_path / "dsg.json", false);
+    dsg_->graph->save(output_path / "dsg_with_mesh.json");
 
-  dsg_->graph->save(output_path / "dsg.json", false);
-  dsg_->graph->save(output_path / "dsg_with_mesh.json");
+    const auto mesh = dsg_->graph->mesh();
+    if (mesh && !mesh->empty()) {
+      kimera_pgmo::WriteMesh(output_path / "mesh.ply", *mesh);
+    }
+  }
 
-  const auto mesh = dsg_->graph->mesh();
-  if (mesh && !mesh->empty()) {
-    kimera_pgmo::WriteMesh(output_path / "mesh.ply", *mesh);
+  // functors flush their own output (e.g., queued keyframes) without blocking the
+  // frontend update loop; functors_ is fixed after construction
+  for (const auto& [_, functor] : functors_) {
+    if (functor) {
+      functor->save(output);
+    }
   }
 }
 
