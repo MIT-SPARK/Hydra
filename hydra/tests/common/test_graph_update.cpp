@@ -151,6 +151,68 @@ TEST(GraphUpdater, BindingHistoryMatchedTracks) {
   expectBinding(bindings[1], 2, NodeSymbol('O', 0), 20, 40, std::nullopt);
 }
 
+TEST(GraphUpdater, BindingEvents) {
+  auto dsg = test::makeSharedDsg();
+  auto& graph = *dsg->graph;
+  GraphUpdater updater(makeConfig(false));
+
+  // replaying the events of every update gives the binding history
+  std::vector<TrackBindingEvent> all;
+  const auto step = [&](const GraphUpdate& update, uint64_t stamp) {
+    updater.update(update, graph, stamp);
+    const auto events = updater.bindingEvents();
+    for (const auto& event : events) {
+      EXPECT_EQ(event.layer, DsgLayers::OBJECTS);
+      EXPECT_EQ(event.timestamp_ns, stamp);
+    }
+    all.insert(all.end(), events.begin(), events.end());
+    return events.size();
+  };
+
+  EXPECT_EQ(step(makeUpdate({addOrUpdate(1, 0.0), addOrUpdate(2, 5.0)}), 10), 2u);
+  EXPECT_EQ(step(makeUpdate({addOrUpdate(1, 0.1), remove(2)}), 20), 1u);
+  EXPECT_EQ(step(makeUpdate({addOrUpdate(2, 6.0), remove(1)}), 30), 2u);
+  EXPECT_EQ(step(makeUpdate({addOrUpdate(2, 6.1)}), 40), 0u);  // touches are not events
+
+  ASSERT_EQ(all.size(), 5u);
+  const auto& bindings = updater.trackers().at(DsgLayers::OBJECTS).bindings;
+  std::vector<TrackBinding> replayed;
+  for (const auto& event : all) {
+    if (!event.binding.end) {
+      replayed.push_back(event.binding);
+      continue;
+    }
+    for (auto& binding : replayed) {
+      if (binding.track_id == event.binding.track_id &&
+          binding.node_id == event.binding.node_id && !binding.end) {
+        binding.end = event.binding.end;
+      }
+    }
+  }
+
+  ASSERT_EQ(replayed.size(), bindings.size());
+  for (size_t i = 0; i < bindings.size(); ++i) {
+    EXPECT_EQ(replayed[i].track_id, bindings[i].track_id);
+    EXPECT_EQ(replayed[i].node_id, bindings[i].node_id);
+    EXPECT_EQ(replayed[i].first_ns, bindings[i].first_ns);
+    EXPECT_EQ(replayed[i].end, bindings[i].end);
+  }
+}
+
+TEST(GraphUpdater, BindingEventsOnRebind) {
+  auto dsg = test::makeSharedDsg();
+  auto& graph = *dsg->graph;
+  GraphUpdater updater(makeConfig(true));
+  updater.update(makeUpdate({addOrUpdate(1, 0.0)}), graph, 10);
+  updater.update(makeUpdate({addOrUpdate(2, 0.2)}), graph, 20);  // matched to O0
+  updater.update(makeUpdate({remove(1)}), graph, 30);
+  const auto events = updater.bindingEvents();
+  ASSERT_EQ(events.size(), 1u);
+  EXPECT_EQ(events[0].binding.track_id, 1u);
+  EXPECT_EQ(events[0].binding.end, std::optional<std::string>("track_removed"));
+  EXPECT_EQ(events[0].timestamp_ns, 30u);
+}
+
 TEST(GraphUpdater, SaveBindings) {
   auto dsg = test::makeSharedDsg();
   GraphUpdater updater(makeConfig(false));

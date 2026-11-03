@@ -36,6 +36,7 @@
 #include <memory>
 #include <unordered_set>
 
+#include "hydra/common/graph_update.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/odometry/pose_graph_packet.h"
 
@@ -69,6 +70,8 @@ struct FrontendOutput {
   std::unordered_set<spark_dsg::NodeId> archived_places;
   //! New agent poses (for LCD)
   std::vector<spark_dsg::NodeId> new_agent_nodes;
+  //! Track-to-node binding changes made by this update
+  std::vector<TrackBindingEvent> binding_events;
 };
 
 }  // namespace hydra

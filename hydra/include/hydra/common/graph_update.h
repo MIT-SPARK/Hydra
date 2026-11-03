@@ -89,6 +89,16 @@ struct TrackBinding {
   std::optional<std::string> end;
 };
 
+//! A change of the binding history: a new binding, or the end of one (binding.end set)
+struct TrackBindingEvent {
+  //! graph_updater layer name (key of GraphUpdater::Config::layer_updates)
+  std::string layer;
+  //! Timestamp of the frontend update that made the change
+  uint64_t timestamp_ns = 0;
+  //! The binding as of the change
+  TrackBinding binding;
+};
+
 struct LayerTracker {
   struct Config {
     char prefix = 0;
@@ -110,10 +120,12 @@ struct LayerTracker {
   std::vector<TrackBinding> bindings;
   //! Index into bindings of the active binding for each track
   std::unordered_map<size_t, size_t> active_bindings;
+  //! Binding changes of the current update (layer left empty, see bindingEvents)
+  std::vector<TrackBindingEvent> events;
 
   void bind(size_t track_id, spark_dsg::NodeId node_id, uint64_t timestamp_ns);
   void touch(size_t track_id, uint64_t timestamp_ns);
-  void unbind(size_t track_id, const std::string& reason);
+  void unbind(size_t track_id, const std::string& reason, uint64_t timestamp_ns);
 };
 
 void declare_config(LayerTracker::Config& config);
@@ -129,6 +141,9 @@ struct GraphUpdater {
   void update(const GraphUpdate& update,
               spark_dsg::SceneGraph& graph,
               uint64_t timestamp_ns = 0);
+
+  //! Binding changes made by the last call to update(), in order per layer
+  std::vector<TrackBindingEvent> bindingEvents() const;
 
   //! Track-to-node binding history as JSON
   std::string bindingsToJson() const;

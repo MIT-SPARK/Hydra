@@ -93,6 +93,7 @@ void declare_config(DsgUpdater::Config& config) {
   field(config.reset_dsg_on_loop_closure, "reset_dsg_on_loop_closure");
   field(config.update_functors, "update_functors");
   field(config.exhaustive_functors, "exhaustive_functors");
+  field(config.merge_sinks, "merge_sinks");
 }
 
 DsgUpdater::DsgUpdater(const Config& config,
@@ -101,6 +102,7 @@ DsgUpdater::DsgUpdater(const Config& config,
     : config(config::checkValid(config)),
       exhaustive_names_(config.exhaustive_functors.begin(),
                         config.exhaustive_functors.end()),
+      merge_sinks_(MergeSink::instantiate(config.merge_sinks)),
       source_graph_(source),
       target_dsg_(target) {
   for (const auto& [name, functor] : config.update_functors) {
@@ -228,6 +230,8 @@ void DsgUpdater::callFunctors(UpdateInfo::ConstPtr info) {
   for (const auto& func : cleanup_hooks) {
     func(info, *source_graph_, target_dsg_.get());
   }
+
+  MergeSink::callAll(merge_sinks_, info->timestamp_ns, target_dsg_->merges);
 }
 
 void DsgUpdater::clearNewNodes() {

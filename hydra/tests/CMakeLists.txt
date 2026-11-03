@@ -68,6 +68,7 @@ add_executable(
   rooms/test_room_utilities.cpp
   utils/test_active_window_tracker.cpp
   utils/test_data_directory.cpp
+  utils/test_event_log.cpp
   utils/test_mesh_utilities.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp

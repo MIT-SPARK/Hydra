@@ -123,11 +123,12 @@ void LayerTracker::bind(size_t track_id, NodeId node_id, uint64_t timestamp_ns) 
       return;
     }
 
-    unbind(track_id, "track_removed");
+    unbind(track_id, "track_removed", timestamp_ns);
   }
 
   active_bindings[track_id] = bindings.size();
   bindings.push_back({track_id, node_id, timestamp_ns, timestamp_ns, std::nullopt});
+  events.push_back({"", timestamp_ns, bindings.back()});
 }
 
 void LayerTracker::touch(size_t track_id, uint64_t timestamp_ns) {
@@ -138,13 +139,17 @@ void LayerTracker::touch(size_t track_id, uint64_t timestamp_ns) {
   }
 }
 
-void LayerTracker::unbind(size_t track_id, const std::string& reason) {
+void LayerTracker::unbind(size_t track_id,
+                          const std::string& reason,
+                          uint64_t timestamp_ns) {
   auto iter = active_bindings.find(track_id);
   if (iter == active_bindings.end()) {
     return;
   }
 
-  bindings.at(iter->second).end = reason;
+  auto& binding = bindings.at(iter->second);
+  binding.end = reason;
+  events.push_back({"", timestamp_ns, binding});
   active_bindings.erase(iter);
 }
 
@@ -224,10 +229,10 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
   tracker.node_to_tracks[map_iter->second].erase(*entry.track_id);
   if (tracker.node_to_tracks[map_iter->second].empty()) {
     graph.removeNode(map_iter->second);
-    tracker.unbind(*entry.track_id, "deleted");
+    tracker.unbind(*entry.track_id, "deleted", curr_timestamp_ns_);
   } else {
     computeMergeGroup(map_iter->second, tracker, graph);
-    tracker.unbind(*entry.track_id, "track_removed");
+    tracker.unbind(*entry.track_id, "track_removed", curr_timestamp_ns_);
   }
 
   tracker.track_to_node.erase(map_iter);
@@ -293,6 +298,10 @@ void GraphUpdater::update(const GraphUpdate& update,
                           SceneGraph& graph,
                           uint64_t timestamp_ns) {
   curr_timestamp_ns_ = timestamp_ns;
+  for (auto& [name, tracker] : trackers_) {
+    tracker.events.clear();
+  }
+
   std::map<LayerId, LayerTracker&> trackers_by_id;
   for (auto& [name, tracker] : trackers_) {
     const auto key = graph.getLayerKey(name);
@@ -341,6 +350,18 @@ void GraphUpdater::update(const GraphUpdate& update,
       }
     }
   }
+}
+
+std::vector<TrackBindingEvent> GraphUpdater::bindingEvents() const {
+  std::vector<TrackBindingEvent> events;
+  for (const auto& [name, tracker] : trackers_) {
+    for (const auto& event : tracker.events) {
+      events.push_back(event);
+      events.back().layer = name;
+    }
+  }
+
+  return events;
 }
 
 std::string GraphUpdater::bindingsToJson() const {

@@ -54,6 +54,9 @@ class DsgUpdater {
   using Sink = OutputSink<uint64_t,
                           const spark_dsg::SceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
+  //! Receives the current child -> parent node merges after every update
+  using MergeSink =
+      OutputSink<uint64_t, const std::map<spark_dsg::NodeId, spark_dsg::NodeId>&>;
   using NodeToRobotMap = std::unordered_map<spark_dsg::NodeId, size_t>;
 
   struct Config : public VerbosityConfig {
@@ -70,6 +73,8 @@ class DsgUpdater {
     config::OrderedMap<std::string, FunctorConfig> update_functors;
     //! Names of functors to use exhaustive merging for
     std::vector<std::string> exhaustive_functors;
+    //! Sinks for the node merges (e.g., MergeEventLogger)
+    std::vector<MergeSink::Factory> merge_sinks;
   } const config;
 
   DsgUpdater(const Config& config,
@@ -102,6 +107,7 @@ class DsgUpdater {
   const std::set<std::string> exhaustive_names_;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
+  MergeSink::List merge_sinks_;
   std::vector<spark_dsg::NodeId> active_nodes_to_restore_;
   spark_dsg::SceneGraph::Ptr source_graph_;
   SharedDsgInfo::Ptr target_dsg_;
