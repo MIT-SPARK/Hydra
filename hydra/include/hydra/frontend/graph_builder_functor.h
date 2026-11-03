@@ -37,6 +37,7 @@
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/frontend/frontend_output.h"
+#include "hydra/utils/data_directory.h"
 
 namespace hydra {
 
@@ -52,6 +53,10 @@ class GraphBuilderFunctor {
                     const VolumetricWindow* window) = 0;
 
   virtual void callPostUpdate(SharedDsgInfo& /* dsg */, FrontendOutput& /* output */) {}
+
+  //! Called when the frontend saves (e.g., to flush any pending output). Called
+  //! without the frontend lock, possibly while call() runs on the frontend thread.
+  virtual void save(const DataDirectory& /* output */) {}
 };
 
 }  // namespace hydra

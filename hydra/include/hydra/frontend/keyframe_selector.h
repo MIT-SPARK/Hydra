@@ -35,7 +35,14 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
+#include <condition_variable>
+#include <deque>
+#include <filesystem>
 #include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <thread>
 
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/feature_selector.h"
@@ -99,9 +106,22 @@ class KeyframeSelector : public GraphBuilderFunctor {
                                     spark_dsg::DsgLayers::MESH_PLACES};
     //! Output sinks and visualization
     std::vector<Sink::Factory> sinks;
+    //! Directory to save accepted keyframes to (empty = off): <timestamp_ns>.zip for
+    //! the first sensor saved, <timestamp_ns>_<sensor name>.zip for any other sensor
+    //! (name characters outside [A-Za-z0-9_.-] replaced by '_')
+    std::filesystem::path log_path;
+    //! Images to keep in saved keyframes (color, color_mask, depth, range, labels,
+    //! instances, vertices, traversability, features)
+    std::vector<std::string> save_fields{"color", "depth"};
+    //! Maximum number of keyframes waiting to be saved (0 = unbounded)
+    size_t max_queue_size = 100;
+    //! Encoding of saved keyframes (depth is compressed by default)
+    InputData::SaveOptions save_options{InputData::SaveOptions::FloatCompression::ZIP};
   } const config;
 
   KeyframeSelector(const Config& config);
+
+  virtual ~KeyframeSelector();
 
   void call(const ActiveWindowOutput& msg,
             SharedDsgInfo& dsg,
@@ -110,7 +130,24 @@ class KeyframeSelector : public GraphBuilderFunctor {
 
   void callPostUpdate(SharedDsgInfo& dsg, FrontendOutput& output) override;
 
+  void save(const DataDirectory& output) override;
+
+  //! Block until all queued keyframes are written to disk
+  void flush();
+
+  //! Shallow copy of the input with only the requested images (and features) present;
+  //! kept images share their pixel buffers with the input
+  static InputData::Ptr selectFields(const InputData& data,
+                                     const std::vector<std::string>& fields);
+
  protected:
+  void queueForSaving(const InputData::ConstPtr& data);
+
+  void saveSpin();
+
+  //! File name of a saved keyframe (save thread only)
+  std::string archiveName(const InputData& data);
+
   void archiveKeyframes(const ActiveWindowOutput& output,
                         const VolumetricWindow& window);
 
@@ -123,6 +160,16 @@ class KeyframeSelector : public GraphBuilderFunctor {
   std::list<InputData::ConstPtr> keyframes_;
   std::list<InputData::ConstPtr> to_archive_;
   mutable std::map<std::string, ActiveWindowTracker> active_window_;
+
+  // background keyframe saving
+  std::mutex save_mutex_;
+  std::condition_variable save_cv_;
+  std::deque<InputData::ConstPtr> save_queue_;
+  bool saving_ = false;
+  bool should_shutdown_ = false;
+  std::unique_ptr<std::thread> save_thread_;
+  //! Sensor whose keyframes are saved without a sensor suffix (the first one saved)
+  std::optional<std::string> primary_sensor_;
 };
 
 void declare_config(KeyframeSelector::Config& config);
