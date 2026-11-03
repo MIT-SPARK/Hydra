@@ -106,6 +106,13 @@ class KeyframeSelector : public GraphBuilderFunctor {
                                     spark_dsg::DsgLayers::MESH_PLACES};
     //! Output sinks and visualization
     std::vector<Sink::Factory> sinks;
+    //! Maximum number of active keyframes held in memory (0 = unbounded). Keyframes
+    //! only leave the active set when they leave the spatial window, so a stationary
+    //! robot with DistancePolicy::max_time_separation_s would otherwise grow it without
+    //! bound. The oldest are evicted first: to the archive used for feature assignment
+    //! when a feature selector is configured, else dropped (they are already queued for
+    //! saving).
+    size_t max_active_keyframes = 50;
     //! Directory to save accepted keyframes to (empty = off): <timestamp_ns>.zip for
     //! the first sensor saved, <timestamp_ns>_<sensor name>.zip for any other sensor
     //! (name characters outside [A-Za-z0-9_.-] replaced by '_')
@@ -150,6 +157,12 @@ class KeyframeSelector : public GraphBuilderFunctor {
 
   void archiveKeyframes(const ActiveWindowOutput& output,
                         const VolumetricWindow& window);
+
+  //! Move a keyframe out of the active set (to the archive with a feature selector)
+  void releaseKeyframe(const InputData::ConstPtr& frame);
+
+  //! Evict the oldest keyframes beyond max_active_keyframes
+  void limitActiveKeyframes();
 
   void cleanInactive(const spark_dsg::SceneGraph& graph);
 

@@ -312,6 +312,7 @@ struct KeyframeSelectorAccess : KeyframeSelector {
   using KeyframeSelector::KeyframeSelector;
   size_t numActive() const { return keyframes_.size(); }
   size_t numArchived() const { return to_archive_.size(); }
+  uint64_t newestActive() const { return keyframes_.back()->timestamp_ns; }
 };
 
 TEST(KeyframeSelector, ReleasesViewsLeavingWindowWithoutFeatureSelector) {
@@ -335,6 +336,54 @@ TEST(KeyframeSelector, ReleasesViewsLeavingWindowWithoutFeatureSelector) {
   // only views inside the 5 m window are held; views that left it are dropped
   EXPECT_LE(selector.numActive(), 3u);
   EXPECT_EQ(selector.numArchived(), 0u);
+}
+
+TEST(KeyframeSelector, BoundsActiveKeyframesOfStationaryRobot) {
+  KeyframeSelector::Config config;
+  DistancePolicy::Config policy;
+  policy.min_pose_separation = 1.0;
+  policy.min_time_separation_s = 0.0;
+  policy.max_time_separation_s = 1.0;
+  config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
+  config.max_active_keyframes = 5;
+
+  const SpatialWindowChecker window({5.0});
+  const auto sensor = makeCamera();
+  auto dsg = test::makeSharedDsg();
+  FrontendOutput output(0, 0);
+  KeyframeSelectorAccess selector(config);
+  // a stationary robot: every frame is a keyframe (time), none ever leaves the window
+  for (size_t i = 0; i < 100; ++i) {
+    ActiveWindowOutput msg(makeInput(sensor, (i + 1) * 1'000'000'000));
+    selector.call(msg, *dsg, output, &window);
+    selector.callPostUpdate(*dsg, output);
+    EXPECT_LE(selector.numActive(), 5u);
+  }
+
+  EXPECT_EQ(selector.numActive(), 5u);
+  // no feature selector: evicted views are dropped
+  EXPECT_EQ(selector.numArchived(), 0u);
+  EXPECT_EQ(selector.newestActive(), 100'000'000'000u);
+}
+
+TEST(KeyframeSelector, UnboundedActiveKeyframesWhenDisabled) {
+  KeyframeSelector::Config config;
+  DistancePolicy::Config policy;
+  policy.min_time_separation_s = 0.0;
+  policy.max_time_separation_s = 1.0;
+  config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
+  config.max_active_keyframes = 0;
+
+  const auto sensor = makeCamera();
+  auto dsg = test::makeSharedDsg();
+  FrontendOutput output(0, 0);
+  KeyframeSelectorAccess selector(config);
+  for (size_t i = 0; i < 60; ++i) {
+    ActiveWindowOutput msg(makeInput(sensor, (i + 1) * 1'000'000'000));
+    selector.call(msg, *dsg, output, nullptr);
+  }
+
+  EXPECT_EQ(selector.numActive(), 60u);
 }
 
 }  // namespace hydra
