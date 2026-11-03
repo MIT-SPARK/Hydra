@@ -84,7 +84,7 @@ struct ActiveWindowOutput {
   virtual void updateFrom(ActiveWindowOutput&& msg, bool clone_map);
 
   /*
-   * @brief Get the body pose from when this packet was created
+   * @brief Get the body pose from when this packet was created (the latest sensor data)
    */
   template <typename T = double>
   Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
@@ -92,7 +92,7 @@ struct ActiveWindowOutput {
       throw std::runtime_error("Invalid active window output; no sensor data");
     }
 
-    return sensor_data.front()->world_T_body.cast<T>();
+    return sensor_data.back()->world_T_body.cast<T>();
   }
 
  protected:
