@@ -42,6 +42,36 @@ using namespace spark_dsg;
 
 namespace hydra {
 
+namespace {
+
+// Checks that a merge parent is in both graphs before rebuilding its attributes.
+//
+// Merge parents are archived nodes, and the frontend does not delete archived nodes,
+// so a parent is not expected to go missing. A parent that is removed anyway (e.g., by
+// an update functor that removes nodes from the graphs) can't be used to rebuild the
+// merged attributes, so its merge set is dropped instead of CHECK-failing (the merges
+// themselves stay recorded in SharedDsgInfo::merges). A parent missing from only one
+// of the graphs is logged as a warning, since the two graphs disagree.
+bool hasParent(const SceneGraph& unmerged, const SceneGraph& merged, NodeId parent) {
+  const bool in_unmerged = unmerged.hasNode(parent);
+  const bool in_merged = merged.hasNode(parent);
+  if (in_unmerged && in_merged) {
+    return true;
+  }
+
+  if (in_unmerged != in_merged) {
+    LOG(WARNING) << "Dropping merge set for parent " << NodeSymbol(parent).str()
+                 << ": missing from the " << (in_unmerged ? "merged" : "unmerged")
+                 << " graph only (inconsistent graphs)";
+  } else {
+    VLOG(1) << "Dropping merge set for deleted parent " << NodeSymbol(parent).str();
+  }
+
+  return false;
+}
+
+}  // namespace
+
 size_t MergeTracker::applyMerges(const SceneGraph& unmerged,
                                  const MergeList& proposals,
                                  SharedDsgInfo& dsg,
@@ -84,10 +114,7 @@ size_t MergeTracker::applyMerges(const SceneGraph& unmerged,
       continue;
     }
 
-    if (!unmerged.hasNode(node)) {
-      CHECK(!graph.hasNode(node)) << NodeSymbol(node).str()
-                                  << " deleted from unmerged graph but in merged graph";
-      VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(node).str();
+    if (!hasParent(unmerged, graph, node)) {
       merge_sets_.erase(iter);
       continue;
     }
@@ -118,11 +145,7 @@ void MergeTracker::updateAllMergeAttributes(const SceneGraph& unmerged,
   auto iter = merge_sets_.begin();
   while (iter != merge_sets_.end()) {
     const auto parent = iter->first;
-    if (!unmerged.hasNode(parent)) {
-      CHECK(!merged.hasNode(parent))
-          << NodeSymbol(parent).str()
-          << " deleted from unmerged graph but in merged graph";
-      VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(parent).str();
+    if (!hasParent(unmerged, merged, parent)) {
       iter = merge_sets_.erase(iter);
       continue;
     }
