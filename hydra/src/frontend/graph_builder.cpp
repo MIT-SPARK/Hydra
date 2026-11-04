@@ -184,15 +184,30 @@ void GraphBuilder::stopImpl() {
 }
 
 void GraphBuilder::save(const DataDirectory& output) {
-  std::lock_guard<std::mutex> lock(mutex_);
   const auto output_path = output.path("frontend");
+  {  // the graph and the bindings are only consistent under the frontend lock
+    std::lock_guard<std::mutex> lock(mutex_);
+    dsg_->graph->save(output_path / "dsg.json", false);
+    dsg_->graph->save(output_path / "dsg_with_mesh.json");
 
-  dsg_->graph->save(output_path / "dsg.json", false);
-  dsg_->graph->save(output_path / "dsg_with_mesh.json");
+    const auto mesh = dsg_->graph->mesh();
+    if (mesh && !mesh->empty()) {
+      kimera_pgmo::WriteMesh(output_path / "mesh.ply", *mesh);
+    }
 
-  const auto mesh = dsg_->graph->mesh();
-  if (mesh && !mesh->empty()) {
-    kimera_pgmo::WriteMesh(output_path / "mesh.ply", *mesh);
+    try {
+      graph_updater_.saveBindings(output_path / "track_bindings.json");
+    } catch (const std::exception& e) {
+      LOG(ERROR) << "Failed to save track bindings: " << e.what();
+    }
+  }
+
+  // functors flush their own output (e.g., queued keyframes) without blocking the
+  // frontend update loop; functors_ is fixed after construction
+  for (const auto& [_, functor] : functors_) {
+    if (functor) {
+      functor->save(output);
+    }
   }
 }
 
@@ -346,7 +361,7 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     }
   }
 
-  graph_updater_.update(msg->graph_update, *dsg_->graph);
+  graph_updater_.update(msg->graph_update, *dsg_->graph, msg->timestamp_ns);
 
   {  // start timing scope
     ScopedTimer timer("frontend/launch_callbacks", msg->timestamp_ns, true, 1, false);

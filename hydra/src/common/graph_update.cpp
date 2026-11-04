@@ -41,8 +41,10 @@
 #include <spark_dsg/scene_graph.h>
 
 #include <algorithm>
+#include <sstream>
 
 #include "hydra/common/attribute_merger.h"
+#include "hydra/utils/data_directory.h"
 
 namespace YAML {
 
@@ -112,6 +114,40 @@ LayerTracker::LayerTracker(const Config& config)
       matcher(config.matcher.create()),
       merger(config.merger.create()) {}
 
+void LayerTracker::bind(size_t track_id, NodeId node_id, uint64_t timestamp_ns) {
+  auto iter = active_bindings.find(track_id);
+  if (iter != active_bindings.end()) {
+    auto& binding = bindings.at(iter->second);
+    if (binding.node_id == node_id) {
+      binding.last_ns = std::max(binding.last_ns, timestamp_ns);
+      return;
+    }
+
+    unbind(track_id, "track_removed");
+  }
+
+  active_bindings[track_id] = bindings.size();
+  bindings.push_back({track_id, node_id, timestamp_ns, timestamp_ns, std::nullopt});
+}
+
+void LayerTracker::touch(size_t track_id, uint64_t timestamp_ns) {
+  auto iter = active_bindings.find(track_id);
+  if (iter != active_bindings.end()) {
+    auto& binding = bindings.at(iter->second);
+    binding.last_ns = std::max(binding.last_ns, timestamp_ns);
+  }
+}
+
+void LayerTracker::unbind(size_t track_id, const std::string& reason) {
+  auto iter = active_bindings.find(track_id);
+  if (iter == active_bindings.end()) {
+    return;
+  }
+
+  bindings.at(iter->second).end = reason;
+  active_bindings.erase(iter);
+}
+
 GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(config)) {
   for (const auto& [layer_name, tracker_config] : config.layer_updates) {
     trackers_.emplace(layer_name, LayerTracker(tracker_config));
@@ -142,6 +178,7 @@ void GraphUpdater::addNode(SceneGraph& graph,
             << " for " << source;
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
+      tracker.bind(*entry.track_id, *to_merge, curr_timestamp_ns_);
     }
 
     tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
@@ -161,6 +198,7 @@ void GraphUpdater::addNode(SceneGraph& graph,
   graph.emplaceNode(target, new_id, std::move(attrs));
   if (entry.track_id) {
     tracker.track_to_node[*entry.track_id] = new_id;
+    tracker.bind(*entry.track_id, new_id, curr_timestamp_ns_);
   }
 
   tracker.node_to_tracks[new_id] = {*entry.track_id};
@@ -186,8 +224,10 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
   tracker.node_to_tracks[map_iter->second].erase(*entry.track_id);
   if (tracker.node_to_tracks[map_iter->second].empty()) {
     graph.removeNode(map_iter->second);
+    tracker.unbind(*entry.track_id, "deleted");
   } else {
     computeMergeGroup(map_iter->second, tracker, graph);
+    tracker.unbind(*entry.track_id, "track_removed");
   }
 
   tracker.track_to_node.erase(map_iter);
@@ -200,6 +240,7 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter != tracker.track_to_node.end()) {
     tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
+    tracker.touch(*entry.track_id, curr_timestamp_ns_);
     computeMergeGroup(map_iter->second, tracker, graph);
     return true;
   }
@@ -248,7 +289,10 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
   graph.setNodeAttributes(node_id, std::move(merged));
 }
 
-void GraphUpdater::update(const GraphUpdate& update, SceneGraph& graph) {
+void GraphUpdater::update(const GraphUpdate& update,
+                          SceneGraph& graph,
+                          uint64_t timestamp_ns) {
+  curr_timestamp_ns_ = timestamp_ns;
   std::map<LayerId, LayerTracker&> trackers_by_id;
   for (auto& [name, tracker] : trackers_) {
     const auto key = graph.getLayerKey(name);
@@ -297,6 +341,35 @@ void GraphUpdater::update(const GraphUpdate& update, SceneGraph& graph) {
       }
     }
   }
+}
+
+std::string GraphUpdater::bindingsToJson() const {
+  std::stringstream ss;
+  ss << "{\"version\": 1, \"layers\": {";
+  bool first_layer = true;
+  for (const auto& [name, tracker] : trackers_) {
+    ss << (first_layer ? "" : ",") << "\n  " << jsonString(name) << ": [";
+    first_layer = false;
+    bool first = true;
+    for (const auto& binding : tracker.bindings) {
+      ss << (first ? "" : ",") << "\n    {\"track_id\": " << binding.track_id
+         << ", \"node_id\": " << binding.node_id
+         << ", \"first_ns\": " << binding.first_ns
+         << ", \"last_ns\": " << binding.last_ns
+         << ", \"active\": " << (binding.end ? "false" : "true")
+         << ", \"end\": " << (binding.end ? jsonString(*binding.end) : "null") << "}";
+      first = false;
+    }
+
+    ss << (first ? "]" : "\n  ]");
+  }
+
+  ss << (first_layer ? "}" : "\n}") << "}\n";
+  return ss.str();
+}
+
+void GraphUpdater::saveBindings(const std::filesystem::path& filepath) const {
+  writeFileAtomic(filepath, bindingsToJson());
 }
 
 }  // namespace hydra

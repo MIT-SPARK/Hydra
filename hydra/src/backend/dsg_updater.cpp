@@ -120,6 +120,12 @@ void DsgUpdater::save(const DataDirectory& output, const std::string& label) con
     // mesh implements vertex and face traits
     kimera_pgmo::WriteMesh(graph_path / "mesh.ply", *mesh, *mesh);
   }
+
+  try {
+    saveMerges(target_dsg_->merges, graph_path / "merges.json");
+  } catch (const std::exception& e) {
+    LOG(ERROR) << "Failed to save merges: " << e.what();
+  }
 }
 
 void DsgUpdater::reset(uint64_t timestamp_ns) {
