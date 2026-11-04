@@ -50,6 +50,8 @@ struct NodeCache {
     Eigen::Vector3f init_pos;
     //! Odometric bounding box for node
     spark_dsg::BoundingBox init_bbox;
+    //! Whether the node was active the last time it was added
+    bool was_active = false;
 
     void update(spark_dsg::NodeAttributes& attrs,
                 const Eigen::Isometry3d& transform) const;
