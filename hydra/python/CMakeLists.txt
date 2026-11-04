@@ -9,11 +9,18 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+if(PROJECT_IS_TOP_LEVEL)
+  find_package(hydra QUIET)
+  if(NOT hydra_FOUND)
+    # e.g. `pip install` without a Hydra build: ship only the pure-python parts
+    # (hydra_python.image_store); importing hydra_python then warns
+    message(WARNING "hydra not found: building hydra_python without its bindings")
+    return()
+  endif()
+endif()
+
 find_package(Python COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
-if(PROJECT_IS_TOP_LEVEL)
-  find_package(hydra REQUIRED)
-endif()
 
 pybind11_add_module(
   _hydra_bindings
