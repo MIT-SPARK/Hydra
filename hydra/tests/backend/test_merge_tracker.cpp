@@ -38,6 +38,8 @@
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <sstream>
+
 #include "hydra_test/shared_dsg_fixture.h"
 
 using namespace spark_dsg;
@@ -93,6 +95,34 @@ TEST(MergeTracker, NullAttributesCorrect) {
   MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
   EXPECT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, null_attrs), 1u);
   EXPECT_TRUE(merged.getNode(NodeSymbol('O', 0)).tryAttributes());
+}
+
+TEST(MergeTracker, MergesToJson) {
+  auto dsg = test::makeSharedDsg();
+  auto& merged = *dsg->graph;
+  for (size_t i = 0; i < 4; ++i) {
+    addObject(merged, i);
+  }
+  const auto unmerged = merged.clone();
+
+  MergeTracker tracker;
+  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)},
+                      {NodeSymbol('O', 0), NodeSymbol('O', 2)}};
+  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg), 2u);
+
+  std::stringstream expected;
+  expected << "{\"version\": 1, \"merges\": [\n"
+           << "  {\"child\": " << static_cast<NodeId>(NodeSymbol('O', 0))
+           << ", \"parent\": " << static_cast<NodeId>(NodeSymbol('O', 2)) << "},\n"
+           << "  {\"child\": " << static_cast<NodeId>(NodeSymbol('O', 1))
+           << ", \"parent\": " << static_cast<NodeId>(NodeSymbol('O', 2)) << "}\n]}\n";
+  EXPECT_EQ(mergesToJson(dsg->merges), expected.str());
+
+  // chains are resolved even if the map is not flattened
+  const std::map<NodeId, NodeId> chain{{NodeSymbol('O', 1), NodeSymbol('O', 0)},
+                                       {NodeSymbol('O', 0), NodeSymbol('O', 2)}};
+  EXPECT_EQ(mergesToJson(chain), expected.str());
+  EXPECT_EQ(mergesToJson({}), "{\"version\": 1, \"merges\": []}\n");
 }
 
 }  // namespace hydra

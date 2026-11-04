@@ -5,6 +5,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/data_directory.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/disjoint_set.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/display_utilities.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/event_log.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/id_tracker.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/logging.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_utilities.cpp

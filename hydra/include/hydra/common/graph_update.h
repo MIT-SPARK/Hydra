@@ -38,10 +38,14 @@
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <filesystem>
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "hydra/common/attribute_merger.h"
 #include "hydra/common/node_matchers.h"
@@ -72,6 +76,29 @@ struct LayerUpdate {
 
 using GraphUpdate = std::map<spark_dsg::LayerId, LayerUpdate::Ptr>;
 
+//! A track bound to a DSG node for some time span (see GraphUpdater::saveBindings)
+struct TrackBinding {
+  size_t track_id;
+  spark_dsg::NodeId node_id;
+  uint64_t first_ns = 0;
+  uint64_t last_ns = 0;
+  //! Why the binding ended ("deleted": the node was removed with the track,
+  //! "track_removed": the track was removed or rebound while the node survives), unset
+  //! if active. The frontend never merges nodes: tracks matched to an existing node are
+  //! bound to that node instead.
+  std::optional<std::string> end;
+};
+
+//! A change of the binding history: a new binding, or the end of one (binding.end set)
+struct TrackBindingEvent {
+  //! graph_updater layer name (key of GraphUpdater::Config::layer_updates)
+  std::string layer;
+  //! Timestamp of the frontend update that made the change
+  uint64_t timestamp_ns = 0;
+  //! The binding as of the change
+  TrackBinding binding;
+};
+
 struct LayerTracker {
   struct Config {
     char prefix = 0;
@@ -89,6 +116,16 @@ struct LayerTracker {
   std::unordered_map<size_t, spark_dsg::NodeId> track_to_node;
   std::unordered_map<spark_dsg::NodeId, std::unordered_set<size_t>> node_to_tracks;
   std::unordered_map<size_t, spark_dsg::NodeAttributes::Ptr> attribute_cache;
+  //! Every track binding made on this layer (including ended bindings)
+  std::vector<TrackBinding> bindings;
+  //! Index into bindings of the active binding for each track
+  std::unordered_map<size_t, size_t> active_bindings;
+  //! Binding changes of the current update (layer left empty, see bindingEvents)
+  std::vector<TrackBindingEvent> events;
+
+  void bind(size_t track_id, spark_dsg::NodeId node_id, uint64_t timestamp_ns);
+  void touch(size_t track_id, uint64_t timestamp_ns);
+  void unbind(size_t track_id, const std::string& reason, uint64_t timestamp_ns);
 };
 
 void declare_config(LayerTracker::Config& config);
@@ -101,10 +138,24 @@ struct GraphUpdater {
   } const config;
 
   explicit GraphUpdater(const Config& config);
-  void update(const GraphUpdate& update, spark_dsg::SceneGraph& graph);
+  void update(const GraphUpdate& update,
+              spark_dsg::SceneGraph& graph,
+              uint64_t timestamp_ns = 0);
+
+  //! Binding changes made by the last call to update(), in order per layer
+  std::vector<TrackBindingEvent> bindingEvents() const;
+
+  //! Track-to-node binding history as JSON
+  std::string bindingsToJson() const;
+
+  //! Write bindingsToJson() to the provided file
+  void saveBindings(const std::filesystem::path& filepath) const;
+
+  const std::map<std::string, LayerTracker>& trackers() const { return trackers_; }
 
  private:
   std::map<std::string, LayerTracker> trackers_;
+  uint64_t curr_timestamp_ns_ = 0;
 
   void addNode(spark_dsg::SceneGraph& graph,
                LayerTracker& tracker,

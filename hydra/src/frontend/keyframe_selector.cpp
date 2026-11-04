@@ -35,10 +35,15 @@
 #include "hydra/frontend/keyframe_selector.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
+
+#include <algorithm>
+#include <cctype>
+#include <set>
 
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/utils/printing.h"
@@ -58,6 +63,16 @@ static const auto functor_registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    KeyframeSelector,
                                    KeyframeSelector::Config>("KeyframeSelector");
+
+const std::set<std::string> kSaveFields{"color",
+                                        "color_mask",
+                                        "depth",
+                                        "range",
+                                        "labels",
+                                        "instances",
+                                        "vertices",
+                                        "traversability",
+                                        "features"};
 
 std::string showVec(const Eigen::MatrixXf& vec, size_t max_length = 100) {
   if (vec.rows() * vec.cols() == 0) {
@@ -109,9 +124,11 @@ void declare_config(DistancePolicy::Config& config) {
   field(config.min_pose_separation, "min_pose_separation");
   field(config.rotation_separation_weight, "rotation_separation_weight");
   field(config.min_time_separation_s, "min_time_separation_s");
-  check(config.min_pose_separation, GE, 0.0, "rotation_separation_weight");
+  field(config.max_time_separation_s, "max_time_separation_s");
+  check(config.min_pose_separation, GE, 0.0, "min_pose_separation");
   check(config.rotation_separation_weight, GE, 0.0, "rotation_separation_weight");
-  check(config.min_time_separation_s, GE, 0.0, "rotation_separation_weight");
+  check(config.min_time_separation_s, GE, 0.0, "min_time_separation_s");
+  check(config.max_time_separation_s, GE, 0.0, "max_time_separation_s");
 }
 
 bool KeyframePolicy::shouldAdd(const InputData::ConstPtr& candidate,
@@ -149,6 +166,14 @@ bool DistancePolicy::shouldAddImpl(const InputData& candidate,
     return false;
   }
 
+  if (config.max_time_separation_s && diff_s.count() >= config.max_time_separation_s) {
+    reason = std::format("Added candidate @ {} [ns] with time diff {} >= {} [s]",
+                         candidate.timestamp_ns,
+                         diff_s.count(),
+                         config.max_time_separation_s);
+    return true;
+  }
+
   const Eigen::Isometry3d pose_diff =
       candidate.world_T_body.inverse() * to_check.world_T_body;
   const auto diff_t = pose_diff.translation().norm();
@@ -174,6 +199,14 @@ void declare_config(KeyframeSelector::Config& config) {
   field(config.feature_selector, "feature_selector");
   field(config.layers, "layers");
   field(config.sinks, "sinks");
+  field(config.max_active_keyframes, "max_active_keyframes");
+  field<Path>(config.log_path, "log_path");
+  field(config.save_fields, "save_fields");
+  field(config.max_queue_size, "max_queue_size");
+  field(config.save_options, "save_options");
+  for (const auto& name : config.save_fields) {
+    checkCondition(kSaveFields.count(name), "unknown save field '" + name + "'");
+  }
 }
 
 KeyframeSelector::Config::Config()
@@ -188,7 +221,140 @@ KeyframeSelector::KeyframeSelector(const Config& config)
   for (const auto& layer : config.layers) {
     active_window_.emplace(layer, ActiveWindowTracker());
   }
+
+  if (!config.log_path.empty()) {
+    std::filesystem::create_directories(config.log_path);
+    save_thread_ = std::make_unique<std::thread>(&KeyframeSelector::saveSpin, this);
+  }
 }
+
+KeyframeSelector::~KeyframeSelector() {
+  if (!save_thread_) {
+    return;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(save_mutex_);
+    should_shutdown_ = true;
+  }
+
+  save_cv_.notify_all();
+  save_thread_->join();
+  save_thread_.reset();
+}
+
+InputData::Ptr KeyframeSelector::selectFields(const InputData& data,
+                                              const std::vector<std::string>& fields) {
+  const std::set<std::string> to_keep(fields.begin(), fields.end());
+  const auto select = [&to_keep](const std::string& name, const cv::Mat& image) {
+    return to_keep.count(name) ? image : cv::Mat();
+  };
+
+  // shallow copy: the input is shared as InputData::ConstPtr and never modified once it
+  // reaches the frontend, so the kept images share their pixel buffers (no deep copy on
+  // the frontend thread)
+  auto copy = std::make_shared<InputData>(data);
+  copy->color_image = select("color", data.color_image);
+  copy->color_mask = select("color_mask", data.color_mask);
+  copy->depth_image = select("depth", data.depth_image);
+  copy->range_image = select("range", data.range_image);
+  copy->label_image = select("labels", data.label_image);
+  copy->instance_image = select("instances", data.instance_image);
+  copy->vertex_map = select("vertices", data.vertex_map);
+  copy->traversability_image = select("traversability", data.traversability_image);
+  if (!to_keep.count("features")) {
+    copy->feature = FeatureVector();
+    copy->label_features.clear();
+  }
+
+  return copy;
+}
+
+void KeyframeSelector::queueForSaving(const InputData::ConstPtr& data) {
+  if (!save_thread_ || !data) {
+    return;
+  }
+
+  auto to_save = selectFields(*data, config.save_fields);
+  {
+    std::lock_guard<std::mutex> lock(save_mutex_);
+    if (config.max_queue_size && save_queue_.size() >= config.max_queue_size) {
+      LOG(WARNING) << config.prefix << "Keyframe save queue full ("
+                   << save_queue_.size() << "), dropping keyframe @ "
+                   << data->timestamp_ns << " [ns]";
+      return;
+    }
+
+    save_queue_.push_back(std::move(to_save));
+  }
+
+  save_cv_.notify_all();
+}
+
+std::string KeyframeSelector::archiveName(const InputData& data) {
+  const auto& sensor = data.getSensor().name;
+  if (!primary_sensor_) {
+    primary_sensor_ = sensor;
+  }
+
+  const auto stamp = std::to_string(data.timestamp_ns);
+  if (sensor == *primary_sensor_) {
+    return stamp + ".zip";
+  }
+
+  std::string suffix = sensor;
+  for (auto& c : suffix) {
+    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-' &&
+        c != '.') {
+      c = '_';
+    }
+  }
+
+  return stamp + "_" + suffix + ".zip";
+}
+
+void KeyframeSelector::saveSpin() {
+  while (true) {
+    InputData::ConstPtr data;
+    {
+      std::unique_lock<std::mutex> lock(save_mutex_);
+      save_cv_.wait(lock, [this] { return should_shutdown_ || !save_queue_.empty(); });
+      if (save_queue_.empty()) {
+        return;  // only exit once all pending keyframes are written
+      }
+
+      data = save_queue_.front();
+      save_queue_.pop_front();
+      saving_ = true;
+    }
+
+    // InputData::save writes to a temporary file and renames it into place
+    const auto filepath = config.log_path / archiveName(*data);
+    try {
+      data->save(filepath, config.save_options);
+    } catch (const std::exception& e) {
+      LOG(ERROR) << config.prefix << "Failed to save keyframe: " << e.what();
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(save_mutex_);
+      saving_ = false;
+    }
+
+    save_cv_.notify_all();
+  }
+}
+
+void KeyframeSelector::flush() {
+  if (!save_thread_) {
+    return;
+  }
+
+  std::unique_lock<std::mutex> lock(save_mutex_);
+  save_cv_.wait(lock, [this] { return save_queue_.empty() && !saving_; });
+}
+
+void KeyframeSelector::save(const DataDirectory&) { flush(); }
 
 void KeyframeSelector::call(const ActiveWindowOutput& input,
                             SharedDsgInfo&,
@@ -201,18 +367,19 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
     std::string reason;
     if (policy_->shouldAdd(data, keyframes_, reason)) {
       keyframes_.push_back(data);
+      queueForSaving(data);
       ++num_added;
     } else if (!reason.empty()) {
       MLOG(2) << reason;
     }
   }
 
-  // TODO(nathan) add saving keyframes to disk (could be sink)
-
   MLOG(2) << "Got " << num_added << " new views!";
   if (window) {
     archiveKeyframes(input, *window);
   }
+
+  limitActiveKeyframes();
 
   Sink::callAll(sinks_, input.timestamp_ns, keyframes_);
 }
@@ -231,12 +398,33 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
 
     if (!window.inBounds(msg.timestamp_ns, msg.world_T_body(), stamp, pos)) {
       MLOG(3) << "Archival candidate found @ " << stamp << " [ns]";
-      to_archive_.push_back(*iter);
+      releaseKeyframe(*iter);
       iter = keyframes_.erase(iter);
       continue;
     }
 
     ++iter;
+  }
+}
+
+void KeyframeSelector::releaseKeyframe(const InputData::ConstPtr& frame) {
+  // archived views are only used (and only ever released) by feature assignment
+  if (feature_selector_) {
+    to_archive_.push_back(frame);
+  }
+}
+
+void KeyframeSelector::limitActiveKeyframes() {
+  if (!config.max_active_keyframes) {
+    return;
+  }
+
+  // policies only compare against the newest keyframe, so evicting the oldest is safe
+  while (keyframes_.size() > config.max_active_keyframes) {
+    MLOG(3) << "Evicting keyframe @ " << keyframes_.front()->timestamp_ns
+            << " [ns] (more than " << config.max_active_keyframes << " active)";
+    releaseKeyframe(keyframes_.front());
+    keyframes_.pop_front();
   }
 }
 

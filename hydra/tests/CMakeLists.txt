@@ -11,6 +11,7 @@ add_executable(
   main.cpp
   eval/test_evaluation.cpp
   src/resources.cpp
+  active_window/test_reconstruction_module.cpp
   backend/test_deformation_interpolator.cpp
   backend/test_external_loop_closure.cpp
   backend/test_merge_tracker.cpp
@@ -23,6 +24,7 @@ add_executable(
   backend/updates/test_update_objects_functor.cpp
   backend/updates/test_update_places_functor.cpp
   common/test_config_utilities.cpp
+  common/test_graph_update.cpp
   common/test_node_matchers.cpp
   common/test_partial_graph.cpp
   common/test_shared_dsg_info.cpp
@@ -30,6 +32,7 @@ add_executable(
   frontend/test_mesh_compression.cpp
   frontend/test_mesh_segmenter.cpp
   frontend/test_feature_selector.cpp
+  frontend/test_keyframe_selector.cpp
   input/test_camera.cpp
   input/test_input_data_io.cpp
   input/test_lidar.cpp
@@ -64,6 +67,8 @@ add_executable(
   rooms/test_room_finder.cpp
   rooms/test_room_utilities.cpp
   utils/test_active_window_tracker.cpp
+  utils/test_data_directory.cpp
+  utils/test_event_log.cpp
   utils/test_mesh_utilities.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp
