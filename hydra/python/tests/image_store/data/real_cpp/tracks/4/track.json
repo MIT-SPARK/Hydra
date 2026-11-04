@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "robot_id": 0,
+  "track_id": 4,
+  "absorbed_track_ids": [],
+  "extracted": false,
+  "semantic_label": null,
+  "observations": [
+    {
+      "k": 0,
+      "timestamp_ns": 10,
+      "world_T_body": {
+        "translation_m": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "rotation_wxyz": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "sensor": "test_camera",
+      "image_size": [
+        4,
+        3
+      ],
+      "bbox_2d": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "mask_rle": "[5,1,6]",
+      "score": 1.0,
+      "kept": false,
+      "color": null,
+      "depth": null,
+      "mask": null
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "robot_id": 0,
+  "track_id": 12,
+  "absorbed_track_ids": [
+    7,
+    9
+  ],
+  "extracted": true,
+  "semantic_label": 3,
+  "observations": [
+    {
+      "k": 0,
+      "timestamp_ns": 10,
+      "world_T_body": {
+        "translation_m": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "rotation_wxyz": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "sensor": "test_camera",
+      "image_size": [
+        4,
+        3
+      ],
+      "bbox_2d": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "mask_rle": "[5,1,6]",
+      "score": 1.0,
+      "kept": false,
+      "color": null,
+      "depth": null,
+      "mask": null
+    },
+    {
+      "k": 1,
+      "timestamp_ns": 20,
+      "world_T_body": {
+        "translation_m": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "rotation_wxyz": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "sensor": "test_camera",
+      "image_size": [
+        4,
+        3
+      ],
+      "bbox_2d": [
+        1,
+        0,
+        2,
+        1
+      ],
+      "mask_rle": null,
+      "score": 3.0,
+      "kept": true,
+      "color": "obs_1_color.jpg",
+      "depth": "obs_1_depth.png",
+      "mask": "obs_1_mask.png"
+    }
+  ]
+}

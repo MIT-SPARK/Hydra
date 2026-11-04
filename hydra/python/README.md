@@ -23,6 +23,13 @@ pip install /path/to/colcon_ws/src/spark_dsg
 pip install /path/to/colcon_ws/src/hydra/hydra
 ```
 
+Without a Hydra build (CMake cannot find `hydra`), `pip install` installs only the pure-python parts and `import hydra_python` warns that the bindings are not built.
+
+### Image store
+
+`hydra_python.image_store` indexes the image logs Hydra and Khronos write (keyframe archives, track logs) into an image store and reads it back; it does not need the compiled bindings.
+See [its README](src/hydra_python/image_store/README.md) and `hydra image-store --help`.
+
 ### Running on MP3D Image Dataset
 
 Point Hydra at the scene(s) you want to run:
