@@ -1,0 +1,14 @@
+Files written by the C++ writers' own gtests (not hand-made):
+- keyframes/{10,30,40}.zip   hydra test_hydra KeyframeSelector.SavesAcceptedKeyframes
+- keyframes_multi/{10,10_rear_cam_1,20}.zip
+                             hydra test_hydra KeyframeSelector.SensorSuffixForSecondarySensors
+                             (sensors "front" and "rear cam/1")
+- keyframes_features/10.zip  hydra test_hydra KeyframeSelector.SavesDescriptorsOnlyWhenRequested
+                             (save_fields [color, depth, features])
+- tracks/12                  khronos test_khronos TrackLogger.WritesTrackAndKeptImages
+- tracks/{4,5}               khronos test_khronos TrackLogger.LogsFailedExtraction
+- tracks/8                   khronos test_khronos TrackLogger.NonFiniteValuesAreNull
+
+The tests delete their temp dirs; they were kept with an LD_PRELOAD shim that makes
+std::filesystem::remove_all a no-op (regenerate.sh), run against the
+KeyframeSelector and TrackLogger builds of MIT-SPARK/Hydra#199 and MIT-SPARK/Khronos#48.
