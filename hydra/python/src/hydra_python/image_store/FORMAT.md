@@ -131,13 +131,15 @@ extraction (rewritten if the track is logged again):
 ## 5. Indexer
 
 ```
-hydra image-store index RUN [--keyframes DIR] [--tracks DIR] [--hydra DIR] [--robot-id N]
+hydra image-store index RUN [--keyframes DIR] [--tracks DIR] [--hydra DIR] [--events DIR]
+                        [--robot-id N]
 ```
 builds `RUN/image_store/` (`schema_version` 1, see `schema.sql`). Defaults when only `RUN`
 is given (also used by `ImageStore.open(RUN)`, which indexes or refreshes the store):
 keyframes `RUN/keyframes`, tracks `RUN/tracks`, Hydra output `RUN/hydra` with
-`backend/{dsg.json,merges.json}` and `frontend/{dsg.json,track_bindings.json}`; the flags
-override them.
+`backend/{dsg.json,merges.json}` and `frontend/{dsg.json,track_bindings.json}`, event
+logs `RUN/events` (§6); the flags override them. A missing save-time file is replaced by
+the event logs.
 
 - Frames: every keyframe archive is a keyframe frame (kind 0); an observation whose
   sensor and stamp match no archive brings in an observation frame (kind 2).
@@ -166,3 +168,45 @@ override them.
 - Descriptors: a non-empty archive `feature` is stored in the table
   `frame_descriptors(frame_id PRIMARY KEY, dim, dtype, data BLOB)`. `label_features` are
   not stored.
+
+## 6. Live event logs (optional, off by default)
+
+The save-time files (sections 3 and 4, the scene graphs) are the source of truth at the
+end. The event logs add what happens during the run, so live readers see bindings and
+merges before the save and a crash does not lose them.
+
+```yaml
+frontend:
+  sinks:        # GraphBuilder sinks
+    - {type: FrontendEventLogger, path: <run>/events/frontend.jsonl, log_agents: true}
+backend:
+  merge_sinks:  # DsgUpdater merge sinks (called after every backend update)
+    - {type: MergeEventLogger, path: <run>/events/backend.jsonl}
+```
+An empty `path` is off. Readers take every `*.jsonl` in `<run>/events`; file names do not
+matter, the `source` of the `open` line and the `ev` field do.
+
+JSON lines, one object per line; each update's lines are appended in one piece and
+flushed. A reader treats an unterminated last line as not yet written and skips (counts)
+unparsable lines. A file is opened on its first event and reopened (new `open` line) if
+it was deleted.
+```
+{"ev": "open", "version": 1, "wall_ns": 1793721242144000000, "source": "frontend", "robot_id": 0}
+{"ev": "bind",  "stamp_ns": T, "layer": "OBJECTS", "track_id": 12, "node_id": 123}
+{"ev": "end",   "stamp_ns": T, "layer": "OBJECTS", "track_id": 12, "node_id": 123, "reason": "deleted"}
+{"ev": "agent", "stamp_ns": T, "node_id": 6989586621679009792, "timestamp_ns": t, "world_T_body": [16]}
+{"ev": "open", "version": 1, "wall_ns": ..., "source": "backend", "robot_id": 0}
+{"ev": "merge",   "stamp_ns": T, "child": 124, "parent": 123}
+{"ev": "unmerge", "stamp_ns": T, "child": 124}
+```
+- `stamp_ns`: timestamp of the frontend/backend update that made the change.
+- `open`: one per (re)opening of the file by a process; `wall_ns` is the system clock. A
+  second `open` in the same file means Hydra restarted and appends: readers drop the
+  earlier events of that file (node ids restart). The backend log is first opened at the
+  first merge, so the session of a run is identified by the frontend log's `open`.
+- `bind` / `end` mirror section 3: `bind` is a new entry (`first_ns` = `last_ns` =
+  `stamp_ns`, active), `end` ends it (`deleted` | `track_removed`; a rebind to another node
+  is `end track_removed` then `bind`).
+- `agent`: every new agent node with its frontend (odometric) pose, row-major 4x4.
+- `merge` / `unmerge`: changes of the backend child -> parent map after each update;
+  replaying them in order and resolving chains gives `merges.json`.

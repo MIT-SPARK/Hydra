@@ -111,9 +111,50 @@ What it produces:
 - **Bindings file**: `layers` keys are graph_updater layer names (`OBJECTS`); the object
   layer is found case-insensitively (else every layer is used). Several tracks may bind to
   one node. Node merges come from `merges.json` only.
+- **Event logs** (Hydra `FrontendEventLogger` / `MergeEventLogger`, `<run>/events/*.jsonl`,
+  `--events DIR`, `FORMAT.md` §6): when a save-time file is missing (Hydra still running,
+  or it crashed) its content comes from the events instead: bindings (`bind`/`end`),
+  merges (`merge`/`unmerge`) and agent nodes with odometric poses (`agent`).
 - **Track logs** must follow `FORMAT.md` §2 (`robot_id`, `track_id`, `absorbed_track_ids`,
   `extracted`, `semantic_label`, every observation key; `mask_rle` a string or `null`).
   A malformed `track.json` is skipped with a warning (`tracks_failed`).
+
+### Tail mode (live)
+
+```
+hydra image-store tail RUN [index flags] [--events DIR] [--interval 1] [--settle 2]
+                           [--timeout S] [--once] [--no-finalize] [--summary FILE] [-v]
+                           [--force]
+```
+
+`hydra_python.image_store.tail.Tailer` (and `ImageStore.open(RUN, live=True)`, which runs one in a
+background thread until the store is closed) keeps `RUN/image_store` current while Hydra
+runs: each pass indexes new `*.zip` archives and new or rewritten `track.json`, replays the
+event logs from the byte offset it reached (an incomplete last line waits for the next
+pass) into bindings and aliases, and anchors frames to the agent nodes seen so far. A frame
+newer than the newest agent node is anchored to it provisionally (meta
+`indexer.r<robot>.provisional_frames`) and decided again on the next pass; frames before
+any agent node stay pending. Readers in other processes see every committed pass (WAL); a
+frame is listed as pending in the same transaction that adds it, and resetting and deciding
+anchors is one transaction, so a reader never sees an undecided frame without its anchor
+that is not listed as pending or provisional (the store mirror holds frames from the lowest
+such one on). An archive that cannot be read (a crash leftover) is warned about once and
+read again only when its mtime or size changes. A malformed event line is skipped; a
+complete event glued after it (a restarted Hydra appending its `open` to the cut last line
+of a killed one) is recovered.
+
+When the backend `dsg.json`, `track_bindings.json` and `merges.json` of the running session
+exist (newer than the newest `open` event) and stay unchanged for `--settle` seconds, the
+tailer reconciles: every frame it made is anchored again from scratch and the save-time
+files are indexed, so the store equals a one-shot `index` of the run; then it exits
+(`--no-finalize` never does). Rows of other writers (tracks from `EXTERNAL_TRACK_BASE` up)
+are kept. Its state is meta `indexer.tail` (`live`, `final`, `heartbeat_wall`, `pid`,
+`host`, `session`
+= `wall_ns` of the frontend log's newest `open` line, i.e. one id per Hydra run,
+`sessions`, per-file event offsets); `ImageStore.open` does not re-index a store whose tail
+heartbeat is younger than 30 s and whose tailer process still exists (checked on the same
+host), and `tail` does not start a second tailer on such a store (`--force` does). Without a robot id (`--robot-id`, the event logs' `open`
+line, a track log or the store) it waits instead of guessing.
 
 ## Reading
 
@@ -191,6 +232,7 @@ hydra image-store info <store>... [--json]
 hydra image-store export <store>... --out DIR [--dsg dsg.json] [--copy] [--kept-only]
 hydra image-store check STORE_OR_RUN [--dsg dsg.json] [--json]
 hydra image-store index RUN [--keyframes DIR] [--tracks DIR] [--hydra DIR] ...   # see Indexer
+hydra image-store tail RUN [index flags] [--interval S] [--settle S] ...           # see Tail mode
 ```
 
 `python -m hydra_python.image_store ...` is the same CLI without the rest of `hydra`
