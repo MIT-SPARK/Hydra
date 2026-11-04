@@ -248,6 +248,11 @@ void GraphBuilder::spin() {
     // wait for current spin to finish before shutting down
     std::this_thread::sleep_for(10ms);
   }
+
+  // Process pending collated packet if it exists
+  if (input && !GlobalInfo::instance().force_shutdown()) {
+    spinOnce(input);
+  }
 }
 
 bool GraphBuilder::spinOnce() {
