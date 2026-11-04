@@ -269,6 +269,7 @@ class ImageStore:
 
     def __init__(self, dbs: list[_Db]):
         self._dbs = dbs
+        self._tailers: list = []
         self._alias_cache: tuple[tuple, dict[int, int], dict[int, set[int]]] | None = (
             None
         )
@@ -282,6 +283,8 @@ class ImageStore:
         readonly: bool = True,
         create: bool = False,
         index: bool = True,
+        live: bool = False,
+        live_interval_s: float = 1.0,
     ) -> "ImageStore":
         """Open stores. A missing store raises ``FileNotFoundError``; with
         ``readonly=False, create=True`` an empty one is created instead.
@@ -290,12 +293,34 @@ class ImageStore:
         run holds raw Hydra/Khronos image logs, the store is built first with
         :func:`hydra_python.image_store.indexer.index` if it was never indexed or its inputs
         changed since (see :func:`hydra_python.image_store.indexer.ensure_indexed`). That
-        writes the store even with ``readonly=True``; ``index=False`` never writes."""
+        writes the store even with ``readonly=True``; ``index=False`` never writes.
+
+        ``live=True`` (run directories of a run Hydra is still writing): index the run
+        now and keep tailing it in a background thread until the store is closed or
+        the run is finalized (:class:`hydra_python.image_store.tail.Tailer`), unless another
+        process already tails it."""
         if not paths:
             raise ValueError("ImageStore.open needs at least one store path")
         if create and readonly:
             raise ValueError("create=True needs readonly=False")
-        return cls([_Db(_store_path(p, index), readonly, create) for p in paths])
+        if not live:
+            return cls([_Db(_store_path(p, index), readonly, create) for p in paths])
+        from .indexer import tail_active
+        from .tail import Tailer
+
+        dbs, tailers = [], []
+        for p in paths:
+            tailer = Tailer(p)
+            if tail_active(tailer.store):
+                dbs.append(_Db(tailer.store, readonly))
+                continue
+            tailer.poll()
+            dbs.append(_Db(tailer.store, readonly))
+            if not tailer.finalized:
+                tailers.append(tailer.start(live_interval_s))
+        store = cls(dbs)
+        store._tailers = tailers
+        return store
 
     @staticmethod
     def open_writer(
@@ -309,6 +334,9 @@ class ImageStore:
         return ImageStoreWriter(_store_path(path, False), robot_id, create=create)
 
     def close(self) -> None:
+        for tailer in self._tailers:
+            tailer.stop()
+        self._tailers = []
         for db in self._dbs:
             db.conn.close()
 

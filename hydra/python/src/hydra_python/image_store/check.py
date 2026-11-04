@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import pathlib
 
+from .codec import EXTERNAL_TRACK_BASE
 from .store import DB_NAME, ImageStore, _image_shape, _resolve_db
 
 
@@ -115,12 +116,26 @@ def check_store(store: str | os.PathLike, *, dsg=None, sample_images: int = 20) 
             bad_kf = [n for n in kf_anchors if not known(n)]
             stats["keyframe_anchors_missing_in_dsg"] = len(bad_kf)
             checks["keyframe anchors exist in DSG"] = not bad_kf
+            # the indexer's (Khronos) tracks only: other writers' tracks (external ids,
+            # e.g. objects a detector created in a database) may bind nodes the DSG
+            # never had
             bound = [
                 r[0]
-                for r in conn.execute("SELECT DISTINCT node_id FROM track_bindings")
+                for r in conn.execute(
+                    "SELECT DISTINCT node_id FROM track_bindings WHERE track_id < ?",
+                    (EXTERNAL_TRACK_BASE,),
+                )
             ]
             bad_bound = [n for n in bound if not known(n)]
             stats["bound_nodes_missing_in_dsg"] = len(bad_bound)
+            stats["external_bound_nodes_not_in_dsg"] = sum(
+                1
+                for (n,) in conn.execute(
+                    "SELECT DISTINCT node_id FROM track_bindings WHERE track_id >= ?",
+                    (EXTERNAL_TRACK_BASE,),
+                )
+                if not known(n)
+            )
             checks["bound nodes exist in DSG or are merge children"] = not bad_bound
     return {
         "ok": all(checks.values()),

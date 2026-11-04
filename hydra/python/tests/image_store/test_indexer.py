@@ -962,3 +962,27 @@ def test_real_cpp_multi_sensor_and_descriptors(tmp_path):
         }
         assert at10 == {"front", "rear cam/1", "camera"}
         assert len(list(store.descriptors())) == 1
+
+
+def test_check_dsg_ignores_other_writers_bindings(indexed):
+    """Other writers (e.g. an open-vocabulary detector) bind external tracks to nodes
+    that live only in their own database (objects they created): `check --dsg` judges
+    the indexer's bindings only and counts the others separately."""
+    from hydra_python.image_store import check_store
+
+    run, _ = indexed
+    dsg = run / "hydra" / "backend" / "dsg.json"
+    assert check_store(run / "image_store", dsg=dsg)["ok"]
+    with ImageStore.open_writer(run) as w:
+        fid = w.reader().frames()[0].frame_id
+        with w.batch():
+            w.bind_track(EXTERNAL_TRACK_BASE | 5, make_node_id("O", 9999))
+            w.add_observation(EXTERNAL_TRACK_BASE | 5, fid, score=0.9, kept=True)
+    report = check_store(run / "image_store", dsg=dsg)
+    assert report["ok"], report["checks"]
+    assert report["stats"]["external_bound_nodes_not_in_dsg"] == 1
+    assert report["stats"]["bound_nodes_missing_in_dsg"] == 0
+    # an indexer binding to a node the DSG lacks still fails
+    with ImageStore.open_writer(run) as w:
+        w.bind_track(12345, make_node_id("O", 8888))
+    assert not check_store(run / "image_store", dsg=dsg)["ok"]

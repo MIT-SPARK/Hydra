@@ -126,7 +126,7 @@ def index_options(f):
             default=None,
             help="default: the robot_id of the track logs, else the one the store was "
             "indexed with, else of the event logs, else inferred from the scene "
-            "graph's agent prefix, else 0",
+            "graph's agent prefix, else 0 (tail waits instead of guessing 0)",
         ),
         click.option(
             "--agent-prefix", help="agent NodeSymbol prefix (default: 'a' + robot id)"
@@ -140,6 +140,9 @@ def index_options(f):
         ),
         click.option(
             "--copy", is_flag=True, help="copy track images (default: hardlink)"
+        ),
+        click.option(
+            "--events", help="Hydra event log directory (default: <run>/events)"
         ),
     ]
     for option in reversed(options):
@@ -167,6 +170,7 @@ def index(
     agent_prefix,
     max_anchor_dist,
     copy,
+    events,
     partial,
 ):
     """Build/update <RUN>/image_store from Hydra/Khronos image logs.
@@ -182,6 +186,7 @@ def index(
         hydra=hydra,
         store=store,
         dsg=dsg,
+        events=events,
         robot_id=robot_id,
         agent_prefix=agent_prefix,
         max_anchor_dist_m=max_anchor_dist,
@@ -189,6 +194,112 @@ def index(
         final=not partial,
     )
     click.echo(json.dumps(stats, indent=1))
+
+
+@cli.command()
+@click.argument("run")
+@index_options
+@click.option(
+    "--interval", type=float, default=1.0, show_default=True, help="[s] between passes"
+)
+@click.option(
+    "--settle",
+    type=float,
+    default=2.0,
+    show_default=True,
+    help="[s] the save-time files must stay unchanged before reconciling",
+)
+@click.option("--timeout", type=float, default=None, help="[s] stop after this")
+@click.option("--once", is_flag=True, help="one pass, then exit")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="tail even if another tailer follows the store (they must not both "
+    "finalize it)",
+)
+@click.option(
+    "--no-finalize",
+    is_flag=True,
+    help="never reconcile with the save-time files (live passes only)",
+)
+@click.option("--summary", help="also write the lag/pass summary (json) here")
+@click.option("-v", "--verbose", is_flag=True, help="print every pass")
+def tail(
+    run,
+    keyframes,
+    tracks,
+    hydra,
+    dsg,
+    store,
+    robot_id,
+    agent_prefix,
+    max_anchor_dist,
+    copy,
+    events,
+    interval,
+    settle,
+    timeout,
+    once,
+    force,
+    no_finalize,
+    summary,
+    verbose,
+):
+    """Index RUN live while Hydra writes it.
+
+    Follows keyframe archives, track logs and event logs; reconciles with the
+    save-time files and exits once Hydra saved (inputs default as for index)."""
+    import logging
+    import pathlib
+    import signal
+    import time
+
+    from .indexer import find_inputs, tail_active
+    from .tail import Tailer
+
+    store_dir = find_inputs(run, store=store).store
+    if tail_active(store_dir) and not force:
+        click.echo(
+            f"another tailer follows {store_dir}: nothing to do (--force to tail anyway)"
+        )
+        return
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
+    tailer = Tailer(
+        run,
+        keyframes=keyframes,
+        tracks=tracks,
+        hydra=hydra,
+        events=events,
+        store=store,
+        dsg=dsg,
+        robot_id=robot_id,
+        agent_prefix=agent_prefix,
+        max_anchor_dist_m=max_anchor_dist,
+        link="copy" if copy else "hardlink",
+        settle_s=settle,
+        finalize=not no_finalize,
+    )
+
+    def stop(*_):
+        tailer.stop()
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+
+    def on_poll(stats):
+        if verbose or stats.get("final"):
+            click.echo(json.dumps({"time": round(time.time(), 3), **stats}))
+
+    if once:
+        on_poll(tailer.poll())
+    else:
+        tailer.run(interval, timeout_s=timeout, on_poll=on_poll)
+    text = json.dumps({**tailer.summary(), "final_stats": tailer.final_stats}, indent=1)
+    if summary:
+        pathlib.Path(summary).write_text(text)
+    click.echo(text)
 
 
 def main(argv=None, prog_name: str = "hydra image-store") -> int:
