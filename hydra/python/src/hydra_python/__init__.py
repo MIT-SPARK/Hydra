@@ -32,20 +32,44 @@
 # purposes notwithstanding any copyright notation herein.
 #
 #
-"""The hydra_python package."""
+"""The hydra_python package.
 
+The compiled bindings (``_hydra_bindings``) are optional: without them (e.g. a pip
+install without Hydra, or Hydra built with ``HYDRA_ENABLE_PYTHON=OFF``) importing the
+package warns once and only the pure-python parts work, such as
+:mod:`hydra_python.image_store`.
+"""
+
+import warnings
 from contextlib import contextmanager
 
-from hydra_python._hydra_bindings import (
-    ExternalPluginConfig,
-    deinit_plugins,
-    init_plugins,
-)
 
-from ._hydra_bindings import *
-from .dataloaders import *
-from .pipeline import *
-from .simulators import *
+class BindingsNotBuiltWarning(UserWarning):
+    """The compiled Hydra bindings could not be imported."""
+
+
+#: Why the compiled bindings could not be imported (None when they are available).
+BINDINGS_ERROR = None
+
+try:
+    from hydra_python._hydra_bindings import (
+        ExternalPluginConfig,
+        deinit_plugins,
+        init_plugins,
+    )
+except ImportError as err:
+    BINDINGS_ERROR = err
+    warnings.warn(
+        f"hydra_python: compiled bindings not available ({err}); only the pure-python "
+        "parts (e.g. hydra_python.image_store) work",
+        BindingsNotBuiltWarning,
+        stacklevel=2,
+    )
+else:
+    from ._hydra_bindings import *
+    from .dataloaders import *
+    from .pipeline import *
+    from .simulators import *
 
 
 @contextmanager
@@ -53,6 +77,8 @@ def external_plugins(
     *args, allow: bool = True, verbose: bool = True, trace_allocations: bool = True
 ):
     """Context manager for external plugins."""
+    if BINDINGS_ERROR is not None:
+        raise ImportError("hydra_python bindings are not built") from BINDINGS_ERROR
     config = ExternalPluginConfig()
     config.allow = allow
     config.verbose = verbose
