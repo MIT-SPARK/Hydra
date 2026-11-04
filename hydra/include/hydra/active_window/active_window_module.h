@@ -39,6 +39,7 @@
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
+#include "hydra/common/labelspace.h"
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
@@ -68,6 +69,7 @@ class ActiveWindowModule : public Module {
   } const config;
 
   ActiveWindowModule(const Config& config,
+                     const Labelspace& labelspace,
                      const OutputQueue::Ptr& output_queue,
                      std::unique_ptr<VolumetricWindow>&& global_window);
 
@@ -107,6 +109,7 @@ class ActiveWindowModule : public Module {
 
   VolumetricMap map_;
   std::unique_ptr<VolumetricWindow> map_window_;
+  std::set<int32_t> invalid_labels_;
 };
 
 void declare_config(ActiveWindowModule::Config& config);

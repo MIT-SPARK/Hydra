@@ -49,6 +49,8 @@ class HydraRosPipeline : public HydraPipeline {
   struct Config : HydraPipeline::Config {
     //! Show the config passed to Hydra (before resolving sensor configurations)
     bool preprint_config = false;
+    //! Closed-set labelspace information
+    config::VirtualConfig<Labelspace> labelspace;
     //! Configuration for sensor inputs
     RosInputModule::Config input;
     //! Monitor to report whether or Hydra is running normally

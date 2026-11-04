@@ -21,6 +21,7 @@ pybind11_add_module(
   bindings/src/color_parser.cpp
   bindings/src/depth_parser.cpp
   bindings/src/glog_utilities.cpp
+  bindings/src/labelspace.cpp
   bindings/src/label_parser.cpp
   bindings/src/python_evaluation.cpp
   bindings/src/python_image.cpp

@@ -49,7 +49,6 @@ struct LcdDetectorTests : public ::testing::Test {
 
     config.object_extraction = SubgraphConfig(5.0);
     config.places_extraction = SubgraphConfig(5.0);
-    config.num_semantic_classes = 20;
     config.place_histogram_config = HistogramConfig<double>(0.5, 2.5, 30);
     config.agent_search_config = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
     config.objects.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
@@ -61,21 +60,21 @@ struct LcdDetectorTests : public ::testing::Test {
 };
 
 TEST_F(LcdDetectorTests, TestEmptyUpdate) {
-  LcdDetector module(config);
+  LcdDetector detector(config, 20);
   std::unordered_set<NodeId> active_places;
-  module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::PLACES));
-  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::OBJECTS));
-  EXPECT_EQ(0u, module.numAgentDescriptors());
+  detector.updateDescriptorCache(*dsg, active_places);
+  EXPECT_EQ(0u, detector.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(0u, detector.numGraphDescriptors(DsgLayers::OBJECTS));
+  EXPECT_EQ(0u, detector.numAgentDescriptors());
 }
 
 TEST_F(LcdDetectorTests, TestInvalidNodeUpdate) {
-  LcdDetector module(config);
+  LcdDetector detector(config, 20);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
-  module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::PLACES));
-  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::OBJECTS));
-  EXPECT_EQ(0u, module.numAgentDescriptors());
+  detector.updateDescriptorCache(*dsg, active_places);
+  EXPECT_EQ(0u, detector.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(0u, detector.numGraphDescriptors(DsgLayers::OBJECTS));
+  EXPECT_EQ(0u, detector.numAgentDescriptors());
 }
 
 TEST_F(LcdDetectorTests, TestNoChildren) {
@@ -85,12 +84,12 @@ TEST_F(LcdDetectorTests, TestNoChildren) {
   dsg->emplaceNode(DsgLayers::PLACES, 4, std::make_unique<NodeAttributes>());
   dsg->emplaceNode(DsgLayers::PLACES, 5, std::make_unique<NodeAttributes>());
 
-  LcdDetector module(config);
+  LcdDetector detector(config, 20);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
-  module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::PLACES));
-  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::OBJECTS));
-  EXPECT_EQ(0u, module.numAgentDescriptors());
+  detector.updateDescriptorCache(*dsg, active_places);
+  EXPECT_EQ(0u, detector.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(0u, detector.numGraphDescriptors(DsgLayers::OBJECTS));
+  EXPECT_EQ(0u, detector.numAgentDescriptors());
 }
 
 TEST_F(LcdDetectorTests, TestNoDynamicChildren) {
@@ -100,12 +99,12 @@ TEST_F(LcdDetectorTests, TestNoDynamicChildren) {
   dsg->insertEdge(1, 2);
   dsg->insertEdge(1, 3);
 
-  LcdDetector module(config);
+  LcdDetector detector(config, 20);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
-  module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::PLACES));
-  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::OBJECTS));
-  EXPECT_EQ(0u, module.numAgentDescriptors());
+  detector.updateDescriptorCache(*dsg, active_places);
+  EXPECT_EQ(0u, detector.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(0u, detector.numGraphDescriptors(DsgLayers::OBJECTS));
+  EXPECT_EQ(0u, detector.numAgentDescriptors());
 }
 
 TEST_F(LcdDetectorTests, TestActualChildren) {
@@ -128,12 +127,12 @@ TEST_F(LcdDetectorTests, TestActualChildren) {
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));
 
-  LcdDetector module(config);
+  LcdDetector detector(config, 20);
   std::unordered_set<NodeId> active_places{1};
-  module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::PLACES));
-  EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::OBJECTS));
-  EXPECT_EQ(2u, module.numAgentDescriptors());
+  detector.updateDescriptorCache(*dsg, active_places);
+  EXPECT_EQ(1u, detector.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(1u, detector.numGraphDescriptors(DsgLayers::OBJECTS));
+  EXPECT_EQ(2u, detector.numAgentDescriptors());
 }
 
 TEST_F(LcdDetectorTests, TestEmptySearch) {
@@ -145,10 +144,10 @@ TEST_F(LcdDetectorTests, TestEmptySearch) {
           10ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
       'a');
 
-  LcdDetector module(config);
+  LcdDetector detector(config, 20);
   std::unordered_set<NodeId> active_places{1};
 
-  const auto results = module.detect(*dsg, NodeSymbol('a', 0));
+  const auto results = detector.detect(*dsg, NodeSymbol('a', 0));
   EXPECT_EQ(0u, results.size());
 }
 
@@ -172,14 +171,14 @@ TEST_F(LcdDetectorTests, TestNonEmptySearch) {
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));
 
-  LcdDetector module(config);
+  LcdDetector detector(config, 20);
   std::unordered_set<NodeId> active_places{1};
-  module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::PLACES));
-  EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::OBJECTS));
-  EXPECT_EQ(2u, module.numAgentDescriptors());
+  detector.updateDescriptorCache(*dsg, active_places);
+  EXPECT_EQ(1u, detector.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(1u, detector.numGraphDescriptors(DsgLayers::OBJECTS));
+  EXPECT_EQ(2u, detector.numAgentDescriptors());
 
-  const auto results = module.detect(*dsg, NodeSymbol('a', 0));
+  const auto results = detector.detect(*dsg, NodeSymbol('a', 0));
   EXPECT_EQ(0u, results.size());
 }
 

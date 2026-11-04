@@ -32,32 +32,31 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/pipeline_queues.h"
+#pragma once
+#include <filesystem>
+#include <unordered_map>
 
-#include <glog/logging.h>
+#include "hydra/input/input_adapter.h"
 
 namespace hydra {
 
-PipelineQueues::~PipelineQueues() {
-  VLOG(2) << "backend_queue: " << backend_queue.size();
-  VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
-  VLOG(2) << "external_loop_closure_queue: " << external_loop_closure_queue.size();
-}
+class LabelRemapper : public InputAdapter {
+ public:
+  struct Config {
+    //! Path to remapping file
+    std::filesystem::path remap_path;
+    //! Default value to use when label is not in remapping
+    InputData::LabelType default_label = -1;
+  } const config;
 
-PipelineQueues& PipelineQueues::instance() {
-  if (!s_instance_) {
-    s_instance_.reset(new PipelineQueues());
-  }
+  explicit LabelRemapper(const Config& config);
+  virtual ~LabelRemapper() = default;
+  void update(InputData& packet) const override;
 
-  return *s_instance_;
-}
+ private:
+  std::unordered_map<InputData::LabelType, InputData::LabelType> label_remapping_;
+};
 
-void PipelineQueues::clear() {
-  backend_queue.clear();
-  backend_lcd_queue.clear();
-  external_loop_closure_queue.clear();
-}
-
-PipelineQueues::PipelineQueues() {}
+void declare_config(LabelRemapper::Config& config);
 
 }  // namespace hydra

@@ -41,7 +41,6 @@
 #include <spark_dsg/printing.h>
 
 #include "hydra/common/global_info.h"
-#include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontend_output.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -54,6 +53,7 @@ static const auto registration =
     config::RegistrationWithConfig<LoopClosureModule,
                                    LoopClosureModule,
                                    LoopClosureModule::Config,
+                                   Labelspace,
                                    SharedModuleState::Ptr>("LoopClosureModule");
 
 }
@@ -65,8 +65,6 @@ void declare_config(LoopClosureModule::Config& config) {
   name("LoopClosureConfig");
   base<VerbosityConfig>(config);
   field(config.detector, "lcd");
-  field(config.visualize_dsg_lcd, "visualize_dsg_lcd");
-  field(config.lcd_visualizer_ns, "lcd_visualizer_ns");
   field(config.lcd_agent_horizon_s, "lcd_agent_horizon_s");
   field(config.descriptor_creation_horizon_m, "descriptor_creation_horizon_m");
 }
@@ -75,12 +73,15 @@ LoopClosureModule::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("lcd")) {}
 
 LoopClosureModule::LoopClosureModule(const Config& config,
-                                     const SharedModuleState::Ptr& state)
+                                     const Labelspace& labelspace,
+                                     const SharedModuleState::Ptr& state,
+                                     const OutputQueue::Ptr& output)
     : config(config),
       queue_(std::make_shared<InputQueue>()),
+      output_queue_(output),
       state_(state),
       lcd_graph_(new SceneGraph()) {
-  lcd_detector_.reset(new lcd::LcdDetector(config.detector));
+  lcd_detector_.reset(new lcd::LcdDetector(config.detector, labelspace.total_labels));
 }
 
 LoopClosureModule::~LoopClosureModule() { stopImpl(); }
@@ -177,10 +178,12 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 
     auto results =
         lcd_detector_->detect(*lcd_graph_, *query_agent, attrs.timestamp.count());
-    auto& queue = PipelineQueues::instance().backend_lcd_queue;
     for (const auto& result : results) {
       // TODO(nathan) consider augmenting with gtsam key
-      queue.push(result);
+      if (output_queue_) {
+        output_queue_->push(result);
+      }
+
       LOG(WARNING) << "[Hydra LCD] Found valid loop-closure: "
                    << NodeSymbol(result.from_node).str() << " -> "
                    << NodeSymbol(result.to_node).str();

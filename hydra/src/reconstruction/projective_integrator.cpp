@@ -84,7 +84,8 @@ inline bool measurementOutsideTruncation(const MapConfig& map_config,
 
 ProjectiveIntegrator::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("projective_integrator")),
-      num_threads(GlobalInfo::instance().getConfig().default_num_threads) {}
+      num_threads(GlobalInfo::instance().getConfig().default_num_threads),
+      interpolation_method(InterpolatorAdaptive::Config{}) {}
 
 void declare_config(ProjectiveIntegrator::Config& config) {
   using namespace config;
@@ -119,10 +120,11 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   }
 }
 
-ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config)
+ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config,
+                                           const Labelspace* labelspace)
     : config(config::checkValid(config)),
       interpolator_(config.interpolation_method.create()),
-      semantic_integrator_(config.semantic_integrator.create()) {}
+      semantic_integrator_(config.semantic_integrator.create(labelspace)) {}
 
 void ProjectiveIntegrator::updateMap(const InputData& data,
                                      VolumetricMap& map,
