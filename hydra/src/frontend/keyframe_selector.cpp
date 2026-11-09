@@ -362,8 +362,16 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
                             const VolumetricWindow* window) {
   ScopedTimer timer("frontend/update_keyframes", input.timestamp_ns);
 
+  // every input, oldest first: forwarded inputs and those of the updates (interleaved
+  // if outputs were collated)
+  std::vector<InputData::ConstPtr> inputs(input.intermediate_inputs);
+  inputs.insert(inputs.end(), input.sensor_data.begin(), input.sensor_data.end());
+  std::stable_sort(inputs.begin(), inputs.end(), [](const auto& lhs, const auto& rhs) {
+    return lhs->timestamp_ns < rhs->timestamp_ns;
+  });
+
   size_t num_added = 0;
-  for (const auto& data : input.sensor_data) {
+  for (const auto& data : inputs) {
     std::string reason;
     if (policy_->shouldAdd(data, keyframes_, reason)) {
       keyframes_.push_back(data);

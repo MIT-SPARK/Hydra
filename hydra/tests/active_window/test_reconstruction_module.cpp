@@ -77,9 +77,9 @@ ReconstructionModule::Config makeConfig(bool forward) {
   return config;
 }
 
-std::vector<uint64_t> stamps(const ActiveWindowOutput& output) {
+std::vector<uint64_t> stamps(const std::vector<InputData::ConstPtr>& inputs) {
   std::vector<uint64_t> result;
-  for (const auto& data : output.sensor_data) {
+  for (const auto& data : inputs) {
     result.push_back(data->timestamp_ns);
   }
   return result;
@@ -89,59 +89,67 @@ constexpr uint64_t kSecond = 1'000'000'000;
 
 }  // namespace
 
-TEST(ReconstructionModule, ForwardsIntermediateInputsInOrder) {
-  const test::ConfigGuard guard;
+// Steps the same inputs through a module and returns its outputs
+std::vector<ActiveWindowOutput::Ptr> run(bool forward) {
   const auto sensor = makeCamera();
   auto queue = std::make_shared<ReconstructionModule::OutputQueue>();
-  ReconstructionModule module(makeConfig(true), queue, nullptr);
+  ReconstructionModule module(makeConfig(forward), queue, nullptr);
 
   // first input is always a full update
   EXPECT_TRUE(module.step(makeInput(sensor, 0)));
-  // partial updates produce no output and are held back
+  // partial updates produce no output
   EXPECT_FALSE(module.step(makeInput(sensor, kSecond / 4)));
   EXPECT_FALSE(module.step(makeInput(sensor, kSecond / 2)));
-  // the next full update carries them first (chronological), then its own input
   EXPECT_TRUE(module.step(makeInput(sensor, kSecond)));
-  // pending at stop: emitted as a last output
+  // still pending at stop: dropped
   EXPECT_FALSE(module.step(makeInput(sensor, 5 * kSecond / 4)));
-  EXPECT_FALSE(module.step(makeInput(sensor, 3 * kSecond / 2)));
   module.stop();
 
-  ASSERT_EQ(queue->size(), 3u);
-  const auto first = queue->pop();
-  EXPECT_EQ(stamps(*first), std::vector<uint64_t>({0}));
-  EXPECT_EQ(first->timestamp_ns, 0u);
-
-  const auto second = queue->pop();
-  EXPECT_EQ(stamps(*second),
-            std::vector<uint64_t>({kSecond / 4, kSecond / 2, kSecond}));
-  EXPECT_EQ(second->timestamp_ns, kSecond);
-  EXPECT_EQ(second->world_T_body().translation().norm(), 0.0);
-
-  const auto last = queue->pop();
-  EXPECT_EQ(stamps(*last), std::vector<uint64_t>({5 * kSecond / 4, 3 * kSecond / 2}));
-  EXPECT_EQ(last->timestamp_ns, 3 * kSecond / 2);
-
-  // stopping again is a no-op
-  module.stop();
-  EXPECT_EQ(queue->size(), 0u);
+  std::vector<ActiveWindowOutput::Ptr> outputs;
+  while (!queue->empty()) {
+    outputs.push_back(queue->pop());
+  }
+  return outputs;
 }
 
-TEST(ReconstructionModule, NoForwardingByDefault) {
+TEST(ReconstructionModule, ForwardsIntermediateInputsSeparately) {
   const test::ConfigGuard guard;
+  const auto outputs = run(true);
+  ASSERT_EQ(outputs.size(), 2u);
+  EXPECT_EQ(stamps(outputs[0]->sensor_data), std::vector<uint64_t>({0}));
+  EXPECT_TRUE(outputs[0]->intermediate_inputs.empty());
+
+  // the partial updates come with the next full update, oldest first, outside of
+  // sensor_data
+  EXPECT_EQ(stamps(outputs[1]->sensor_data), std::vector<uint64_t>({kSecond}));
+  EXPECT_EQ(stamps(outputs[1]->intermediate_inputs),
+            std::vector<uint64_t>({kSecond / 4, kSecond / 2}));
+  EXPECT_EQ(outputs[1]->timestamp_ns, kSecond);
+}
+
+TEST(ReconstructionModule, ForwardingKeepsSensorData) {
+  const test::ConfigGuard guard;
+  // everything but intermediate_inputs is the same as without forwarding
+  const auto with = run(true);
+  const auto without = run(false);
+  ASSERT_EQ(with.size(), without.size());
+  for (size_t i = 0; i < with.size(); ++i) {
+    EXPECT_EQ(with[i]->timestamp_ns, without[i]->timestamp_ns);
+    EXPECT_EQ(stamps(with[i]->sensor_data), stamps(without[i]->sensor_data));
+    EXPECT_TRUE(without[i]->intermediate_inputs.empty());
+  }
+}
+
+TEST(ActiveWindowOutput, CollatesIntermediateInputs) {
   const auto sensor = makeCamera();
-  auto queue = std::make_shared<ReconstructionModule::OutputQueue>();
-  ReconstructionModule module(makeConfig(false), queue, nullptr);
-
-  EXPECT_TRUE(module.step(makeInput(sensor, 0)));
-  EXPECT_FALSE(module.step(makeInput(sensor, kSecond / 2)));
-  EXPECT_TRUE(module.step(makeInput(sensor, kSecond)));
-  EXPECT_FALSE(module.step(makeInput(sensor, 3 * kSecond / 2)));
-  module.stop();
-
-  ASSERT_EQ(queue->size(), 2u);
-  EXPECT_EQ(stamps(*queue->pop()), std::vector<uint64_t>({0}));
-  EXPECT_EQ(stamps(*queue->pop()), std::vector<uint64_t>({kSecond}));
+  ActiveWindowOutput first(makeInput(sensor, 20));
+  first.intermediate_inputs.push_back(makeInput(sensor, 10));
+  ActiveWindowOutput second(makeInput(sensor, 40));
+  second.intermediate_inputs.push_back(makeInput(sensor, 30));
+  second.setMap(VolumetricMap(VolumetricMap::Config{}));
+  first.updateFrom(std::move(second), true);
+  EXPECT_EQ(stamps(first.sensor_data), std::vector<uint64_t>({20, 40}));
+  EXPECT_EQ(stamps(first.intermediate_inputs), std::vector<uint64_t>({10, 30}));
 }
 
 }  // namespace hydra

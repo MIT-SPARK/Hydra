@@ -40,6 +40,7 @@
 #include <unistd.h>
 
 #include <filesystem>
+#include <set>
 
 #include "hydra_test/shared_dsg_fixture.h"
 
@@ -184,6 +185,40 @@ TEST(KeyframeSelector, SavesAcceptedKeyframes) {
   EXPECT_TRUE(loaded->vertex_map.empty());
   EXPECT_EQ(loaded->feature.size(), 0);
 
+  std::filesystem::remove_all(log_path.parent_path());
+}
+
+TEST(KeyframeSelector, ConsidersForwardedInputsInTimeOrder) {
+  const auto log_path = makeTempDir() / "keyframes";
+  const auto sensor = makeCamera();
+
+  KeyframeSelector::Config config;
+  DistancePolicy::Config policy;
+  policy.min_pose_separation = 1.0;
+  policy.min_time_separation_s = 0.0;
+  config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
+  config.log_path = log_path;
+
+  auto dsg = test::makeSharedDsg();
+  FrontendOutput output(0, 0);
+  {
+    KeyframeSelector selector(config);
+    // two collated outputs: their updates (20, 40) and forwarded inputs (10, 30)
+    // interleave in time
+    ActiveWindowOutput msg(makeInput(sensor, 20, 0.5));
+    msg.sensor_data.push_back(makeInput(sensor, 40, 4.0));
+    msg.intermediate_inputs.push_back(makeInput(sensor, 10, 0.0));
+    msg.intermediate_inputs.push_back(makeInput(sensor, 30, 2.0));
+    selector.call(msg, *dsg, output, nullptr);
+    selector.flush();
+  }
+
+  // in time order 20 is too close to 10; out of order it would follow 30 and be kept
+  std::set<std::string> files;
+  for (const auto& entry : std::filesystem::directory_iterator(log_path)) {
+    files.insert(entry.path().filename().string());
+  }
+  EXPECT_EQ(files, std::set<std::string>({"10.zip", "30.zip", "40.zip"}));
   std::filesystem::remove_all(log_path.parent_path());
 }
 

@@ -55,6 +55,10 @@ struct ActiveWindowOutput {
   uint64_t timestamp_ns;
   //! Sensor data from last update
   std::vector<InputData::ConstPtr> sensor_data;
+  //! Inputs since the previous output that did not trigger an update (oldest first),
+  //! if the active window forwards them; only consumers that want every input (e.g.,
+  //! the keyframe selector) read them
+  std::vector<InputData::ConstPtr> intermediate_inputs;
   //! New nodes to add to the scene graph
   GraphUpdate graph_update;
   //! Archived blocks on this pass

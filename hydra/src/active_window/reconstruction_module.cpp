@@ -171,12 +171,6 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
     return nullptr;
   }
 
-  return makeOutput(data);
-}
-
-ActiveWindowOutput::Ptr ReconstructionModule::makeOutput(
-    const InputData::ConstPtr& data) {
-  const auto stamp = data->timestamp_ns;
   last_update_ns_ = stamp;
   {  // timing scope
     ScopedTimer timer("reconstruction/mesh", stamp);
@@ -184,10 +178,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::makeOutput(
   }  // timing scope
 
   auto output = std::make_shared<ActiveWindowOutput>(data);
-  // intermediate inputs come first to keep sensor_data in chronological order
-  output->sensor_data.insert(output->sensor_data.begin(),
-                             intermediate_inputs_.begin(),
-                             intermediate_inputs_.end());
+  output->intermediate_inputs = std::move(intermediate_inputs_);
   intermediate_inputs_.clear();
   if (map_window_) {
     // this comes before clearing the update flag as we don't archive updated blocks
@@ -196,38 +187,11 @@ ActiveWindowOutput::Ptr ReconstructionModule::makeOutput(
   }
 
   output->setMap(map_.cloneUpdated());
-  for (const auto& block : map_.getTsdfLayer()) {
+  for (const auto& block : tsdf) {
     block.clearUpdated();
   }
 
   return output;
-}
-
-void ReconstructionModule::stop() {
-  ActiveWindowModule::stop();
-  flushIntermediateInputs();
-}
-
-void ReconstructionModule::flushIntermediateInputs() {
-  if (intermediate_inputs_.empty()) {
-    return;
-  }
-
-  if (map_.getTsdfLayer().numBlocks() == 0) {
-    intermediate_inputs_.clear();
-    return;
-  }
-
-  // the newest pending input (already integrated) stands in for the full update
-  const auto last = intermediate_inputs_.back();
-  intermediate_inputs_.pop_back();
-  MLOG(1) << "emitting " << intermediate_inputs_.size() + 1
-          << " pending forwarded input(s) @ " << last->timestamp_ns << " [ns]";
-  const auto output = makeOutput(last);
-  Sink::callAll(sinks_, last->timestamp_ns, map_, *output);
-  if (output_queue_) {
-    output_queue_->push(output);
-  }
 }
 
 }  // namespace hydra

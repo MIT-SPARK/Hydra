@@ -48,14 +48,11 @@ class ReconstructionModule : public ActiveWindowModule {
  public:
   struct Config : ActiveWindowModule::Config {
     double full_update_separation_s = 0.0;
-    //! Pass inputs from partial updates to the next output (in
-    //! ActiveWindowOutput::sensor_data, oldest first, before the input of the full
-    //! update), e.g., for the frontend keyframe selector. Side effects downstream:
-    //! every frontend functor sees every input, so PoseGraphTracker adds denser agent
-    //! nodes (up to its own gates) and traversability integrates every frame (more
-    //! CPU), and up to one full_update_separation_s of InputData is held in memory.
-    //! Inputs still pending at stop() are emitted as one last output (the last of them
-    //! becomes the full update).
+    //! Pass the inputs of partial updates with the next output
+    //! (ActiveWindowOutput::intermediate_inputs, oldest first), e.g., for the frontend
+    //! keyframe selector. They are not in sensor_data, so the other frontend functors
+    //! (pose graph, places) see the same inputs as without forwarding. Inputs still
+    //! pending at stop() are dropped.
     bool forward_intermediate_inputs = false;
     MeshIntegrator::Config mesh;
     SensorMap<ProjectiveIntegrator>::Config tsdf;
@@ -70,17 +67,8 @@ class ReconstructionModule : public ActiveWindowModule {
 
   std::string printInfo() const override;
 
-  //! Stop the spin thread, then emit any forwarded inputs still pending
-  void stop() override;
-
  protected:
   bool shouldUpdate(uint64_t timestamp_ns) const;
-
-  //! Mesh the map and package the full update for data (with pending forwarded inputs)
-  ActiveWindowOutput::Ptr makeOutput(const InputData::ConstPtr& data);
-
-  //! Emit pending forwarded inputs as a last output (see forward_intermediate_inputs)
-  void flushIntermediateInputs();
 
   ActiveWindowOutput::Ptr spinOnce(const InputData::Ptr& input) override;
 
