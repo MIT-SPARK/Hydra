@@ -44,8 +44,10 @@ Conventions:
   `min_pose_separation` and `max_time_separation_s`). By default the selector only sees
   the input of each full update; with Hydra `ReconstructionModule.forward_intermediate_inputs`
   or Khronos `ActiveWindow.forward_intermediate_inputs` (both default `false`) it sees
-  every input. Forwarded inputs still pending at stop are emitted with a last output
-  (Hydra) or the final `finishMapping` output (Khronos).
+  every input. Forwarded inputs travel in `ActiveWindowOutput::intermediate_inputs`, which
+  only the selector reads: the pose graph, places and the other functors see the same
+  inputs as without forwarding. Inputs still pending at stop are dropped (Hydra) or go
+  with the final `finishMapping` output (Khronos).
 - `max_active_keyframes` (default 50, 0 = unbounded) caps the keyframes held in memory;
   the oldest are evicted (they are already saved). `max_queue_size` (default 100,
   0 = unbounded) caps the keyframes waiting to be written; when it is full, keyframes are
