@@ -373,39 +373,53 @@ def _load_json(path: pathlib.Path):
         return json.load(f)
 
 
-def _matrix(values) -> np.ndarray | None:
-    if values is None:
+def _track_pose(node) -> np.ndarray | None:
+    """4x4 pose of a ``track.json`` ``world_T_body`` (``{translation_m, rotation_wxyz}``,
+    the keyframe archives' layout); null entries (non-finite values) become NaN."""
+    from .codec import pose_matrix, quat_to_rot
+
+    if node is None:
         return None
-    arr = np.asarray(values, dtype=float)
-    return arr.reshape(4, 4) if arr.size == 16 else None
+    p = np.asarray(node["translation_m"], dtype=float).reshape(3)
+    w, x, y, z = np.asarray(node["rotation_wxyz"], dtype=float).reshape(4)
+    return pose_matrix(p, quat_to_rot(w, x, y, z))
 
 
-def _track_observation(obs: dict):
-    """``(obs, sensor, timestamp_ns, kept, mask_rle)`` of a ``track.json`` observation
-    (FORMAT.md §2); raises ``KeyError`` / ``ValueError`` / ``TypeError`` when malformed."""
-    from .inputdata import SensorInfo
+def _load_track_sensors(tracks_dir: pathlib.Path) -> dict:
+    """Sensors of a track log by name, from ``<tracks>/sensors.yaml`` (FORMAT.md §2;
+    each record is the ``sensor`` entry of a keyframe archive's metadata.yaml)."""
+    from .inputdata import _yaml, sensor_from_record
 
+    path = tracks_dir / "sensors.yaml"
+    if not path.is_file():
+        return {}
+    data = _yaml().safe_load(path.read_text()) or {}
+    return {str(r["name"]): sensor_from_record(r) for r in data.get("sensors") or []}
+
+
+def _track_observation(obs: dict, sensors: dict):
+    """``(obs, sensor, timestamp_ns, kept, mask_rle, world_T_body)`` of a ``track.json``
+    observation (FORMAT.md §2); raises ``KeyError`` / ``ValueError`` / ``TypeError``
+    when malformed or when its sensor is not in ``sensors``."""
     keys = ("world_T_body", "bbox_2d", "score", "color", "depth", "mask")
     missing = [k for k in keys if k not in obs]  # required, possibly null
     if missing:
         raise KeyError(f"observation without {missing}")
-    s = obs["sensor"]
-    body_T_sensor = _matrix(s["body_T_sensor"])
-    info = SensorInfo(
-        name=str(s["name"]),
-        width=int(s["width"]),
-        height=int(s["height"]),
-        # null for non-pinhole sensors
-        fx=float(s["fx"] or 0),
-        fy=float(s["fy"] or 0),
-        cx=float(s["cx"] or 0),
-        cy=float(s["cy"] or 0),
-        body_T_sensor=np.eye(4) if body_T_sensor is None else body_T_sensor,
-    )
+    name = obs["sensor"]
+    if not isinstance(name, str):
+        raise TypeError(f"sensor must be a name, got {type(name).__name__}")
+    if name not in sensors:
+        raise KeyError(f"sensor {name!r} not in sensors.yaml")
+    info = sensors[name]
+    size = obs.get("image_size")
+    if (not info.width or not info.height) and size:
+        # sensors other than cameras have no image size in their record
+        info = dataclasses.replace(info, width=int(size[0]), height=int(size[1]))
     rle = obs["mask_rle"]
     if rle is not None and not isinstance(rle, str):
         raise TypeError(f"mask_rle must be a string or null, got {type(rle).__name__}")
-    return obs, info, int(obs["timestamp_ns"]), bool(obs["kept"]), rle or None
+    pose = _track_pose(obs["world_T_body"])
+    return obs, info, int(obs["timestamp_ns"]), bool(obs["kept"]), rle or None, pose
 
 
 def _sig(path: pathlib.Path) -> list[int]:
@@ -614,6 +628,7 @@ class _Indexer:
         if tr_dir is None or not tr_dir.is_dir():
             return tracks
         link = self.opts["link"]
+        sensors = None  # loaded with the first track to index
         for d in sorted(tr_dir.iterdir(), key=lambda p: p.name):
             tj = d / "track.json"
             if not d.is_dir() or not tj.is_file():
@@ -632,7 +647,11 @@ class _Indexer:
                         data["robot_id"],
                         self.robot,
                     )
-                observations = [_track_observation(o) for o in data["observations"]]
+                if sensors is None:
+                    sensors = _load_track_sensors(tr_dir)
+                observations = [
+                    _track_observation(o, sensors) for o in data["observations"]
+                ]
                 info = {
                     "sig": sig,
                     "track_id": track_id,
@@ -646,7 +665,7 @@ class _Indexer:
                 continue
             with self.w.batch():
                 self._delete_track(track_id)
-                for obs, info_s, ts, kept, rle in observations:
+                for obs, info_s, ts, kept, rle, pose in observations:
                     sid = self.sensor_id(info_s)
 
                     def existing(key, obs=obs, kept=kept, d=d):
@@ -664,7 +683,7 @@ class _Indexer:
                         sid,
                         ts,
                         kind=FrameKind.OBSERVATION,
-                        world_T_body_odom=_matrix(obs["world_T_body"]),
+                        world_T_body_odom=pose,
                         rgb=existing("color"),
                         depth=existing("depth"),
                         link=link,

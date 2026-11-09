@@ -8,6 +8,7 @@ Files written by the C++ writers' own gtests (not hand-made):
 - tracks/12                  khronos test_khronos TrackLogger.WritesTrackAndKeptImages
 - tracks/{4,5}               khronos test_khronos TrackLogger.LogsFailedExtraction
 - tracks/8                   khronos test_khronos TrackLogger.NonFiniteValuesAreNull
+- tracks/sensors.yaml       the sensor record the TrackLogger tests write (the same in all)
 
 The tests delete their temp dirs; they were kept with an LD_PRELOAD shim that makes
 std::filesystem::remove_all a no-op (regenerate.sh), run against the

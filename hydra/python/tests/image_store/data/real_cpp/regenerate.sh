@@ -27,4 +27,8 @@ cp "$tmp"/out/hydra-keyframes-*/on/*.zip "$here/keyframes_features/"
 for d in "$tmp"/out/khronos-tracks-*/tracks/* "$tmp"/out/khronos-tracks-*/[0-9]*; do
   [ -f "$d/track.json" ] && cp -r "$d" "$here/tracks/"
 done
+# every test logs the same sensor; keep one sensors.yaml
+for f in "$tmp"/out/khronos-tracks-*/tracks/sensors.yaml "$tmp"/out/khronos-tracks-*/sensors.yaml; do
+  [ -f "$f" ] && cp "$f" "$here/tracks/sensors.yaml" && break
+done
 rm -rf "$tmp"

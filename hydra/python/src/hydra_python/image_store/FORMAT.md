@@ -54,6 +54,7 @@ Conventions:
 ## 2. Object tracks: Khronos `active_window.track_logger.log_path`
 
 ```
+<log_path>/sensors.yaml                   # every sensor the tracks reference
 <log_path>/<track_id>/track.json
 <log_path>/<track_id>/obs_<k>_color.jpg   # kept observations only
 <log_path>/<track_id>/obs_<k>_depth.png   # uint16 millimetres, kept only, with save_depth
@@ -64,11 +65,23 @@ extraction (rewritten if the track is logged again):
 ```json
 {"version": 1, "robot_id": 0, "track_id": 12, "absorbed_track_ids": [7, 9], "extracted": true,
  "semantic_label": 3, "observations": [
-   {"k": 0, "timestamp_ns": 0, "world_T_body": [16], "sensor": {"name": "camera",
-     "width": 640, "height": 480, "fx": 0, "fy": 0, "cx": 0, "cy": 0, "body_T_sensor": [16]},
+   {"k": 0, "timestamp_ns": 0,
+    "world_T_body": {"translation_m": [x, y, z], "rotation_wxyz": [w, x, y, z]},
+    "sensor": "camera", "image_size": [640, 480],
     "bbox_2d": [u_min, v_min, u_max, v_max], "mask_rle": null,
     "score": 0.0, "kept": true, "color": "obs_0_color.jpg", "depth": "obs_0_depth.png",
     "mask": "obs_0_mask.png"}]}
+```
+`sensors.yaml` holds one record per sensor, the same record as the `sensor` entry of a
+keyframe archive's `metadata.yaml` (`hydra::input::writeSensor`: `Sensor::dump()` with
+the extrinsics as parameters); it is written before the first `track.json` that
+references the sensor:
+```yaml
+version: 1
+sensors:
+  - name: camera
+    config: {type: camera, width: 640, height: 480, fx: 0, fy: 0, cx: 0, cy: 0,
+             extrinsics: {type: param, body_R_sensor: {w, x, y, z}, body_p_sensor: [x, y, z]}, ...}
 ```
 - `robot_id` is `GlobalInfo::getRobotPrefix().id` of the Khronos process.
 - `absorbed_track_ids`: tracks Khronos merged into this one; the frontend only sees
@@ -92,10 +105,13 @@ extraction (rewritten if the track is logged again):
   mask PNG), when the mask is empty or with `save_mask_rle: false`. `bbox_2d` is in
   pixels, inclusive, `null` if the mask is empty.
 - Every key shown above is always written (`null` where it does not apply); the indexer
-  skips a `track.json` without one.
-- For non-pinhole sensors `fx/fy/cx/cy` are `null` and `width/height` are the image size.
+  skips a `track.json` without one, or whose `sensor` is not in `sensors.yaml`.
+- `world_T_body` has the layout of the keyframe metadata; non-finite values are `null`.
+- `image_size` (`[width, height]`, `null` without an image) is the size of the image the
+  mask and `bbox_2d` refer to; the indexer uses it when the sensor record has no size
+  (sensors other than cameras).
 - `obs_<k>_color.jpg` is a normal JPEG (true colours in the file), full image size.
-  `sensor.name` equals the `InputData` sensor name of section 1.
+  `sensor` equals the `InputData` sensor name of section 1.
 - Config (`active_window.track_logger`): `log_path` (empty = off),
   `max_images_per_object: 1`, `score: segment_size | bbox_volume`, `save_depth: false`,
   `save_mask_rle: true`, `keep_images_of_dropped_tracks: false`, `jpeg_quality: 95`,

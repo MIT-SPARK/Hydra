@@ -695,8 +695,9 @@ def test_robot_id_from_track_logs(tmp_path):
 
 
 def test_null_fields_from_cpp(run):
-    """Non-pinhole sensor (null intrinsics), null semantic label, empty mask (null
-    bbox and mask_rle), mask_rle string for a non-kept observation."""
+    """Non-pinhole sensor (no intrinsics or size in its record: the size comes from
+    the observation's image_size), null semantic label, empty mask (null bbox and
+    mask_rle), mask_rle string for a non-kept observation."""
     R.write_track(
         run / "tracks",
         40,
@@ -707,14 +708,16 @@ def test_null_fields_from_cpp(run):
                 "kept": False,
                 "bbox": None,
                 "mask": np.zeros((R.H, R.W), bool),
-                "sensor": {
-                    "name": "lidar",
-                    "fx": None,
-                    "fy": None,
-                    "cx": None,
-                    "cy": None,
-                    "body_T_sensor": None,
-                },
+                "sensor": R.sensor_record(
+                    "lidar",
+                    type="lidar",
+                    width=None,
+                    height=None,
+                    fx=None,
+                    fy=None,
+                    cx=None,
+                    cy=None,
+                ),
             },
             {"ts": ts(2.3), "T": R.odom(2.3), "kept": False, "mask_rle": "[5,1,186]"},
         ],
@@ -737,6 +740,9 @@ def test_null_fields_from_cpp(run):
         lambda d: d.pop("robot_id"),
         lambda d: d.pop("absorbed_track_ids"),
         lambda d: d["observations"][0].pop("sensor"),
+        lambda d: d["observations"][0].update(sensor="unknown"),  # not in sensors.yaml
+        lambda d: d["observations"][0].update(sensor={"name": "camera"}),  # not a name
+        lambda d: d["observations"][0]["world_T_body"].pop("rotation_wxyz"),
     ],
 )
 def test_malformed_track_log_is_skipped(run, broken):
@@ -795,6 +801,9 @@ def test_real_cpp_artifacts(tmp_path):
         (o8,) = store.track_observations(0, 8)
         assert o8.kept  # shares track 12's frame at 10 ns (same sensor and stamp)
         assert {c.name for c in store.sensors()} == {"camera", "test_camera"}
+        # the track log's sensor comes from its sensors.yaml (hydra::input::writeSensor)
+        calib = {c.name: c for c in store.sensors()}["test_camera"]
+        assert (calib.fx, calib.cy, calib.width, calib.height) == (10, 1.5, 4, 3)
 
 
 # --- bindings, aliases and archive names ----------------------------------------

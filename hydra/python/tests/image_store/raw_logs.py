@@ -135,35 +135,11 @@ def write_input_zip(
             add("depth", ".exr", depth, exr + [cv.IMWRITE_EXR_COMPRESSION, 0])
         else:
             add("depth", ".tiff", depth)
-    T = np.asarray(world_T_body, float)
     meta = {
         "version": 1,
         "timestamp_ns": int(timestamp_ns),
-        "world_T_body": {
-            "translation_m": [float(v) for v in T[:3, 3]],
-            "rotation_wxyz": _quat_wxyz(T[:3, :3]),
-        },
-        "sensor": {
-            "name": sensor,
-            "config": {
-                "type": "camera",
-                "min_range": 0.1,
-                "max_range": float("inf"),
-                "static_mask_fp": "",
-                "extrinsics": {
-                    "type": "param",
-                    "body_R_sensor": dict(BODY_Q_SENSOR),
-                    "body_p_sensor": list(BODY_P_SENSOR),
-                },
-                "invalid_labels": [],
-                "width": W,
-                "height": H,
-                "cx": CX,
-                "cy": CY,
-                "fx": FX,
-                "fy": FY,
-            },
-        },
+        "world_T_body": pose_record(world_T_body),
+        "sensor": sensor_record(sensor),
         "points_in_world_frame": False,
         "min_range_m": 0.0,
         "max_range_m": float("inf"),
@@ -185,17 +161,55 @@ def write_input_zip(
     return path
 
 
-def sensor_json(name="camera"):
+def pose_record(T):
+    """``{translation_m, rotation_wxyz}`` (keyframe metadata and track.json poses);
+    NaN entries become null as in the C++ writers."""
+    T = np.asarray(T, float)
+
+    def num(v):
+        return float(v) if np.isfinite(v) else None
+
     return {
-        "name": name,
+        "translation_m": [num(v) for v in T[:3, 3]],
+        "rotation_wxyz": [num(v) for v in _quat_wxyz(T[:3, :3])],
+    }
+
+
+def sensor_record(name="camera", **config):
+    """``hydra::input::writeSensor`` of the test camera (``config`` overrides fields; a
+    ``None`` value removes one): the ``sensor`` entry of a keyframe archive's
+    metadata.yaml and one entry of a track log's sensors.yaml."""
+    base = {
+        "type": "camera",
+        "min_range": 0.1,
+        "max_range": float("inf"),
+        "static_mask_fp": "",
+        "extrinsics": {
+            "type": "param",
+            "body_R_sensor": dict(BODY_Q_SENSOR),
+            "body_p_sensor": list(BODY_P_SENSOR),
+        },
+        "invalid_labels": [],
         "width": W,
         "height": H,
-        "fx": FX,
-        "fy": FY,
         "cx": CX,
         "cy": CY,
-        "body_T_sensor": body_T_sensor().reshape(16).tolist(),
+        "fx": FX,
+        "fy": FY,
     }
+    base.update(config)
+    return {"name": name, "config": {k: v for k, v in base.items() if v is not None}}
+
+
+def write_sensors(tracks_dir, *records):
+    """Add sensor records to ``<tracks>/sensors.yaml`` (the track logger writes each
+    sensor once, before the first track that references it)."""
+    path = pathlib.Path(tracks_dir) / "sensors.yaml"
+    known = yaml.safe_load(path.read_text())["sensors"] if path.exists() else []
+    names = {r["name"] for r in known}
+    known += [r for r in records if r["name"] not in names]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump({"version": 1, "sensors": known}))
 
 
 def write_track(
@@ -210,7 +224,8 @@ def write_track(
 ):
     """A Khronos track log as khronos' TrackLogger writes it; ``observations`` are dicts
     with ``ts``, ``T`` and ``kept`` (optional ``score``, ``bbox`` (None = empty mask),
-    ``mask`` bool HxW, ``mask_rle``, ``sensor`` dict overrides)."""
+    ``mask`` bool HxW, ``mask_rle``, ``sensor`` record from :func:`sensor_record`,
+    ``image_size`` [w, h] or None). Sensors go to ``<tracks>/sensors.yaml``."""
     from hydra_python.image_store import rle_encode
 
     cv = _cv2()
@@ -218,11 +233,14 @@ def write_track(
     d.mkdir(parents=True, exist_ok=True)
     obs_json = []
     for k, o in enumerate(observations):
+        sensor = o.get("sensor") or sensor_record()
+        write_sensors(tracks_dir, sensor)
         entry = {
             "k": k,
             "timestamp_ns": int(o["ts"]),
-            "world_T_body": np.asarray(o["T"], float).reshape(16).tolist(),
-            "sensor": {**sensor_json(), **o.get("sensor", {})},
+            "world_T_body": pose_record(o["T"]),
+            "sensor": sensor["name"],
+            "image_size": o.get("image_size", [W, H]),
             "bbox_2d": None
             if o.get("bbox", 0) is None
             else list(o.get("bbox", [2, 3, 9, 8])),

@@ -9,51 +9,24 @@
     {
       "k": 0,
       "timestamp_ns": 10,
-      "world_T_body": [
-        1,
-        0,
-        0,
-        null,
-        0,
-        1,
-        0,
-        null,
-        0,
-        0,
-        1,
-        3,
-        0,
-        0,
-        0,
-        1
-      ],
-      "sensor": {
-        "name": "test_camera",
-        "width": 4,
-        "height": 3,
-        "fx": 10,
-        "fy": 10,
-        "cx": 2,
-        "cy": 1.5,
-        "body_T_sensor": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
+      "world_T_body": {
+        "translation_m": [
+          null,
+          null,
+          3.0
+        ],
+        "rotation_wxyz": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
         ]
       },
+      "sensor": "test_camera",
+      "image_size": [
+        4,
+        3
+      ],
       "bbox_2d": [
         1,
         1,
@@ -61,7 +34,7 @@
         1
       ],
       "mask_rle": null,
-      "score": 1,
+      "score": 1.0,
       "kept": true,
       "color": "obs_0_color.jpg",
       "depth": null,

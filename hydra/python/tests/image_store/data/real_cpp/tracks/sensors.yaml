@@ -1,0 +1,24 @@
+---
+version: 1
+sensors:
+  - name: test_camera
+    config:
+      type: camera
+      min_range: 0.01
+      max_range: 100
+      static_mask_fp: ''
+      extrinsics:
+        type: param
+        body_R_sensor:
+          w: 1
+          x: 0
+          y: 0
+          z: 0
+        body_p_sensor: [0, 0, 0]
+      invalid_labels: []
+      width: 4
+      height: 3
+      cx: 2
+      cy: 1.5
+      fx: 10
+      fy: 10
