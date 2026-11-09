@@ -40,6 +40,7 @@
 
 #include <ctime>
 #include <filesystem>
+#include <fstream>
 
 namespace hydra {
 
@@ -114,6 +115,23 @@ DataDirectory DataDirectory::child(const std::string& sub_path) const {
   Config new_config = config;
   new_config.overwrite = false;  // no need to clear children
   return DataDirectory(sub_path, new_config);
+}
+
+void writeFileAtomic(const std::filesystem::path& filepath,
+                     const std::string& contents) {
+  auto tmp_path = filepath;
+  tmp_path += ".tmp";
+  {
+    std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
+    out << contents;
+    out.close();
+    if (!out) {
+      std::filesystem::remove(tmp_path);
+      throw std::runtime_error("failed to write '" + tmp_path.string() + "'");
+    }
+  }
+
+  std::filesystem::rename(tmp_path, filepath);
 }
 
 bool DataDirectory::valid() const { return valid_; }

@@ -181,28 +181,6 @@ cv::Mat readImage(const std::string& name,
   return image;
 }
 
-YAML::Node writeSensor(const Sensor& sensor) {
-  auto node = sensor.dump();
-  if (!node["type"] || node["type"].as<std::string>().empty()) {
-    throw std::runtime_error("sensor dump must include its registered factory type");
-  }
-
-  ParamSensorExtrinsics::Config extrinsics;
-  const auto transform = sensor.body_T_sensor();
-  extrinsics.body_p_sensor = transform.translation();
-  extrinsics.body_R_sensor = Eigen::Quaterniond(transform.rotation());
-  node["extrinsics"] =
-      config::toYaml(config::VirtualConfig<SensorExtrinsics>(extrinsics));
-
-  // The effective mask is an archive entry, never a dependency on an external path.
-  node["static_mask_fp"] = "";
-
-  YAML::Node record;
-  record["name"] = sensor.name;
-  record["config"] = node;
-  return record;
-}
-
 Sensor::Ptr readSensor(const YAML::Node& record, const cv::Mat& mask) {
   const auto node = record["config"];
   if (!node["extrinsics"] || node["extrinsics"]["type"].as<std::string>() != "param" ||
@@ -268,6 +246,28 @@ void readMetadata(const YAML::Node& record, InputData& input) {
 
 }  // namespace
 
+YAML::Node writeSensor(const Sensor& sensor) {
+  auto node = sensor.dump();
+  if (!node["type"] || node["type"].as<std::string>().empty()) {
+    throw std::runtime_error("sensor dump must include its registered factory type");
+  }
+
+  ParamSensorExtrinsics::Config extrinsics;
+  const auto transform = sensor.body_T_sensor();
+  extrinsics.body_p_sensor = transform.translation();
+  extrinsics.body_R_sensor = Eigen::Quaterniond(transform.rotation());
+  node["extrinsics"] =
+      config::toYaml(config::VirtualConfig<SensorExtrinsics>(extrinsics));
+
+  // The effective mask is an archive entry, never a dependency on an external path.
+  node["static_mask_fp"] = "";
+
+  YAML::Node record;
+  record["name"] = sensor.name;
+  record["config"] = node;
+  return record;
+}
+
 void writeInputData(const InputData& input,
                     const io::WriteEntry& write,
                     const SaveOptions& opts) {
@@ -277,12 +277,15 @@ void writeInputData(const InputData& input,
   auto images = record["images"];
   writeImage("color", ".png", opts, input.color_image, write, images);
   writeImage("color_mask", ".png", opts, input.color_mask, write, images);
-  writeImage("depth", ".exr", opts, input.depth_image, write, images);
-  writeImage("range", ".exr", opts, input.range_image, write, images);
+  // Single-channel float images are TIFF (the archive compresses them). OpenCV
+  // cannot round-trip multi-channel float TIFF, so the vertex map stays EXR.
+  writeImage("depth", ".tiff", opts, input.depth_image, write, images);
+  writeImage("range", ".tiff", opts, input.range_image, write, images);
   writeImage("labels", ".tiff", opts, input.label_image, write, images);
   writeImage("instances", ".tiff", opts, input.instance_image, write, images);
   writeImage("vertices", ".exr", opts, input.vertex_map, write, images);
-  writeImage("traversability", ".exr", opts, input.traversability_image, write, images);
+  writeImage(
+      "traversability", ".tiff", opts, input.traversability_image, write, images);
 
   const auto& mask = input.getSensor().getStaticMask();
   writeImage("sensor_mask", ".png", opts, mask, write, images);

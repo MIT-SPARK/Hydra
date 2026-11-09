@@ -51,6 +51,9 @@ const VolumetricMap& ActiveWindowOutput::map() const {
 void ActiveWindowOutput::updateFrom(ActiveWindowOutput&& msg, bool clone_map) {
   timestamp_ns = msg.timestamp_ns;
   sensor_data.insert(sensor_data.end(), msg.sensor_data.begin(), msg.sensor_data.end());
+  intermediate_inputs.insert(intermediate_inputs.end(),
+                             msg.intermediate_inputs.begin(),
+                             msg.intermediate_inputs.end());
   // TODO(nathan) incorrect behavior if we add in one update but then archive in another
   archived.insert(archived.end(), msg.archived.begin(), msg.archived.end());
 

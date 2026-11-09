@@ -70,4 +70,11 @@ class DataDirectory {
 
 void declare_config(DataDirectory::Config& config);
 
+/**
+ * @brief Write contents to a temporary file next to filepath and rename it into place
+ * @throws std::runtime_error on failure
+ */
+void writeFileAtomic(const std::filesystem::path& filepath,
+                     const std::string& contents);
+
 }  // namespace hydra
