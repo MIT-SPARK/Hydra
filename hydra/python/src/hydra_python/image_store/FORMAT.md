@@ -31,8 +31,12 @@ Conventions:
   others are cleared on a shallow copy. Names: `color`, `color_mask`, `depth`, `range`,
   `labels`, `instances`, `vertices`, `traversability`, `features`. `metadata.yaml`
   (pose, sensor, timestamp) is always present. The archive has no robot id.
-- `save_options` sets the encoding (`InputData::SaveOptions`); float images (depth) are
-  zip-compressed by default.
+- `save_options` sets the encoding (`InputData::SaveOptions`). Colour is a PNG;
+  single-channel float images (depth in metres, range, traversability) are float32 TIFF,
+  which OpenCV writes uncompressed and the archive deflates (`archive_compression`). The
+  vertex map stays EXR (OpenCV cannot round-trip multi-channel float TIFF).
+  Archives from older Hydra versions hold `depth.exr` instead; readers dispatch on the
+  file name in `metadata.yaml`.
 - Descriptors (optional): with `features` in `save_fields` the metadata's `feature`
   (`InputData::feature`) and `label_features` (`[{label, feature}]`) are filled;
   otherwise both are `[]`.

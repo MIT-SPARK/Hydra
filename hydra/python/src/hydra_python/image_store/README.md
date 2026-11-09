@@ -74,11 +74,9 @@ What it produces:
   and depth as uint16 mm `<stem>_depth.png` (`depth_scale` 0.001; NaN/inf -> 0). Hydra's
   colour Mat is RGB and OpenCV writes it to the archive's PNG unconverted; the indexer
   decodes it back to RGB and writes a normal JPEG (quality 90; depth PNG zlib level 1).
-  Images are read and written with `imageio`. Depth is a float32 EXR, read by
-  `hydra_python.image_store.exr` (pure numpy): no imageio backend reads EXR out of the
-  box (its `opencv` plugin needs `OPENCV_IO_ENABLE_OPENEXR=1` before `cv2` is imported,
-  which a library cannot guarantee; `freeimage` needs a binary download). EXR encodings
-  Hydra does not write (PIZ, B44, tiled, ...) fall back to imageio's `opencv` plugin.
+  Images are read and written with `imageio`; depth is a float32 TIFF. Archives from
+  before Hydra wrote TIFF hold `depth.exr`, which only imageio's `opencv` plugin reads
+  (OpenCV installed and `OPENCV_IO_ENABLE_OPENEXR=1` set before `cv2` is imported).
 - **Track observations** -> OBSERVATION frames (kind 2), or the KEYFRAME frame of the same
   sensor and stamp, and `observations` rows, kept and not kept. Kept ones reference the
   logged colour/depth/mask files (hardlinked into the store, `--copy` to copy).
@@ -220,6 +218,7 @@ cd hydra/python && python -m pytest tests/image_store   # do not source ROS (PYT
 ```
 
 The indexer tests also need `opencv-python-headless`: they encode archives and track logs
-exactly as Hydra's `input_data_io.cpp` and Khronos' track logger do (OpenCV, with
-`OPENCV_IO_ENABLE_OPENEXR=1` set in `conftest.py`). `data/real_cpp/` holds files written
-by the C++ writers' own tests. spark_dsg (`numpy<2` for the PyPI wheel) is optional.
+exactly as Hydra's `input_data_io.cpp` and Khronos' track logger do (OpenCV;
+`conftest.py` sets `OPENCV_IO_ENABLE_OPENEXR=1` for the legacy EXR tests).
+`data/real_cpp/` holds files written by the C++ writers' own tests. spark_dsg (`numpy<2`
+for the PyPI wheel) is optional.

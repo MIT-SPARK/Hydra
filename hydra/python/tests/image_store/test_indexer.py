@@ -15,6 +15,7 @@ import json
 import os
 import pathlib
 import shutil
+import zipfile
 
 import imageio.v3 as iio
 import numpy as np
@@ -30,7 +31,7 @@ from hydra_python.image_store.cli import main as cli_main
 from hydra_python.image_store.indexer import index, is_indexed, load_agent_nodes
 
 cv2 = pytest.importorskip("cv2")
-pytest.importorskip("yaml")
+yaml = pytest.importorskip("yaml")
 
 import raw_logs as R  # noqa: E402 (after the importorskip calls)
 
@@ -60,25 +61,19 @@ def frame_at(store, t):
 # --- readers ------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("comp", ["NO", "RLE", "ZIP", "ZIPS"])
-def test_exr_reader_matches_opencv(comp):
-    from hydra_python.image_store.exr import read_exr
+def test_tiff_depth_matches_opencv():
+    """Float32 depth as OpenCV's TIFF encoder writes it decodes bit-exactly with
+    imageio (NaN, inf and -0 included)."""
+    from hydra_python.image_store.inputdata import decode_tiff
 
     rng = np.random.default_rng(1)
     d = (rng.random((37, 23)) * 5).astype(np.float32)
-    d[0, 0], d[1, 1], d[5, :] = np.nan, np.inf, 2.0
-    ok, buf = cv2.imencode(
-        ".exr",
-        d,
-        [
-            cv2.IMWRITE_EXR_TYPE,
-            cv2.IMWRITE_EXR_TYPE_FLOAT,
-            cv2.IMWRITE_EXR_COMPRESSION,
-            getattr(cv2, f"IMWRITE_EXR_COMPRESSION_{comp}"),
-        ],
-    )
+    d[0, 0], d[1, 1], d[2, 2], d[3, 3], d[5, :] = np.nan, np.inf, -np.inf, -0.0, 2.0
+    ok, buf = cv2.imencode(".tiff", d)
     assert ok
-    np.testing.assert_array_equal(read_exr(buf.tobytes()), d)
+    out = decode_tiff(buf.tobytes())
+    assert out.dtype == np.float32
+    np.testing.assert_array_equal(out.view(np.uint32), d.view(np.uint32))
 
 
 def test_read_input_zip(tmp_path):
@@ -553,21 +548,36 @@ assert "cv2" not in {{k for k, v in sys.modules.items() if v is not None}}
     assert out.returncode == 0, out.stderr
 
 
-def test_exr_fallback_reads_other_encodings(tmp_path):
-    """EXR encodings Hydra never writes (here PIZ) go through imageio's opencv plugin,
-    in OpenCV's channel order like read_exr."""
-    from hydra_python.image_store.exr import UnsupportedExr, read_exr
-    from hydra_python.image_store.inputdata import decode_exr
+def test_legacy_exr_depth(tmp_path):
+    """Archives from before Hydra wrote TIFF hold depth.exr: read through imageio's
+    opencv plugin, in OpenCV's channel order."""
+    from hydra_python.image_store.inputdata import decode_exr, read_input_zip
 
-    params = [cv2.IMWRITE_EXR_COMPRESSION, cv2.IMWRITE_EXR_COMPRESSION_PIZ]
-    depth = np.random.default_rng(0).uniform(0.1, 9, (6, 8)).astype(np.float32)
-    ok, buf = cv2.imencode(".exr", depth, params)
-    with pytest.raises(UnsupportedExr):
-        read_exr(buf.tobytes())
-    np.testing.assert_array_equal(decode_exr(buf.tobytes()), depth)
+    depth = np.random.default_rng(0).uniform(0.1, 9, (R.H, R.W)).astype(np.float32)
+    path = R.write_input_zip(
+        tmp_path / "7.zip", 7, np.eye(4), depth=depth, legacy_exr=True
+    )
+    np.testing.assert_array_equal(read_input_zip(path).depth, depth)
     bgr = np.random.default_rng(1).uniform(0, 1, (6, 8, 3)).astype(np.float32)
-    ok, buf = cv2.imencode(".exr", bgr, params)
+    ok, buf = cv2.imencode(".exr", bgr)
     np.testing.assert_array_equal(decode_exr(buf.tobytes()), bgr)
+
+
+def test_unknown_image_extension_is_rejected(tmp_path):
+    from hydra_python.image_store.inputdata import read_input_zip
+
+    path = R.write_input_zip(tmp_path / "7.zip", 7, np.eye(4), depth=R.depth_m(2.0))
+    with zipfile.ZipFile(path) as zf:
+        entries = {n: zf.read(n) for n in zf.namelist()}
+    meta = yaml.safe_load(entries.pop("metadata.yaml"))
+    meta["images"]["depth"]["file"] = "depth.jp2"
+    entries["depth.jp2"] = entries.pop("depth.tiff")
+    entries["metadata.yaml"] = yaml.safe_dump(meta).encode()
+    with zipfile.ZipFile(path, "w") as zf:
+        for name, data in entries.items():
+            zf.writestr(name, data)
+    with pytest.raises(ValueError, match="unsupported image file"):
+        read_input_zip(path)
 
 
 # --- reconciliation with the C++ writers (FORMAT.md "[C++ writer]") -------------------

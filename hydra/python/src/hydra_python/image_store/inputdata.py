@@ -6,9 +6,12 @@ by ``hydra/src/input/input_data_io.cpp``:
 - ``color.png``  ``CV_8UC3`` holding **RGB** (Hydra's ``InputData::color_image``
   convention; OpenCV encodes the Mat as if it were BGR, so the PNG file itself has its
   red and blue channels swapped)
-- ``depth.exr``  ``CV_32FC1`` planar depth in metres (see :mod:`hydra_python.image_store.exr`)
-- ``color_mask.png``, ``range.exr``, ``labels.tiff``, ``instances.tiff``,
-  ``vertices.exr``, ``traversability.exr``, ``sensor_mask.png`` (ignored here)
+- ``depth.tiff``  ``CV_32FC1`` depth in metres (uncompressed TIFF; the archive deflates it)
+- ``color_mask.png``, ``range.tiff``, ``labels.tiff``, ``instances.tiff``,
+  ``vertices.exr``, ``traversability.tiff``, ``sensor_mask.png`` (ignored here)
+
+Archives written before Hydra switched its float images to TIFF hold ``depth.exr``
+instead; :func:`decode_exr` reads those through imageio's ``opencv`` plugin.
 
 ``metadata.yaml``::
 
@@ -33,7 +36,6 @@ import imageio.v3 as iio
 import numpy as np
 
 from .codec import pose_matrix, quat_to_rot
-from .exr import UnsupportedExr, read_exr
 
 CV_8UC1, CV_8UC3, CV_8UC4, CV_32FC1 = 0, 16, 24, 5
 
@@ -113,27 +115,26 @@ def decode_png(data: bytes) -> np.ndarray:
     return _swap_rb(iio.imread(data, extension=".png"))
 
 
-def decode_exr(data: bytes) -> np.ndarray:
-    """Decode an archive EXR with :func:`read_exr`.
+def decode_tiff(data: bytes) -> np.ndarray:
+    """Decode an archive TIFF (float32 depth, int32 labels, ...) as OpenCV wrote it."""
+    return np.ascontiguousarray(iio.imread(data, extension=".tiff"))
 
-    Hydra only writes encodings :mod:`.exr` reads (none / RLE / ZIP). Other EXR files
-    (PIZ, B44, tiled, ...) go through imageio's ``opencv`` plugin, the only imageio
-    backend that reads EXR without a separate binary download; it needs
-    ``OPENCV_IO_ENABLE_OPENEXR=1`` set before ``cv2`` is first imported."""
+
+def decode_exr(data: bytes) -> np.ndarray:
+    """Decode an EXR from an archive written before Hydra used TIFF for float images.
+
+    No imageio backend reads EXR out of the box: this uses the ``opencv`` plugin, which
+    needs OpenCV and ``OPENCV_IO_ENABLE_OPENEXR=1`` set before ``cv2`` is imported."""
     try:
-        return read_exr(data)
-    except UnsupportedExr as unsupported:
-        try:
-            # flags=-1 is cv2.IMREAD_UNCHANGED (float32, all channels)
-            img = iio.imread(data, extension=".exr", plugin="opencv", flags=-1)
-        except Exception as exc:  # noqa: BLE001 - missing cv2 / codec disabled
-            raise UnsupportedExr(
-                f"{unsupported}; imageio's opencv plugin could not read it either "
-                f"({exc}); install opencv and set OPENCV_IO_ENABLE_OPENEXR=1 before "
-                "cv2 is imported"
-            ) from exc
-        # the plugin converts to RGB(A); return OpenCV's order like read_exr
-        return _swap_rb(img)
+        # flags=-1 is cv2.IMREAD_UNCHANGED (float32, all channels)
+        img = iio.imread(data, extension=".exr", plugin="opencv", flags=-1)
+    except Exception as exc:  # noqa: BLE001 - missing cv2 / codec disabled
+        raise ValueError(
+            f"could not read EXR ({exc}); this archive predates Hydra's TIFF depth: "
+            "install opencv and set OPENCV_IO_ENABLE_OPENEXR=1 before cv2 is imported"
+        ) from exc
+    # the plugin converts to RGB(A); return OpenCV's channel order
+    return _swap_rb(img)
 
 
 def _swap_rb(img: np.ndarray) -> np.ndarray:
@@ -155,7 +156,15 @@ def _read_image(zf: zipfile.ZipFile, images: dict, name: str) -> np.ndarray | No
     if not desc:
         return None
     data = zf.read(desc["file"])
-    img = decode_exr(data) if desc["file"].endswith(".exr") else decode_png(data)
+    suffix = pathlib.PurePosixPath(desc["file"]).suffix.lower()
+    if suffix == ".png":
+        img = decode_png(data)
+    elif suffix in (".tiff", ".tif"):
+        img = decode_tiff(data)
+    elif suffix == ".exr":
+        img = decode_exr(data)
+    else:
+        raise ValueError(f"{name}: unsupported image file {desc['file']!r}")
     rows, cols = int(desc["rows"]), int(desc["cols"])
     if img.shape[0] != rows or img.shape[1] != cols:
         raise ValueError(
@@ -241,6 +250,7 @@ __all__ = [
     "SensorInfo",
     "decode_exr",
     "decode_png",
+    "decode_tiff",
     "depth_to_mm",
     "read_input_zip",
     "sensor_from_record",

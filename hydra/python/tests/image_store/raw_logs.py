@@ -1,6 +1,6 @@
 """Writers for synthetic Hydra/Khronos image logs (FORMAT.md), byte-compatible with the
 C++ writers: InputData archives as ``input_data_io.cpp`` encodes them (OpenCV PNG of the
-RGB Mat, float32 EXR, metadata.yaml), track logs, track_bindings.json, merges.json and a
+RGB Mat, float32 TIFF, metadata.yaml), track logs, track_bindings.json, merges.json and a
 scene graph json in spark_dsg's format."""
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ cv2 = None
 def _cv2():
     global cv2
     if cv2 is None:
-        import cv2 as _cv2mod  # OPENCV_IO_ENABLE_OPENEXR is set in conftest
+        import cv2 as _cv2mod  # OPENCV_IO_ENABLE_OPENEXR (legacy_exr) is set in conftest
 
         cv2 = _cv2mod
     return cv2
@@ -95,10 +95,11 @@ def write_input_zip(
     color=None,
     depth=None,
     sensor="camera",
-    exr_compression=None,
+    legacy_exr=False,
     feature=None,
 ):
-    """``InputData::save`` of a camera input (entry names/encodings of input_data_io.cpp)."""
+    """``InputData::save`` of a camera input (entry names/encodings of input_data_io.cpp).
+    ``legacy_exr`` writes depth as the uncompressed EXR older Hydra versions used."""
     cv = _cv2()
     entries = {}
     images = {}
@@ -129,22 +130,11 @@ def write_input_zip(
             ],
         )
     if depth is not None:
-        comp = (
-            cv.IMWRITE_EXR_COMPRESSION_NO
-            if exr_compression is None
-            else exr_compression
-        )
-        add(
-            "depth",
-            ".exr",
-            depth,
-            [
-                cv.IMWRITE_EXR_TYPE,
-                cv.IMWRITE_EXR_TYPE_FLOAT,
-                cv.IMWRITE_EXR_COMPRESSION,
-                comp,
-            ],
-        )
+        if legacy_exr:
+            exr = [cv.IMWRITE_EXR_TYPE, cv.IMWRITE_EXR_TYPE_FLOAT]
+            add("depth", ".exr", depth, exr + [cv.IMWRITE_EXR_COMPRESSION, 0])
+        else:
+            add("depth", ".tiff", depth)
     T = np.asarray(world_T_body, float)
     meta = {
         "version": 1,
@@ -185,7 +175,10 @@ def write_input_zip(
     path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(path, "w") as zf:
         for name, data in entries.items():
-            zf.writestr(name, data, compress_type=zipfile.ZIP_STORED)
+            # zip_archive.cpp deflates every entry except PNG
+            stored = name.endswith((".png", ".exr"))
+            method = zipfile.ZIP_STORED if stored else zipfile.ZIP_DEFLATED
+            zf.writestr(name, data, compress_type=method)
         zf.writestr(
             "metadata.yaml", yaml.safe_dump(meta), compress_type=zipfile.ZIP_DEFLATED
         )
