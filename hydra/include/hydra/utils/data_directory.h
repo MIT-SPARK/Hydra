@@ -77,10 +77,4 @@ void declare_config(DataDirectory::Config& config);
 void writeFileAtomic(const std::filesystem::path& filepath,
                      const std::string& contents);
 
-//! Quoted and escaped JSON string literal
-std::string jsonString(const std::string& str);
-
-//! Shortest round-trip JSON number; null for non-finite values (JSON has no nan/inf)
-std::string jsonNumber(double value);
-
 }  // namespace hydra

@@ -41,7 +41,7 @@
 #include <spark_dsg/scene_graph.h>
 
 #include <algorithm>
-#include <sstream>
+#include <nlohmann/json.hpp>
 
 #include "hydra/common/attribute_merger.h"
 #include "hydra/utils/data_directory.h"
@@ -344,28 +344,23 @@ void GraphUpdater::update(const GraphUpdate& update,
 }
 
 std::string GraphUpdater::bindingsToJson() const {
-  std::stringstream ss;
-  ss << "{\"version\": 1, \"layers\": {";
-  bool first_layer = true;
+  auto layers = nlohmann::ordered_json::object();
   for (const auto& [name, tracker] : trackers_) {
-    ss << (first_layer ? "" : ",") << "\n  " << jsonString(name) << ": [";
-    first_layer = false;
-    bool first = true;
+    auto& entries = layers[name] = nlohmann::ordered_json::array();
     for (const auto& binding : tracker.bindings) {
-      ss << (first ? "" : ",") << "\n    {\"track_id\": " << binding.track_id
-         << ", \"node_id\": " << binding.node_id
-         << ", \"first_ns\": " << binding.first_ns
-         << ", \"last_ns\": " << binding.last_ns
-         << ", \"active\": " << (binding.end ? "false" : "true")
-         << ", \"end\": " << (binding.end ? jsonString(*binding.end) : "null") << "}";
-      first = false;
+      entries.push_back({{"track_id", binding.track_id},
+                         {"node_id", binding.node_id},
+                         {"first_ns", binding.first_ns},
+                         {"last_ns", binding.last_ns},
+                         {"active", !binding.end},
+                         {"end",
+                          binding.end ? nlohmann::ordered_json(*binding.end)
+                                      : nlohmann::ordered_json(nullptr)}});
     }
-
-    ss << (first ? "]" : "\n  ]");
   }
 
-  ss << (first_layer ? "}" : "\n}") << "}\n";
-  return ss.str();
+  const nlohmann::ordered_json record{{"version", 1}, {"layers", layers}};
+  return record.dump(2) + "\n";
 }
 
 void GraphUpdater::saveBindings(const std::filesystem::path& filepath) const {

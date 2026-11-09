@@ -38,13 +38,9 @@
 #include <config_utilities/types/path.h>
 #include <glog/logging.h>
 
-#include <cmath>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
-#include <limits>
-#include <sstream>
 
 namespace hydra {
 
@@ -136,41 +132,6 @@ void writeFileAtomic(const std::filesystem::path& filepath,
   }
 
   std::filesystem::rename(tmp_path, filepath);
-}
-
-std::string jsonString(const std::string& str) {
-  std::stringstream ss;
-  ss << '"';
-  for (const char c : str) {
-    switch (c) {
-      case '"':
-        ss << "\\\"";
-        break;
-      case '\\':
-        ss << "\\\\";
-        break;
-      default:
-        if (static_cast<unsigned char>(c) < 0x20) {
-          ss << "\\u" << std::hex << std::setw(4) << std::setfill('0')
-             << static_cast<int>(c) << std::dec;
-        } else {
-          ss << c;
-        }
-    }
-  }
-
-  ss << '"';
-  return ss.str();
-}
-
-std::string jsonNumber(double value) {
-  if (!std::isfinite(value)) {
-    return "null";
-  }
-
-  std::stringstream ss;
-  ss << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
-  return ss.str();
 }
 
 bool DataDirectory::valid() const { return valid_; }

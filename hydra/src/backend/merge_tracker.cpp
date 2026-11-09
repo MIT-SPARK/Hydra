@@ -38,6 +38,7 @@
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <nlohmann/json.hpp>
 #include <sstream>
 
 #include "hydra/utils/data_directory.h"
@@ -77,9 +78,7 @@ bool hasParent(const SceneGraph& unmerged, const SceneGraph& merged, NodeId pare
 }  // namespace
 
 std::string mergesToJson(const std::map<NodeId, NodeId>& merges) {
-  std::stringstream ss;
-  ss << "{\"version\": 1, \"merges\": [";
-  bool first = true;
+  auto entries = nlohmann::ordered_json::array();
   for (const auto& [child, parent] : merges) {
     // resolve chains defensively (bounded to avoid cycles)
     auto final_parent = parent;
@@ -92,13 +91,11 @@ std::string mergesToJson(const std::map<NodeId, NodeId>& merges) {
       final_parent = iter->second;
     }
 
-    ss << (first ? "" : ",") << "\n  {\"child\": " << child
-       << ", \"parent\": " << final_parent << "}";
-    first = false;
+    entries.push_back({{"child", child}, {"parent", final_parent}});
   }
 
-  ss << (first ? "]" : "\n]") << "}\n";
-  return ss.str();
+  const nlohmann::ordered_json record{{"version", 1}, {"merges", entries}};
+  return record.dump(2) + "\n";
 }
 
 void saveMerges(const std::map<NodeId, NodeId>& merges,

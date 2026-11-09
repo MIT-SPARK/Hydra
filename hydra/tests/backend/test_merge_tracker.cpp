@@ -38,6 +38,7 @@
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <nlohmann/json.hpp>
 #include <sstream>
 
 #include "hydra_test/shared_dsg_fixture.h"
@@ -161,19 +162,21 @@ TEST(MergeTracker, MergesToJson) {
                       {NodeSymbol('O', 0), NodeSymbol('O', 2)}};
   ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg), 2u);
 
-  std::stringstream expected;
-  expected << "{\"version\": 1, \"merges\": [\n"
-           << "  {\"child\": " << static_cast<NodeId>(NodeSymbol('O', 0))
-           << ", \"parent\": " << static_cast<NodeId>(NodeSymbol('O', 2)) << "},\n"
-           << "  {\"child\": " << static_cast<NodeId>(NodeSymbol('O', 1))
-           << ", \"parent\": " << static_cast<NodeId>(NodeSymbol('O', 2)) << "}\n]}\n";
-  EXPECT_EQ(mergesToJson(dsg->merges), expected.str());
+  const auto merge = [](NodeId child, NodeId parent) {
+    return nlohmann::json{{"child", child}, {"parent", parent}};
+  };
+  const nlohmann::json expected{{"version", 1},
+                                {"merges",
+                                 {merge(NodeSymbol('O', 0), NodeSymbol('O', 2)),
+                                  merge(NodeSymbol('O', 1), NodeSymbol('O', 2))}}};
+  EXPECT_EQ(nlohmann::json::parse(mergesToJson(dsg->merges)), expected);
 
   // chains are resolved even if the map is not flattened
   const std::map<NodeId, NodeId> chain{{NodeSymbol('O', 1), NodeSymbol('O', 0)},
                                        {NodeSymbol('O', 0), NodeSymbol('O', 2)}};
-  EXPECT_EQ(mergesToJson(chain), expected.str());
-  EXPECT_EQ(mergesToJson({}), "{\"version\": 1, \"merges\": []}\n");
+  EXPECT_EQ(nlohmann::json::parse(mergesToJson(chain)), expected);
+  EXPECT_EQ(nlohmann::json::parse(mergesToJson({})),
+            (nlohmann::json{{"version", 1}, {"merges", nlohmann::json::array()}}));
 }
 
 }  // namespace hydra

@@ -90,19 +90,4 @@ TEST(WriteFileAtomic, ThrowsForMissingDirectory) {
   std::filesystem::remove_all(dir);
 }
 
-TEST(JsonHelpers, EscapesStrings) {
-  EXPECT_EQ(jsonString("OBJECTS"), "\"OBJECTS\"");
-  EXPECT_EQ(jsonString("a\"b\\c"), "\"a\\\"b\\\\c\"");
-  EXPECT_EQ(jsonString(std::string("x\ny\x01", 4)), "\"x\\u000ay\\u0001\"");
-}
-
-TEST(JsonHelpers, NonFiniteNumbersAreNull) {
-  EXPECT_EQ(jsonNumber(1.5), "1.5");
-  EXPECT_EQ(jsonNumber(-2.0), "-2");
-  EXPECT_EQ(jsonNumber(0.1), "0.10000000000000001");
-  EXPECT_EQ(jsonNumber(std::numeric_limits<double>::quiet_NaN()), "null");
-  EXPECT_EQ(jsonNumber(std::numeric_limits<double>::infinity()), "null");
-  EXPECT_EQ(jsonNumber(-std::numeric_limits<double>::infinity()), "null");
-}
-
 }  // namespace hydra

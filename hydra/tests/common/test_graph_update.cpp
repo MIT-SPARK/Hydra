@@ -40,6 +40,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <nlohmann/json.hpp>
 #include <sstream>
 
 #include "hydra_test/shared_dsg_fixture.h"
@@ -115,21 +116,29 @@ TEST(GraphUpdater, BindingHistory) {
   expectBinding(bindings[1], 2, NodeSymbol('O', 1), 10, 10, "deleted");
   expectBinding(bindings[2], 2, NodeSymbol('O', 2), 30, 40, std::nullopt);
 
-  std::stringstream expected;
-  expected << "{\"version\": 1, \"layers\": {\n  \"OBJECTS\": [\n"
-           << "    {\"track_id\": 1, \"node_id\": "
-           << static_cast<NodeId>(NodeSymbol('O', 0))
-           << ", \"first_ns\": 10, \"last_ns\": 20, \"active\": false, \"end\": "
-              "\"deleted\"},\n"
-           << "    {\"track_id\": 2, \"node_id\": "
-           << static_cast<NodeId>(NodeSymbol('O', 1))
-           << ", \"first_ns\": 10, \"last_ns\": 10, \"active\": false, \"end\": "
-              "\"deleted\"},\n"
-           << "    {\"track_id\": 2, \"node_id\": "
-           << static_cast<NodeId>(NodeSymbol('O', 2))
-           << ", \"first_ns\": 30, \"last_ns\": 40, \"active\": true, \"end\": null}\n"
-           << "  ]\n}}\n";
-  EXPECT_EQ(updater.bindingsToJson(), expected.str());
+  const auto binding = [](int track,
+                          NodeId node,
+                          uint64_t first,
+                          uint64_t last,
+                          const nlohmann::json& end) {
+    return nlohmann::json{{"track_id", track},
+                          {"node_id", node},
+                          {"first_ns", first},
+                          {"last_ns", last},
+                          {"active", end.is_null()},
+                          {"end", end}};
+  };
+  const nlohmann::json expected{
+      {"version", 1},
+      {"layers",
+       {{"OBJECTS",
+         {binding(1, NodeSymbol('O', 0), 10, 20, "deleted"),
+          binding(2, NodeSymbol('O', 1), 10, 10, "deleted"),
+          binding(2, NodeSymbol('O', 2), 30, 40, nullptr)}}}}};
+  const auto text = updater.bindingsToJson();
+  EXPECT_EQ(nlohmann::json::parse(text), expected);
+  EXPECT_EQ(text.rfind("{\n  \"version\": 1,", 0), 0u);  // version first
+  EXPECT_EQ(text.back(), '\n');
 }
 
 TEST(GraphUpdater, BindingHistoryMatchedTracks) {
