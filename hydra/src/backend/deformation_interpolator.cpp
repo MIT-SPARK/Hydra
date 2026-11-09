@@ -113,19 +113,29 @@ NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
   auto iter = nodes.find(node_id);
   if (iter == nodes.end()) {
     return &nodes
-                .emplace(
-                    node_id,
-                    Entry{node_id, timestamp_ns, attrs.position.cast<float>(), bbox})
+                .emplace(node_id,
+                         Entry{node_id,
+                               timestamp_ns,
+                               attrs.position.cast<float>(),
+                               bbox,
+                               false})
                 .first->second;
   }
 
-  if (attrs.is_active) {
-    iter->second.init_pos = attrs.position.cast<float>();
-    iter->second.timestamp = timestamp_ns;
-    iter->second.init_bbox = bbox;
+  // The frontend still overwrites the attributes in the update that archives a node
+  // (e.g., the final object extracted by Khronos), so those are odometric too. A node
+  // only counts as active after a second active update, so that new nodes that the
+  // backend forces active for one update (see DsgUpdater::markNewNodes) are not
+  // refreshed from the deformed values written in that update.
+  auto& entry = iter->second;
+  if (attrs.is_active || entry.was_active) {
+    entry.init_pos = attrs.position.cast<float>();
+    entry.timestamp = timestamp_ns;
+    entry.init_bbox = bbox;
   }
 
-  return &iter->second;
+  entry.was_active = attrs.is_active;
+  return &entry;
 }
 
 struct EntryList {
