@@ -233,6 +233,53 @@ TEST_F(InputDataIo, LidarArchiveRoundTrip) {
   EXPECT_EQ(result.is_asymmetric, result.is_asymmetric);
 }
 
+TEST_F(InputDataIo, FloatImageFormats) {
+  const auto path = directory / "frame.input.zip";
+  const auto camera = std::make_shared<Camera>(cameraConfig(), "camera");
+  const auto data = sampleInput(camera);
+  data.save(path);
+
+  // Read every entry, checking that single-channel float images are TIFF and the
+  // vertex map (multi-channel float) is EXR.
+  std::map<std::string, io::Bytes> entries;
+  YAML::Node record;
+  io::readArchive(path, [&](const auto& read) {
+    entries["metadata.yaml"] = read("metadata.yaml");
+    const auto& bytes = entries["metadata.yaml"];
+    record = YAML::Load(std::string(bytes.begin(), bytes.end()));
+    for (const auto& image : record["images"]) {
+      const auto file = image.second["file"].template as<std::string>();
+      entries[file] = read(file);
+    }
+  });
+
+  const auto images = record["images"];
+  EXPECT_EQ(images["depth"]["file"].as<std::string>(), "depth.tiff");
+  EXPECT_EQ(images["range"]["file"].as<std::string>(), "range.tiff");
+  EXPECT_EQ(images["traversability"]["file"].as<std::string>(), "traversability.tiff");
+  EXPECT_EQ(images["vertices"]["file"].as<std::string>(), "vertices.exr");
+
+  // Archives written before depth was TIFF hold depth.exr and still load.
+  io::Bytes exr;
+  ASSERT_TRUE(cv::imencode(".exr", data.depth_image, exr));
+  entries.erase("depth.tiff");
+  entries["depth.exr"] = exr;
+  record["images"]["depth"]["file"] = "depth.exr";
+  const auto text = YAML::Dump(record);
+  entries["metadata.yaml"] = io::Bytes(text.begin(), text.end());
+
+  const auto legacy = directory / "legacy.input.zip";
+  io::writeArchive(legacy, [&](const auto& write) {
+    for (const auto& [name, bytes] : entries) {
+      write(name, bytes);
+    }
+  });
+
+  const auto loaded = InputData::load(legacy);
+  ASSERT_TRUE(loaded);
+  expectInput(data, *loaded);
+}
+
 TEST_F(InputDataIo, EmptyArchiveRoundTrip) {
   const auto path = directory / "empty.zip";
   ASSERT_NO_THROW(io::writeArchive(path, [](const auto&) {}));

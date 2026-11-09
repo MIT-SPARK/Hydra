@@ -277,12 +277,15 @@ void writeInputData(const InputData& input,
   auto images = record["images"];
   writeImage("color", ".png", opts, input.color_image, write, images);
   writeImage("color_mask", ".png", opts, input.color_mask, write, images);
-  writeImage("depth", ".exr", opts, input.depth_image, write, images);
-  writeImage("range", ".exr", opts, input.range_image, write, images);
+  // Single-channel float images are TIFF (the archive compresses them). OpenCV
+  // cannot round-trip multi-channel float TIFF, so the vertex map stays EXR.
+  writeImage("depth", ".tiff", opts, input.depth_image, write, images);
+  writeImage("range", ".tiff", opts, input.range_image, write, images);
   writeImage("labels", ".tiff", opts, input.label_image, write, images);
   writeImage("instances", ".tiff", opts, input.instance_image, write, images);
   writeImage("vertices", ".exr", opts, input.vertex_map, write, images);
-  writeImage("traversability", ".exr", opts, input.traversability_image, write, images);
+  writeImage(
+      "traversability", ".tiff", opts, input.traversability_image, write, images);
 
   const auto& mask = input.getSensor().getStaticMask();
   writeImage("sensor_mask", ".png", opts, mask, write, images);

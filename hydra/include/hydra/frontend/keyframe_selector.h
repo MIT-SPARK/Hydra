@@ -122,7 +122,7 @@ class KeyframeSelector : public GraphBuilderFunctor {
     std::vector<std::string> save_fields{"color", "depth"};
     //! Maximum number of keyframes waiting to be saved (0 = unbounded)
     size_t max_queue_size = 100;
-    //! Encoding of saved keyframes (depth is compressed by default)
+    //! Encoding of saved keyframes (EXR vertex maps are compressed by default)
     InputData::SaveOptions save_options{InputData::SaveOptions::FloatCompression::ZIP};
   } const config;
 

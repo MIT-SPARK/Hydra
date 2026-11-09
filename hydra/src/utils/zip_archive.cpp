@@ -108,7 +108,8 @@ class ZipWriter {
       throw std::runtime_error("could not create entry " + name);
     }
 
-    // Some OpenCV TIFF encoders leave int32 images uncompressed.
+    // OpenCV writes float and int32 TIFF images uncompressed; PNG and EXR compress
+    // themselves.
     const auto extension = std::filesystem::path(name).extension();
     const auto compress =
         options_.compression_level != 0 && extension != ".png" && extension != ".exr";
