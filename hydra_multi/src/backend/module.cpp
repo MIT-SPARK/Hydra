@@ -16,6 +16,8 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
+#include <fstream>
+#include <map>
 #include <ranges>
 #include <set>
 
@@ -237,6 +239,33 @@ void MultiBackendModule::save(const DataDirectory& output) {
   if (mesh && !mesh->empty()) {
     // mesh implements vertex and face traits
     kimera_pgmo::WriteMesh(backend_path / "mesh.ply", *mesh, *mesh);
+  }
+
+  // node id bookkeeping so per-robot data keyed by node id (e.g. image stores) can be
+  // re-keyed into the fused graph: robot -> [original id, fused id], fused merges
+  {
+    std::ofstream map_file(backend_path / "fusion_node_map.json");
+    map_file << "{\"robots\": {";
+    bool first_robot = true;
+    for (const auto& [robot_id, node_map] : unmerged_dsg_->robot_node_map) {
+      map_file << (first_robot ? "" : ", ") << "\"" << robot_id << "\": [";
+      first_robot = false;
+      std::map<NodeId, NodeId> sorted(node_map.begin(), node_map.end());
+      bool first = true;
+      for (const auto& [original, fused] : sorted) {
+        map_file << (first ? "" : ", ") << "[" << original << ", " << fused << "]";
+        first = false;
+      }
+      map_file << "]";
+    }
+
+    map_file << "}, \"merges\": [";
+    bool first = true;
+    for (const auto& [child, parent] : merged_dsg_->merges) {
+      map_file << (first ? "" : ", ") << "[" << child << ", " << parent << "]";
+      first = false;
+    }
+    map_file << "]}\n";
   }
 
   writeBackendStatus(status_log_, pgmo_path / "dsg_pgmo_status.csv");
