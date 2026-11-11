@@ -9,6 +9,9 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
+#include <algorithm>
+#include <vector>
+
 namespace hydra_multi {
 
 using config::Path;
@@ -30,32 +33,15 @@ static const auto registration_ =
                                    std::string,
                                    size_t>("FileDsgInput");
 
-inline void rewireRobotId(int new_id, SceneGraph& graph) {
-  const auto agent_key = graph.getLayerKey(DsgLayers::AGENTS).value();
-  const SceneGraphLayer* prev_layer = nullptr;
-  for (const auto& layer : graph.layer_partition(agent_key.layer)) {
-    prev_layer = &layer;
-    break;
-  }
-
-  if (!prev_layer) {
-    LOG(WARNING) << "Could not find agent layer in graph!";
-    return;
-  }
-
-  const auto new_char = kimera_pgmo::GetRobotPrefix(new_id);
-  if (prev_layer->id.partition == static_cast<uint32_t>(new_char)) {
-    return;
-  }
-
-  LOG(INFO) << "Moving Layer " << prev_layer->id << " to "
-            << LayerKey(agent_key.layer, new_char);
+void movePartition(SceneGraph& graph, const SceneGraphLayer& prev_layer, char new_char) {
+  const auto layer_id = prev_layer.id.layer;
+  LOG(INFO) << "Moving Layer " << prev_layer.id << " to " << LayerKey(layer_id, new_char);
 
   // add all nodes
   std::map<NodeId, NodeId> lookup;
-  for (const auto& node : prev_layer->nodes()) {
+  for (const auto& node : prev_layer.nodes()) {
     const NodeSymbol new_id(new_char, NodeSymbol(node.id).categoryId());
-    graph.emplaceNode(agent_key.layer, new_id, node.attributes().clone(), new_char);
+    graph.emplaceNode(layer_id, new_id, node.attributes().clone(), new_char);
     lookup[node.id] = new_id;
 
     auto new_attrs = graph.getNode(new_id).tryAttributes<AgentNodeAttributes>();
@@ -68,7 +54,7 @@ inline void rewireRobotId(int new_id, SceneGraph& graph) {
   }
 
   // add all edges
-  for (const auto& node : prev_layer->nodes()) {
+  for (const auto& node : prev_layer.nodes()) {
     const auto new_id = lookup.at(node.id);
     const auto connections = node.connections();
     for (const auto n_id : connections) {
@@ -79,7 +65,49 @@ inline void rewireRobotId(int new_id, SceneGraph& graph) {
     }
   }
 
-  graph.removeLayer(prev_layer->id.layer, prev_layer->id.partition);
+  graph.removeLayer(layer_id, prev_layer.id.partition);
+}
+
+// Shifts the agent partitions (one per robot) so that the lowest robot id becomes
+// new_id, the same shift the backend applies to the deformation graph robot ids
+void shiftRobotIds(size_t new_id, SceneGraph& graph) {
+  const auto agent_key = graph.getLayerKey(DsgLayers::AGENTS).value();
+  std::vector<size_t> robot_ids;
+  for (const auto& layer : graph.layer_partition(agent_key.layer)) {
+    const auto iter = kimera_pgmo::robot_prefix_to_id.find(static_cast<char>(layer.id.partition));
+    if (iter == kimera_pgmo::robot_prefix_to_id.end()) {
+      LOG(WARNING) << "Agent layer " << layer.id << " is not a robot partition";
+      continue;
+    }
+
+    robot_ids.push_back(iter->second);
+  }
+
+  if (robot_ids.empty()) {
+    LOG(WARNING) << "Could not find agent layer in graph!";
+    return;
+  }
+
+  std::sort(robot_ids.begin(), robot_ids.end());
+  const auto lowest = robot_ids.front();
+  if (lowest == new_id) {
+    return;
+  }
+
+  // move the highest robot first when shifting up (and the lowest first when shifting
+  // down) so a partition never moves onto one that is still occupied
+  if (new_id > lowest) {
+    std::reverse(robot_ids.begin(), robot_ids.end());
+  }
+
+  for (const auto robot_id : robot_ids) {
+    const auto new_char = kimera_pgmo::GetRobotPrefix(robot_id + new_id - lowest);
+    CHECK(robot_id + new_id >= lowest && new_char != '\0')
+        << "Robot " << robot_id << " has no valid robot id after shifting the lowest "
+        << "robot id " << lowest << " to " << new_id;
+    const auto prev_char = kimera_pgmo::robot_id_to_prefix.at(robot_id);
+    movePartition(graph, graph.getLayer(agent_key.layer, prev_char), new_char);
+  }
 }
 
 }  // namespace
@@ -113,9 +141,8 @@ void FileDsgInput::init() {
     }
   }
 
-  if (config.force_robot_id) {
-    rewireRobotId(id_, *state_->dsg_);
-  }
+  // always shift the agent layers so they match the backend's deformation graph ids
+  shiftRobotIds(id_, *state_->dsg_);
 
   state_->updated = true;
   state_->rebased = true;
