@@ -8,6 +8,9 @@ class FileDsgInput : public Input {
  public:
   struct Config {
     std::string dsg_json;
+    //! Deprecated and ignored: the robot ids of the agent layers are always shifted so
+    //! the lowest one is this unit's robot id (e.g., 0 -> 1 for a single map, 1..N
+    //! unchanged for a fused map), matching the backend's deformation graph ids
     bool force_robot_id = false;
   } const config;
 

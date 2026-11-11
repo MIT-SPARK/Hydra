@@ -17,6 +17,7 @@
 #include <spark_dsg/node_symbol.h>
 
 #include <ranges>
+#include <set>
 
 #include "hydra_multi/backend/loop_closure_initial_align.h"
 #include "hydra_multi/backend/utils.h"
@@ -98,6 +99,44 @@ void saveTrajectory(const SceneGraphLayer& layer,
 
   fout.flush();
   fout.close();
+}
+
+// Shifts every robot id in a unit's pose and mesh graphs so that the lowest one becomes
+// the unit id, e.g., a single saved map (robot 0) becomes robot 1 when loaded as unit
+// 1, and a saved fused map with robots 1..N keeps its ids
+std::map<size_t, size_t> shiftToUnitId(size_t unit_id,
+                                       const pose_graph_tools::PoseGraph& pose_graph,
+                                       const pose_graph_tools::PoseGraph& mesh_graph) {
+  std::set<size_t> node_ids;
+  std::set<size_t> robot_ids;
+  for (const auto* graph : {&pose_graph, &mesh_graph}) {
+    for (const auto& node : graph->nodes) {
+      node_ids.insert(node.robot_id);
+    }
+
+    for (const auto& edge : graph->edges) {
+      robot_ids.insert(edge.robot_from);
+      robot_ids.insert(edge.robot_to);
+    }
+  }
+
+  std::map<size_t, size_t> id_mapping;
+  if (node_ids.empty()) {
+    return id_mapping;
+  }
+
+  robot_ids.insert(node_ids.begin(), node_ids.end());
+  const auto lowest = *node_ids.begin();
+  for (const auto robot_id : robot_ids) {
+    const auto new_id = robot_id + unit_id - lowest;
+    CHECK(robot_id + unit_id >= lowest && kimera_pgmo::GetRobotPrefix(new_id) != '\0')
+        << "Robot " << robot_id << " of unit " << unit_id
+        << " has no valid robot id after shifting the lowest robot id " << lowest
+        << " to the unit id";
+    id_mapping[robot_id] = new_id;
+  }
+
+  return id_mapping;
 }
 
 }  // namespace
@@ -642,18 +681,17 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
     // account for it in initial alignment.
 
     //// Process pose graph and mesh graph
-    // Check and construct remapping ids then process pose graph and mesh graph
-    // Implicit assumption that each state here only have a single id
+    // Shift the robot ids so the lowest one is the unit id (a unit can hold several
+    // robots, e.g., a saved fused map), then process pose graph and mesh graph
+    const auto id_mapping = shiftToUnitId(id, *state->pose_graph_, *state->mesh_graph_);
     if (state->pose_graph_->nodes.size() > 0) {
-      std::map<size_t, size_t> id_mapping;
-      id_mapping[state->pose_graph_->nodes[0].robot_id] = id;
-      // other robot ids in the pose graph (e.g., a fused prior map) are kept as is
       for (const auto& node : state->pose_graph_->nodes) {
-        const auto iter = id_mapping.find(node.robot_id);
-        robot_units_[iter == id_mapping.end() ? node.robot_id : iter->second] = id;
+        robot_units_[id_mapping.at(node.robot_id)] = id;
       }
-      VLOG(3) << "Remapping " << state->pose_graph_->nodes[0].robot_id << " -> " << id
-              << " for pg with " << state->pose_graph_->nodes.size() << " nodes";
+      VLOG(3) << "Remapping robots " << id_mapping.begin()->first << ".."
+              << id_mapping.rbegin()->first << " -> " << id_mapping.begin()->second
+              << ".." << id_mapping.rbegin()->second << " for pg with "
+              << state->pose_graph_->nodes.size() << " nodes";
       deformation_graph_->processPoseGraph(
           *state->pose_graph_, edge_variance_map_, id_mapping, &transform);
       if (config.anchor_robot_id >= 0 &&
@@ -668,8 +706,6 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
     }
 
     if (state->mesh_graph_->nodes.size() > 0 && config.include_mesh_factors) {
-      std::map<size_t, size_t> id_mapping;
-      id_mapping[state->mesh_graph_->nodes[0].robot_id] = id;
       deformation_graph_->processMeshGraph(
           *state->mesh_graph_, edge_variance_map_, id_mapping, &transform);
     }
