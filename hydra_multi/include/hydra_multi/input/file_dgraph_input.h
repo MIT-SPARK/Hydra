@@ -16,6 +16,9 @@ class FileDGraphInput : public Input {
     //! Fix every loaded trajectory with a prior
     bool fix_as_prior = false;
     double prior_variance = 1.0e-4;
+    //! Load the mesh control points and their factors. A fixed prior map's mesh only
+    //! slows down optimization without affecting other robots
+    bool include_mesh = true;
   } const config;
 
   FileDGraphInput(const Config& config,

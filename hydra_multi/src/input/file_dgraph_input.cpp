@@ -31,6 +31,7 @@ void declare_config(FileDGraphInput::Config& config) {
   field(config.keep_robot_ids, "keep_robot_ids");
   field(config.fix_as_prior, "fix_as_prior");
   field(config.prior_variance, "prior_variance");
+  field(config.include_mesh, "include_mesh");
 
   check<Path::Exists>(config.dgrf_path, "dgrf_path");
   check(config.prior_variance, GT, 0.0, "prior_variance");
@@ -83,7 +84,9 @@ void FileDGraphInput::init() {
     dgraph->processNodeMeasurements(measurements, config.prior_variance);
   }
 
-  state_->mesh_graph_ = dgraph->getPoseGraph(true, false, false);
+  if (config.include_mesh) {
+    state_->mesh_graph_ = dgraph->getPoseGraph(true, false, false);
+  }
   state_->pose_graph_ = dgraph->getPoseGraph(false, true, false);
   state_->updated = true;
   state_->rebased = true;
