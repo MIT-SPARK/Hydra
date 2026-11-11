@@ -33,9 +33,12 @@ static const auto registration_ =
                                    std::string,
                                    size_t>("FileDsgInput");
 
-void movePartition(SceneGraph& graph, const SceneGraphLayer& prev_layer, char new_char) {
+void movePartition(SceneGraph& graph,
+                   const SceneGraphLayer& prev_layer,
+                   char new_char) {
   const auto layer_id = prev_layer.id.layer;
-  LOG(INFO) << "Moving Layer " << prev_layer.id << " to " << LayerKey(layer_id, new_char);
+  LOG(INFO) << "Moving Layer " << prev_layer.id << " to "
+            << LayerKey(layer_id, new_char);
 
   // add all nodes
   std::map<NodeId, NodeId> lookup;
@@ -74,7 +77,8 @@ void shiftRobotIds(size_t new_id, SceneGraph& graph) {
   const auto agent_key = graph.getLayerKey(DsgLayers::AGENTS).value();
   std::vector<size_t> robot_ids;
   for (const auto& layer : graph.layer_partition(agent_key.layer)) {
-    const auto iter = kimera_pgmo::robot_prefix_to_id.find(static_cast<char>(layer.id.partition));
+    const auto iter =
+        kimera_pgmo::robot_prefix_to_id.find(static_cast<char>(layer.id.partition));
     if (iter == kimera_pgmo::robot_prefix_to_id.end()) {
       LOG(WARNING) << "Agent layer " << layer.id << " is not a robot partition";
       continue;

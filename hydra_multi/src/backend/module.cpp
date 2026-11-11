@@ -102,8 +102,8 @@ void saveTrajectory(const SceneGraphLayer& layer,
 }
 
 // Shifts every robot id in a unit's pose and mesh graphs so that the lowest one becomes
-// the unit id, e.g., a single saved map (robot 0) becomes robot 1 when loaded as unit 1,
-// and a saved fused map with robots 1..N keeps its ids
+// the unit id, e.g., a single saved map (robot 0) becomes robot 1 when loaded as unit
+// 1, and a saved fused map with robots 1..N keeps its ids
 std::map<size_t, size_t> shiftToUnitId(size_t unit_id,
                                        const pose_graph_tools::PoseGraph& pose_graph,
                                        const pose_graph_tools::PoseGraph& mesh_graph) {
@@ -683,8 +683,7 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
     //// Process pose graph and mesh graph
     // Shift the robot ids so the lowest one is the unit id (a unit can hold several
     // robots, e.g., a saved fused map), then process pose graph and mesh graph
-    const auto id_mapping =
-        shiftToUnitId(id, *state->pose_graph_, *state->mesh_graph_);
+    const auto id_mapping = shiftToUnitId(id, *state->pose_graph_, *state->mesh_graph_);
     if (state->pose_graph_->nodes.size() > 0) {
       for (const auto& node : state->pose_graph_->nodes) {
         robot_units_[id_mapping.at(node.robot_id)] = id;
