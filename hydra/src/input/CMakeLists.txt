@@ -7,6 +7,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/input_data.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/input_data_io.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/input_module.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/label_remapper.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/lidar.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_extrinsics.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_input_packet.cpp

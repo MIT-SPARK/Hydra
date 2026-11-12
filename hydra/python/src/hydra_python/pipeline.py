@@ -36,7 +36,6 @@
 
 import logging
 import pathlib
-import pprint
 
 import yaml
 
@@ -178,7 +177,6 @@ def load_pipeline(
 
         set_glog_dir(glog_dir)
 
-    logging.debug(pprint.pformat(contents, sort_dicts=False))
     pipeline = HydraPipeline.from_config(
         yaml.safe_dump(contents),
         sensor,

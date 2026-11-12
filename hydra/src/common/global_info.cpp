@@ -78,15 +78,10 @@ void declare_config(PipelineConfig& config) {
   field(config.default_verbosity, "default_verbosity");
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
-  config.labelspace.setOptional();
-  field(config.labelspace, "labelspace");
-  field<Path::Absolute>(config.label_remap_filepath, "semantic_label_remap_filepath");
   field(config.mesh, "mesh");
-  field(config.semantic_layers, "semantic_layers");
 
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
-  field(config.graph, "graph", false);
 }
 
 GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
@@ -98,15 +93,6 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   auto& timer = ElapsedTimeRecorder::instance();
   timer.timing_disabled = config_.timing_disabled;
   timer.disable_output = config_.disable_timer_output;
-
-  labelspace_ = config_.labelspace.create();
-  if (!labelspace_) {
-    labelspace_ = std::make_unique<Labelspace>();
-  }
-
-  if (!config_.label_remap_filepath.empty()) {
-    label_remapper_ = LabelRemapper(config_.label_remap_filepath);
-  }
 
   if (config_.enable_pgmo_logging) {
     logging::Logger::addSink("glog", std::make_shared<PgmoGlogSink>());
@@ -140,36 +126,6 @@ const PipelineConfig& GlobalInfo::getConfig() const { return config_; }
 const FrameConfig& GlobalInfo::getFrames() const { return config_.frames; }
 
 const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefix_; }
-
-const Labelspace& GlobalInfo::labelspace() const {
-  if (!labelspace_) {
-    labelspace_.reset(new Labelspace());
-  }
-
-  return *labelspace_;
-}
-
-const LabelRemapper& GlobalInfo::getLabelRemapper() const { return label_remapper_; }
-
-SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
-  auto graph_info = std::make_shared<SharedDsgInfo>(config_.graph);
-  auto& graph = *graph_info->graph;
-
-  CHECK(labelspace_);
-  const spark_dsg::Labelspace labelspace(labelspace_->label_names);
-  if (labelspace) {
-    labelspace.save(graph, "mesh", false);
-    for (const auto& layer_name : config_.semantic_layers) {
-      if (graph.layer_names().count(layer_name)) {
-        labelspace.save(graph, layer_name);
-      } else {
-        LOG(WARNING) << "Skipping saving labelspace for unknown '" << layer_name << "'";
-      }
-    }
-  }
-
-  return graph_info;
-}
 
 spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {
   // we force the mesh to have last seen stamps

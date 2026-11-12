@@ -74,7 +74,7 @@ TEST(ExternalLoopClosureReceiver, FindClosest) {
   ExternalLoopClosureReceiver::Config config;
   config.layer = "AGENTS";
   config.verbosity = 5;
-  ExternalLoopClosureReceiver receiver(config, nullptr);
+  ExternalLoopClosureReceiver receiver(config);
 
   SceneGraph graph;
   {  // no layer: unknown result
@@ -143,9 +143,8 @@ TEST(ExternalLoopClosureReceiver, FindClosest) {
 TEST(ExternalLoopClosureReceiver, QueueCorrect) {
   ExternalLoopClosureReceiver::Config config;
   config.max_time_difference = 2.0;
-  ExternalLoopClosureReceiver::Queue queue;
   config.layer = "AGENTS";
-  ExternalLoopClosureReceiver receiver(config, &queue);
+  ExternalLoopClosureReceiver receiver(config);
 
   SceneGraph graph;
   graph.addLayer(2, kimera_pgmo::GetRobotPrefix(0));
@@ -153,8 +152,8 @@ TEST(ExternalLoopClosureReceiver, QueueCorrect) {
   graph.emplaceNode(2, "a0"_id, makeAttrs(10s), kimera_pgmo::GetRobotPrefix(0));
   graph.emplaceNode(2, "a1"_id, makeAttrs(102s), kimera_pgmo::GetRobotPrefix(0));
 
-  addToQueue(queue, 0, 11s, 0, 101s);
-  addToQueue(queue, 0, 11s, 1, 21s);
+  addToQueue(*receiver.queue(), 0, 11s, 0, 101s);
+  addToQueue(*receiver.queue(), 0, 11s, 1, 21s);
 
   {  // first loop closure is available
     std::vector<std::pair<NodeId, NodeId>> results;

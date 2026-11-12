@@ -32,38 +32,12 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <pose_graph_tools/pose_graph.h>
+#include <pybind11/pybind11.h>
 
-#include <memory>
+namespace hydra::python {
 
-#include "hydra/common/message_queue.h"
-#include "hydra/loop_closure/registration_solution.h"
+namespace labelspace {
+void addBindings(pybind11::module_& m);
+}
 
-namespace hydra {
-
-struct FrontendOutput;
-
-class PipelineQueues {
- public:
-  ~PipelineQueues();
-
-  static PipelineQueues& instance();
-
-  void clear();
-
-  //! Connection between frontend and backend
-  MessageQueue<std::shared_ptr<const FrontendOutput>> backend_queue;
-  //! Connection between backend and LCD module
-  MessageQueue<lcd::RegistrationSolution> backend_lcd_queue;
-  //! Queue for receiving (timestamped) external loop closures
-  MessageQueue<pose_graph_tools::PoseGraph> external_loop_closure_queue;
-
- private:
-  PipelineQueues();
-
-  // TODO(nathan) fix thread safety (by probably just having a single static instance)
-  inline static std::unique_ptr<PipelineQueues> s_instance_;
-};
-
-}  // namespace hydra
+}  // namespace hydra::python
