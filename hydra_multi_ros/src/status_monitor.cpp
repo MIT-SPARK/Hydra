@@ -38,6 +38,7 @@
 #include <config_utilities/validation.h>
 
 #include <chrono>
+#include <iomanip>
 #include <nlohmann/json.hpp>
 
 namespace hydra_multi {
@@ -94,6 +95,12 @@ void StatusMonitor::publish() {
       note << last_status.inlier_interrobot_loop_closures << " / "
            << last_status.total_interrobot_loop_closures
            << " valid interrobot loop closures";
+      if (last_status.opt_s) {
+        note << std::fixed << "; last optimization took " << std::setprecision(3)
+             << *last_status.opt_s << " s";
+      } else {
+        note << "; no optimization yet";
+      }
     } else {
       note << "time since last spin: " << std::setprecision(3) << diff_s.count()
            << " [s]";
