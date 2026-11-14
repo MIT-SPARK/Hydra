@@ -69,7 +69,7 @@ void MultiRosBackendPublisher::publishPoseGraph(const SceneGraph& graph,
   for (const auto& layer : graph.layer_partition(agent_layer_id)) {
     for (const auto& node : layer.nodes()) {
       NodeSymbol node_symb(node.id);
-      size_t robot_id = kimera_pgmo::robot_prefix_to_id.at(node_symb.category());
+      size_t robot_id = kimera_pgmo::isVertexPrefix(node_symb.category());
       if (!id_timestamps.count(robot_id)) {
         id_timestamps[robot_id] = std::vector<size_t>();
       }
@@ -148,9 +148,8 @@ void MultiRosBackendPublisher::publishDeformationGraphViz(
     auto& p_back = edges.points.emplace_back();
     tf2::convert(values->at<gtsam::Pose3>(back).translation(), p_back);
 
-    const bool front_is_pose_vertex =
-        kimera_pgmo::robot_prefix_to_id.count(front.chr());
-    const bool back_is_pose_vertex = kimera_pgmo::robot_prefix_to_id.count(back.chr());
+    const bool front_is_pose_vertex = kimera_pgmo::isVertexPrefix(front.chr());
+    const bool back_is_pose_vertex = kimera_pgmo::isVertexPrefix(back.chr());
     if (front_is_pose_vertex && back_is_pose_vertex) {
       edges.colors.push_back(pose_pose_color);
       edges.colors.push_back(pose_pose_color);

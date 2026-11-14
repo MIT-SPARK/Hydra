@@ -42,8 +42,8 @@ namespace hydra {
 
 RobotPrefixConfig::RobotPrefixConfig(int robot_id)
     : id(robot_id),
-      key(kimera_pgmo::robot_id_to_prefix.at(robot_id)),
-      vertex_key(kimera_pgmo::robot_id_to_vertex_prefix.at(robot_id)) {}
+      key(kimera_pgmo::getRobotPrefix(robot_id)),
+      vertex_key(kimera_pgmo::getVertexPrefix(robot_id)) {}
 
 RobotPrefixConfig::RobotPrefixConfig() : RobotPrefixConfig(0) {}
 

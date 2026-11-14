@@ -109,7 +109,7 @@ void MstPlaceFactors::updateProblem(
       extras.initial.insert(node.id, pose);
       auto vertex_prefix = this_vertex_key;
       if (robot_lookup) {
-        vertex_prefix = kimera_pgmo::GetVertexPrefix(robot_lookup->at(node.id));
+        vertex_prefix = kimera_pgmo::getVertexPrefix(robot_lookup->at(node.id));
       }
 
       if (!mst_info.leaves.count(node.id)) {

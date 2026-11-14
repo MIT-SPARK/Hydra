@@ -49,6 +49,8 @@ namespace hydra::places {
 class BlockTraversabilityClustering : public TraversabilityClustering {
  public:
   struct Config {
+    //! Node prefix to use
+    char node_prefix = 'T';
     //! Minimum width of a place in meters.
     float min_place_width = 0.5f;
     //! Maximum width of a place in meters. This defines the place block size.

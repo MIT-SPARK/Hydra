@@ -129,7 +129,7 @@ std::map<size_t, size_t> shiftToUnitId(size_t unit_id,
   const auto lowest = *node_ids.begin();
   for (const auto robot_id : robot_ids) {
     const auto new_id = robot_id + unit_id - lowest;
-    CHECK(robot_id + unit_id >= lowest && kimera_pgmo::GetRobotPrefix(new_id) != '\0')
+    CHECK(robot_id + unit_id >= lowest && kimera_pgmo::getRobotPrefix(new_id) != '\0')
         << "Robot " << robot_id << " of unit " << unit_id
         << " has no valid robot id after shifting the lowest robot id " << lowest
         << " to the unit id";
@@ -227,7 +227,7 @@ void MultiBackendModule::save(const DataDirectory& output) {
   const auto& graph = *merged_dsg_->graph;
   const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
   for (const auto& layer : graph.layer_partition(desired_layer)) {
-    const auto robot_id = kimera_pgmo::robot_prefix_to_id.at(layer.id.partition);
+    const auto robot_id = kimera_pgmo::idFromRobotPrefix(layer.id.partition);
     std::string filename = "robot_" + std::to_string(robot_id) + "_trajectory.csv";
     const std::filesystem::path trajectory_path = backend_path / filename;
     ::hydra_multi::saveTrajectory(layer, trajectory_path);
@@ -610,7 +610,7 @@ void MultiBackendModule::optimize(size_t timestamp_ns) {
 
 gtsam::Pose3 MultiBackendModule::getRobotWorldFrame(RobotId robot_id,
                                                     gtsam::Values& optimized) {
-  const char robot_prefix = kimera_pgmo::robot_id_to_prefix.at(robot_id);
+  const char robot_prefix = kimera_pgmo::getRobotPrefix(robot_id);
   if (!deformation_graph_->hasPrefixPoses(robot_prefix)) {
     return gtsam::Pose3();
   }
@@ -696,7 +696,7 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
           *state->pose_graph_, edge_variance_map_, id_mapping, &transform);
       if (config.anchor_robot_id >= 0 &&
           id == static_cast<size_t>(config.anchor_robot_id)) {
-        auto prefix = kimera_pgmo::GetRobotPrefix(id);
+        auto prefix = kimera_pgmo::getRobotPrefix(id);
         deformation_graph_->addNewNode(gtsam::Symbol(prefix, 0),
                                        0,
                                        gtsam::Pose3(),
@@ -748,10 +748,9 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
       VLOG(3) << "Deforming mesh for robot " << id;
       // TODO(Yun): cannot use pre archived vertices as 'start_hint'
       // Note that here the mesh in the state is actually getting modified!
-      char vertex_prefix = kimera_pgmo::robot_id_to_vertex_prefix.at(id);
       deformation_graph_->deformPoints(*mesh_data->mesh,
                                        mesh_data->original,
-                                       vertex_prefix,
+                                       kimera_pgmo::getVertexPrefix(id),
                                        KimeraPgmoInterface::config_.num_interp_pts,
                                        KimeraPgmoInterface::config_.interp_horizon);
     }
@@ -805,10 +804,8 @@ void MultiBackendModule::initialAlignment() {
   VLOG(10) << "Running initial alignment";
   initial_align_->update(info);
 
-  // TODO(Yun): temp values not aligned. Might be fine for now
   auto pgmo_values = deformation_graph_->getValuesCopy();
-  const auto initial_values = initial_align_->computeInitialGuess(
-      info, pgmo_values, merged_dsg_->node_robot_map);
+  const auto initial_values = initial_align_->computeInitialGuess(info, pgmo_values);
   deformation_graph_->updateValues(initial_values);
 }
 

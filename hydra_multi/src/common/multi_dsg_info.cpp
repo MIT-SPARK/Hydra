@@ -72,8 +72,7 @@ void MultiDsgInfo::addRobotGraph(size_t robot_id,
     return;
   }
 
-  char robot_prefix = kimera_pgmo::GetRobotPrefix(robot_id);
-  if (robot_prefix == '\0') {
+  if (!kimera_pgmo::isValidId(robot_id)) {
     LOG(FATAL) << "Robot ID (" << robot_id << ") not assigned valid prefix.";
   }
 

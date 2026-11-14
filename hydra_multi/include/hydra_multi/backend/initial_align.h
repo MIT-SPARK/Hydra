@@ -52,8 +52,7 @@ class InitialAlignModule {
   inline MultiTransforms getPairwiseTransforms() const { return pairwise_transforms_; }
 
   gtsam::Values computeInitialGuess(InitialAlignModule::Info::Ptr info,
-                                    const gtsam::Values& input_values,
-                                    const NodeIdRobotMap& node_id_robot_map);
+                                    const gtsam::Values& input_values);
 
   bool checkAlignConsistent(InitialAlignModule::Info::Ptr info);
 

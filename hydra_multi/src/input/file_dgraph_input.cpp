@@ -48,26 +48,13 @@ void FileDGraphInput::init() {
   CHECK(dgraph);
 
   if (config.fix_as_prior) {
-    // TODO(nathan) it would be nice to push this later in the backend
-    std::vector<std::pair<gtsam::Key, gtsam::Pose3>> measurements;
-    for (const auto& [prefix, robot_id] : kimera_pgmo::robot_prefix_to_id) {
-      if (!dgraph->hasPrefixPoses(prefix)) {
-        continue;
-      }
-
-      const auto poses = dgraph->getTrajectory(prefix);
-      for (size_t i = 0; i < poses.size(); ++i) {
-        const gtsam::Key key = gtsam::Symbol(prefix, i);
-        measurements.push_back(std::make_pair(key, poses[i]));
-      }
-    }
-
-    dgraph->processNodeMeasurements(measurements, config.prior_variance);
+    dgraph->fixPosesAsPriors(config.prior_variance);
   }
 
   if (config.include_mesh) {
     state_->mesh_graph_ = dgraph->getPoseGraph(true, false, false);
   }
+
   state_->pose_graph_ = dgraph->getPoseGraph(false, true, false);
   state_->updated = true;
   state_->rebased = true;

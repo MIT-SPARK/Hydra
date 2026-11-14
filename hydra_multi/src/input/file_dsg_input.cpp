@@ -77,14 +77,13 @@ void shiftRobotIds(size_t new_id, SceneGraph& graph) {
   const auto agent_key = graph.getLayerKey(DsgLayers::AGENTS).value();
   std::vector<size_t> robot_ids;
   for (const auto& layer : graph.layer_partition(agent_key.layer)) {
-    const auto iter =
-        kimera_pgmo::robot_prefix_to_id.find(static_cast<char>(layer.id.partition));
-    if (iter == kimera_pgmo::robot_prefix_to_id.end()) {
+    const auto prefix = static_cast<char>(layer.id.partition);
+    if (!kimera_pgmo::isRobotPrefix(prefix)) {
       LOG(WARNING) << "Agent layer " << layer.id << " is not a robot partition";
       continue;
     }
 
-    robot_ids.push_back(iter->second);
+    robot_ids.push_back(kimera_pgmo::idFromRobotPrefix(prefix));
   }
 
   if (robot_ids.empty()) {
@@ -105,11 +104,11 @@ void shiftRobotIds(size_t new_id, SceneGraph& graph) {
   }
 
   for (const auto robot_id : robot_ids) {
-    const auto new_char = kimera_pgmo::GetRobotPrefix(robot_id + new_id - lowest);
+    const auto new_char = kimera_pgmo::getRobotPrefix(robot_id + new_id - lowest);
     CHECK(robot_id + new_id >= lowest && new_char != '\0')
         << "Robot " << robot_id << " has no valid robot id after shifting the lowest "
         << "robot id " << lowest << " to " << new_id;
-    const auto prev_char = kimera_pgmo::robot_id_to_prefix.at(robot_id);
+    const auto prev_char = kimera_pgmo::getRobotPrefix(robot_id);
     movePartition(graph, graph.getLayer(agent_key.layer, prev_char), new_char);
   }
 }

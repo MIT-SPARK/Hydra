@@ -49,6 +49,8 @@ namespace hydra::places {
 class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
  public:
   struct Config {
+    //! Node prefix to use
+    char node_prefix = 'T';
     //! Maximum radius of a place [m].
     float max_radius = 3.0f;
     //! Number of rays to consider for boundary computation.

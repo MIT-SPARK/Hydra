@@ -57,7 +57,7 @@ bool updateToGlobalFrame(const kimera_pgmo::DeformationGraph& dgraph,
                          const RobotId robot_id,
                          const gtsam::Pose3& local_T_pose,
                          gtsam::Pose3& global_T_pose) {
-  const char robot_prefix = kimera_pgmo::GetRobotPrefix(robot_id);
+  const char robot_prefix = kimera_pgmo::getRobotPrefix(robot_id);
   if (robot_prefix == '\0') {
     LOG(WARNING) << "Robot ID (" << robot_id
                  << ") not assigned valid prefix in updateToGlobalFrame.";

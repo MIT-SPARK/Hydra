@@ -134,7 +134,7 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const SceneGraph& graph,
                                                       uint64_t stamp_ns,
                                                       int robot_id,
                                                       double max_diff_s) const {
-  const auto prefix = kimera_pgmo::GetRobotPrefix(robot_id);
+  const auto prefix = kimera_pgmo::getRobotPrefix(robot_id);
   const auto layer_id = graph.getLayerKey(config.layer)->layer;
   const auto layer = graph.findLayer(layer_id, prefix);
   if (!layer) {

@@ -83,7 +83,7 @@ TEST(ExternalLoopClosureReceiver, FindClosest) {
     EXPECT_EQ(result.status, LookupResult::Status::UNKNOWN);
   }
 
-  graph.addLayer(2, kimera_pgmo::GetRobotPrefix(0));
+  graph.addLayer(2, kimera_pgmo::getRobotPrefix(0));
   {  // empty layer: unknown result
     std::chrono::nanoseconds stamp_ns = 100s;
     const auto result = receiver.findClosest(graph, stamp_ns.count(), 0, 1.0);
@@ -91,7 +91,7 @@ TEST(ExternalLoopClosureReceiver, FindClosest) {
   }
 
   ASSERT_TRUE(
-      graph.emplaceNode(2, "a0"_id, makeAttrs(10s), kimera_pgmo::GetRobotPrefix(0)));
+      graph.emplaceNode(2, "a0"_id, makeAttrs(10s), kimera_pgmo::getRobotPrefix(0)));
   {  // node too early: unknown result
     std::chrono::nanoseconds stamp_ns = 100s;
     const auto result = receiver.findClosest(graph, stamp_ns.count(), 0, 1.0);
@@ -99,7 +99,7 @@ TEST(ExternalLoopClosureReceiver, FindClosest) {
   }
 
   ASSERT_TRUE(
-      graph.emplaceNode(2, "a1"_id, makeAttrs(102s), kimera_pgmo::GetRobotPrefix(0)));
+      graph.emplaceNode(2, "a1"_id, makeAttrs(102s), kimera_pgmo::getRobotPrefix(0)));
   {  // node too late: invalid result
     std::chrono::nanoseconds stamp_ns = 100s;
     const auto result = receiver.findClosest(graph, stamp_ns.count(), 0, 1.0);
@@ -126,11 +126,11 @@ TEST(ExternalLoopClosureReceiver, FindClosest) {
     EXPECT_EQ(result.status, LookupResult::Status::UNKNOWN);
   }
 
-  graph.addLayer(2, kimera_pgmo::GetRobotPrefix(0));
+  graph.addLayer(2, kimera_pgmo::getRobotPrefix(0));
   ASSERT_TRUE(
-      graph.emplaceNode(2, "b0"_id, makeAttrs(20s), kimera_pgmo::GetRobotPrefix(1)));
+      graph.emplaceNode(2, "b0"_id, makeAttrs(20s), kimera_pgmo::getRobotPrefix(1)));
   ASSERT_TRUE(
-      graph.emplaceNode(2, "b1"_id, makeAttrs(23s), kimera_pgmo::GetRobotPrefix(1)));
+      graph.emplaceNode(2, "b1"_id, makeAttrs(23s), kimera_pgmo::getRobotPrefix(1)));
 
   {  // different robot: valid time
     std::chrono::nanoseconds stamp_ns = 22s;
@@ -148,10 +148,10 @@ TEST(ExternalLoopClosureReceiver, QueueCorrect) {
   ExternalLoopClosureReceiver receiver(config, &queue);
 
   SceneGraph graph;
-  graph.addLayer(2, kimera_pgmo::GetRobotPrefix(0));
-  graph.addLayer(2, kimera_pgmo::GetRobotPrefix(1));
-  graph.emplaceNode(2, "a0"_id, makeAttrs(10s), kimera_pgmo::GetRobotPrefix(0));
-  graph.emplaceNode(2, "a1"_id, makeAttrs(102s), kimera_pgmo::GetRobotPrefix(0));
+  graph.addLayer(2, kimera_pgmo::getRobotPrefix(0));
+  graph.addLayer(2, kimera_pgmo::getRobotPrefix(1));
+  graph.emplaceNode(2, "a0"_id, makeAttrs(10s), kimera_pgmo::getRobotPrefix(0));
+  graph.emplaceNode(2, "a1"_id, makeAttrs(102s), kimera_pgmo::getRobotPrefix(0));
 
   addToQueue(queue, 0, 11s, 0, 101s);
   addToQueue(queue, 0, 11s, 1, 21s);
@@ -165,7 +165,7 @@ TEST(ExternalLoopClosureReceiver, QueueCorrect) {
     EXPECT_EQ(results, expected);
   }
 
-  graph.emplaceNode(2, "b0"_id, makeAttrs(20s), kimera_pgmo::GetRobotPrefix(1));
+  graph.emplaceNode(2, "b0"_id, makeAttrs(20s), kimera_pgmo::getRobotPrefix(1));
   {  // one node of edge is still unknown
     std::vector<std::pair<NodeId, NodeId>> results;
     std::vector<std::pair<NodeId, NodeId>> expected;
@@ -175,7 +175,7 @@ TEST(ExternalLoopClosureReceiver, QueueCorrect) {
     EXPECT_EQ(results, expected);
   }
 
-  graph.emplaceNode(2, "b1"_id, makeAttrs(23s), kimera_pgmo::GetRobotPrefix(1));
+  graph.emplaceNode(2, "b1"_id, makeAttrs(23s), kimera_pgmo::getRobotPrefix(1));
   {  // both nodes are known
     std::vector<std::pair<NodeId, NodeId>> results;
     std::vector<std::pair<NodeId, NodeId>> expected{{"b0"_id, "a0"_id}};

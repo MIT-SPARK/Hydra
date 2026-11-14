@@ -53,18 +53,18 @@ bool LoopClosureInitialAlignModule::addLoopClosure(const gtsam::Key& from,
     return false;
   }
 
-  if (!kimera_pgmo::robot_prefix_to_id.count(from_symb.chr())) {
+  if (!kimera_pgmo::isRobotPrefix(from_symb.chr())) {
     VLOG(3) << "Prefix: " << from_symb.chr() << " not a known robot prefix.";
     return false;
   }
 
-  if (!kimera_pgmo::robot_prefix_to_id.count(to_symb.chr())) {
+  if (!kimera_pgmo::isRobotPrefix(to_symb.chr())) {
     VLOG(3) << "Prefix: " << to_symb.chr() << " not a known robot prefix.";
     return false;
   }
 
-  RobotId from_robot_id = getFrame(kimera_pgmo::robot_prefix_to_id.at(from_symb.chr()));
-  RobotId to_robot_id = getFrame(kimera_pgmo::robot_prefix_to_id.at(to_symb.chr()));
+  RobotId from_robot_id = getFrame(kimera_pgmo::idFromRobotPrefix(from_symb.chr()));
+  RobotId to_robot_id = getFrame(kimera_pgmo::idFromRobotPrefix(to_symb.chr()));
   if (from_robot_id == to_robot_id) {
     VLOG(3) << "Skipping loop closure between robots in the same frame "
             << from_robot_id << " in LoopClosureInitialAlignModule.";
