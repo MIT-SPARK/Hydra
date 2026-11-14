@@ -7,7 +7,7 @@ namespace hydra {
 
 struct OpenVocabRegionsUpdateFunctor : public UpdateFunctor {
   struct Config : VerbosityConfig {
-    char id_prefix = 'r';
+    char id_prefix = 'R';
     std::string source_layer = spark_dsg::DsgLayers::PLACES;
     std::string target_layer = spark_dsg::DsgLayers::ROOMS;
     size_t min_num_nodes = 5;

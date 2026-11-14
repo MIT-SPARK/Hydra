@@ -36,6 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
+#include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
@@ -84,6 +85,7 @@ using spark_dsg::TraversabilityNodeAttributes;
 void declare_config(BlockTraversabilityClustering::Config& config) {
   using namespace config;
   name("BlockTraversabilityClustering::Config");
+  field<CharConversion>(config.node_prefix, "node_prefix");
   field(config.min_place_width, "min_place_width");
   field(config.max_place_width, "max_place_width");
   field(config.recursive, "recursive");
@@ -539,7 +541,7 @@ void BlockTraversabilityClustering::updatePlaceNodesInDsg(
 
       if (place.node_id == 0) {
         // Node does not exist yet, create a new place node.
-        place.node_id = spark_dsg::NodeSymbol('t', current_id_++);
+        place.node_id = spark_dsg::NodeSymbol(config.node_prefix, current_id_++);
         auto attrs = std::make_unique<TraversabilityNodeAttributes>();
         attrs->is_active = true;
         graph.emplaceNode(layer_name, place.node_id, std::move(attrs));

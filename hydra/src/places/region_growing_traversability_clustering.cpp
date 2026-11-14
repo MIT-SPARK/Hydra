@@ -36,6 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
+#include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <hydra/utils/nearest_neighbor_utilities.h>
@@ -69,6 +70,7 @@ using VoxelMap = RegionGrowingTraversabilityClustering::VoxelMap;
 void declare_config(RegionGrowingTraversabilityClustering::Config& config) {
   using namespace config;
   name("RegionGrowingTraversabilityClustering::Config");
+  field<CharConversion>(config.node_prefix, "node_prefix");
   field(config.max_radius, "max_radius", "m");
   field(config.num_orientation_bins, "num_orientation_bins");
   field(config.use_diagonal_connectivity, "use_diagonal_connectivity");
@@ -447,7 +449,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
 
 RegionGrowingTraversabilityClustering::Region&
 RegionGrowingTraversabilityClustering::allocateNewRegion() {
-  const NodeId id = spark_dsg::NodeSymbol('t', ++current_id_);
+  const NodeId id = spark_dsg::NodeSymbol(config.node_prefix, ++current_id_);
   auto& region = regions_[id];
   region.id = id;
   return region;
