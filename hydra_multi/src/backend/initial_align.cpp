@@ -38,26 +38,16 @@ void InitialAlignModule::update(InitialAlignModule::Info::Ptr info) {
 }
 
 gtsam::Values InitialAlignModule::computeInitialGuess(
-    InitialAlignModule::Info::Ptr info,
-    const gtsam::Values& input_values,
-    const NodeIdRobotMap& node_id_robot_map) {
+    InitialAlignModule::Info::Ptr info, const gtsam::Values& input_values) {
   gtsam::Values aligned;
   for (const auto& key : input_values.keys()) {
     gtsam::Symbol node(key);
     RobotId robot_id;
-    if (node.chr() == 'p' || node.chr() == 'O') {
-      // Places or object nodes
-      if (!node_id_robot_map.count(key)) {
-        LOG(ERROR) << "Unrecognized node in loopClosureInitialization";
-        continue;
-      }
-      robot_id = node_id_robot_map.at(key);
-    } else if (kimera_pgmo::robot_prefix_to_id.count(node.chr())) {
+    if (kimera_pgmo::robot_prefix_to_id.count(node.chr())) {
       // Agent node
       robot_id = getFrame(kimera_pgmo::robot_prefix_to_id.at(node.chr()));
-    } else if (kimera_pgmo::vertex_prefix_to_id.count(node.chr())) {
-      // Deformation graph vertex
-      robot_id = getFrame(kimera_pgmo::vertex_prefix_to_id.at(node.chr()));
+    } else if (kimera_pgmo::isVertexKey(key)) {  // Deformation graph vertex
+      robot_id = getFrame(kimera_pgmo::idFromVertexKey(key));
     } else {
       LOG(ERROR) << "Unrecognized prefix in loopClosureInitialization.";
       continue;
@@ -66,16 +56,6 @@ gtsam::Values InitialAlignModule::computeInitialGuess(
     if (!W_T_robot_.count(robot_id)) {
       LOG_EVERY_N(ERROR, 50) << "Missing Robot ID (" << robot_id
                              << ") when computing initial guess.";
-      continue;
-    }
-
-    if (node.chr() == 'p' || node.chr() == 'O') {
-      // Places are from temporary values (not stored in pgmo dgraph)
-      gtsam::Pose3 Wglobal_T_Wrobot = W_T_robot_.at(robot_id);
-      gtsam::Pose3 Wrobot_T_pose =
-          info->getPrevRobotPose(robot_id).between(input_values.at<gtsam::Pose3>(key));
-      gtsam::Pose3 Wglobal_T_pose = Wglobal_T_Wrobot.compose(Wrobot_T_pose);
-      aligned.insert(key, Wglobal_T_pose);
       continue;
     }
 
@@ -92,6 +72,7 @@ gtsam::Values InitialAlignModule::computeInitialGuess(
     gtsam::Pose3 Wglobal_T_pose = Wglobal_T_Wrobot.compose(Wrobot_T_pose);
     aligned.insert(key, Wglobal_T_pose);
   }
+
   return aligned;
 }
 

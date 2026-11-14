@@ -245,30 +245,7 @@ TEST(LoopClosureInitialAlignTests, ComputeInitialGuess) {
   info->dgraph = dgraph;
   ia.update(info);
 
-  NodeIdRobotMap id_robot_map;
-  // Add places
-  initial.insert(gtsam::Symbol('p', 0),
-                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(1, 0, 0)));
-  id_robot_map[gtsam::Symbol('p', 0)] = 0;
-  initial.insert(gtsam::Symbol('p', 1),
-                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(1, 0, 0)));
-  id_robot_map[gtsam::Symbol('p', 1)] = 1;
-  initial.insert(gtsam::Symbol('p', 2),
-                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(1, 0, 0)));
-  id_robot_map[gtsam::Symbol('p', 2)] = 2;
-
-  // Add objects
-  initial.insert(gtsam::Symbol('O', 0),
-                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(-1, 0, 0)));
-  id_robot_map[gtsam::Symbol('O', 0)] = 0;
-  initial.insert(gtsam::Symbol('O', 1),
-                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(-1, 0, 0)));
-  id_robot_map[gtsam::Symbol('O', 1)] = 1;
-  initial.insert(gtsam::Symbol('O', 2),
-                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(-1, 0, 0)));
-  id_robot_map[gtsam::Symbol('O', 2)] = 2;
-
-  gtsam::Values aligned = ia.computeInitialGuess(info, initial, id_robot_map);
+  gtsam::Values aligned = ia.computeInitialGuess(info, initial);
   for (size_t i = 0; i < 3; i++) {
     EXPECT_TRUE(gtsam::assert_equal(
         gtsam::Pose3(), aligned.at<gtsam::Pose3>(gtsam::Symbol('a', i)), 1e-2));

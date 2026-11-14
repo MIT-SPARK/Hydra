@@ -218,7 +218,7 @@ void DeformationInterpolator::interpolate(const SceneGraph& unmerged,
 
   const auto& dgraph = *info->deformation_graph;
   for (auto& [robot_id, entries] : robot_entries) {
-    const auto prefix = kimera_pgmo::GetVertexPrefix(robot_id);
+    const auto prefix = kimera_pgmo::getVertexPrefix(robot_id);
     entries.sort();
 
     const auto deform_func = [&](const Eigen::Isometry3d& transform, size_t index) {

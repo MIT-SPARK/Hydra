@@ -748,10 +748,9 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
       VLOG(3) << "Deforming mesh for robot " << id;
       // TODO(Yun): cannot use pre archived vertices as 'start_hint'
       // Note that here the mesh in the state is actually getting modified!
-      char vertex_prefix = kimera_pgmo::robot_id_to_vertex_prefix.at(id);
       deformation_graph_->deformPoints(*mesh_data->mesh,
                                        mesh_data->original,
-                                       vertex_prefix,
+                                       kimera_pgmo::getVertexPrefix(id),
                                        KimeraPgmoInterface::config_.num_interp_pts,
                                        KimeraPgmoInterface::config_.interp_horizon);
     }
@@ -805,10 +804,8 @@ void MultiBackendModule::initialAlignment() {
   VLOG(10) << "Running initial alignment";
   initial_align_->update(info);
 
-  // TODO(Yun): temp values not aligned. Might be fine for now
   auto pgmo_values = deformation_graph_->getValuesCopy();
-  const auto initial_values = initial_align_->computeInitialGuess(
-      info, pgmo_values, merged_dsg_->node_robot_map);
+  const auto initial_values = initial_align_->computeInitialGuess(info, pgmo_values);
   deformation_graph_->updateValues(initial_values);
 }
 
