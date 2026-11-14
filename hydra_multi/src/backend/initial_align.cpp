@@ -43,9 +43,8 @@ gtsam::Values InitialAlignModule::computeInitialGuess(
   for (const auto& key : input_values.keys()) {
     gtsam::Symbol node(key);
     RobotId robot_id;
-    if (kimera_pgmo::robot_prefix_to_id.count(node.chr())) {
-      // Agent node
-      robot_id = getFrame(kimera_pgmo::robot_prefix_to_id.at(node.chr()));
+    if (kimera_pgmo::isRobotKey(key)) {  // Agent node
+      robot_id = getFrame(kimera_pgmo::idFromRobotKey(key));
     } else if (kimera_pgmo::isVertexKey(key)) {  // Deformation graph vertex
       robot_id = getFrame(kimera_pgmo::idFromVertexKey(key));
     } else {
@@ -60,7 +59,7 @@ gtsam::Values InitialAlignModule::computeInitialGuess(
     }
 
     gtsam::Pose3 Wrobot_T_pose;
-    if (kimera_pgmo::robot_prefix_to_id.count(node.chr())) {
+    if (kimera_pgmo::isRobotKey(key)) {
       Wrobot_T_pose = info->getPrevRobotPose(robot_id).between(
           info->dgraph->getInitialPose(node.chr(), node.index()));
     } else {
@@ -79,15 +78,14 @@ gtsam::Values InitialAlignModule::computeInitialGuess(
 bool InitialAlignModule::checkAlignConsistent(InitialAlignModule::Info::Ptr info) {
   const auto optimized_values = info->dgraph->getValues();
   for (const auto& [robot_id, transform] : W_T_robot_) {
-    CHECK(kimera_pgmo::robot_id_to_prefix.count(robot_id));
+    CHECK(kimera_pgmo::isValidId(robot_id));
 
-    const char robot_prefix = kimera_pgmo::robot_id_to_prefix.at(robot_id);
-
-    const gtsam::Pose3& Wrobot_T_pose = info->getPrevRobotPose(robot_id).between(
+    const char robot_prefix = kimera_pgmo::getRobotPrefix(robot_id);
+    const gtsam::Pose3 Wrobot_T_pose = info->getPrevRobotPose(robot_id).between(
         info->dgraph->getInitialPose(robot_prefix, 0));
-    const gtsam::Pose3& Wglobal_T_pose =
+    const gtsam::Pose3 Wglobal_T_pose =
         optimized_values->at<gtsam::Pose3>(gtsam::Symbol(robot_prefix, 0));
-    const gtsam::Pose3& Wglobal_T_Wrobot =
+    const gtsam::Pose3 Wglobal_T_Wrobot =
         Wglobal_T_pose.compose(Wrobot_T_pose.inverse());
     if (!transform.equals(Wglobal_T_Wrobot, config.dgraph_consistency_tol)) {
       LOG(ERROR) << "Robot " << robot_id << " has initial alignment: " << transform
