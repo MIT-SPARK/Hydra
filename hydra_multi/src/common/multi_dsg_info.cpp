@@ -85,6 +85,7 @@ void MultiDsgInfo::addRobotGraph(size_t robot_id,
 }
 
 void MultiDsgInfo::addLabelspaces(size_t robot_id, const SceneGraph& dsg) {
+  // TODO(nathan) clean up this implementation
   // Semantic labels stay as they are when graphs are merged, so the merged graph
   // needs the robots' label -> category name maps to stay readable (without them,
   // every consumer, e.g. a prior map loaded into a planner, only sees label ids).
