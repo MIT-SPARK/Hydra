@@ -77,6 +77,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.no_packet_collation, "no_packet_collation");
   field(config.clear_object_meshes, "clear_object_meshes");
   field(config.enable_mesh_objects, "enable_mesh_objects");
+  config.mesh_compression.setOptional();
   field(config.mesh_compression, "mesh_compression");
 
   field(config.graph_updater, "graph_updater");
@@ -135,7 +136,9 @@ GraphBuilder::GraphBuilder(const Config& config,
   CHECK(dsg_->graph != nullptr);
   dsg_->graph->setMesh(global_info.createMesh());
 
-  addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
+  if (mesh_compression_) {
+    addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
+  }
 
   // TODO(nathan) this needs to be pushed to an actual config at some point
   functors_.emplace("pose_graph_tracker", config.pose_graph_tracker.create());
@@ -386,6 +389,11 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
+  if (!mesh_compression_) {
+    LOG_FIRST_N(WARNING, 1)
+        << "MeshCompression turned off! Post-mesh callbacks will not run!";
+  }
+
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     last_mesh_update_ = mesh_compression_->update(input, map_window_.get());
