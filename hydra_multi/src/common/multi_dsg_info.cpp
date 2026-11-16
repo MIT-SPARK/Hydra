@@ -5,6 +5,8 @@
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <nlohmann/json.hpp>
+
 namespace hydra_multi {
 
 using spark_dsg::LayerKey;
@@ -78,7 +80,43 @@ void MultiDsgInfo::addRobotGraph(size_t robot_id,
 
   robot_node_map[robot_id] = {};
   remapAndAddLayers(robot_id, dsg, transform);
+  addLabelspaces(robot_id, dsg);
   updated = true;
+}
+
+void MultiDsgInfo::addLabelspaces(size_t robot_id, const SceneGraph& dsg) {
+  // TODO(nathan) clean up this implementation
+  // Semantic labels stay as they are when graphs are merged, so the merged graph
+  // needs the robots' label -> category name maps to stay readable (without them,
+  // every consumer, e.g. a prior map loaded into a planner, only sees label ids).
+  const auto& incoming = dsg.metadata();
+  const auto incoming_spaces = incoming.find("labelspaces");
+  if (incoming_spaces == incoming.end() || !incoming_spaces->is_object()) {
+    return;
+  }
+
+  const auto& current = graph->metadata();
+  const auto current_spaces = current.find("labelspaces");
+  auto to_add = nlohmann::json::object();
+  for (const auto& [key, mapping] : incoming_spaces->items()) {
+    if (mapping.empty()) {
+      continue;
+    }
+
+    if (current_spaces != current.end() && current_spaces->contains(key) &&
+        !current_spaces->at(key).empty()) {
+      LOG_IF(WARNING, current_spaces->at(key) != mapping)
+          << "Robot " << robot_id << " has a different labelspace for '" << key
+          << "' than an earlier robot; keeping the earlier one";
+      continue;
+    }
+
+    to_add[key] = mapping;
+  }
+
+  if (!to_add.empty()) {
+    graph->metadata.add(nlohmann::json{{"labelspaces", to_add}});
+  }
 }
 
 void MultiDsgInfo::remapAndAddLayer(size_t robot_id,
