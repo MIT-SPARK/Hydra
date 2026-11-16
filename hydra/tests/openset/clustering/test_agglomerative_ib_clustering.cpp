@@ -1,9 +1,11 @@
+#include <config_utilities/parsing/yaml.h>
 #include <gtest/gtest.h>
 #include <hydra/openset/clustering/agglomerative_ib_clustering.h>
 #include <hydra/utils/printing.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
+#include <spark_dsg/scene_graph_layer.h>
 
 namespace hydra {
 
@@ -404,6 +406,128 @@ TEST(AgglomerativeIBClustering, GetClustersCorrect) {
     const auto result = getNodeAssignments(clusters);
     std::map<NodeId, size_t> expected{{0, 0}, {2, 0}, {4, 0}, {6, 0}, {8, 0}};
     EXPECT_EQ(expected, result) << workspaceState(ws);
+  }
+}
+
+namespace {
+
+// Features that all share one dominant direction (e0) plus a small distinct part:
+// nodes 0-2 lean towards e1 and nodes 3-5 lean towards e2
+Eigen::VectorXf sharedFeature(size_t node) {
+  Eigen::VectorXf f = Eigen::VectorXf::Zero(6);
+  f(0) = 1.0f;
+  f(node < 3 ? 1 : 2) = 0.3f;
+  return f;
+}
+
+// Query 'a' (distinct part e1) overlaps the shared direction much more than query 'b'
+// (distinct part e2)
+const std::string kUnequalQueries = R"(
+type: from_config
+names: [a, b]
+embeddings: [[0.5, 0.3, 0.0, 0.0, 0.0, 0.0], [0.1, 0.0, 0.3, 0.0, 0.0, 0.0]]
+)";
+
+std::unique_ptr<SceneGraphLayer> makeSharedFeatureLayer() {
+  auto layer = std::make_unique<SceneGraphLayer>(2);
+  for (size_t i = 0; i < 6; ++i) {
+    auto attrs = std::make_unique<SemanticNodeAttributes>();
+    attrs->semantic_feature = sharedFeature(i);
+    layer->emplaceNode(i, std::move(attrs));
+    if (i > 0) {
+      layer->insertEdge(i - 1, i);
+    }
+  }
+
+  return layer;
+}
+
+AgglomerativeIBClustering::Config makeClusteringConfig(const std::string& params) {
+  auto node = YAML::Load(params);
+  node["queries"] = YAML::Load(kUnequalQueries);
+  return config::fromYaml<AgglomerativeIBClustering::Config>(node);
+}
+
+// best query per node (-1 if the cluster score is below the threshold)
+std::map<NodeId, int> getNodeLabels(const LayerClustering::Clusters& clusters,
+                                    double threshold) {
+  std::map<NodeId, int> labels;
+  for (const auto& cluster : clusters) {
+    for (const auto node_id : cluster->nodes) {
+      labels[node_id] = cluster->score >= threshold ? cluster->best_query : -1;
+    }
+  }
+
+  return labels;
+}
+
+}  // namespace
+
+TEST(AgglomerativeIBClustering, CenterQueriesRemovesSharedDirection) {
+  const auto queries = config::fromYaml<EmbeddingGroup>(YAML::Load(kUnequalQueries));
+  NodeEmbeddingMap features;
+  for (size_t i = 0; i < 6; ++i) {
+    features[i] = sharedFeature(i);
+  }
+
+  CosineDistance dist;
+  {  // without centering: query 'a' wins at every node
+    for (const auto& [node_id, feature] : features) {
+      EXPECT_EQ(queries.getBestScore(dist, feature).index, 0u) << "node " << node_id;
+    }
+  }
+
+  const auto centered = AgglomerativeIBClustering::centerQueries(queries, features);
+  ASSERT_EQ(centered.embeddings.size(), 2u);
+  EXPECT_EQ(centered.names, queries.names);
+
+  Eigen::VectorXf mean = Eigen::VectorXf::Zero(6);
+  for (const auto& [node_id, feature] : features) {
+    mean += feature.normalized();
+  }
+  mean.normalize();
+
+  for (const auto& query : centered.embeddings) {
+    EXPECT_NEAR(query.norm(), 1.0f, 1.0e-6f);
+    EXPECT_NEAR(query.dot(mean), 0.0f, 1.0e-6f);
+  }
+
+  // with centering: the assignment follows the distinct parts
+  for (const auto& [node_id, feature] : features) {
+    const auto best = centered.getBestScore(dist, feature);
+    EXPECT_EQ(best.index, node_id < 3 ? 0u : 1u) << "node " << node_id;
+    EXPECT_LT(std::abs(best.score), 0.25f);  // centered scores are small
+  }
+}
+
+TEST(AgglomerativeIBClustering, CenterQueriesClustering) {
+  const auto layer = makeSharedFeatureLayer();
+  ASSERT_TRUE(layer);
+
+  {  // default: one query wins everywhere
+    const auto config =
+        makeClusteringConfig("{score_threshold: 0.2, top_k: 1, max_delta: 0.01}");
+    ASSERT_FALSE(config.center_queries);
+    const AgglomerativeIBClustering clustering(config);
+    const auto labels = getNodeLabels(clustering.cluster(*layer), 0.2);
+    ASSERT_EQ(labels.size(), 6u);
+    for (const auto& [node_id, label] : labels) {
+      EXPECT_EQ(label, 0) << "node " << node_id;
+    }
+  }
+
+  {  // centered: the regions follow the distinct parts of the features
+    const auto config = makeClusteringConfig(
+        "{score_threshold: 0.01, top_k: 1, max_delta: 0.01, center_queries: true}");
+    ASSERT_TRUE(config.center_queries);
+    const AgglomerativeIBClustering clustering(config);
+    const auto clusters = clustering.cluster(*layer);
+    EXPECT_EQ(clusters.size(), 2u);
+    const auto labels = getNodeLabels(clusters, 0.01);
+    ASSERT_EQ(labels.size(), 6u);
+    for (const auto& [node_id, label] : labels) {
+      EXPECT_EQ(label, node_id < 3 ? 0 : 1) << "node " << node_id;
+    }
   }
 }
 

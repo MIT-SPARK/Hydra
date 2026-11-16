@@ -7,6 +7,7 @@
 #include <spark_dsg/printing.h>
 
 #include <numeric>
+#include <optional>
 
 #include "hydra/utils/printing.h"
 #include "hydra/utils/probability_utilities.h"
@@ -359,6 +360,7 @@ void declare_config(AgglomerativeIBClustering::Config& config) {
   config.metric.setOptional();
   field(config.metric, "metric");
   field(config.filter_clusters, "filter_clusters");
+  field(config.center_queries, "center_queries");
 }
 
 AgglomerativeIBClustering::AgglomerativeIBClustering(const Config& config)
@@ -386,7 +388,13 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
     return {};
   }
 
-  Workspace ws(config, layer, features, *queries_, *metric_);
+  std::optional<EmbeddingGroup> centered;
+  if (config.center_queries) {
+    centered = centerQueries(*queries_, features);
+  }
+
+  const EmbeddingGroup& queries = centered ? *centered : *queries_;
+  Workspace ws(config, layer, features, queries, *metric_);
   MLOG(1) << "starting clustering with " << ws.edges.size() << " edges";
   cluster(ws, config);
   MLOG(1) << ws.summary();
@@ -408,7 +416,7 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
 
     cluster->feature /= cluster->nodes.size();
 
-    const auto info = queries_->getBestScore(*metric_, cluster->feature);
+    const auto info = queries.getBestScore(*metric_, cluster->feature);
     if (config.filter_clusters && info.score < config.score_threshold) {
       continue;
     }
@@ -423,6 +431,63 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
 
   MLOG(1) << "finished clustering with " << to_return.size() << " cluster(s)";
   return to_return;
+}
+
+EmbeddingGroup AgglomerativeIBClustering::centerQueries(
+    const EmbeddingGroup& queries, const Workspace::NodeEmbeddings& features) {
+  EmbeddingGroup centered;
+  centered.names = queries.names;
+  centered.embeddings = queries.embeddings;
+  if (features.empty() || queries.embeddings.empty()) {
+    return centered;
+  }
+
+  const auto dim = features.begin()->second.size();
+  Eigen::VectorXd mean = Eigen::VectorXd::Zero(dim);
+  size_t num_used = 0;
+  for (const auto& [node_id, feature] : features) {
+    const auto norm = feature.norm();
+    if (feature.size() != dim || norm <= 0.0f) {
+      continue;
+    }
+
+    mean += feature.cast<double>() / norm;
+    ++num_used;
+  }
+
+  if (num_used == 0 || mean.norm() < 1.0e-9) {
+    LOG(WARNING) << "Cannot center queries: degenerate mean feature";
+    return centered;
+  }
+
+  mean /= num_used;
+  VLOG(1) << "centering queries: |mean normalized feature| = " << mean.norm()
+          << " over " << num_used << " feature(s)";
+  mean.normalize();
+
+  for (auto& query : centered.embeddings) {
+    if (query.size() != dim) {
+      LOG(ERROR) << "Cannot center queries: query dimension " << query.size()
+                 << " != feature dimension " << dim;
+      centered.embeddings = queries.embeddings;
+      return centered;
+    }
+
+    Eigen::VectorXd q = query.cast<double>();
+    const auto q_norm = q.norm();
+    if (q_norm <= 0.0) {
+      continue;
+    }
+
+    q /= q_norm;
+    q -= q.dot(mean) * mean;
+    const auto c_norm = q.norm();
+    // a query parallel to the mean has no distinct part left (and scores 0 everywhere)
+    query = c_norm > 1.0e-9 ? (q / c_norm).cast<float>().eval()
+                            : FeatureVector::Zero(dim).eval();
+  }
+
+  return centered;
 }
 
 void AgglomerativeIBClustering::cluster(Workspace& ws, const VerbosityConfig& config) {
