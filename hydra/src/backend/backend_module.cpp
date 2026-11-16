@@ -447,7 +447,7 @@ bool BackendModule::updateFromLcdQueue() {
 void BackendModule::copyMeshDelta(const FrontendOutput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
   if (!input.mesh_update) {
-    LOG(WARNING) << "[Hydra Backend] invalid mesh update!";
+    LOG_FIRST_N(WARNING, 1) << "[Hydra Backend] invalid mesh update!";
     return;
   }
 
