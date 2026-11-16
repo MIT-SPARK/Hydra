@@ -25,6 +25,10 @@ class MultiDsgInfo : public hydra::SharedDsgInfo {
                      Eigen::Isometry3d* transform = nullptr);
 
  private:
+  //! Copy the robot graph's labelspaces (category names per layer) into the merged
+  //! graph's metadata; the first robot to provide a layer's labelspace wins.
+  void addLabelspaces(size_t robot_id, const spark_dsg::SceneGraph& dsg);
+
   void remapAndAddLayer(size_t robot_id,
                         spark_dsg::LayerKey layer_key,
                         const spark_dsg::SceneGraph& dsg,
