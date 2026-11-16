@@ -18,6 +18,7 @@
 
 #include <fstream>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <ranges>
 #include <set>
 
@@ -244,28 +245,22 @@ void MultiBackendModule::save(const DataDirectory& output) {
   // node id bookkeeping so per-robot data keyed by node id (e.g. image stores) can be
   // re-keyed into the fused graph: robot -> [original id, fused id], fused merges
   {
-    std::ofstream map_file(backend_path / "fusion_node_map.json");
-    map_file << "{\"robots\": {";
-    bool first_robot = true;
+    nlohmann::json robots = nlohmann::json::object();
     for (const auto& [robot_id, node_map] : unmerged_dsg_->robot_node_map) {
-      map_file << (first_robot ? "" : ", ") << "\"" << robot_id << "\": [";
-      first_robot = false;
-      std::map<NodeId, NodeId> sorted(node_map.begin(), node_map.end());
-      bool first = true;
+      const std::map<NodeId, NodeId> sorted(node_map.begin(), node_map.end());
+      auto& pairs = robots[std::to_string(robot_id)] = nlohmann::json::array();
       for (const auto& [original, fused] : sorted) {
-        map_file << (first ? "" : ", ") << "[" << original << ", " << fused << "]";
-        first = false;
+        pairs.push_back({original, fused});
       }
-      map_file << "]";
     }
 
-    map_file << "}, \"merges\": [";
-    bool first = true;
+    auto merges = nlohmann::json::array();
     for (const auto& [child, parent] : merged_dsg_->merges) {
-      map_file << (first ? "" : ", ") << "[" << child << ", " << parent << "]";
-      first = false;
+      merges.push_back({child, parent});
     }
-    map_file << "]}\n";
+
+    std::ofstream map_file(backend_path / "fusion_node_map.json");
+    map_file << nlohmann::json{{"robots", robots}, {"merges", merges}} << "\n";
   }
 
   writeBackendStatus(status_log_, pgmo_path / "dsg_pgmo_status.csv");
