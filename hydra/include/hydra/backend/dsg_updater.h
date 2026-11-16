@@ -39,6 +39,10 @@
 
 #include <map>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/common/output_sink.h"
@@ -66,7 +70,9 @@ class DsgUpdater {
     bool enable_node_merging = true;
     //! If true, reset the private DSG with the unmerged graph on every loop closure
     bool reset_dsg_on_loop_closure = false;
-    //! Update functors that get applied in the specified order
+    //! Update functors, called in the order they are listed in the config (each
+    //! functor's merges are applied before the next functor runs, so a functor that
+    //! reads a layer should be listed after any functor that merges that layer)
     config::OrderedMap<std::string, FunctorConfig> update_functors;
     //! Names of functors to use exhaustive merging for
     std::vector<std::string> exhaustive_functors;
@@ -100,7 +106,8 @@ class DsgUpdater {
 
   GroupedMergeTracker merge_tracker;
   const std::set<std::string> exhaustive_names_;
-  std::map<std::string, UpdateFunctor::Ptr> update_functors_;
+  //! Functors in config order (not sorted by name)
+  std::vector<std::pair<std::string, UpdateFunctor::Ptr>> update_functors_;
 
   std::vector<spark_dsg::NodeId> active_nodes_to_restore_;
   spark_dsg::SceneGraph::Ptr source_graph_;
