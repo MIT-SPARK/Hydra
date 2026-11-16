@@ -16,6 +16,9 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
+#include <fstream>
+#include <map>
+#include <nlohmann/json.hpp>
 #include <ranges>
 #include <set>
 
@@ -237,6 +240,27 @@ void MultiBackendModule::save(const DataDirectory& output) {
   if (mesh && !mesh->empty()) {
     // mesh implements vertex and face traits
     kimera_pgmo::WriteMesh(backend_path / "mesh.ply", *mesh, *mesh);
+  }
+
+  // node id bookkeeping so per-robot data keyed by node id (e.g. image stores) can be
+  // re-keyed into the fused graph: robot -> [original id, fused id], fused merges
+  {
+    nlohmann::json robots = nlohmann::json::object();
+    for (const auto& [robot_id, node_map] : unmerged_dsg_->robot_node_map) {
+      const std::map<NodeId, NodeId> sorted(node_map.begin(), node_map.end());
+      auto& pairs = robots[std::to_string(robot_id)] = nlohmann::json::array();
+      for (const auto& [original, fused] : sorted) {
+        pairs.push_back({original, fused});
+      }
+    }
+
+    auto merges = nlohmann::json::array();
+    for (const auto& [child, parent] : merged_dsg_->merges) {
+      merges.push_back({child, parent});
+    }
+
+    std::ofstream map_file(backend_path / "fusion_node_map.json");
+    map_file << nlohmann::json{{"robots", robots}, {"merges", merges}} << "\n";
   }
 
   writeBackendStatus(status_log_, pgmo_path / "dsg_pgmo_status.csv");
