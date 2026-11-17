@@ -39,6 +39,7 @@
 #include <Eigen/Dense>
 #include <map>
 
+#include "hydra/openset/embedding_group.h"
 #include "hydra/openset/layer_clustering.h"
 #include "hydra/utils/logging.h"
 
@@ -56,6 +57,13 @@ class AgglomerativeIBClustering : public LayerClustering {
 
   struct Config : LayerClustering::Config, ClusteringConfig {
     bool filter_clusters = false;
+    //! If true, remove the component along the mean source-layer feature from each
+    //! query before scoring (recomputed on every call to cluster()). Useful when all
+    //! node features share one dominant direction, which otherwise gives the queries
+    //! that happen to overlap it most a constant head start at every node. Note that
+    //! scores are on a different scale with centering (small and centered near 0),
+    //! so score_threshold and max_delta need to be set accordingly
+    bool center_queries = false;
   } const config;
 
   struct Workspace {
@@ -142,6 +150,16 @@ class AgglomerativeIBClustering : public LayerClustering {
   Clusters cluster(const spark_dsg::SceneGraphLayer& layer) const override;
 
   static void cluster(Workspace& workspace, const VerbosityConfig& config = {});
+
+  /**
+   * @brief Remove the mean feature direction from each query
+   *
+   * Computes m = normalize(mean_i(normalize(f_i))) over the provided features and
+   * replaces every query q with normalize(q' - (q' . m) m), where q' = normalize(q).
+   * Queries are returned unchanged if the mean is degenerate or dimensions mismatch.
+   */
+  static EmbeddingGroup centerQueries(const EmbeddingGroup& queries,
+                                      const Workspace::NodeEmbeddings& features);
 };
 
 void declare_config(AgglomerativeIBClustering::ClusteringConfig& config);
