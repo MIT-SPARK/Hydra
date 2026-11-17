@@ -103,8 +103,14 @@ DsgUpdater::DsgUpdater(const Config& config,
                         config.exhaustive_functors.end()),
       source_graph_(source),
       target_dsg_(target) {
+  std::set<std::string> seen;
   for (const auto& [name, functor] : config.update_functors) {
-    update_functors_.emplace(name, functor.create());
+    if (!seen.insert(name).second) {
+      LOG(WARNING) << "Ignoring duplicate update functor '" << name << "'";
+      continue;
+    }
+
+    update_functors_.emplace_back(name, functor.create());
     merge_tracker.initializeTracker(name);
   }
 }
