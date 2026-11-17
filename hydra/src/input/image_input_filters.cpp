@@ -38,6 +38,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 
 #include <limits>
 
@@ -54,6 +55,7 @@ static const auto registration =
 void declare_config(InvalidDepthFilter::Config& config) {
   using namespace config;
   name("InvalidDepthFilter::Config");
+  base<VerbosityConfig>(config);
   field(config.max_invalid_ratio, "max_invalid_ratio");
   field(config.inf_is_valid, "inf_is_valid");
   checkInRange(config.max_invalid_ratio, 0.0, 1.0, "max_invalid_ratio", false);
@@ -87,7 +89,16 @@ bool InvalidDepthFilter::valid(const SensorInputPacket& current,
   }
 
   const auto ratio = static_cast<double>(num_invalid) / total;
-  return ratio < config.max_invalid_ratio;
+  const bool passes = ratio < config.max_invalid_ratio;
+  const double valid_pct = 100.0 * (1.0 - ratio);
+  const double required_pct = 100.0 * (1.0 - config.max_invalid_ratio);
+  MLOG(1) << "valid depth: " << valid_pct << "% (" << total - num_invalid << "/"
+          << total << "), required > " << required_pct << "%";
+  if (!passes) {
+    MLOG(0) << "DROPPING FRAME: VALID DEPTH " << valid_pct
+            << "% DOES NOT MEET REQUIRED " << required_pct << "%";
+  }
+  return passes;
 }
 
 }  // namespace hydra
