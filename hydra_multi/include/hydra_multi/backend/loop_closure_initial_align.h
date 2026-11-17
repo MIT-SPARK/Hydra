@@ -2,9 +2,9 @@
 #include <config_utilities/factory.h>
 #include <gtsam/geometry/Pose3.h>
 #include <kimera_pgmo/deformation_graph.h>
+#include <kimera_pgmo/optimizer/kimera_rpgo_optimizer.h>
 
 #include <map>
-#include <set>
 
 #include "hydra_multi/backend/initial_align.h"
 #include "hydra_multi/common/types.h"
@@ -16,9 +16,10 @@ class LoopClosureInitialAlignModule : public InitialAlignModule {
   // Types.
   using Ptr = std::unique_ptr<LoopClosureInitialAlignModule>;
   struct Config : InitialAlignModule::Config {
-    double alignment_gnc_alpha = 0.7;
+    Config();
     double rot_sigma = 0.1;
     double trans_sigma = 1.0;
+    kimera_pgmo::KimeraRpgoOptimizer::Config optimizer;
   } config;
 
   using LoopClosures = std::vector<LoopClosure>;
@@ -49,17 +50,12 @@ class LoopClosureInitialAlignModule : public InitialAlignModule {
       const kimera_pgmo::DeformationGraph& dgraph);
 
  private:
+  kimera_pgmo::KimeraRpgoOptimizer optimizer_;
   MultiLoopClosures interrobot_lcs_;
   size_t align_num_measurements_ = 0;
   size_t align_num_inliers_ = 0;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<InitialAlignModule,
-                                     LoopClosureInitialAlignModule,
-                                     LoopClosureInitialAlignModule::Config>(
-          "LoopClosureInitialAlign");
 };
+
 void declare_config(LoopClosureInitialAlignModule::Config&);
 
 }  // namespace hydra_multi

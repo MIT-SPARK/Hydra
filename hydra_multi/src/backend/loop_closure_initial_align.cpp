@@ -10,27 +10,50 @@
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/slam/BetweenFactor.h>
+#include <kimera_pgmo/optimization_types.h>
 #include <kimera_pgmo/utils/common_functions.h>
 
 namespace hydra_multi {
+namespace {
 
-void declare_config(LoopClosureInitialAlignModule::Config& conf) {
-  using namespace config;
-  name("LoopClosureInitialAlignModule::Config");
-  base<InitialAlignModule::Config>(conf);
+static const auto registration =
+    config::RegistrationWithConfig<InitialAlignModule,
+                                   LoopClosureInitialAlignModule,
+                                   LoopClosureInitialAlignModule::Config>(
+        "LoopClosureInitialAlign");
 
-  field(conf.alignment_gnc_alpha, "alignment_gnc_alpha");
-  field(conf.rot_sigma, "rot_sigma");
-  field(conf.trans_sigma, "trans_sigma");
-
-  check(conf.alignment_gnc_alpha, GE, 0.f, "alignment_gnc_alpha");
-  check(conf.alignment_gnc_alpha, LE, 1.0f, "alignment_gnc_alpha");
-  check(conf.rot_sigma, GT, 0.f, "rot_sigma");
-  check(conf.trans_sigma, GT, 0.f, "trans_sigma");
+inline kimera_pgmo::KimeraRpgoOptimizer::Config makeConfigAtAlpha(double alpha) {
+  auto config = kimera_pgmo::KimeraRpgoOptimizer::Config();
+  config.gnc.inlier_probability = alpha;
+  return config;
 }
 
+size_t numInliersFromWeights(const std::vector<double>& weights) {
+  double total = 0;
+  for (const auto& w : weights) {
+    total += w;
+  }
+
+  return static_cast<size_t>(total);
+}
+
+}  // namespace
+
+void declare_config(LoopClosureInitialAlignModule::Config& config) {
+  using namespace config;
+  name("LoopClosureInitialAlignModule::Config");
+  base<InitialAlignModule::Config>(config);
+  field(config.rot_sigma, "rot_sigma");
+  field(config.trans_sigma, "trans_sigma");
+  field(config.optimizer, "optimizer");
+  check(config.rot_sigma, GT, 0.0f, "rot_sigma");
+  check(config.trans_sigma, GT, 0.0f, "trans_sigma");
+}
+
+LoopClosureInitialAlignModule::Config::Config() : optimizer(makeConfigAtAlpha(0.7)) {}
+
 LoopClosureInitialAlignModule::LoopClosureInitialAlignModule(const Config& config)
-    : config(config::checkValid(config)) {}
+    : config(config::checkValid(config)), optimizer_(config.optimizer) {}
 
 void LoopClosureInitialAlignModule::update(InitialAlignModule::Info::Ptr info) {
   InitialAlignModule::update(info);
@@ -78,10 +101,12 @@ bool LoopClosureInitialAlignModule::addLoopClosure(const gtsam::Key& from,
     interrobot_lcs_[from_robot_id] = std::map<RobotId, LoopClosures>();
     pairwise_transforms_[from_robot_id] = std::map<RobotId, Transforms>();
   }
+
   if (!interrobot_lcs_[from_robot_id].count(to_robot_id)) {
     interrobot_lcs_[from_robot_id][to_robot_id] = LoopClosures();
     pairwise_transforms_[from_robot_id][to_robot_id] = Transforms();
   }
+
   interrobot_lcs_[from_robot_id][to_robot_id].push_back({from, to, from_T_to});
   return true;
 }
@@ -142,17 +167,15 @@ gtsam::Pose3 LoopClosureInitialAlignModule::robustInitialGuess(
 
   const RobotId robot_0 = reference_robot;
 
-  gtsam::Values initial;
-  initial.insert(0, gtsam::Pose3());
-  gtsam::NonlinearFactorGraph factors;
+  kimera_pgmo::OptimizationProblem problem;
+  problem.initial.insert(0, gtsam::Pose3());
 
   // Set up noise
   gtsam::Vector sigmas;
   sigmas.resize(6);
   sigmas.head(3).setConstant(config.rot_sigma);
   sigmas.tail(3).setConstant(config.trans_sigma);
-  const gtsam::noiseModel::Diagonal::shared_ptr noise =
-      gtsam::noiseModel::Diagonal::Sigmas(sigmas);
+  const auto noise = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
 
   // Get all ransfroms from robot i to robot_id
   std::vector<std::pair<RobotId, gtsam::Pose3>> transforms_to;
@@ -162,12 +185,13 @@ gtsam::Pose3 LoopClosureInitialAlignModule::robustInitialGuess(
     for (const auto& to_transforms : from_to.second) {
       for (const auto& transform : to_transforms.second) {
         if (from_to.first == robot_0 && to_transforms.first == robot_id) {
-          factors.add(gtsam::PriorFactor<gtsam::Pose3>(0, transform, noise));
+          problem.factors.add(gtsam::PriorFactor<gtsam::Pose3>(0, transform, noise));
           continue;
         }
 
         if (from_to.first == robot_id && to_transforms.first == robot_0) {
-          factors.add(gtsam::PriorFactor<gtsam::Pose3>(0, transform.inverse(), noise));
+          problem.factors.add(
+              gtsam::PriorFactor<gtsam::Pose3>(0, transform.inverse(), noise));
           continue;
         }
 
@@ -196,18 +220,14 @@ gtsam::Pose3 LoopClosureInitialAlignModule::robustInitialGuess(
     for (const auto& interm2_transform : transforms_from_0) {
       if (interm1_transform.first == interm2_transform.first) {
         auto o_T_id = interm2_transform.second.compose(interm1_transform.second);
-        factors.add(gtsam::PriorFactor<gtsam::Pose3>(0, o_T_id, noise));
+        problem.factors.add(gtsam::PriorFactor<gtsam::Pose3>(0, o_T_id, noise));
       }
     }
   }
 
   // Solve with GNC
-  gtsam::GncParams<gtsam::LevenbergMarquardtParams> gnc_params;
-  auto gnc = gtsam::GncOptimizer<gtsam::GncParams<gtsam::LevenbergMarquardtParams>>(
-      factors, initial, gnc_params);
-  gnc.setInlierCostThresholdsAtProbability(config.alignment_gnc_alpha);
-  gtsam::Values estimate = gnc.optimize();
-  return estimate.at<gtsam::Pose3>(0);
+  const auto result = optimizer_.update(problem);
+  return result.estimates.at<gtsam::Pose3>(0);
 }
 
 void LoopClosureInitialAlignModule::computeInitialTransforms() {
@@ -217,13 +237,13 @@ void LoopClosureInitialAlignModule::computeInitialTransforms() {
   }
 
   // Set up initial guess
-  gtsam::Values initial;
+  kimera_pgmo::OptimizationProblem problem;
   for (const RobotId& robot : all_robots_) {
     if (W_T_robot_.count(robot)) {
-      initial.insert(robot, W_T_robot_.at(robot));
+      problem.initial.insert(robot, W_T_robot_.at(robot));
     } else {
       gtsam::Pose3 initial_guess = robustInitialGuess(robot);
-      initial.insert(robot, initial_guess);
+      problem.initial.insert(robot, initial_guess);
     }
   }
 
@@ -232,8 +252,7 @@ void LoopClosureInitialAlignModule::computeInitialTransforms() {
   sigmas.resize(6);
   sigmas.head(3).setConstant(config.rot_sigma);
   sigmas.tail(3).setConstant(config.trans_sigma);
-  const gtsam::noiseModel::Diagonal::shared_ptr noise =
-      gtsam::noiseModel::Diagonal::Sigmas(sigmas);
+  const auto noise = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
 
   // Determine reference robot: use config if set, otherwise use lowest ID
   const RobotId reference_robot =
@@ -243,33 +262,28 @@ void LoopClosureInitialAlignModule::computeInitialTransforms() {
           : *all_robots_.begin();
 
   // Add factors (from pairwise transforms)
-  gtsam::NonlinearFactorGraph factors;
   for (const auto& from_to : pairwise_transforms_) {
     for (const auto& to_transforms : from_to.second) {
       for (const auto& transform : to_transforms.second) {
-        factors.add(gtsam::BetweenFactor<gtsam::Pose3>(
+        problem.factors.add(gtsam::BetweenFactor<gtsam::Pose3>(
             from_to.first, to_transforms.first, transform, noise));
       }
     }
   }
   // Fix reference robot as identity
-  factors.add(gtsam::PriorFactor<gtsam::Pose3>(reference_robot, gtsam::Pose3(), noise));
+  problem.factors.add(gtsam::PriorFactor<gtsam::Pose3>(reference_robot, gtsam::Pose3(), noise));
 
   // TODO(Yun) Consider adding back set weights logic
 
   // Solve with GNC
-  align_num_measurements_ = factors.size() - 1;  // Don't count the prior factor
-  gtsam::GncParams<gtsam::LevenbergMarquardtParams> gnc_params;
-  auto gnc = gtsam::GncOptimizer<gtsam::GncParams<gtsam::LevenbergMarquardtParams>>(
-      factors, initial, gnc_params);
-  gnc.setInlierCostThresholdsAtProbability(config.alignment_gnc_alpha);
-  gtsam::Values estimate = gnc.optimize();
-  align_num_inliers_ = gnc.getWeights().sum();
+  align_num_measurements_ = problem.factors.size() - 1;  // Don't count the prior factor
+  const auto result = optimizer_.update(problem);
+  align_num_inliers_ = numInliersFromWeights(result.weights);
 
   // Update W_T_robot_
-  for (const auto& key : estimate.keys()) {
+  for (const auto& key : result.estimates.keys()) {
     const RobotId robot_id(key);
-    W_T_robot_[robot_id] = estimate.at<gtsam::Pose3>(key);
+    W_T_robot_[robot_id] = result.estimates.at<gtsam::Pose3>(key);
     VLOG(5) << "Update robot " << robot_id << " W_T_robot: " << W_T_robot_[robot_id];
   }
 }
