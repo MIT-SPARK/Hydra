@@ -58,12 +58,15 @@ void declare_config(HydraRosPipeline::Config& config) {
   name("HydraRosConfig");
   base<HydraPipeline::Config>(config);
   field(config.preprint_config, "preprint_config");
+  config.labelspace.setOptional();
+  field(config.labelspace, "labelspace");
   field(config.input, "input");
   field(config.status_monitor, "status_monitor");
 }
 
 HydraRosPipeline::HydraRosPipeline(const Config& config)
-    : HydraPipeline(config), config(config::checkValid(config)) {
+    : HydraPipeline(config, config.labelspace.create()),
+      config(config::checkValid(config)) {
   if (config.preprint_config) {
     LOG(INFO) << "Using configuration to start Hydra\n" << config::toString(config);
   }
@@ -79,7 +82,8 @@ void HydraRosPipeline::init() {
   auto nh = ianvs::NodeHandle::this_node("~");
   backend_->addSink(std::make_shared<RosBackendPublisher>(nh / "backend"));
   frontend_->addSink(std::make_shared<RosFrontendPublisher>(nh / "frontend"));
-  external_loop_closure_sub_.reset(new ExternalLoopClosureSubscriber(nh));
+  external_loop_closure_sub_ = std::make_unique<ExternalLoopClosureSubscriber>(
+      nh, [this](const auto& lc) { backend_->addExternalLoopClosure(lc); });
 
   using std::chrono::nanoseconds;
   monitor_ = std::make_unique<StatusMonitor>(config.status_monitor, nh);

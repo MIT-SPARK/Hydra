@@ -34,15 +34,9 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <cstdint>
-#include <filesystem>
 #include <map>
-#include <optional>
 #include <set>
 #include <string>
-
-namespace cv {
-class Mat;
-}
 
 namespace hydra {
 
@@ -62,22 +56,5 @@ struct Labelspace {
 };
 
 void declare_config(Labelspace& config);
-
-class LabelRemapper {
- public:
-  // Construction
-  LabelRemapper();
-  explicit LabelRemapper(const std::filesystem::path& filepath);
-  virtual ~LabelRemapper() = default;
-
-  std::optional<uint32_t> remapLabel(const uint32_t from) const;
-  void remapImage(cv::Mat& img) const;
-
-  bool empty() const;
-  operator bool() const;
-
- private:
-  std::map<uint32_t, uint32_t> label_remapping_;
-};
 
 }  // namespace hydra

@@ -40,12 +40,11 @@ namespace hydra {
 
 class ExternalLoopClosureSubscriber {
  public:
-  explicit ExternalLoopClosureSubscriber(ianvs::NodeHandle nh);
+  using Callback = std::function<void(const pose_graph_tools::PoseGraph&)>;
 
- protected:
-  void callback(const pose_graph_tools::PoseGraph& pose_graph);
+  ExternalLoopClosureSubscriber(ianvs::NodeHandle nh, const Callback& callback);
 
- protected:
+ private:
   pose_graph_tools::PoseGraphSubscription sub_;
 };
 
