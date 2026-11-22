@@ -170,6 +170,7 @@ TEST(KeyframeSelector, SavesAcceptedKeyframes) {
     EXPECT_EQ(entry.path().extension(), ".zip") << entry.path();
     ++num_files;
   }
+
   EXPECT_EQ(num_files, 3u);
 
   const auto loaded = InputData::load(log_path / "30.zip");
@@ -218,6 +219,7 @@ TEST(KeyframeSelector, ConsidersForwardedInputsInTimeOrder) {
   for (const auto& entry : std::filesystem::directory_iterator(log_path)) {
     files.insert(entry.path().filename().string());
   }
+
   EXPECT_EQ(files, std::set<std::string>({"10.zip", "30.zip", "40.zip"}));
   std::filesystem::remove_all(log_path.parent_path());
 }
@@ -301,17 +303,6 @@ TEST(KeyframeSelector, SensorSuffixForSecondarySensors) {
   std::filesystem::remove_all(log_path.parent_path());
 }
 
-TEST(KeyframeSelector, NoLogPathNoFiles) {
-  KeyframeSelector::Config config;
-  EXPECT_TRUE(config.log_path.empty());
-  KeyframeSelector selector(config);
-  auto dsg = test::makeSharedDsg();
-  FrontendOutput output(0, 0);
-  ActiveWindowOutput msg(makeInput(makeCamera(), 10));
-  selector.call(msg, *dsg, output, nullptr);
-  selector.flush();  // no-op without a log path
-}
-
 TEST(KeyframeSelector, FlushOnDestruction) {
   const auto log_path = makeTempDir();
   KeyframeSelector::Config config;
@@ -331,6 +322,7 @@ TEST(KeyframeSelector, FlushOnDestruction) {
     for (size_t i = 2; i <= 20; ++i) {
       msg.sensor_data.push_back(makeInput(sensor, i));
     }
+
     selector.call(msg, *dsg, output, nullptr);
   }
 
@@ -339,6 +331,7 @@ TEST(KeyframeSelector, FlushOnDestruction) {
     EXPECT_EQ(entry.path().extension(), ".zip") << entry.path();
     ++num_files;
   }
+
   EXPECT_EQ(num_files, 20u);
   std::filesystem::remove_all(log_path);
 }

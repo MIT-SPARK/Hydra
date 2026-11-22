@@ -20,7 +20,7 @@ cv2 = None
 def _cv2():
     global cv2
     if cv2 is None:
-        import cv2 as _cv2mod  # OPENCV_IO_ENABLE_OPENEXR (legacy_exr) is set in conftest
+        import cv2 as _cv2mod
 
         cv2 = _cv2mod
     return cv2
@@ -95,11 +95,9 @@ def write_input_zip(
     color=None,
     depth=None,
     sensor="camera",
-    legacy_exr=False,
     feature=None,
 ):
-    """``InputData::save`` of a camera input (entry names/encodings of input_data_io.cpp).
-    ``legacy_exr`` writes depth as the uncompressed EXR older Hydra versions used."""
+    """``InputData::save`` of a camera input (entry names/encodings of input_data_io.cpp)."""
     cv = _cv2()
     entries = {}
     images = {}
@@ -130,11 +128,7 @@ def write_input_zip(
             ],
         )
     if depth is not None:
-        if legacy_exr:
-            exr = [cv.IMWRITE_EXR_TYPE, cv.IMWRITE_EXR_TYPE_FLOAT]
-            add("depth", ".exr", depth, exr + [cv.IMWRITE_EXR_COMPRESSION, 0])
-        else:
-            add("depth", ".tiff", depth)
+        add("depth", ".tiff", depth)
     meta = {
         "version": 1,
         "timestamp_ns": int(timestamp_ns),
@@ -152,7 +146,7 @@ def write_input_zip(
     with zipfile.ZipFile(path, "w") as zf:
         for name, data in entries.items():
             # zip_archive.cpp deflates every entry except PNG
-            stored = name.endswith((".png", ".exr"))
+            stored = name.endswith(".png")
             method = zipfile.ZIP_STORED if stored else zipfile.ZIP_DEFLATED
             zf.writestr(name, data, compress_type=method)
         zf.writestr(

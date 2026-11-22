@@ -75,8 +75,6 @@ bool hasParent(const SceneGraph& unmerged, const SceneGraph& merged, NodeId pare
   return false;
 }
 
-}  // namespace
-
 std::string mergesToJson(const std::map<NodeId, NodeId>& merges) {
   auto entries = nlohmann::ordered_json::array();
   for (const auto& [child, parent] : merges) {
@@ -97,6 +95,8 @@ std::string mergesToJson(const std::map<NodeId, NodeId>& merges) {
   const nlohmann::ordered_json record{{"version", 1}, {"merges", entries}};
   return record.dump(2) + "\n";
 }
+
+}  // namespace
 
 void saveMerges(const std::map<NodeId, NodeId>& merges,
                 const std::filesystem::path& filepath) {
@@ -197,6 +197,7 @@ void MergeTracker::updateAllMergeAttributes(const SceneGraph& unmerged,
     if (attrs) {
       merged.setNodeAttributes(parent, std::move(attrs));
     }
+
     ++iter;
   }
 }
@@ -213,6 +214,7 @@ std::string MergeTracker::print() const {
         ss << ", ";
       }
     }
+
     ss << "]\n";
   }
 

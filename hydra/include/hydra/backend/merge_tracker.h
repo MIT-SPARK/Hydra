@@ -39,10 +39,7 @@
 
 namespace hydra {
 
-//! Child -> final parent map as JSON (chains are resolved to their final parent)
-std::string mergesToJson(const std::map<spark_dsg::NodeId, spark_dsg::NodeId>& merges);
-
-//! Write mergesToJson() to the provided file
+//! Save child-to-final-parent merges as JSON, resolving chains
 void saveMerges(const std::map<spark_dsg::NodeId, spark_dsg::NodeId>& merges,
                 const std::filesystem::path& filepath);
 

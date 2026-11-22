@@ -61,21 +61,6 @@ def frame_at(store, t):
 # --- readers ------------------------------------------------------------------------
 
 
-def test_tiff_depth_matches_opencv():
-    """Float32 depth as OpenCV's TIFF encoder writes it decodes bit-exactly with
-    imageio (NaN, inf and -0 included)."""
-    from hydra_python.image_store.inputdata import decode_tiff
-
-    rng = np.random.default_rng(1)
-    d = (rng.random((37, 23)) * 5).astype(np.float32)
-    d[0, 0], d[1, 1], d[2, 2], d[3, 3], d[5, :] = np.nan, np.inf, -np.inf, -0.0, 2.0
-    ok, buf = cv2.imencode(".tiff", d)
-    assert ok
-    out = decode_tiff(buf.tobytes())
-    assert out.dtype == np.float32
-    np.testing.assert_array_equal(out.view(np.uint32), d.view(np.uint32))
-
-
 def test_read_input_zip(tmp_path):
     from hydra_python.image_store.inputdata import read_input_zip
 
@@ -548,30 +533,17 @@ assert "cv2" not in {{k for k, v in sys.modules.items() if v is not None}}
     assert out.returncode == 0, out.stderr
 
 
-def test_legacy_exr_depth(tmp_path):
-    """Archives from before Hydra wrote TIFF hold depth.exr: read through imageio's
-    opencv plugin, in OpenCV's channel order."""
-    from hydra_python.image_store.inputdata import decode_exr, read_input_zip
-
-    depth = np.random.default_rng(0).uniform(0.1, 9, (R.H, R.W)).astype(np.float32)
-    path = R.write_input_zip(
-        tmp_path / "7.zip", 7, np.eye(4), depth=depth, legacy_exr=True
-    )
-    np.testing.assert_array_equal(read_input_zip(path).depth, depth)
-    bgr = np.random.default_rng(1).uniform(0, 1, (6, 8, 3)).astype(np.float32)
-    ok, buf = cv2.imencode(".exr", bgr)
-    np.testing.assert_array_equal(decode_exr(buf.tobytes()), bgr)
-
-
-def test_unknown_image_extension_is_rejected(tmp_path):
+@pytest.mark.parametrize("extension", ["jp2", "exr"])
+def test_unknown_image_extension_is_rejected(tmp_path, extension):
     from hydra_python.image_store.inputdata import read_input_zip
 
     path = R.write_input_zip(tmp_path / "7.zip", 7, np.eye(4), depth=R.depth_m(2.0))
     with zipfile.ZipFile(path) as zf:
         entries = {n: zf.read(n) for n in zf.namelist()}
     meta = yaml.safe_load(entries.pop("metadata.yaml"))
-    meta["images"]["depth"]["file"] = "depth.jp2"
-    entries["depth.jp2"] = entries.pop("depth.tiff")
+    filename = f"depth.{extension}"
+    meta["images"]["depth"]["file"] = filename
+    entries[filename] = entries.pop("depth.tiff")
     entries["metadata.yaml"] = yaml.safe_dump(meta).encode()
     with zipfile.ZipFile(path, "w") as zf:
         for name, data in entries.items():

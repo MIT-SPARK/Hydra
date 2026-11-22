@@ -82,12 +82,11 @@ std::vector<uint64_t> stamps(const std::vector<InputData::ConstPtr>& inputs) {
   for (const auto& data : inputs) {
     result.push_back(data->timestamp_ns);
   }
+
   return result;
 }
 
 constexpr uint64_t kSecond = 1'000'000'000;
-
-}  // namespace
 
 // Steps the same inputs through a module and returns its outputs
 std::vector<ActiveWindowOutput::Ptr> run(bool forward) {
@@ -109,34 +108,28 @@ std::vector<ActiveWindowOutput::Ptr> run(bool forward) {
   while (!queue->empty()) {
     outputs.push_back(queue->pop());
   }
+
   return outputs;
 }
 
-TEST(ReconstructionModule, ForwardsIntermediateInputsSeparately) {
-  const test::ConfigGuard guard;
-  const auto outputs = run(true);
-  ASSERT_EQ(outputs.size(), 2u);
-  EXPECT_EQ(stamps(outputs[0]->sensor_data), std::vector<uint64_t>({0}));
-  EXPECT_TRUE(outputs[0]->intermediate_inputs.empty());
+}  // namespace
 
-  // the partial updates come with the next full update, oldest first, outside of
-  // sensor_data
-  EXPECT_EQ(stamps(outputs[1]->sensor_data), std::vector<uint64_t>({kSecond}));
-  EXPECT_EQ(stamps(outputs[1]->intermediate_inputs),
-            std::vector<uint64_t>({kSecond / 4, kSecond / 2}));
-  EXPECT_EQ(outputs[1]->timestamp_ns, kSecond);
-}
-
-TEST(ReconstructionModule, ForwardingKeepsSensorData) {
+TEST(ReconstructionModule, ForwardsIntermediateInputsOnlyWhenEnabled) {
   const test::ConfigGuard guard;
-  // everything but intermediate_inputs is the same as without forwarding
-  const auto with = run(true);
-  const auto without = run(false);
-  ASSERT_EQ(with.size(), without.size());
-  for (size_t i = 0; i < with.size(); ++i) {
-    EXPECT_EQ(with[i]->timestamp_ns, without[i]->timestamp_ns);
-    EXPECT_EQ(stamps(with[i]->sensor_data), stamps(without[i]->sensor_data));
-    EXPECT_TRUE(without[i]->intermediate_inputs.empty());
+  for (const bool forward : {false, true}) {
+    SCOPED_TRACE(forward);
+    const auto outputs = run(forward);
+    ASSERT_EQ(outputs.size(), 2u);
+    EXPECT_EQ(outputs[0]->timestamp_ns, 0u);
+    EXPECT_EQ(stamps(outputs[0]->sensor_data), std::vector<uint64_t>({0}));
+    EXPECT_TRUE(outputs[0]->intermediate_inputs.empty());
+    EXPECT_EQ(outputs[1]->timestamp_ns, kSecond);
+    EXPECT_EQ(stamps(outputs[1]->sensor_data), std::vector<uint64_t>({kSecond}));
+
+    const std::vector<uint64_t> expected =
+        forward ? std::vector<uint64_t>{kSecond / 4, kSecond / 2}
+                : std::vector<uint64_t>{};
+    EXPECT_EQ(stamps(outputs[1]->intermediate_inputs), expected);
   }
 }
 

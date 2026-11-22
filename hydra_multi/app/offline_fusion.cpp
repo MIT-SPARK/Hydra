@@ -53,6 +53,7 @@ void to_json(const DataLoopClosure& loop_closure, nlohmann::json& record) {
   if (loop_closure.variance) {
     record["variance"] = loop_closure.variance.value();
   }
+
   record["in_body_frame"] = loop_closure.in_body_frame;
 }
 
@@ -188,7 +189,6 @@ ProblemInfo::ProblemInfo(const Args& args)
     // TODO(nathan) configure mesh
     hydra_multi::FileDsgInput::Config dsg;
     dsg.dsg_json = dirpath / "frontend/dsg_with_mesh.json";
-    dsg.force_robot_id = true;
     robot_config.inputs.emplace_back("dsg", dsg);
 
     hydra_multi::FileDGraphInput::Config dgraph;
