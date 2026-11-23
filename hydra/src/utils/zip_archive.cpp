@@ -64,15 +64,14 @@ class ZipWriter {
  public:
   ZipWriter(const std::filesystem::path& destination, const ArchiveOptions& options)
       : destination_(destination),
-        temporary_directory_(
-            std::filesystem::canonical(destination.parent_path().empty()
-                                           ? std::filesystem::path(".")
-                                           : destination.parent_path()),
-            ".hydra-archive-",
-            true),
-        temporary_(temporary_directory_ / "archive.zip"),
+        temporary_(std::filesystem::canonical(destination.parent_path().empty()
+                                                  ? std::filesystem::path(".")
+                                                  : destination.parent_path()),
+                   ".hydra-archive-",
+                   true),
         options_(config::checkValid(options)) {
-    file_ = zip_open(temporary_.string().c_str(), ZIP_CREATE | ZIP_TRUNCATE, nullptr);
+    file_ =
+        zip_open(temporary_.path.string().c_str(), ZIP_CREATE | ZIP_TRUNCATE, nullptr);
     if (!file_) {
       throw std::runtime_error("could not open temporary archive");
     }
@@ -118,20 +117,19 @@ class ZipWriter {
     if (entries_.empty()) {
       zip_discard(file_);
       file_ = nullptr;
-      writeEmptyArchive(temporary_);
+      writeEmptyArchive(temporary_.path);
     } else if (zip_close(file_) < 0) {
       throw std::runtime_error("could not finish archive: " +
                                std::string(zip_strerror(file_)));
     }
 
     file_ = nullptr;
-    std::filesystem::rename(temporary_, destination_);
+    std::filesystem::rename(temporary_.path, destination_);
   }
 
  private:
   std::filesystem::path destination_;
-  utils::TempDirectory temporary_directory_;
-  std::filesystem::path temporary_;
+  utils::TempFile temporary_;
   zip_t* file_ = nullptr;
   std::list<Bytes> entries_;
   const ArchiveOptions options_;
