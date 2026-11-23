@@ -47,15 +47,13 @@ class RobotFootprintIntegrator;
 class ReconstructionModule : public ActiveWindowModule {
  public:
   struct Config : ActiveWindowModule::Config {
+    //! Minimum time separation between mesh updates
     double full_update_separation_s = 0.0;
-    //! Pass the inputs of partial updates with the next output
-    //! (ActiveWindowOutput::intermediate_inputs, oldest first), e.g., for the frontend
-    //! keyframe selector. They are not in sensor_data, so the other frontend functors
-    //! (pose graph, places) see the same inputs as without forwarding. Inputs still
-    //! pending at stop() are dropped.
-    bool forward_intermediate_inputs = false;
+    //! Marching cubes settings
     MeshIntegrator::Config mesh;
+    //! Per-sensor TSDF integration settings
     SensorMap<ProjectiveIntegrator>::Config tsdf;
+    //! Optional robot geometry to use to mark freespace
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
   } const config;
 
@@ -74,7 +72,6 @@ class ReconstructionModule : public ActiveWindowModule {
 
  protected:
   std::optional<uint64_t> last_update_ns_;
-  std::vector<InputData::ConstPtr> intermediate_inputs_;
 
   SensorMap<ProjectiveIntegrator> tsdf_integrators_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
