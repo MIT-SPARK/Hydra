@@ -33,15 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <filesystem>
 
 #include "hydra/backend/update_functions.h"
 
 namespace hydra {
-
-//! Save child-to-final-parent merges as JSON, resolving chains
-void saveMerges(const std::map<spark_dsg::NodeId, spark_dsg::NodeId>& merges,
-                const std::filesystem::path& filepath);
 
 struct MergeTracker {
   using MergeFunc = UpdateFunctor::Hooks::MergeFunc;

@@ -38,6 +38,8 @@
 #include <glog/logging.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <nlohmann/json.hpp>
+
 namespace YAML {
 
 template <>
@@ -88,6 +90,27 @@ SharedDsgInfo::Ptr SharedDsgInfo::clone() const {
   other->sequence_number = sequence_number;
   other->graph = graph->clone();
   return other;
+}
+
+void SharedDsgInfo::updateMergesMetadata() const {
+  auto mapping = nlohmann::json::object();
+  for (const auto& [original, parent] : merges) {
+    auto final_parent = parent;
+    for (size_t i = 0; i < merges.size(); ++i) {
+      const auto iter = merges.find(final_parent);
+      if (iter == merges.end() || iter->second == final_parent) {
+        break;
+      }
+
+      final_parent = iter->second;
+    }
+
+    mapping[std::to_string(original)] = final_parent;
+  }
+
+  auto metadata = graph->metadata.get();
+  metadata["node_merges"] = std::move(mapping);
+  graph->metadata.set(metadata);
 }
 
 void declare_config(SharedDsgInfo::Config& config) {

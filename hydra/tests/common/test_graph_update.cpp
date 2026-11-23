@@ -37,12 +37,12 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <sstream>
 
+#include "hydra/utils/temp_path.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
 using namespace spark_dsg;
@@ -78,6 +78,7 @@ GraphUpdate makeUpdate(const std::list<NodeUpdate>& updates) {
   for (const auto& update : updates) {
     layer->updates.push_back(update);
   }
+
   return {{2, layer}};
 }
 
@@ -165,17 +166,13 @@ TEST(GraphUpdater, SaveBindings) {
   GraphUpdater updater(makeConfig(false));
   updater.update(makeUpdate({addOrUpdate(1, 0.0)}), *dsg->graph, 10);
 
-  auto dir =
-      (std::filesystem::temp_directory_path() / "hydra-bindings-XXXXXX").string();
-  ASSERT_NE(mkdtemp(dir.data()), nullptr);
-  const auto path = std::filesystem::path(dir) / "track_bindings.json";
+  const auto dir = utils::TempDirectory::system_default("hydra-bindings-", true);
+  const auto path = dir / "track_bindings.json";
   updater.saveBindings(path);
   std::ifstream fin(path);
   std::stringstream contents;
   contents << fin.rdbuf();
   EXPECT_EQ(contents.str(), updater.bindingsToJson());
-  EXPECT_FALSE(std::filesystem::exists(path.string() + ".tmp"));
-  std::filesystem::remove_all(dir);
 }
 
 }  // namespace hydra

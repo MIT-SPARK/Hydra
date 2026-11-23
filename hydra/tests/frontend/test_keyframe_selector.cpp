@@ -37,24 +37,14 @@
 #include <hydra/frontend/keyframe_selector.h>
 #include <hydra/input/camera.h>
 #include <hydra/input/sensor_extrinsics.h>
-#include <unistd.h>
 
 #include <filesystem>
 
+#include "hydra/utils/temp_path.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
 namespace hydra {
 namespace {
-
-std::filesystem::path makeTempDir() {
-  auto pattern =
-      (std::filesystem::temp_directory_path() / "hydra-keyframes-XXXXXX").string();
-  if (!mkdtemp(pattern.data())) {
-    throw std::runtime_error("could not create temporary directory");
-  }
-
-  return pattern;
-}
 
 Sensor::ConstPtr makeCamera(const std::string& name = "camera") {
   Camera::Config config;
@@ -135,7 +125,8 @@ TEST(KeyframeSelector, SelectFields) {
 }
 
 TEST(KeyframeSelector, SavesAcceptedKeyframes) {
-  const auto log_path = makeTempDir() / "keyframes";
+  const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
+  const auto log_path = temp / "keyframes";
   const auto sensor = makeCamera();
 
   KeyframeSelector::Config config;
@@ -184,12 +175,11 @@ TEST(KeyframeSelector, SavesAcceptedKeyframes) {
   EXPECT_TRUE(loaded->label_image.empty());
   EXPECT_TRUE(loaded->vertex_map.empty());
   EXPECT_EQ(loaded->feature.size(), 0);
-
-  std::filesystem::remove_all(log_path.parent_path());
 }
 
 TEST(KeyframeSelector, SavesDescriptorsOnlyWhenRequested) {
-  const auto root = makeTempDir();
+  const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
+  const auto& root = temp.path;
   const auto sensor = makeCamera();
   DistancePolicy::Config policy;
   policy.min_pose_separation = 0.0;
@@ -231,12 +221,11 @@ TEST(KeyframeSelector, SavesDescriptorsOnlyWhenRequested) {
     EXPECT_FALSE(loaded->color_image.empty());
     EXPECT_TRUE(loaded->label_image.empty());
   }
-
-  std::filesystem::remove_all(root);
 }
 
 TEST(KeyframeSelector, SensorSuffixForSecondarySensors) {
-  const auto log_path = makeTempDir() / "keyframes_multi";
+  const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
+  const auto log_path = temp / "keyframes_multi";
   const auto front = makeCamera("front");
   const auto rear = makeCamera("rear cam/1");
 
@@ -264,11 +253,11 @@ TEST(KeyframeSelector, SensorSuffixForSecondarySensors) {
   const auto loaded = InputData::load(log_path / "10_rear_cam_1.zip");
   ASSERT_TRUE(loaded);
   EXPECT_EQ(loaded->getSensor().name, "rear cam/1");
-  std::filesystem::remove_all(log_path.parent_path());
 }
 
 TEST(KeyframeSelector, FlushOnDestruction) {
-  const auto log_path = makeTempDir();
+  const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
+  const auto& log_path = temp.path;
   KeyframeSelector::Config config;
   DistancePolicy::Config policy;
   policy.min_pose_separation = 0.0;
@@ -297,7 +286,6 @@ TEST(KeyframeSelector, FlushOnDestruction) {
   }
 
   EXPECT_EQ(num_files, 20u);
-  std::filesystem::remove_all(log_path);
 }
 
 struct KeyframeSelectorAccess : KeyframeSelector {

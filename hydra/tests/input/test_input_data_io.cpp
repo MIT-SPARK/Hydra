@@ -36,8 +36,8 @@
 #include <hydra/input/camera.h>
 #include <hydra/input/input_data_io.h>
 #include <hydra/input/lidar.h>
+#include <hydra/utils/temp_path.h>
 #include <hydra/utils/zip_archive.h>
-#include <unistd.h>
 #include <yaml-cpp/yaml.h>
 
 #include <cmath>
@@ -175,16 +175,9 @@ void expectInput(const InputData& expected, const InputData& actual) {
 
 class InputDataIo : public ::testing::Test {
  protected:
-  void SetUp() override {
-    const auto path = (std::filesystem::temp_directory_path() / "hydra-input-XXXXXX");
-    auto pattern = path.string();
-    ASSERT_NE(mkdtemp(pattern.data()), nullptr);
-    directory = pattern;
-  }
-
-  void TearDown() override { std::filesystem::remove_all(directory); }
-
-  std::filesystem::path directory;
+  const utils::TempDirectory temp =
+      utils::TempDirectory::system_default("hydra-input-", true);
+  const std::filesystem::path& directory = temp.path;
 };
 
 }  // namespace

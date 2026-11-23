@@ -37,11 +37,12 @@
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
-#include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "hydra/backend/dsg_updater.h"
+#include "hydra/backend/graph_reconciler.h"
 #include "hydra/backend/merge_tracker.h"
-#include "hydra/utils/temp_directory.h"
+#include "hydra/utils/temp_path.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
 using namespace spark_dsg;
@@ -113,39 +114,52 @@ TEST(MergeTracker, NullAttributesCorrect) {
   EXPECT_TRUE(merged.getNode(NodeSymbol('O', 0)).tryAttributes());
 }
 
-TEST(MergeTracker, SavesMerges) {
+TEST(MergeTracker, BackendGraphStoresFinalParentsInMetadata) {
   const auto tempdir = utils::TempDirectory::system_default("hydra-merges-", true);
-
   auto dsg = test::makeSharedDsg();
   auto& merged = *dsg->graph;
+  merged.metadata.add(nlohmann::json{{"source", "test"}});
   for (size_t i = 0; i < 4; ++i) {
     addObject(merged, i);
   }
 
   const auto unmerged = merged.clone();
+  MergeTracker first, second;
+  ASSERT_EQ(first.applyMerges(*unmerged, {{"O1"_id, "O0"_id}}, *dsg), 1u);
+  ASSERT_EQ(second.applyMerges(*unmerged, {{"O0"_id, "O2"_id}}, *dsg), 1u);
 
-  MergeTracker tracker;
-  MergeList proposals{{"O1"_id, "O0"_id}, {"O0"_id, "O2"_id}};
-  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg), 2u);
+  DsgUpdater updater(DsgUpdater::Config{}, unmerged, dsg);
+  const DataDirectory output(tempdir.path);
+  updater.save(output, "backend");
+  const auto path = tempdir / "backend/dsg.json";
+  auto saved = SceneGraph::load(path);
+  const NodeId parent = "O2"_id;
+  const nlohmann::json expected{{std::to_string("O0"_id), parent},
+                                {std::to_string("O1"_id), parent}};
+  EXPECT_EQ(saved->metadata.get().at("node_merges"), expected);
+  EXPECT_EQ(saved->metadata.get().at("source"), "test");
+  EXPECT_FALSE(std::filesystem::exists(tempdir / "backend/merges.json"));
 
-  const auto merge = [](NodeId child, NodeId parent) {
-    return nlohmann::json{{"child", child}, {"parent", parent}};
-  };
-  const nlohmann::json expected{
-      {"version", 1}, {"merges", {merge("O0"_id, "O2"_id), merge("O1"_id, "O2"_id)}}};
-  const auto path = tempdir / "merges.json";
-  const auto read_saved = [&path](const std::map<NodeId, NodeId>& merges) {
-    saveMerges(merges, path);
-    std::ifstream input(path);
-    return nlohmann::json::parse(input);
-  };
-  EXPECT_EQ(read_saved(dsg->merges), expected);
+  // Saving again replaces the map, including after all merges are cleared.
+  dsg->merges.clear();
+  updater.save(output, "backend");
+  saved = SceneGraph::load(path);
+  EXPECT_EQ(saved->metadata.get().at("node_merges"), nlohmann::json::object());
+  EXPECT_EQ(saved->metadata.get().at("source"), "test");
+}
 
-  // Chains are resolved even if the map is not flattened.
-  const std::map<NodeId, NodeId> chain{{"O1"_id, "O0"_id}, {"O0"_id, "O2"_id}};
-  EXPECT_EQ(read_saved(chain), expected);
-  EXPECT_EQ(read_saved({}),
-            (nlohmann::json{{"version", 1}, {"merges", nlohmann::json::array()}}));
+TEST(Reconciler, PreservesMergesFromInputGraphMetadata) {
+  auto dsg = test::makeSharedDsg();
+  addObject(*dsg->graph, 2);
+  const NodeId original = "O0"_id;
+  const NodeId parent = "O2"_id;
+  const nlohmann::json mapping{{std::to_string(original), parent}};
+  dsg->graph->metadata.add(nlohmann::json{{"node_merges", mapping}});
+
+  Reconciler reconciler(Reconciler::Config{});
+  const auto result = reconciler.reconcile(*dsg->graph);
+  ASSERT_TRUE(result);
+  EXPECT_EQ(result->metadata.get().at("node_merges"), mapping);
 }
 
 }  // namespace hydra

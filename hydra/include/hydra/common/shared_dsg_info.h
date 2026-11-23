@@ -62,6 +62,9 @@ struct SharedDsgInfo {
 
   SharedDsgInfo::Ptr clone() const;
 
+  //! Store original-to-final node merges in graph metadata; caller holds mutex
+  void updateMergesMetadata() const;
+
   mutable std::mutex mutex;
   std::atomic<bool> updated;
   uint64_t sequence_number = 0;

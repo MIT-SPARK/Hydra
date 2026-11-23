@@ -139,16 +139,22 @@ sensors:
   that node, so several tracks can share a `node_id`. Node merges come only from the
   backend (section 4).
 
-## 4. Backend merges: backend save
+## 4. Backend merges: scene graph metadata
 
-`<backend save dir>/merges.json`
+Backend scene graphs store the reconciled original-node-to-final-parent map in their
+`node_merges` metadata field. JSON graph files contain, for example:
+
 ```json
-{"version": 1, "merges": [{"child": 124, "parent": 123}]}
+{"metadata": {"node_merges": {"124": 123}}}
 ```
-- The final child to final parent map (`SharedDsgInfo::merges`, chains resolved).
-- Hydra writes it to `<log>/backend/merges.json`. The Khronos backend writes all its
-  output, including `dsg.json` and `merges.json`, into the directory it is given (the log
-  root, not `backend/`).
+
+Keys are decimal node IDs; values are final parent node IDs. Merge chains are resolved
+before saving. Each save replaces the map, including with an empty object when no
+merges remain, while preserving unrelated metadata. Binary scene graphs carry the
+same metadata. No separate `merges.json` is written or read.
+
+Hydra saves the graph under `<log>/backend/`; Khronos saves it in the directory passed
+to its backend. Offline reconciliation also attaches the map to its returned graph.
 
 ## 5. Indexer
 
@@ -158,7 +164,7 @@ hydra image-store index RUN [--keyframes DIR] [--tracks DIR] [--hydra DIR] [--ro
 builds `RUN/image_store/` (`schema_version` 1, see `schema.sql`). Defaults when only `RUN`
 is given (also used by `ImageStore.open(RUN)`, which indexes or refreshes the store):
 keyframes `RUN/keyframes`, tracks `RUN/tracks`, Hydra output `RUN/hydra` with
-`backend/{dsg.json,merges.json}` and `frontend/{dsg.json,track_bindings.json}`; the flags
+`backend/dsg.json` and `frontend/{dsg.json,track_bindings.json}`; the flags
 override them.
 
 - Frames: every keyframe archive is a keyframe frame (kind 0); an observation whose
@@ -170,7 +176,7 @@ override them.
   node's stamp, then the backend pose. An agent node's own image is the keyframe
   anchored to it nearest to its stamp.
 - Track chain: track, then the track that absorbed it, then the frontend node it is bound
-  to, then the backend parent from `merges.json`.
+  to, then the backend parent from `node_merges` metadata.
 - Ids are namespaced per robot (`robot << 48 | seq`). `--robot-id` defaults to the
   `robot_id` in `track.json`, else the robot the store was indexed with, else the robot
   whose agent prefix (`'a' + id`) the frontend (else backend) graph holds.
@@ -180,7 +186,7 @@ override them.
   with a reason (`ImageStore.unbound_tracks()`): `extraction_failed` (`extracted: false`
   and no binding or only an ended one), `node_deleted`, `node_missing` (the bound node,
   after merges, is not in the saved backend graph) or `no_binding`.
-- Aliases come from `merges.json` only; a re-index replaces the aliases the previous
+- Aliases come from backend graph metadata only; a re-index replaces the aliases the previous
   indexing of that robot recorded.
 - `ImageStore.open(RUN)` indexes when the store was never indexed or the raw inputs changed
   since (meta `indexer.input_signature`), under the store's `.index.lock`. This writes the

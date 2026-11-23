@@ -224,8 +224,12 @@ void MultiBackendModule::stop() { stopImpl(); }
 void MultiBackendModule::save(const DataDirectory& output) {
   const auto backend_path = output.path("backend");
   const auto pgmo_path = output.path("backend/pgmo");
-  merged_dsg_->graph->save(backend_path / "dsg.json", false);
-  merged_dsg_->graph->save(backend_path / "dsg_with_mesh.json");
+  {
+    std::lock_guard<std::mutex> lock(merged_dsg_->mutex);
+    merged_dsg_->updateMergesMetadata();
+    merged_dsg_->graph->save(backend_path / "dsg.json", false);
+    merged_dsg_->graph->save(backend_path / "dsg_with_mesh.json");
+  }
 
   const auto& graph = *merged_dsg_->graph;
   const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
@@ -712,6 +716,7 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
       for (const auto& node : state->pose_graph_->nodes) {
         robot_units_[id_mapping.at(node.robot_id)] = id;
       }
+
       VLOG(3) << "Remapping robots " << id_mapping.begin()->first << ".."
               << id_mapping.rbegin()->first << " -> " << id_mapping.begin()->second
               << ".." << id_mapping.rbegin()->second << " for pg with "

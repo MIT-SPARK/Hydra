@@ -9,8 +9,11 @@ cat > "$tmp/keep.cpp" <<'CPP'
 #include <filesystem>
 #include <system_error>
 namespace std::filesystem {
-std::uintmax_t remove_all(const path&) { return 0; }
-std::uintmax_t remove_all(const path&, std::error_code& ec) { ec.clear(); return 0; }
+// Keep nonempty fixture directories, but let writers clean empty staging directories.
+std::uintmax_t remove_all(const path& p) { return is_empty(p) ? remove(p) : 0; }
+std::uintmax_t remove_all(const path& p, std::error_code& ec) {
+  return is_empty(p, ec) ? remove(p, ec) : 0;
+}
 }
 CPP
 g++ -std=c++17 -shared -fPIC -o "$tmp/libkeep.so" "$tmp/keep.cpp"

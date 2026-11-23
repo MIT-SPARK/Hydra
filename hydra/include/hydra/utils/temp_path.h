@@ -45,11 +45,31 @@ struct TempDirectory {
                 bool remove_on_exit = false);
   ~TempDirectory();
 
+  TempDirectory(const TempDirectory&) = delete;
+  TempDirectory& operator=(const TempDirectory&) = delete;
+
   static TempDirectory system_default(const std::string& prefix = "",
                                       bool remove_on_exit = false);
 
   std::filesystem::path operator/(const std::string& other) const;
 
+  const std::filesystem::path path;
+  const bool remove_on_exit;
+};
+
+struct TempFile {
+  TempFile(const std::filesystem::path& root,
+           const std::string& prefix = "",
+           bool remove_on_exit = false);
+  ~TempFile();
+
+  TempFile(const TempFile&) = delete;
+  TempFile& operator=(const TempFile&) = delete;
+
+  static TempFile system_default(const std::string& prefix = "",
+                                 bool remove_on_exit = false);
+
+  //! Path of the exclusively created empty file
   const std::filesystem::path path;
   const bool remove_on_exit;
 };

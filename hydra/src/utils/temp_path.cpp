@@ -32,12 +32,13 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/utils/temp_directory.h"
-
-#include <glog/logging.h>
+#include "hydra/utils/temp_path.h"
 
 #include <array>
+#include <cerrno>
+#include <cstdio>
 #include <random>
+#include <system_error>
 
 namespace hydra::utils {
 
@@ -45,7 +46,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr static std::array<char, 62> valid_characters{
+constexpr std::array<char, 62> valid_characters{
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
     'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
     'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
@@ -54,7 +55,7 @@ constexpr static std::array<char, 62> valid_characters{
 std::string random_suffix(size_t characters = 10) {
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<uint8_t> distrib(0, 61);
+  std::uniform_int_distribution<size_t> distrib(0, valid_characters.size() - 1);
   std::string result(characters, 0);
   for (size_t i = 0; i < characters; ++i) {
     result.at(i) = valid_characters.at(distrib(gen));
@@ -63,23 +64,46 @@ std::string random_suffix(size_t characters = 10) {
   return result;
 }
 
-std::filesystem::path make_temp_directory(const fs::path& root,
-                                          const std::string& prefix) {
+template <typename Create>
+std::filesystem::path make_temp_path(const fs::path& root,
+                                     const std::string& prefix,
+                                     Create create) {
   if (!std::filesystem::exists(root)) {
     std::filesystem::create_directories(root);
   }
 
-  try {
-    std::filesystem::path temp_path = root / (prefix + random_suffix());
-    while (!fs::create_directory(temp_path)) {
-      temp_path = root / (prefix + random_suffix());
+  auto temp_path = root / (prefix + random_suffix());
+  while (!create(temp_path)) {
+    temp_path = root / (prefix + random_suffix());
+  }
+
+  return temp_path;
+}
+
+bool create_file(const fs::path& path) {
+  // Exclusive creation reserves the path without truncating an existing file.
+  const auto file = std::fopen(path.string().c_str(), "wbx");
+  if (!file) {
+    const auto error = errno;
+    if (error == EEXIST) {
+      return false;
     }
 
-    return temp_path;
-  } catch (const fs::filesystem_error& ex) {
-    LOG(ERROR) << "Unable to make temp directory: " << ex.what();
-    return {};
+    throw fs::filesystem_error("Unable to create temporary file",
+                               path,
+                               std::error_code(error, std::generic_category()));
   }
+
+  if (std::fclose(file) != 0) {
+    const auto error = errno;
+    std::error_code ignored;
+    fs::remove(path, ignored);
+    throw fs::filesystem_error("Unable to close temporary file",
+                               path,
+                               std::error_code(error, std::generic_category()));
+  }
+
+  return true;
 }
 
 }  // namespace
@@ -87,11 +111,16 @@ std::filesystem::path make_temp_directory(const fs::path& root,
 TempDirectory::TempDirectory(const fs::path& root,
                              const std::string& prefix,
                              bool _remove_on_exit)
-    : path(make_temp_directory(root, prefix)), remove_on_exit(_remove_on_exit) {}
+    : path(make_temp_path(
+          root,
+          prefix,
+          [](const auto& candidate) { return fs::create_directory(candidate); })),
+      remove_on_exit(_remove_on_exit) {}
 
 TempDirectory::~TempDirectory() {
-  if (remove_on_exit && !path.empty()) {
-    fs::remove_all(path);
+  if (remove_on_exit) {
+    std::error_code error;
+    fs::remove_all(path, error);
   }
 }
 
@@ -101,11 +130,24 @@ TempDirectory TempDirectory::system_default(const std::string& prefix,
 }
 
 std::filesystem::path TempDirectory::operator/(const std::string& other) const {
-  if (path.empty()) {
-    throw std::domain_error("Invalid temporary directory, path not set");
-  }
-
   return path / other;
+}
+
+TempFile::TempFile(const fs::path& root,
+                   const std::string& prefix,
+                   bool _remove_on_exit)
+    : path(make_temp_path(root, prefix, create_file)),
+      remove_on_exit(_remove_on_exit) {}
+
+TempFile::~TempFile() {
+  if (remove_on_exit) {
+    std::error_code error;
+    fs::remove(path, error);
+  }
+}
+
+TempFile TempFile::system_default(const std::string& prefix, bool remove_on_exit) {
+  return TempFile(fs::temp_directory_path(), prefix, remove_on_exit);
 }
 
 }  // namespace hydra::utils
