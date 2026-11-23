@@ -33,15 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/backend/merge_tracker.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
-#include <unistd.h>
 
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "hydra/backend/merge_tracker.h"
+#include "hydra/utils/temp_directory.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
 using namespace spark_dsg;
@@ -67,8 +67,8 @@ TEST(MergeTracker, DropsMergeSetsWithMissingParents) {
     addObject(merged, 1);
     const auto unmerged = merged.clone();
 
-    const auto parent = NodeSymbol('O', 0);
-    const auto child = NodeSymbol('O', 1);
+    const auto parent = "O0"_id;
+    const auto child = "O1"_id;
     const auto merge_attrs =
         [](const SceneGraph& graph,
            const std::vector<NodeId>& nodes) -> NodeAttributes::Ptr {
@@ -114,6 +114,8 @@ TEST(MergeTracker, NullAttributesCorrect) {
 }
 
 TEST(MergeTracker, SavesMerges) {
+  const auto tempdir = utils::TempDirectory::system_default("hydra-merges-", true);
+
   auto dsg = test::makeSharedDsg();
   auto& merged = *dsg->graph;
   for (size_t i = 0; i < 4; ++i) {
@@ -123,21 +125,15 @@ TEST(MergeTracker, SavesMerges) {
   const auto unmerged = merged.clone();
 
   MergeTracker tracker;
-  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)},
-                      {NodeSymbol('O', 0), NodeSymbol('O', 2)}};
+  MergeList proposals{{"O1"_id, "O0"_id}, {"O0"_id, "O2"_id}};
   ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg), 2u);
 
   const auto merge = [](NodeId child, NodeId parent) {
     return nlohmann::json{{"child", child}, {"parent", parent}};
   };
-  const nlohmann::json expected{{"version", 1},
-                                {"merges",
-                                 {merge(NodeSymbol('O', 0), NodeSymbol('O', 2)),
-                                  merge(NodeSymbol('O', 1), NodeSymbol('O', 2))}}};
-  auto pattern =
-      (std::filesystem::temp_directory_path() / "hydra-merges-XXXXXX").string();
-  ASSERT_NE(mkdtemp(pattern.data()), nullptr);
-  const auto path = std::filesystem::path(pattern) / "merges.json";
+  const nlohmann::json expected{
+      {"version", 1}, {"merges", {merge("O0"_id, "O2"_id), merge("O1"_id, "O2"_id)}}};
+  const auto path = tempdir / "merges.json";
   const auto read_saved = [&path](const std::map<NodeId, NodeId>& merges) {
     saveMerges(merges, path);
     std::ifstream input(path);
@@ -146,12 +142,10 @@ TEST(MergeTracker, SavesMerges) {
   EXPECT_EQ(read_saved(dsg->merges), expected);
 
   // Chains are resolved even if the map is not flattened.
-  const std::map<NodeId, NodeId> chain{{NodeSymbol('O', 1), NodeSymbol('O', 0)},
-                                       {NodeSymbol('O', 0), NodeSymbol('O', 2)}};
+  const std::map<NodeId, NodeId> chain{{"O1"_id, "O0"_id}, {"O0"_id, "O2"_id}};
   EXPECT_EQ(read_saved(chain), expected);
   EXPECT_EQ(read_saved({}),
             (nlohmann::json{{"version", 1}, {"merges", nlohmann::json::array()}}));
-  std::filesystem::remove_all(pattern);
 }
 
 }  // namespace hydra

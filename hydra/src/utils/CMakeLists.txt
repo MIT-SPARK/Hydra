@@ -14,6 +14,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_mesh_interface.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_mesh_traits.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/probability_utilities.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/temp_directory.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/timing_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/zip_archive.cpp
 )
