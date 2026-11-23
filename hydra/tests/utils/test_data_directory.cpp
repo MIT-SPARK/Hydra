@@ -33,13 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/utils/data_directory.h>
-#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
-#include <limits>
 #include <sstream>
+
+#include "hydra/utils/data_directory.h"
+#include "hydra/utils/temp_directory.h"
 
 namespace hydra {
 
@@ -52,18 +52,10 @@ std::string readFile(const std::filesystem::path& path) {
   return ss.str();
 }
 
-std::filesystem::path makeTempDir() {
-  const auto path = std::filesystem::temp_directory_path() /
-                    ("hydra_test_write_atomic_" + std::to_string(::getpid()));
-  std::filesystem::remove_all(path);
-  std::filesystem::create_directories(path);
-  return path;
-}
-
 }  // namespace
 
 TEST(WriteFileAtomic, WritesAndReplaces) {
-  const auto dir = makeTempDir();
+  const auto dir = utils::TempDirectory::system_default("", true);
   const auto path = dir / "out.json";
   writeFileAtomic(path, "first");
   EXPECT_EQ(readFile(path), "first");
@@ -74,20 +66,19 @@ TEST(WriteFileAtomic, WritesAndReplaces) {
 
   // only the target remains (no temporary files)
   size_t num_files = 0;
-  for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+  for (const auto& entry : std::filesystem::directory_iterator(dir.path)) {
     EXPECT_EQ(entry.path().filename(), "out.json");
     ++num_files;
   }
+
   EXPECT_EQ(num_files, 1u);
-  std::filesystem::remove_all(dir);
 }
 
 TEST(WriteFileAtomic, ThrowsForMissingDirectory) {
-  const auto dir = makeTempDir();
+  const auto dir = utils::TempDirectory::system_default("", true);
   const auto path = dir / "missing" / "out.json";
   EXPECT_THROW(writeFileAtomic(path, "contents"), std::runtime_error);
   EXPECT_FALSE(std::filesystem::exists(path));
-  std::filesystem::remove_all(dir);
 }
 
 }  // namespace hydra
