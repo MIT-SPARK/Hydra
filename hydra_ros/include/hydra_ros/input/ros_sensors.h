@@ -35,6 +35,7 @@
 #pragma once
 #include <hydra/input/camera.h>
 #include <hydra/input/sensor.h>
+#include <hydra/utils/logging.h>
 
 namespace hydra {
 
@@ -51,7 +52,7 @@ struct InvalidSensor : Sensor {
 };
 
 struct RosExtrinsics : SensorExtrinsics {
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     //! @brief Override camera info frame ID
     std::string sensor_frame = "";
     //! @brief Override global robot frame ID
@@ -62,8 +63,6 @@ struct RosExtrinsics : SensorExtrinsics {
     double error_timeout_s = 0.0;
     //! @brief Sample period for looking up extrinsics transform
     double wait_duration_s = 0.1;
-    //! @brief TF lookup verbosity
-    int verbosity = 3;
   } const config;
 
   explicit RosExtrinsics(const Config& config);

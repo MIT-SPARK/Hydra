@@ -9,6 +9,7 @@
 namespace hydra_multi {
 
 void declare_config(InitialAlignModule::Config& conf) {
+  config::base<hydra::VerbosityConfig>(conf);
   using namespace config;
   name("InitialAlignModule::Config");
   field(conf.dgraph_consistency_tol, "dgraph_consistency_tol");

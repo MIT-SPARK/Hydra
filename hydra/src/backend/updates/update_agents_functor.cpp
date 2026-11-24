@@ -70,11 +70,12 @@ inline std::string toString(const Eigen::Quaterniond& q, const Eigen::Vector3d& 
 
 using timing::ScopedTimer;
 
-void declare_config(UpdateAgentsFunctor::Config&) {
+void declare_config(UpdateAgentsFunctor::Config& config) {
+  config::base<VerbosityConfig>(config);
   config::name("UpdateAgentsFunctor::Config");
 }
 
-UpdateAgentsFunctor::UpdateAgentsFunctor(const Config&) {}
+UpdateAgentsFunctor::UpdateAgentsFunctor(const Config& config) : config(config) {}
 
 void UpdateAgentsFunctor::call(const SceneGraph&,
                                SharedDsgInfo& dsg,
@@ -105,7 +106,7 @@ void UpdateAgentsFunctor::call(const SceneGraph&,
       const auto diff = prev_pose.between(pose);
       const auto q_diff = Eigen::Quaterniond(diff.rotation().matrix());
       const auto p_diff = diff.translation();
-      VLOG(10) << "Updating agent " << NodeSymbol(node.id).str() << " pose from "
+      MLOG(10) << "Updating agent " << NodeSymbol(node.id).str() << " pose from "
                << NodeSymbol(attrs.external_key).str() << ":"
                << "\n - original: " << toString(q_prev, p_prev)
                << "\n - new:      " << toString(attrs.world_R_body, attrs.position)

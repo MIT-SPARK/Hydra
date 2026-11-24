@@ -178,7 +178,7 @@ InitialClusters RoomFinder::getBestComponents(
       false,
       get_distance);
 
-  VLOG(10) << "[RoomFinder] Filtration: " << filtration;
+  MLOG(10) << "[RoomFinder] Filtration: " << filtration;
 
   auto window = getTrimmedFiltration(filtration,
                                      config.min_dilation_m,
@@ -192,7 +192,7 @@ InitialClusters RoomFinder::getBestComponents(
     const double window_size =
         filtration[window.second].distance - filtration[window.first].distance;
     if (window_size < config.min_window_size) {
-      VLOG(2) << "[RoomFinder] Bad window bounds: [" << config.min_dilation_m << ", "
+      MLOG(2) << "[RoomFinder] Bad window bounds: [" << config.min_dilation_m << ", "
               << config.max_dilation_m << "],  window: [" << window.first << ", "
               << window.second << "]" << " with size: " << window_size;
 
@@ -201,7 +201,7 @@ InitialClusters RoomFinder::getBestComponents(
     }
   }
 
-  VLOG(2) << "[RoomFinder] Bounds: [" << config.min_dilation_m << ", "
+  MLOG(2) << "[RoomFinder] Bounds: [" << config.min_dilation_m << ", "
           << config.max_dilation_m << "],  window: [" << window.first << ", "
           << window.second << "]";
 
@@ -236,7 +236,7 @@ InitialClusters RoomFinder::getBestComponents(
   }
 
   const auto info = *candidate;
-  VLOG(2) << "[RoomFinder] Best threshold: " << info.distance << " ("
+  MLOG(2) << "[RoomFinder] Best threshold: " << info.distance << " ("
           << info.num_components << " components)";
 
   if (log_file_) {
@@ -274,7 +274,7 @@ InitialClusters RoomFinder::getBestComponents(
 }
 
 SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
-  VLOG(2) << "[Room Finder] Detecting rooms for " << places.numNodes() << " nodes";
+  MLOG(2) << "[Room Finder] Detecting rooms for " << places.numNodes() << " nodes";
   last_results_.clear();
   cluster_room_map_.clear();
   const DistanceAdaptor get_distance;
@@ -289,7 +289,7 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
 
   const auto components = getBestComponents(places, get_distance);
   if (components.empty()) {
-    VLOG(2) << "[Room Finder] No components found";
+    MLOG(2) << "[Room Finder] No components found";
     return nullptr;
   }
 

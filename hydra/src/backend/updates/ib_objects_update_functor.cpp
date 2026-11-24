@@ -318,7 +318,7 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
 
     const auto clusters = new_component->ws.getClusters();
     for (const auto& cluster : clusters) {
-      VLOG(5) << "Cluster: " << displayNodeSymbolContainer(cluster);
+      MLOG(5) << "Cluster: " << displayNodeSymbolContainer(cluster);
 
       auto attrs = getMergedAttributes(graph, cluster);
       if (!attrs) {
@@ -329,7 +329,7 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
       const auto derived = dynamic_cast<SemanticNodeAttributes*>(attrs.get());
       const auto result = tasks_->getBestScore(*metric_, derived->semantic_feature);
       if (result.score < config.min_object_score) {
-        VLOG(1) << "Skipping object with score: " << result.score;
+        MLOG(1) << "Skipping object with score: " << result.score;
         continue;
       }
 

@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
+
 #include "hydra/loop_closure/descriptor_matching.h"
 #include "hydra/loop_closure/registration.h"
 #include "hydra/loop_closure/scene_graph_descriptors.h"
@@ -64,7 +66,7 @@ class LcdDetector {
   using FactoryMap = std::map<std::string, DescriptorFactory::Ptr>;
   using SearchResultMap = std::map<size_t, LayerSearchResults>;
 
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     TeaserParams teaser_config;
     bool enable_agent_registration = true;
     DescriptorMatchConfig agent_search_config;

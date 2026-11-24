@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
 
 #include "hydra/reconstruction/index_getter.h"
 #include "hydra/reconstruction/marching_cubes.h"
@@ -46,7 +47,7 @@ class MeshIntegrator {
  public:
   using BlockIndexGetter = IndexGetter<BlockIndex>;
 
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     float min_weight = 1.0e-4f;
     //! Inherit the run thread count when unset; non-positive counts use all threads
     std::optional<int> integrator_threads;

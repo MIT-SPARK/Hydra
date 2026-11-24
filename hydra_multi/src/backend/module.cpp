@@ -360,21 +360,21 @@ void MultiBackendModule::optimizeSpin() {
 }
 
 void MultiBackendModule::stopImpl() {
-  VLOG(1) << "Backend stopping...";
+  MLOG(1) << "Backend stopping...";
   should_shutdown_ = true;
 
   if (optimization_thread_) {
-    VLOG(3) << "[Hydra-Multi Backend] joining optimizer thread and stopping";
+    MLOG(3) << "[Hydra-Multi Backend] joining optimizer thread and stopping";
     optimization_thread_->join();
     optimization_thread_.reset();
-    VLOG(3) << "[Hydra-Multi Backend] optimizer thread stopped!";
+    MLOG(3) << "[Hydra-Multi Backend] optimizer thread stopped!";
   }
 
   if (spin_thread_) {
-    VLOG(3) << "[Hydra-Multi Backend] joining spin thread and stopping";
+    MLOG(3) << "[Hydra-Multi Backend] joining spin thread and stopping";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(3) << "[Hydra-Multi Backend] spin stopped!";
+    MLOG(3) << "[Hydra-Multi Backend] spin stopped!";
   }
 }
 
@@ -546,13 +546,13 @@ bool MultiBackendModule::spinOnce(Timestamp timestamp_ns) {
     auto lock = deformation_graph_->acquireLock();
     std::lock_guard<std::mutex> graph_lock(unmerged_dsg_->mutex);
 
-    VLOG(2) << "Checking for updates @ " << timestamp_ns << " [ns]";
+    MLOG(2) << "Checking for updates @ " << timestamp_ns << " [ns]";
     if (!updateFromStates(timestamp_ns)) {
-      VLOG(2) << "Waiting for states...";
+      MLOG(2) << "Waiting for states...";
       return true;
     }
 
-    VLOG(1) << "Spinning once for update @ " << timestamp_ns << " [ns]";
+    MLOG(1) << "Spinning once for update @ " << timestamp_ns << " [ns]";
     partialOptimization(timestamp_ns);
 
     combineAndDeformMesh(timestamp_ns, should_deform_);
@@ -571,7 +571,7 @@ bool MultiBackendModule::spinOnce(Timestamp timestamp_ns) {
     rebaseStates(timestamp_ns);
   }
 
-  VLOG(2) << "Calling backend sinks @ " << timestamp_ns << " [ns]";
+  MLOG(2) << "Calling backend sinks @ " << timestamp_ns << " [ns]";
   ScopedTimer sink_timer("backend/sinks", timestamp_ns);
   MultiBackendModuleStatus status;
   {  // status critical section
@@ -697,7 +697,7 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
   }
 
   for (const auto& [id, state] : *shared_states_) {
-    VLOG(3) << "Saw robot " << id << " in update @ " << timestamp_ns << " [ns]";
+    MLOG(3) << "Saw robot " << id << " in update @ " << timestamp_ns << " [ns]";
     std::lock_guard<std::mutex> state_lock(state->mutex);
 
     // Append transform
@@ -716,7 +716,7 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
         robot_units_[id_mapping.at(node.robot_id)] = id;
       }
 
-      VLOG(3) << "Remapping robots " << id_mapping.begin()->first << ".."
+      MLOG(3) << "Remapping robots " << id_mapping.begin()->first << ".."
               << id_mapping.rbegin()->first << " -> " << id_mapping.begin()->second
               << ".." << id_mapping.rbegin()->second << " for pg with "
               << state->pose_graph_->nodes.size() << " nodes";
@@ -773,7 +773,7 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
     }
 
     if (have_loopclosures_ || force_mesh_update) {
-      VLOG(3) << "Deforming mesh for robot " << id;
+      MLOG(3) << "Deforming mesh for robot " << id;
       // TODO(Yun): cannot use pre archived vertices as 'start_hint'
       // Note that here the mesh in the state is actually getting modified!
       deformation_graph_->deformPoints(*mesh_data->mesh,
@@ -783,7 +783,7 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
                                        KimeraPgmoInterface::config_.interp_horizon);
     }
 
-    VLOG(5) << "Copying mesh to combined mesh for robot " << id;
+    MLOG(5) << "Copying mesh to combined mesh for robot " << id;
     if (!combined_mesh) {
       combined_mesh = mesh_data->mesh->clone();
       unmerged_dsg_->robot_vertex_offset[id] = 0;
@@ -801,7 +801,7 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
                            unmerged_dsg_->node_robot_map,
                            unmerged_dsg_->robot_vertex_offset);
   } else {
-    VLOG(3) << "No mesh for any robot!";
+    MLOG(3) << "No mesh for any robot!";
   }
 
   // TODO(nathan) fix this!!!!!!!!!!!!!!!!
@@ -829,7 +829,7 @@ void MultiBackendModule::initialAlignment() {
     info->loop_closures.push_back({lc.src, lc.dest, lc.src_T_dest});
   }
 
-  VLOG(10) << "Running initial alignment";
+  MLOG(10) << "Running initial alignment";
   initial_align_->update(info);
 
   auto pgmo_values = deformation_graph_->getValuesCopy();

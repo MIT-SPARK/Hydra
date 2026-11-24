@@ -33,13 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
+
 #include "hydra/loop_closure/scene_graph_descriptors.h"
 
 namespace hydra::lcd {
 
 enum class DescriptorScoreType { COSINE, L1 };
 
-struct DescriptorMatchConfig {
+struct DescriptorMatchConfig : hydra::VerbosityConfig {
   float min_score = 1.0;
   float min_registration_score = 1.0;
   double min_time_separation_s = 0.0;

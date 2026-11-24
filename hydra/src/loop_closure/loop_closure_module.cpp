@@ -71,7 +71,7 @@ void declare_config(LoopClosureModule::Config& config) {
 }
 
 LoopClosureModule::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("lcd")) {}
+    : VerbosityConfig(hydra::VerbosityConfig::named("lcd")) {}
 
 LoopClosureModule::LoopClosureModule(const Config& config,
                                      RunContext::ConstPtr context,

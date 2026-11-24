@@ -90,7 +90,7 @@ inline bool measurementOutsideTruncation(const MapConfig& map_config,
 }  // namespace
 
 ProjectiveIntegrator::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("projective_integrator")),
+    : VerbosityConfig(hydra::VerbosityConfig::named("projective_integrator")),
       interpolation_method(InterpolatorAdaptive::Config{}) {}
 
 void declare_config(ProjectiveIntegrator::Config& config) {

@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
 #include <spark_dsg/spark_dsg_fwd.h>
 
 #include <memory>
@@ -47,7 +48,7 @@ namespace hydra {
 
 class ZmqSink : public BackendModule::Sink {
  public:
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     std::string url = "tcp://127.0.0.1:8001";
     bool send_mesh = true;
     size_t num_threads = 2;

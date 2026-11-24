@@ -58,7 +58,7 @@ void declare_config(InputModule::Config& config) {
 }
 
 InputModule::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("input")) {}
+    : VerbosityConfig(hydra::VerbosityConfig::named("input")) {}
 
 InputModule::InputModule(const Config& _config,
                          RunContext::ConstPtr context,

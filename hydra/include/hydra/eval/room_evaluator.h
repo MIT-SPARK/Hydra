@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-
+#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <memory>
@@ -49,7 +49,7 @@ class RoomEvaluator {
  public:
   using Ptr = std::unique_ptr<RoomEvaluator>;
 
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     bool only_labeled = false;
     float min_weight = 1.0e-6f;
     float min_distance = 0.0f;

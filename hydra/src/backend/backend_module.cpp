@@ -150,10 +150,10 @@ void BackendModule::stopImpl() {
   }
 
   if (spin_thread_) {
-    VLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
+    MLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra Backend] stopped!";
+    MLOG(2) << "[Hydra Backend] stopped!";
   }
 
   if (config.finalize_on_shutdown) {
@@ -265,7 +265,7 @@ bool BackendModule::spinOnce(bool force_update) {
   status_log_.back().total_loop_closures = num_loop_closures_;
 
   if (!updatePrivateDsg(timestamp_ns, force_update)) {
-    VLOG(2) << "Backend skipping input @ " << timestamp_ns << " [ns]";
+    MLOG(2) << "Backend skipping input @ " << timestamp_ns << " [ns]";
     // we only read from the frontend dsg if we've processed all the
     // factor graph update packets (as long as force_update is false)
     // we still log the status for each received frontend packet
@@ -394,14 +394,14 @@ void BackendModule::updateFactorGraph(const FrontendOutput& input) {
       throw std::logic_error(e.what());
     }
   } else {
-    VLOG(10) << "[Hydra Backend] Dropping empty deformation graph @ "
+    MLOG(10) << "[Hydra Backend] Dropping empty deformation graph @ "
              << input.timestamp_ns << " [ns]";
   }
 
   for (const auto& msg : input.agent_updates.pose_graphs) {
     status_log_.back().new_factors += msg.edges.size();
 
-    VLOG(5) << "[Hydra Backend] Adding pose graph message: " << msg;
+    MLOG(5) << "[Hydra Backend] Adding pose graph message: " << msg;
     if (hasLoopClosure(msg)) {
       LOG(INFO) << "[Hydra Backend] Input pose graph has loop closure @ "
                 << msg.stamp_ns << " [ns]";
@@ -542,7 +542,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 
   ScopedTimer timer("backend/mesh_deformation", timestamp_ns);
 
-  VLOG(2) << "Deforming mesh with " << mesh->numVertices() << " vertices";
+  MLOG(2) << "Deforming mesh with " << mesh->numVertices() << " vertices";
 
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
                                    original_vertices_,

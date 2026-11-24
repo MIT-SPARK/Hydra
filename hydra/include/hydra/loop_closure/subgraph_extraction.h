@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <spark_dsg/spark_dsg_fwd.h>
 
@@ -40,7 +41,7 @@
 
 namespace hydra {
 
-struct SubgraphConfig {
+struct SubgraphConfig : hydra::VerbosityConfig {
   bool fixed_radius = true;
   double max_radius_m;
   double min_radius_m;

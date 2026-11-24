@@ -100,3 +100,9 @@ set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
 
 The uhumans2 (v2) office scene is *mostly* guaranteed to work out-of-the-box.
 See [here](../hydra_ros/launch/datasets/uhumans2.launch.yaml) to get a better sense for how everything is configured.
+
+Module diagnostics use `verbosity`, inheriting the active run's `default_verbosity`
+when omitted or null. An explicit value overrides that default; zero enables only
+level-zero diagnostics, and negative values suppress all nonnegative levels.
+Use `log_prefix` to customize the diagnostic tag. Node-symbol `prefix` fields
+retain their original meaning and are independent of logging.

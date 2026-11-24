@@ -191,6 +191,7 @@ void LayerConnector::connectChildren(SceneGraph& graph,
 }
 
 void declare_config(GraphConnector::Config& config) {
+  config::base<hydra::VerbosityConfig>(config);
   using namespace config;
   name("GraphConnector::Config");
   field(config.layers, "layers");

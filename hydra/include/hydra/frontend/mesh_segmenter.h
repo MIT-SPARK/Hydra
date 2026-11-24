@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
 #include <spark_dsg/bounding_box.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
@@ -66,7 +67,7 @@ class MeshSegmenter {
                           const LabelIndices&,
                           const LabelClusters&>;
 
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     std::string layer_id = spark_dsg::DsgLayers::OBJECTS;
     clustering::ClusteringConfig clustering;
     spark_dsg::BoundingBox::Type bounding_box_type = spark_dsg::BoundingBox::Type::AABB;

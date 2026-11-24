@@ -35,6 +35,7 @@
 #pragma once
 #include <hydra/common/robot_config.h>
 #include <hydra/input/input_module.h>
+#include <hydra/utils/logging.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
@@ -51,19 +52,17 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
                            const std::string& source,
                            size_t max_tries = 0,
                            double wait_duration_s = 0.1,
-                           int verbosity = 10,
+                           const VerbosityConfig& config = {},
                            std::string* message = nullptr);
 
 struct TFLookup {
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     //! Amount of time to wait between tf lookup attempts
     double wait_duration_s = 0.1;
     //! Buffer size in second for tf
     double buffer_size_s = 30.0;
     //! Number of lookup attempts before giving up (0 will try forever)
     size_t max_tries = 5;
-    //! Logging verbosity of tf lookup process
-    int verbosity = 3;
     //! Get the buffer size in nanoseconds
     std::chrono::nanoseconds buffer_size_ns() const;
   } const config;

@@ -104,11 +104,14 @@ void declare_config(GraphBuilder::Config& config) {
 }
 
 GraphBuilder::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("graph_builder")),
+    : VerbosityConfig(hydra::VerbosityConfig::named("graph_builder")),
       mesh_compression(MeshCompression::Config{0.005}),
-      graph_updater({{DsgLayers::OBJECTS, {'O', std::nullopt, {}, {}}}}),
       pose_graph_tracker(PoseGraphFromOdom::Config()),
-      deformation_graph_builder(DeformationGraphBuilder::Config()) {}
+      deformation_graph_builder(DeformationGraphBuilder::Config()) {
+  LayerTracker::Config objects;
+  objects.prefix = 'O';
+  graph_updater.layer_updates[DsgLayers::OBJECTS] = objects;
+}
 
 GraphBuilder::GraphBuilder(const Config& config,
                            RunContext::ConstPtr context,

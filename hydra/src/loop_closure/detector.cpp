@@ -177,6 +177,7 @@ void declare_config(LcdDetector::Config::Variances& config) {
 }
 
 void declare_config(LcdDetector::Config& config) {
+  config::base<hydra::VerbosityConfig>(config);
   using namespace config;
   name("LcdDetectorConfig");
   field(config.objects, "objects");
@@ -497,8 +498,8 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
   }
 
   const auto& latest_node = dsg.getNode(agent_id);
-  VLOG(2) << "************************************************************";
-  VLOG(2) << "LCD Matching: " << NodeSymbol(latest_node.id).str();
+  MLOG(2) << "************************************************************";
+  MLOG(2) << "LCD Matching: " << NodeSymbol(latest_node.id).str();
 
   matches_.clear();
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
@@ -506,7 +507,7 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
     const auto& layer = internal_index_to_layer_.at(idx);
     auto descriptor = layer_factories_[layer]->construct(dsg, latest_node);
     if (descriptor) {
-      VLOG(2) << "level " << idx << ": " << showVector(descriptor->values, 3, 20, 9);
+      MLOG(2) << "level " << idx << ": " << showVector(descriptor->values, 3, 20, 9);
       matches_[idx] = searchDescriptors(*descriptor,
                                         config,
                                         prev_valid_roots,
@@ -515,7 +516,7 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
                                         agent_id);
       prev_valid_roots = matches_[idx].valid_matches;
     } else {
-      VLOG(2) << "level " << idx << " -> ?";
+      MLOG(2) << "level " << idx << " -> ?";
       prev_valid_roots = std::set<NodeId>();
       break;
     }
@@ -531,18 +532,18 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
   }
 
   if (matches_.empty()) {
-    VLOG(1) << "No LCD matches for node " << NodeSymbol(agent_id).str() << " against "
+    MLOG(1) << "No LCD matches for node " << NodeSymbol(agent_id).str() << " against "
             << numDescriptors() << " descriptors";
     return {};
   }
 
-  VLOG(2) << "-----------------------------------------------------------";
-  VLOG(2) << "LCD results for node " << NodeSymbol(agent_id).str() << " against "
+  MLOG(2) << "-----------------------------------------------------------";
+  MLOG(2) << "LCD results for node " << NodeSymbol(agent_id).str() << " against "
           << numDescriptors() / 2 << " roots";
   for (const auto& id_match_pair : matches_) {
     const auto& scores = id_match_pair.second.score;
     const auto best_score = std::max_element(scores.begin(), scores.end());
-    VLOG(2) << " - index " << id_match_pair.first << ": "
+    MLOG(2) << " - index " << id_match_pair.first << ": "
             << id_match_pair.second.valid_matches.size() << " valid matches, "
             << id_match_pair.second.match_root.size()
             << " registration matches (best score "
@@ -550,16 +551,16 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
             << ")";
 
     for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
-      VLOG(2) << "   - #" << i
+      MLOG(2) << "   - #" << i
               << ": query=" << NodeSymbol(id_match_pair.second.query_root).str()
               << ", match=" << NodeSymbol(id_match_pair.second.match_root[i]).str()
               << " -> " << id_match_pair.second.score[i];
     }
   }
 
-  VLOG(2) << "-----------------------------------------------------------";
+  MLOG(2) << "-----------------------------------------------------------";
   const auto results = registerAndVerify(dsg, matches_, agent_id, timestamp);
-  VLOG(2) << "************************************************************";
+  MLOG(2) << "************************************************************";
 
   return results;
 }

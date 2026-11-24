@@ -46,6 +46,7 @@
 namespace hydra::lcd {
 
 void declare_config(LayerRegistrationConfig& conf) {
+  config::base<hydra::VerbosityConfig>(conf);
   using namespace config;
   name("LayerRegistrationConfig");
   field(conf.min_correspondences, "min_correspondences");

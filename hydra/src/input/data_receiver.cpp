@@ -54,7 +54,7 @@ void declare_config(DataReceiver::Config& config) {
 }
 
 DataReceiver::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
+    : VerbosityConfig(hydra::VerbosityConfig::named("data_receiver")) {}
 
 DataReceiver::DataReceiver(const Config& config,
                            const Sensor::ConstPtr& sensor,

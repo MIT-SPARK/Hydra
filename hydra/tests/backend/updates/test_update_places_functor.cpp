@@ -87,7 +87,9 @@ TEST(UpdatePlacesFunctor, PlaceUpdate) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, true, {}});
-  UpdatePlacesFunctor::Config config{0.4, 0.3, DeformationInterpolator::Config{}};
+  UpdatePlacesFunctor::Config config;
+  config.pos_threshold_m = 0.4;
+  config.distance_tolerance_m = 0.3;
   config.use_temp_values = true;
 
   const UpdatePlacesFunctor functor(config);
@@ -136,7 +138,10 @@ TEST(UpdatePlacesFunctor, PlaceUpdateNodeFinderBug) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, false, {}});
-  UpdatePlacesFunctor functor({0.4, 0.3, DeformationInterpolator::Config{}});
+  UpdatePlacesFunctor::Config config;
+  config.pos_threshold_m = 0.4;
+  config.distance_tolerance_m = 0.3;
+  UpdatePlacesFunctor functor(config);
   // initialize node finder
   callWithUnmerged(functor, *dsg, info, false);
 
@@ -176,7 +181,9 @@ TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, true, {}});
-  UpdatePlacesFunctor::Config config{0.4, 0.3, DeformationInterpolator::Config{}};
+  UpdatePlacesFunctor::Config config;
+  config.pos_threshold_m = 0.4;
+  config.distance_tolerance_m = 0.3;
   config.use_temp_values = true;
 
   UpdatePlacesFunctor functor(config);

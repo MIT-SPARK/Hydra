@@ -58,7 +58,7 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
                            const std::string& source,
                            size_t max_tries,
                            double wait_duration_s,
-                           int verbosity,
+                           const VerbosityConfig& config,
                            std::string* message) {
   using namespace std::chrono_literals;
   rclcpp::WallRate tf_wait_rate(1.0 / wait_duration_s);
@@ -71,15 +71,14 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
 
   bool have_transform = false;
   std::string err_str;
-  VLOG(verbosity) << "Looking up transform " << target << "_T_" << source
-                  << stamp_suffix;
+  MLOG(3) << "Looking up transform " << target << "_T_" << source << stamp_suffix;
 
   const auto lookup_time = stamp.value_or(rclcpp::Time());
   size_t attempt_number = 0;
   while (rclcpp::ok()) {
-    VLOG(verbosity) << "Attempting to lookup tf @ " << lookup_time.nanoseconds()
-                    << " [ns]: " << attempt_number << " / "
-                    << (max_tries ? std::to_string(max_tries) : "n/a");
+    MLOG(3) << "Attempting to lookup tf @ " << lookup_time.nanoseconds()
+            << " [ns]: " << attempt_number << " / "
+            << (max_tries ? std::to_string(max_tries) : "n/a");
     if (max_tries && attempt_number >= max_tries) {
       break;
     }
@@ -129,12 +128,12 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
 }
 
 void declare_config(TFLookup::Config& config) {
+  config::base<hydra::VerbosityConfig>(config);
   using namespace config;
   name("TFLookup::Config");
   field(config.wait_duration_s, "wait_duration_s");
   field(config.buffer_size_s, "buffer_size_s");
   field(config.max_tries, "max_tries");
-  field(config.verbosity, "verbosity");
 }
 
 TFLookup::TFLookup(const Config& config, const RobotConfig::Frames& frames)
@@ -151,7 +150,7 @@ PoseStatus TFLookup::getBodyPose(uint64_t timestamp_ns) const {
                          frames.robot,
                          config.max_tries,
                          config.wait_duration_s,
-                         config.verbosity);
+                         config);
 }
 
 }  // namespace hydra

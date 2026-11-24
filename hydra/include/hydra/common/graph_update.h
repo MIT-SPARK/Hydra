@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/virtual_config.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
@@ -90,7 +91,7 @@ struct TrackBinding {
 };
 
 struct LayerTracker {
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     char prefix = 0;
     std::optional<spark_dsg::LayerId> target_layer;
     config::VirtualConfig<NodeMatcher> matcher;
@@ -119,7 +120,7 @@ struct LayerTracker {
 void declare_config(LayerTracker::Config& config);
 
 struct GraphUpdater {
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     std::map<std::string, LayerTracker::Config> layer_updates;
     //! @brief mark all added nodes as active
     bool mark_active = true;

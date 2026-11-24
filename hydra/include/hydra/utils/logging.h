@@ -42,17 +42,20 @@ namespace hydra {
 
 struct VerbosityConfig {
   //! An unset value inherits the current run default
-  std::optional<int> verbosity = 0;
-  std::string prefix = "";
+  std::optional<int> verbosity = std::nullopt;
+  std::string log_prefix = "";
 
   VerbosityConfig() = default;
   VerbosityConfig(int verbosity);
-  VerbosityConfig(const std::string& prefix, std::optional<int> verbosity = 0);
+  VerbosityConfig(const std::string& prefix,
+                  std::optional<int> verbosity = std::nullopt);
 
   //! Make a copy of the verbosity config with a prefix derived from the provided name
   VerbosityConfig with_name(const std::string& name) const;
 
-  static VerbosityConfig default_verbosity(const std::string& name = "");
+  static VerbosityConfig named(const std::string& name = "");
+
+  bool enabled(int level) const { return get_verbosity() >= level; }
 
   int get_verbosity() const;
 };
@@ -61,6 +64,7 @@ void declare_config(VerbosityConfig& config);
 
 // NOTE(nathan) you need to include <glog/logging.h> for this to work, but
 // I don't want have <glog/logging.h> included in a bunch of header files
-#define MLOG(V) LOG_IF(INFO, config.get_verbosity() >= V) << config.prefix
+#define MLOG_WITH(C, V) LOG_IF(INFO, (C).enabled(V)) << (C).log_prefix
+#define MLOG(V) MLOG_WITH(config, V)
 
 }  // namespace hydra

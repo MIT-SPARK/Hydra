@@ -50,9 +50,15 @@ struct LcdDetectorTests : public ::testing::Test {
     config.object_extraction = SubgraphConfig(5.0);
     config.places_extraction = SubgraphConfig(5.0);
     config.place_histogram_config = HistogramConfig<double>(0.5, 2.5, 30);
-    config.agent_search_config = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-    config.objects.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-    config.places.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+    DescriptorMatchConfig matching;
+    matching.min_score = 0.8;
+    matching.min_registration_score = 0.8;
+    matching.max_registration_matches = 1;
+    matching.min_score_ratio = 0.0;
+    matching.min_match_separation_m = 0.0;
+    config.agent_search_config = matching;
+    config.objects.matching = matching;
+    config.places.matching = matching;
   }
 
   LcdDetector::Config config;

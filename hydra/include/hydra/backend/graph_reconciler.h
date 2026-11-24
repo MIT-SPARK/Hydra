@@ -35,6 +35,7 @@
 #pragma once
 #include <config_utilities/config.h>
 #include <config_utilities/virtual_config.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/backend/update_functions.h"
@@ -43,7 +44,7 @@ namespace hydra {
 struct Reconciler {
   using Graph = spark_dsg::SceneGraph;
 
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     using FunctorConfig = config::VirtualConfig<UpdateFunctor, true>;
 
     config::OrderedMap<std::string, FunctorConfig> update_functors;

@@ -158,7 +158,7 @@ ParamSensorExtrinsics::Config lookupExtrinsics(const RosExtrinsics::Config& conf
                              sensor_frame,
                              warning_tries,
                              config.wait_duration_s,
-                             config.verbosity,
+                             config,
                              &message);
     if (!status) {
       LOG(WARNING) << "Waiting for sensor extrinsics " << message;
@@ -188,6 +188,7 @@ RosCamera::RosCamera(const Config&) {
 }
 
 void declare_config(RosExtrinsics::Config& config) {
+  config::base<hydra::VerbosityConfig>(config);
   using namespace config;
   name("RosExtrinsics::Config");
   field(config.sensor_frame, "sensor_frame");
@@ -195,7 +196,6 @@ void declare_config(RosExtrinsics::Config& config) {
   field(config.warning_timeout_s, "warning_timeout_s", "s");
   field(config.error_timeout_s, "error_timeout_s", "s");
   field(config.wait_duration_s, "wait_duration_s", "s");
-  field(config.verbosity, "verbosity");
   check(config.warning_timeout_s, GE, 0.0, "warning_timeout_s");
   check(config.error_timeout_s, GE, 0.0, "error_timeout_s");
 }
