@@ -48,10 +48,6 @@ frontend:
     place_max_neighbor_z_diff: 0.5
     place_overlap_threshold: 0.0
   deformation_graph_builder: {horizon_s: 15.0, resolution: 2.5}
-  graph_updater:
-    layer_updates:
-      OBJECTS: {prefix: O}
-      MESH_PLACES: {prefix: P}
 backend:
   type: BackendModule
   serialize_dsg_mesh: false

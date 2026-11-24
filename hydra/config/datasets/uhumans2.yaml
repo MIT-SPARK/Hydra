@@ -65,10 +65,6 @@ frontend:
     tsdf_interpolator: {type: downsample, ratio: 2}
   frontier_places: {type: ''}
   deformation_graph_builder: {horizon_s: 15.0, resolution: 2.5}
-  graph_updater:
-    layer_updates:
-      OBJECTS: {prefix: O}
-      MESH_PLACES: {prefix: P}
 backend:
   optimize_on_lc: true
   enable_node_merging: true

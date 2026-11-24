@@ -39,10 +39,6 @@ frontend:
       overlap_edges: {enable: false}
       freespace_edges: {enable: false}
   deformation_graph_builder: {horizon_s: 100.0, resolution: 2.5}
-  graph_updater:
-    layer_updates:
-      OBJECTS: {prefix: O}
-      MESH_PLACES: {prefix: P}
 backend:
   optimize_on_lc: true
   enable_node_merging: true

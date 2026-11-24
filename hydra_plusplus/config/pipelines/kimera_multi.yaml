@@ -12,10 +12,6 @@ frontend:
       - {parent_layer: MESH_PLACES, child_layers: [layer: OBJECTS]}
   deformation_graph_builder: {horizon_s: 100.0, resolution: 2.5}
   pose_graph_tracker: {min_pose_separation: 1.0, rotation_separation_weight: 1.0, min_time_separation_s: 5.0}
-  graph_updater:
-    layer_updates:
-      OBJECTS: {prefix: O}
-      MESH_PLACES: {prefix: P}
 backend:
   serialize_dsg_mesh: false
   min_dsg_separation_s: 2
