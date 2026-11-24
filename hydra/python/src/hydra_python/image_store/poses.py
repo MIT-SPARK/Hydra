@@ -27,6 +27,7 @@ class JsonDsg:
     """
 
     def __init__(self, data: dict):
+        self.metadata = data.get("metadata") or {}
         self.nodes: dict[int, dict] = {}
         for node in data.get("nodes", []):
             self.nodes[int(node["id"])] = node

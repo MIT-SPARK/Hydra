@@ -1,6 +1,6 @@
 """Writers for synthetic Hydra/Khronos image logs (FORMAT.md), byte-compatible with the
 C++ writers: InputData archives as ``input_data_io.cpp`` encodes them (OpenCV PNG of the
-RGB Mat, float32 TIFF, metadata.yaml), track logs, track_bindings.json, merges.json and a
+RGB Mat, float32 TIFF, metadata.yaml), track logs, track_bindings.json and a
 scene graph json in spark_dsg's format."""
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ cv2 = None
 def _cv2():
     global cv2
     if cv2 is None:
-        import cv2 as _cv2mod  # OPENCV_IO_ENABLE_OPENEXR (legacy_exr) is set in conftest
+        import cv2 as _cv2mod
 
         cv2 = _cv2mod
     return cv2
@@ -95,11 +95,9 @@ def write_input_zip(
     color=None,
     depth=None,
     sensor="camera",
-    legacy_exr=False,
     feature=None,
 ):
-    """``InputData::save`` of a camera input (entry names/encodings of input_data_io.cpp).
-    ``legacy_exr`` writes depth as the uncompressed EXR older Hydra versions used."""
+    """``InputData::save`` of a camera input (entry names/encodings of input_data_io.cpp)."""
     cv = _cv2()
     entries = {}
     images = {}
@@ -130,11 +128,7 @@ def write_input_zip(
             ],
         )
     if depth is not None:
-        if legacy_exr:
-            exr = [cv.IMWRITE_EXR_TYPE, cv.IMWRITE_EXR_TYPE_FLOAT]
-            add("depth", ".exr", depth, exr + [cv.IMWRITE_EXR_COMPRESSION, 0])
-        else:
-            add("depth", ".tiff", depth)
+        add("depth", ".tiff", depth)
     meta = {
         "version": 1,
         "timestamp_ns": int(timestamp_ns),
@@ -152,7 +146,7 @@ def write_input_zip(
     with zipfile.ZipFile(path, "w") as zf:
         for name, data in entries.items():
             # zip_archive.cpp deflates every entry except PNG
-            stored = name.endswith((".png", ".exr"))
+            stored = name.endswith(".png")
             method = zipfile.ZIP_STORED if stored else zipfile.ZIP_DEFLATED
             zf.writestr(name, data, compress_type=method)
         zf.writestr(
@@ -310,14 +304,13 @@ def write_bindings(frontend_dir, bindings, layer="OBJECTS", extra=None):
     (d / "track_bindings.json").write_text(json.dumps(data))
 
 
-def write_merges(backend_dir, merges):
-    d = pathlib.Path(backend_dir)
-    d.mkdir(parents=True, exist_ok=True)
-    data = {
-        "version": 1,
-        "merges": [{"child": c, "parent": p} for c, p in merges.items()],
+def write_node_merges(backend_dir, merges):
+    path = pathlib.Path(backend_dir) / "dsg.json"
+    data = json.loads(path.read_text())
+    data.setdefault("metadata", {})["node_merges"] = {
+        str(child): parent for child, parent in merges.items()
     }
-    (d / "merges.json").write_text(json.dumps(data))
+    path.write_text(json.dumps(data))
 
 
 def write_dsg(path, agents, objects=(), prefix="a"):
@@ -325,6 +318,9 @@ def write_dsg(path, agents, objects=(), prefix="a"):
     writer when it is importable, else the same json by hand."""
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    metadata = (
+        json.loads(path.read_text()).get("metadata", {}) if path.is_file() else {}
+    )
     try:
         import datetime
 
@@ -347,6 +343,7 @@ def write_dsg(path, agents, objects=(), prefix="a"):
         g.save(str(path))
         # the python bindings only take microseconds: restore the exact ns stamps
         data = json.loads(path.read_text())
+        data["metadata"] = metadata
         exact = {make_node_id(prefix, idx): int(ts) for idx, ts, _ in agents}
         for node in data["nodes"]:
             if node["id"] in exact:
@@ -379,7 +376,7 @@ def write_dsg(path, agents, objects=(), prefix="a"):
                 "attributes": {"type": "ObjectNodeAttributes", "position": [0, 0, 0]},
             }
         )
-    path.write_text(json.dumps({"nodes": nodes, "edges": []}))
+    path.write_text(json.dumps({"nodes": nodes, "edges": [], "metadata": metadata}))
     return path
 
 
@@ -442,7 +439,6 @@ def build_run(run, *, robot_prefix="a", with_frontend=True):
             (31, O4, 1, 3, False, "track_removed"),
         ],
     )
-    write_merges(hydra / "backend", {O2: O6, O4: O6})
     agents_t = (1.0, 2.0, 3.0, 4.0)
     # backend poses are optimized: shifted by 1 m in y relative to odometry
     write_dsg(
@@ -454,6 +450,7 @@ def build_run(run, *, robot_prefix="a", with_frontend=True):
         objects=(O1, O6),
         prefix=robot_prefix,
     )
+    write_node_merges(hydra / "backend", {O2: O6, O4: O6})
     if with_frontend:
         write_dsg(
             hydra / "frontend" / "dsg.json",

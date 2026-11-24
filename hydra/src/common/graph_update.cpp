@@ -364,7 +364,7 @@ std::string GraphUpdater::bindingsToJson() const {
 }
 
 void GraphUpdater::saveBindings(const std::filesystem::path& filepath) const {
-  writeFileAtomic(filepath, bindingsToJson());
+  DataDirectory::writeFileAtomic(filepath, bindingsToJson());
 }
 
 }  // namespace hydra

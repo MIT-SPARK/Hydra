@@ -98,7 +98,7 @@ def check_store(store: str | os.PathLike, *, dsg=None, sample_images: int = 20) 
                 def has(n):
                     return graph.has_node(int(n))
 
-            # node_aliases holds the backend merges (merges.json)
+            # node_aliases holds the backend graph's node_merges metadata
             aliases = dict(
                 conn.execute("SELECT child_id, parent_id FROM node_aliases").fetchall()
             )

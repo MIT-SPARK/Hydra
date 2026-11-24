@@ -33,14 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/backend/merge_tracker.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <nlohmann/json.hpp>
-#include <sstream>
 
+#include "hydra/backend/dsg_updater.h"
+#include "hydra/backend/graph_reconciler.h"
+#include "hydra/backend/merge_tracker.h"
+#include "hydra/utils/temp_path.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
 using namespace spark_dsg;
@@ -56,79 +58,42 @@ void addObject(SceneGraph& graph, size_t index) {
 
 }  // namespace
 
-TEST(MergeTracker, DeletedParentCorrect) {
-  auto dsg = test::makeSharedDsg();
-  auto& merged = *dsg->graph;
-  addObject(merged, 0);
-  addObject(merged, 1);
-  const auto unmerged = merged.clone();
+TEST(MergeTracker, DropsMergeSetsWithMissingParents) {
+  for (const auto& [remove_unmerged, remove_merged] :
+       {std::pair{true, true}, std::pair{true, false}, std::pair{false, true}}) {
+    SCOPED_TRACE(::testing::Message() << remove_unmerged << ", " << remove_merged);
+    auto dsg = test::makeSharedDsg();
+    auto& merged = *dsg->graph;
+    addObject(merged, 0);
+    addObject(merged, 1);
+    const auto unmerged = merged.clone();
 
-  MergeTracker tracker;
-  const auto merge_attrs = [](const SceneGraph& unmerged,
-                              const std::vector<NodeId>& nodes) -> NodeAttributes::Ptr {
-    const auto node = unmerged.findNode(nodes.front());
-    return node ? node->attributes().clone() : nullptr;
-  };
+    const auto parent = "O0"_id;
+    const auto child = "O1"_id;
+    const auto merge_attrs =
+        [](const SceneGraph& graph,
+           const std::vector<NodeId>& nodes) -> NodeAttributes::Ptr {
+      return graph.getNode(nodes.front()).attributes().clone();
+    };
+    MergeTracker tracker;
+    const MergeList proposals{{child, parent}};
+    ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, merge_attrs), 1u);
+    const auto saved_merges = dsg->merges;
+    if (remove_unmerged) {
+      unmerged->removeNode(parent);
+    }
 
-  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
-  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, merge_attrs), 1u);
+    if (remove_merged) {
+      merged.removeNode(parent);
+    }
 
-  unmerged->removeNode(NodeSymbol('O', 0));
-  merged.removeNode(NodeSymbol('O', 0));
-  EXPECT_NO_THROW(tracker.updateAllMergeAttributes(*unmerged, merged, merge_attrs));
-  MergeList repeat{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
-  EXPECT_NO_THROW(tracker.applyMerges(*unmerged, repeat, *dsg, merge_attrs));
-}
-
-// A parent missing from only the unmerged graph drops the merge set without
-// rebuilding its attributes.
-TEST(MergeTracker, ParentDeletedOnlyFromUnmerged) {
-  auto dsg = test::makeSharedDsg();
-  auto& merged = *dsg->graph;
-  addObject(merged, 0);
-  addObject(merged, 1);
-  const auto unmerged = merged.clone();
-
-  MergeTracker tracker;
-  size_t num_calls = 0;
-  const auto merge_attrs =
-      [&num_calls](const SceneGraph& unmerged,
-                   const std::vector<NodeId>& nodes) -> NodeAttributes::Ptr {
-    ++num_calls;
-    return unmerged.getNode(nodes.front()).attributes().clone();
-  };
-
-  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
-  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, merge_attrs), 1u);
-  EXPECT_EQ(num_calls, 1u);
-
-  unmerged->removeNode(NodeSymbol('O', 0));
-  EXPECT_NO_THROW(tracker.updateAllMergeAttributes(*unmerged, merged, merge_attrs));
-  EXPECT_EQ(num_calls, 1u);
-  EXPECT_TRUE(tracker.print().empty());
-}
-
-// A parent missing from only the merged graph also drops the merge set.
-TEST(MergeTracker, ParentDeletedOnlyFromMerged) {
-  auto dsg = test::makeSharedDsg();
-  auto& merged = *dsg->graph;
-  addObject(merged, 0);
-  addObject(merged, 1);
-  const auto unmerged = merged.clone();
-
-  MergeTracker tracker;
-  const auto merge_attrs = [](const SceneGraph& unmerged,
-                              const std::vector<NodeId>& nodes) -> NodeAttributes::Ptr {
-    return unmerged.getNode(nodes.front()).attributes().clone();
-  };
-
-  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
-  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, merge_attrs), 1u);
-
-  merged.removeNode(NodeSymbol('O', 0));
-  EXPECT_NO_THROW(tracker.updateAllMergeAttributes(*unmerged, merged, merge_attrs));
-  EXPECT_FALSE(merged.hasNode(NodeSymbol('O', 0)));
-  EXPECT_TRUE(tracker.print().empty());
+    EXPECT_NO_THROW(tracker.updateAllMergeAttributes(*unmerged, merged, merge_attrs));
+    EXPECT_NO_THROW(tracker.applyMerges(*unmerged, proposals, *dsg, merge_attrs));
+    EXPECT_EQ(unmerged->hasNode(parent), !remove_unmerged);
+    EXPECT_EQ(merged.hasNode(parent), !remove_merged);
+    EXPECT_FALSE(merged.hasNode(child));
+    EXPECT_EQ(dsg->merges, saved_merges);
+  }
 }
 
 TEST(MergeTracker, NullAttributesCorrect) {
@@ -149,34 +114,52 @@ TEST(MergeTracker, NullAttributesCorrect) {
   EXPECT_TRUE(merged.getNode(NodeSymbol('O', 0)).tryAttributes());
 }
 
-TEST(MergeTracker, MergesToJson) {
+TEST(MergeTracker, BackendGraphStoresFinalParentsInMetadata) {
+  const auto tempdir = utils::TempDirectory::system_default("hydra-merges-", true);
   auto dsg = test::makeSharedDsg();
   auto& merged = *dsg->graph;
+  merged.metadata.add(nlohmann::json{{"source", "test"}});
   for (size_t i = 0; i < 4; ++i) {
     addObject(merged, i);
   }
+
   const auto unmerged = merged.clone();
+  MergeTracker first, second;
+  ASSERT_EQ(first.applyMerges(*unmerged, {{"O1"_id, "O0"_id}}, *dsg), 1u);
+  ASSERT_EQ(second.applyMerges(*unmerged, {{"O0"_id, "O2"_id}}, *dsg), 1u);
 
-  MergeTracker tracker;
-  MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)},
-                      {NodeSymbol('O', 0), NodeSymbol('O', 2)}};
-  ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg), 2u);
+  DsgUpdater updater(DsgUpdater::Config{}, unmerged, dsg);
+  const DataDirectory output(tempdir.path);
+  updater.save(output, "backend");
+  const auto path = tempdir / "backend/dsg.json";
+  auto saved = SceneGraph::load(path);
+  const NodeId parent = "O2"_id;
+  const nlohmann::json expected{{std::to_string("O0"_id), parent},
+                                {std::to_string("O1"_id), parent}};
+  EXPECT_EQ(saved->metadata.get().at("node_merges"), expected);
+  EXPECT_EQ(saved->metadata.get().at("source"), "test");
+  EXPECT_FALSE(std::filesystem::exists(tempdir / "backend/merges.json"));
 
-  const auto merge = [](NodeId child, NodeId parent) {
-    return nlohmann::json{{"child", child}, {"parent", parent}};
-  };
-  const nlohmann::json expected{{"version", 1},
-                                {"merges",
-                                 {merge(NodeSymbol('O', 0), NodeSymbol('O', 2)),
-                                  merge(NodeSymbol('O', 1), NodeSymbol('O', 2))}}};
-  EXPECT_EQ(nlohmann::json::parse(mergesToJson(dsg->merges)), expected);
+  // Saving again replaces the map, including after all merges are cleared.
+  dsg->merges.clear();
+  updater.save(output, "backend");
+  saved = SceneGraph::load(path);
+  EXPECT_EQ(saved->metadata.get().at("node_merges"), nlohmann::json::object());
+  EXPECT_EQ(saved->metadata.get().at("source"), "test");
+}
 
-  // chains are resolved even if the map is not flattened
-  const std::map<NodeId, NodeId> chain{{NodeSymbol('O', 1), NodeSymbol('O', 0)},
-                                       {NodeSymbol('O', 0), NodeSymbol('O', 2)}};
-  EXPECT_EQ(nlohmann::json::parse(mergesToJson(chain)), expected);
-  EXPECT_EQ(nlohmann::json::parse(mergesToJson({})),
-            (nlohmann::json{{"version", 1}, {"merges", nlohmann::json::array()}}));
+TEST(Reconciler, PreservesMergesFromInputGraphMetadata) {
+  auto dsg = test::makeSharedDsg();
+  addObject(*dsg->graph, 2);
+  const NodeId original = "O0"_id;
+  const NodeId parent = "O2"_id;
+  const nlohmann::json mapping{{std::to_string(original), parent}};
+  dsg->graph->metadata.add(nlohmann::json{{"node_merges", mapping}});
+
+  Reconciler reconciler(Reconciler::Config{});
+  const auto result = reconciler.reconcile(*dsg->graph);
+  ASSERT_TRUE(result);
+  EXPECT_EQ(result->metadata.get().at("node_merges"), mapping);
 }
 
 }  // namespace hydra

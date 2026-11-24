@@ -63,18 +63,15 @@ class DataDirectory {
   std::filesystem::path path(const std::filesystem::path& sub_path = "") const;
   DataDirectory child(const std::string& sub_path) const;
 
+  //! Write through a temporary file on the same filesystem, then rename into place
+  static void writeFileAtomic(const std::filesystem::path& filepath,
+                              const std::string& contents);
+
  private:
   bool valid_;
   std::filesystem::path root_path_;
 };
 
 void declare_config(DataDirectory::Config& config);
-
-/**
- * @brief Write contents to a temporary file next to filepath and rename it into place
- * @throws std::runtime_error on failure
- */
-void writeFileAtomic(const std::filesystem::path& filepath,
-                     const std::string& contents);
 
 }  // namespace hydra

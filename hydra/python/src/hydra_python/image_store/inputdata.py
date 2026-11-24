@@ -10,8 +10,7 @@ by ``hydra/src/input/input_data_io.cpp``:
 - ``color_mask.png``, ``range.tiff``, ``labels.tiff``, ``instances.tiff``,
   ``vertices.exr``, ``traversability.tiff``, ``sensor_mask.png`` (ignored here)
 
-Archives written before Hydra switched its float images to TIFF hold ``depth.exr``
-instead; :func:`decode_exr` reads those through imageio's ``opencv`` plugin.
+Legacy ``depth.exr`` archives are unsupported; depth must be stored as TIFF.
 
 ``metadata.yaml``::
 
@@ -120,23 +119,6 @@ def decode_tiff(data: bytes) -> np.ndarray:
     return np.ascontiguousarray(iio.imread(data, extension=".tiff"))
 
 
-def decode_exr(data: bytes) -> np.ndarray:
-    """Decode an EXR from an archive written before Hydra used TIFF for float images.
-
-    No imageio backend reads EXR out of the box: this uses the ``opencv`` plugin, which
-    needs OpenCV and ``OPENCV_IO_ENABLE_OPENEXR=1`` set before ``cv2`` is imported."""
-    try:
-        # flags=-1 is cv2.IMREAD_UNCHANGED (float32, all channels)
-        img = iio.imread(data, extension=".exr", plugin="opencv", flags=-1)
-    except Exception as exc:  # noqa: BLE001 - missing cv2 / codec disabled
-        raise ValueError(
-            f"could not read EXR ({exc}); this archive predates Hydra's TIFF depth: "
-            "install opencv and set OPENCV_IO_ENABLE_OPENEXR=1 before cv2 is imported"
-        ) from exc
-    # the plugin converts to RGB(A); return OpenCV's channel order
-    return _swap_rb(img)
-
-
 def _swap_rb(img: np.ndarray) -> np.ndarray:
     """BGR(A) <-> RGB(A) for 3/4-channel images; others unchanged."""
     if img.ndim == 3 and img.shape[2] in (3, 4):
@@ -161,8 +143,6 @@ def _read_image(zf: zipfile.ZipFile, images: dict, name: str) -> np.ndarray | No
         img = decode_png(data)
     elif suffix in (".tiff", ".tif"):
         img = decode_tiff(data)
-    elif suffix == ".exr":
-        img = decode_exr(data)
     else:
         raise ValueError(f"{name}: unsupported image file {desc['file']!r}")
     rows, cols = int(desc["rows"]), int(desc["cols"])
@@ -248,7 +228,6 @@ def _atomic_write(path: pathlib.Path, data: bytes) -> None:
 __all__ = [
     "InputRecord",
     "SensorInfo",
-    "decode_exr",
     "decode_png",
     "decode_tiff",
     "depth_to_mm",

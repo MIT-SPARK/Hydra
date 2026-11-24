@@ -36,15 +36,15 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <unistd.h>
 #include <zip.h>
 
-#include <cstdlib>
 #include <fstream>
 #include <limits>
 #include <list>
 #include <memory>
 #include <stdexcept>
+
+#include "hydra/utils/temp_path.h"
 
 namespace hydra::io {
 namespace {
@@ -63,20 +63,16 @@ void writeEmptyArchive(const std::filesystem::path& path) {
 class ZipWriter {
  public:
   ZipWriter(const std::filesystem::path& destination, const ArchiveOptions& options)
-      : destination_(destination), options_(config::checkValid(options)) {
-    const auto pattern = destination.string() + ".tmp.XXXXXX";
-    std::vector<char> name(pattern.begin(), pattern.end());
-    name.push_back('\0');
-    const auto fd = mkstemp(name.data());
-    if (fd < 0) {
-      throw std::runtime_error("could not create temporary archive");
-    }
-
-    close(fd);
-    temporary_ = name.data();
-    file_ = zip_open(temporary_.c_str(), ZIP_CREATE | ZIP_TRUNCATE, nullptr);
+      : destination_(destination),
+        temporary_(std::filesystem::canonical(destination.parent_path().empty()
+                                                  ? std::filesystem::path(".")
+                                                  : destination.parent_path()),
+                   ".hydra-archive-",
+                   true),
+        options_(config::checkValid(options)) {
+    file_ =
+        zip_open(temporary_.path.string().c_str(), ZIP_CREATE | ZIP_TRUNCATE, nullptr);
     if (!file_) {
-      std::filesystem::remove(temporary_);
       throw std::runtime_error("could not open temporary archive");
     }
   }
@@ -85,9 +81,6 @@ class ZipWriter {
     if (file_) {
       zip_discard(file_);
     }
-
-    std::error_code error;
-    std::filesystem::remove(temporary_, error);
   }
 
   ZipWriter(const ZipWriter&) = delete;
@@ -124,19 +117,19 @@ class ZipWriter {
     if (entries_.empty()) {
       zip_discard(file_);
       file_ = nullptr;
-      writeEmptyArchive(temporary_);
+      writeEmptyArchive(temporary_.path);
     } else if (zip_close(file_) < 0) {
       throw std::runtime_error("could not finish archive: " +
                                std::string(zip_strerror(file_)));
     }
 
     file_ = nullptr;
-    std::filesystem::rename(temporary_, destination_);
+    std::filesystem::rename(temporary_.path, destination_);
   }
 
  private:
   std::filesystem::path destination_;
-  std::filesystem::path temporary_;
+  utils::TempFile temporary_;
   zip_t* file_ = nullptr;
   std::list<Bytes> entries_;
   const ArchiveOptions options_;
@@ -145,7 +138,7 @@ class ZipWriter {
 class ZipReader {
  public:
   explicit ZipReader(const std::filesystem::path& path)
-      : file_(zip_open(path.c_str(), ZIP_RDONLY, nullptr)) {
+      : file_(zip_open(path.string().c_str(), ZIP_RDONLY, nullptr)) {
     if (!file_) {
       throw std::runtime_error("could not open ZIP archive");
     }

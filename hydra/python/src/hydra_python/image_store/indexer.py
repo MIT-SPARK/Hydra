@@ -5,7 +5,7 @@ Inputs (any may be missing):
 - keyframe ``InputData`` archives ``<keyframes>/<timestamp_ns>[_<sensor>].zip``
   (FORMAT.md §1; optionally with a feature vector, stored as the frame's descriptor)
 - per-track object logs ``<tracks>/<track_id>/track.json`` + images (§2)
-- frontend ``track_bindings.json`` (§3) and backend ``merges.json`` (§4)
+- frontend ``track_bindings.json`` (§3) and backend graph merge metadata (§4)
 - the backend (and frontend) scene graph ``dsg.json``
 
 :func:`index` writes them into ``store.sqlite`` (schema_version 1) through
@@ -31,7 +31,7 @@ Representation (see README "Indexer"):
   ended one, and ``extracted: false``), ``node_deleted`` (the frontend deleted the
   node), ``node_missing`` (the node, after merges, is not in the backend scene graph)
   or ``no_binding``.
-- Node aliases: backend ``merges.json`` (final parents). Re-indexing replaces the
+- Node aliases: backend ``node_merges`` metadata (final parents). Re-indexing replaces the
   aliases this robot's previous indexing recorded.
 - Anchoring: of this robot's agent nodes just before and just after the frame in time,
   the nearer in time (ties: the earlier); none when its odometric position is more than
@@ -61,19 +61,18 @@ from .codec import (
     node_symbol,
     transform_to_blob,
 )
-from .poses import JsonDsg
+from .poses import JsonDsg, load_dsg
 from .store import DB_NAME, FrameKind, ImageStoreWriter, frame_stem
 
 logger = logging.getLogger(__name__)
 
-INDEXER_VERSION = 1
+INDEXER_VERSION = 2
 SIGNATURE_KEY = "indexer.input_signature"
 STORE_DIR = "image_store"
 KEYFRAME_DIRS = ("keyframes",)
 TRACK_DIRS = ("tracks",)
 HYDRA_DIRS = ("hydra",)
 BINDINGS_FILE = "track_bindings.json"
-MERGES_FILE = "merges.json"
 DSG_FILES = ("dsg.json", "dsg_with_mesh.json", "dsg.sparkdsg")
 #: an archive within this of an agent node's stamp gives the node's odometric pose
 STAMP_TOL_NS = 1_000_000
@@ -93,7 +92,6 @@ class IndexInputs:
     backend_dsg: pathlib.Path | None = None
     frontend_dsg: pathlib.Path | None = None
     bindings: pathlib.Path | None = None
-    merges: pathlib.Path | None = None
 
     def to_json(self) -> dict:
         return {
@@ -158,7 +156,6 @@ def find_inputs(
         or _first_file(hy, DSG_FILES),
         frontend_dsg=p(frontend_dsg) or _first_file(frontend, DSG_FILES),
         bindings=_first_file(frontend, [BINDINGS_FILE]),
-        merges=_first_file(backend, [MERGES_FILE]) or _first_file(hy, [MERGES_FILE]),
     )
 
 
@@ -712,15 +709,22 @@ class _Indexer:
 
     # bindings / merges --------------------------------------------------------------
     def _load_merges(self) -> dict[int, int]:
-        """Backend ``child -> final parent`` merges (merges.json)."""
-        merges: dict[int, int] = {}
-        if self.inp.merges is not None:
-            try:
-                for m in _load_json(self.inp.merges).get("merges") or []:
-                    merges[int(m["child"])] = int(m["parent"])
-            except (OSError, ValueError, TypeError, KeyError) as exc:
-                self.warn("%s: cannot read merges: %s", self.inp.merges, exc)
-        return merges
+        """Original node ids mapped to their final parents in graph metadata."""
+        path = self.inp.backend_dsg
+        if path is None:
+            return {}
+        try:
+            graph = load_dsg(path)
+            metadata = (
+                graph.metadata if isinstance(graph, JsonDsg) else graph.metadata.get()
+            )
+            return {
+                int(child): int(parent)
+                for child, parent in (metadata.get("node_merges") or {}).items()
+            }
+        except Exception as exc:  # noqa: BLE001 - unreadable graph or metadata
+            self.warn("%s: cannot read node merges: %s", path, exc)
+            return {}
 
     def _backend_nodes(self) -> set[int] | None:
         """Node ids of the backend scene graph, ``None`` when it is not available."""
@@ -835,7 +839,7 @@ class _Indexer:
                 [(self.robot, t, n) for t, n in bound.items()],
             )
             self.set_meta("unbound_tracks", unbound)
-            # aliases this robot's previous indexing recorded that merges.json no longer
+            # aliases this robot's previous indexing recorded that graph metadata no longer
             # has (e.g. it was rewritten by a later save) are stale
             previous = set(self.meta("aliases", []))
             self.conn.executemany(
@@ -1044,7 +1048,7 @@ def _index(
 
 def input_signature(inputs: IndexInputs) -> dict:
     """Cheap fingerprint of a run's raw inputs: (mtime, size) of the scene graphs,
-    bindings and merges, the keyframe archive count and directory mtime (archives are
+    bindings, the keyframe archive count and directory mtime (archives are
     renamed into place) and (mtime, size) of every ``track.json``."""
 
     def sig(path: pathlib.Path | None):
@@ -1054,9 +1058,9 @@ def input_signature(inputs: IndexInputs) -> dict:
             return None
 
     out: dict = {
-        k: sig(getattr(inputs, k))
-        for k in ("backend_dsg", "frontend_dsg", "bindings", "merges")
+        k: sig(getattr(inputs, k)) for k in ("backend_dsg", "frontend_dsg", "bindings")
     }
+    out["indexer_version"] = INDEXER_VERSION
     kf = inputs.keyframes
     if kf is not None and kf.is_dir():
         out["keyframes"] = [

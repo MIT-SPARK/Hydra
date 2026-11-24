@@ -118,6 +118,7 @@ DsgUpdater::DsgUpdater(const Config& config,
 void DsgUpdater::save(const DataDirectory& output, const std::string& label) const {
   std::lock_guard<std::mutex> graph_lock(target_dsg_->mutex);
   const auto graph_path = output.path(label);
+  target_dsg_->updateMergesMetadata();
   target_dsg_->graph->save(graph_path / "dsg.json", false);
   target_dsg_->graph->save(graph_path / "dsg_with_mesh.json");
 
@@ -125,12 +126,6 @@ void DsgUpdater::save(const DataDirectory& output, const std::string& label) con
   if (mesh && !mesh->empty()) {
     // mesh implements vertex and face traits
     kimera_pgmo::WriteMesh(graph_path / "mesh.ply", *mesh, *mesh);
-  }
-
-  try {
-    saveMerges(target_dsg_->merges, graph_path / "merges.json");
-  } catch (const std::exception& e) {
-    LOG(ERROR) << "Failed to save merges: " << e.what();
   }
 }
 

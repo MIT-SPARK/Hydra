@@ -61,21 +61,6 @@ def frame_at(store, t):
 # --- readers ------------------------------------------------------------------------
 
 
-def test_tiff_depth_matches_opencv():
-    """Float32 depth as OpenCV's TIFF encoder writes it decodes bit-exactly with
-    imageio (NaN, inf and -0 included)."""
-    from hydra_python.image_store.inputdata import decode_tiff
-
-    rng = np.random.default_rng(1)
-    d = (rng.random((37, 23)) * 5).astype(np.float32)
-    d[0, 0], d[1, 1], d[2, 2], d[3, 3], d[5, :] = np.nan, np.inf, -np.inf, -0.0, 2.0
-    ok, buf = cv2.imencode(".tiff", d)
-    assert ok
-    out = decode_tiff(buf.tobytes())
-    assert out.dtype == np.float32
-    np.testing.assert_array_equal(out.view(np.uint32), d.view(np.uint32))
-
-
 def test_read_input_zip(tmp_path):
     from hydra_python.image_store.inputdata import read_input_zip
 
@@ -486,7 +471,7 @@ def test_cli_index_info_check(run, capsys):
     assert cli_main(["info", str(run / "image_store"), "--json"]) == 0
     info = json.loads(capsys.readouterr().out)[0]
     assert info["frames"] == {"keyframe": 6, "observation": 6}
-    assert info["meta"]["indexer_version"] == "1"
+    assert info["meta"]["indexer_version"] == "2"
     assert cli_main(["check", str(run)]) == 0
 
 
@@ -548,30 +533,17 @@ assert "cv2" not in {{k for k, v in sys.modules.items() if v is not None}}
     assert out.returncode == 0, out.stderr
 
 
-def test_legacy_exr_depth(tmp_path):
-    """Archives from before Hydra wrote TIFF hold depth.exr: read through imageio's
-    opencv plugin, in OpenCV's channel order."""
-    from hydra_python.image_store.inputdata import decode_exr, read_input_zip
-
-    depth = np.random.default_rng(0).uniform(0.1, 9, (R.H, R.W)).astype(np.float32)
-    path = R.write_input_zip(
-        tmp_path / "7.zip", 7, np.eye(4), depth=depth, legacy_exr=True
-    )
-    np.testing.assert_array_equal(read_input_zip(path).depth, depth)
-    bgr = np.random.default_rng(1).uniform(0, 1, (6, 8, 3)).astype(np.float32)
-    ok, buf = cv2.imencode(".exr", bgr)
-    np.testing.assert_array_equal(decode_exr(buf.tobytes()), bgr)
-
-
-def test_unknown_image_extension_is_rejected(tmp_path):
+@pytest.mark.parametrize("extension", ["jp2", "exr"])
+def test_unknown_image_extension_is_rejected(tmp_path, extension):
     from hydra_python.image_store.inputdata import read_input_zip
 
     path = R.write_input_zip(tmp_path / "7.zip", 7, np.eye(4), depth=R.depth_m(2.0))
     with zipfile.ZipFile(path) as zf:
         entries = {n: zf.read(n) for n in zf.namelist()}
     meta = yaml.safe_load(entries.pop("metadata.yaml"))
-    meta["images"]["depth"]["file"] = "depth.jp2"
-    entries["depth.jp2"] = entries.pop("depth.tiff")
+    filename = f"depth.{extension}"
+    meta["images"]["depth"]["file"] = filename
+    entries[filename] = entries.pop("depth.tiff")
     entries["metadata.yaml"] = yaml.safe_dump(meta).encode()
     with zipfile.ZipFile(path, "w") as zf:
         for name, data in entries.items():
@@ -638,7 +610,11 @@ def test_bindings_of_any_layer_when_no_object_layer(run):
 
 def test_several_tracks_share_a_node(run):
     _cpp_bindings(run)
-    (run / "hydra/backend/merges.json").unlink()
+    R.write_node_merges(run / "hydra/backend", {})
+    # An obsolete sidecar must not override the graph's authoritative empty map.
+    (run / "hydra/backend/merges.json").write_text(
+        json.dumps({"merges": [{"child": R.O2, "parent": R.O6}]})
+    )
     _backend_objects(run, (R.O1, R.O2))
     stats = index(run)
     assert stats["node_aliases"] == 0
@@ -670,13 +646,11 @@ def test_binding_to_deleted_node_is_dropped(run):
 
 
 def test_khronos_backend_layout(run):
-    """Khronos' backend saves dsg.json and merges.json into the log root."""
-    for name in ("dsg.json", "merges.json"):
-        shutil.move(run / "hydra/backend" / name, run / "hydra" / name)
+    """Khronos' backend saves dsg.json into the log root."""
+    shutil.move(run / "hydra/backend/dsg.json", run / "hydra/dsg.json")
     (run / "hydra/backend").rmdir()
     stats = index(run)
     assert stats["inputs"]["backend_dsg"].endswith("hydra/dsg.json")
-    assert stats["inputs"]["merges"].endswith("hydra/merges.json")
     with ImageStore.open(run) as store:
         assert frame_at(store, 1.0).kind == FrameKind.KEYFRAME
         assert store.canonical(R.O2) == R.O6
@@ -809,12 +783,25 @@ def test_real_cpp_artifacts(tmp_path):
 # --- bindings, aliases and archive names ----------------------------------------
 
 
+def test_binary_backend_merge_metadata(run):
+    sd = pytest.importorskip("spark_dsg")
+    path = run / "hydra/backend/dsg.json"
+    graph = sd.DynamicSceneGraph.load(str(path))
+    binary = path.with_suffix(".sparkdsg")
+    graph.save(str(binary))
+    stats = index(run, dsg=binary)
+    assert stats["node_aliases"] == 2
+    with ImageStore.open(run, index=False) as store:
+        assert store.canonical(R.O2) == R.O6
+        assert store.canonical(R.O4) == R.O6
+
+
 def test_reindex_replaces_stale_aliases(run):
     index(run)
     with ImageStore.open(run) as store:
         assert store.canonical(R.O4) == R.O6
-    # a later save rewrote merges.json: O4 is no longer merged, O3 is
-    R.write_merges(run / "hydra/backend", {R.O2: R.O6, R.O3: R.O6})
+    # a later save rewrote graph metadata: O4 is no longer merged, O3 is
+    R.write_node_merges(run / "hydra/backend", {R.O2: R.O6, R.O3: R.O6})
     _backend_objects(run, (R.O1, R.O4, R.O6))
     stats = index(run)
     assert stats["node_aliases"] == 2
@@ -828,7 +815,7 @@ def test_reindex_replaces_stale_aliases(run):
 def test_reindex_keeps_aliases_of_other_writers(run):
     index(run)
     with ImageStore.open_writer(run / "image_store", robot_id=0) as w:
-        w.record_merges({R.O9: R.O1})  # e.g. a manual merge, not from merges.json
+        w.record_merges({R.O9: R.O1})  # e.g. a manual merge, not from graph metadata
     index(run)
     with ImageStore.open(run) as store:
         assert store.canonical(R.O9) == R.O1

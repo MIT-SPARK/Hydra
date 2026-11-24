@@ -33,13 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/utils/data_directory.h>
-#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
-#include <limits>
+#include <iterator>
 #include <sstream>
+
+#include "hydra/utils/data_directory.h"
+#include "hydra/utils/temp_path.h"
 
 namespace hydra {
 
@@ -52,42 +53,88 @@ std::string readFile(const std::filesystem::path& path) {
   return ss.str();
 }
 
-std::filesystem::path makeTempDir() {
-  const auto path = std::filesystem::temp_directory_path() /
-                    ("hydra_test_write_atomic_" + std::to_string(::getpid()));
-  std::filesystem::remove_all(path);
-  std::filesystem::create_directories(path);
-  return path;
-}
-
 }  // namespace
 
-TEST(WriteFileAtomic, WritesAndReplaces) {
-  const auto dir = makeTempDir();
+TEST(DataDirectory, WritesAndReplaces) {
+  const auto dir = utils::TempDirectory::system_default("", true);
   const auto path = dir / "out.json";
-  writeFileAtomic(path, "first");
+  DataDirectory::writeFileAtomic(path, "first");
   EXPECT_EQ(readFile(path), "first");
 
   const std::string binary("a\0b\nc", 5);
-  writeFileAtomic(path, binary);
+  DataDirectory::writeFileAtomic(path, binary);
   EXPECT_EQ(readFile(path), binary);
 
   // only the target remains (no temporary files)
   size_t num_files = 0;
-  for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+  for (const auto& entry : std::filesystem::directory_iterator(dir.path)) {
     EXPECT_EQ(entry.path().filename(), "out.json");
     ++num_files;
   }
+
   EXPECT_EQ(num_files, 1u);
-  std::filesystem::remove_all(dir);
 }
 
-TEST(WriteFileAtomic, ThrowsForMissingDirectory) {
-  const auto dir = makeTempDir();
+TEST(DataDirectory, ThrowsForMissingDirectory) {
+  const auto dir = utils::TempDirectory::system_default("", true);
   const auto path = dir / "missing" / "out.json";
-  EXPECT_THROW(writeFileAtomic(path, "contents"), std::runtime_error);
+  EXPECT_THROW(DataDirectory::writeFileAtomic(path, "contents"), std::runtime_error);
   EXPECT_FALSE(std::filesystem::exists(path));
-  std::filesystem::remove_all(dir);
+}
+
+TEST(DataDirectory, FailedReplacementPreservesDestination) {
+  const auto temp = utils::TempDirectory::system_default("hydra-write-", true);
+  const auto destination = temp / "existing";
+  std::filesystem::create_directory(destination);
+  {
+    std::ofstream contents(destination / "contents");
+    contents << "original";
+  }
+
+  EXPECT_THROW(DataDirectory::writeFileAtomic(destination, "replacement"),
+               std::filesystem::filesystem_error);
+  EXPECT_EQ(readFile(destination / "contents"), "original");
+  EXPECT_EQ(std::distance(std::filesystem::directory_iterator(temp.path),
+                          std::filesystem::directory_iterator()),
+            1);
+}
+
+TEST(TempDirectory, ScopedCleanupPreservesRetainedDirectories) {
+  const auto root = utils::TempDirectory::system_default("hydra-temp-", true);
+  std::filesystem::path removed, retained;
+  {
+    const utils::TempDirectory scoped(root.path, "scoped-", true);
+    const utils::TempDirectory kept(root.path, "kept-", false);
+    removed = scoped.path;
+    retained = kept.path;
+    std::ofstream(scoped / "contents") << "temporary";
+    std::ofstream(kept / "contents") << "retained";
+  }
+
+  EXPECT_FALSE(std::filesystem::exists(removed));
+  EXPECT_EQ(readFile(retained / "contents"), "retained");
+}
+
+TEST(TempFile, ScopedCleanupPreservesRetainedFiles) {
+  const auto root = utils::TempDirectory::system_default("hydra-files-", true);
+  std::filesystem::path removed, retained;
+  {
+    const utils::TempFile scoped(root.path, "file-", true);
+    const utils::TempFile kept(root.path, "file-", false);
+    ASSERT_TRUE(std::filesystem::is_regular_file(scoped.path));
+    ASSERT_TRUE(std::filesystem::is_regular_file(kept.path));
+    EXPECT_NE(scoped.path, kept.path);
+    removed = scoped.path;
+    retained = kept.path;
+    std::ofstream(scoped.path) << "temporary";
+    std::ofstream(kept.path) << "retained";
+  }
+
+  EXPECT_FALSE(std::filesystem::exists(removed));
+  EXPECT_EQ(readFile(retained), "retained");
+  EXPECT_EQ(std::distance(std::filesystem::directory_iterator(root.path),
+                          std::filesystem::directory_iterator()),
+            1);
 }
 
 }  // namespace hydra

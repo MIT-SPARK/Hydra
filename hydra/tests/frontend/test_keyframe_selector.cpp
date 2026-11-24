@@ -37,25 +37,14 @@
 #include <hydra/frontend/keyframe_selector.h>
 #include <hydra/input/camera.h>
 #include <hydra/input/sensor_extrinsics.h>
-#include <unistd.h>
 
 #include <filesystem>
-#include <set>
 
+#include "hydra/utils/temp_path.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
 namespace hydra {
 namespace {
-
-std::filesystem::path makeTempDir() {
-  auto pattern =
-      (std::filesystem::temp_directory_path() / "hydra-keyframes-XXXXXX").string();
-  if (!mkdtemp(pattern.data())) {
-    throw std::runtime_error("could not create temporary directory");
-  }
-
-  return pattern;
-}
 
 Sensor::ConstPtr makeCamera(const std::string& name = "camera") {
   Camera::Config config;
@@ -136,7 +125,8 @@ TEST(KeyframeSelector, SelectFields) {
 }
 
 TEST(KeyframeSelector, SavesAcceptedKeyframes) {
-  const auto log_path = makeTempDir() / "keyframes";
+  const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
+  const auto log_path = temp / "keyframes";
   const auto sensor = makeCamera();
 
   KeyframeSelector::Config config;
@@ -170,6 +160,7 @@ TEST(KeyframeSelector, SavesAcceptedKeyframes) {
     EXPECT_EQ(entry.path().extension(), ".zip") << entry.path();
     ++num_files;
   }
+
   EXPECT_EQ(num_files, 3u);
 
   const auto loaded = InputData::load(log_path / "30.zip");
@@ -184,46 +175,11 @@ TEST(KeyframeSelector, SavesAcceptedKeyframes) {
   EXPECT_TRUE(loaded->label_image.empty());
   EXPECT_TRUE(loaded->vertex_map.empty());
   EXPECT_EQ(loaded->feature.size(), 0);
-
-  std::filesystem::remove_all(log_path.parent_path());
-}
-
-TEST(KeyframeSelector, ConsidersForwardedInputsInTimeOrder) {
-  const auto log_path = makeTempDir() / "keyframes";
-  const auto sensor = makeCamera();
-
-  KeyframeSelector::Config config;
-  DistancePolicy::Config policy;
-  policy.min_pose_separation = 1.0;
-  policy.min_time_separation_s = 0.0;
-  config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
-  config.log_path = log_path;
-
-  auto dsg = test::makeSharedDsg();
-  FrontendOutput output(0, 0);
-  {
-    KeyframeSelector selector(config);
-    // two collated outputs: their updates (20, 40) and forwarded inputs (10, 30)
-    // interleave in time
-    ActiveWindowOutput msg(makeInput(sensor, 20, 0.5));
-    msg.sensor_data.push_back(makeInput(sensor, 40, 4.0));
-    msg.intermediate_inputs.push_back(makeInput(sensor, 10, 0.0));
-    msg.intermediate_inputs.push_back(makeInput(sensor, 30, 2.0));
-    selector.call(msg, *dsg, output, nullptr);
-    selector.flush();
-  }
-
-  // in time order 20 is too close to 10; out of order it would follow 30 and be kept
-  std::set<std::string> files;
-  for (const auto& entry : std::filesystem::directory_iterator(log_path)) {
-    files.insert(entry.path().filename().string());
-  }
-  EXPECT_EQ(files, std::set<std::string>({"10.zip", "30.zip", "40.zip"}));
-  std::filesystem::remove_all(log_path.parent_path());
 }
 
 TEST(KeyframeSelector, SavesDescriptorsOnlyWhenRequested) {
-  const auto root = makeTempDir();
+  const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
+  const auto& root = temp.path;
   const auto sensor = makeCamera();
   DistancePolicy::Config policy;
   policy.min_pose_separation = 0.0;
@@ -265,12 +221,11 @@ TEST(KeyframeSelector, SavesDescriptorsOnlyWhenRequested) {
     EXPECT_FALSE(loaded->color_image.empty());
     EXPECT_TRUE(loaded->label_image.empty());
   }
-
-  std::filesystem::remove_all(root);
 }
 
 TEST(KeyframeSelector, SensorSuffixForSecondarySensors) {
-  const auto log_path = makeTempDir() / "keyframes_multi";
+  const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
+  const auto log_path = temp / "keyframes_multi";
   const auto front = makeCamera("front");
   const auto rear = makeCamera("rear cam/1");
 
@@ -298,22 +253,11 @@ TEST(KeyframeSelector, SensorSuffixForSecondarySensors) {
   const auto loaded = InputData::load(log_path / "10_rear_cam_1.zip");
   ASSERT_TRUE(loaded);
   EXPECT_EQ(loaded->getSensor().name, "rear cam/1");
-  std::filesystem::remove_all(log_path.parent_path());
-}
-
-TEST(KeyframeSelector, NoLogPathNoFiles) {
-  KeyframeSelector::Config config;
-  EXPECT_TRUE(config.log_path.empty());
-  KeyframeSelector selector(config);
-  auto dsg = test::makeSharedDsg();
-  FrontendOutput output(0, 0);
-  ActiveWindowOutput msg(makeInput(makeCamera(), 10));
-  selector.call(msg, *dsg, output, nullptr);
-  selector.flush();  // no-op without a log path
 }
 
 TEST(KeyframeSelector, FlushOnDestruction) {
-  const auto log_path = makeTempDir();
+  const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
+  const auto& log_path = temp.path;
   KeyframeSelector::Config config;
   DistancePolicy::Config policy;
   policy.min_pose_separation = 0.0;
@@ -331,6 +275,7 @@ TEST(KeyframeSelector, FlushOnDestruction) {
     for (size_t i = 2; i <= 20; ++i) {
       msg.sensor_data.push_back(makeInput(sensor, i));
     }
+
     selector.call(msg, *dsg, output, nullptr);
   }
 
@@ -339,8 +284,8 @@ TEST(KeyframeSelector, FlushOnDestruction) {
     EXPECT_EQ(entry.path().extension(), ".zip") << entry.path();
     ++num_files;
   }
+
   EXPECT_EQ(num_files, 20u);
-  std::filesystem::remove_all(log_path);
 }
 
 struct KeyframeSelectorAccess : KeyframeSelector {

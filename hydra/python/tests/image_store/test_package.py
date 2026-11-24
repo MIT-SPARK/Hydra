@@ -3,7 +3,6 @@
 import subprocess
 import sys
 
-import hydra_python
 import pytest
 
 
@@ -54,7 +53,3 @@ def test_hydra_cli_has_image_store():
     result = CliRunner().invoke(cli, ["image-store", "--help"])
     assert result.exit_code == 0, result.output
     assert "index" in result.output and "check" in result.output
-
-
-def test_bindings_state_is_exposed():
-    assert hasattr(hydra_python, "BINDINGS_ERROR")

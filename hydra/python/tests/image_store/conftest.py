@@ -1,8 +1,3 @@
-import os
-
-# Legacy EXR fixtures are encoded with OpenCV, which needs this before cv2 is imported.
-os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
-
 import pathlib
 
 import imageio.v3 as iio

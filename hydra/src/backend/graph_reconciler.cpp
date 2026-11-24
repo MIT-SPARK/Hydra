@@ -40,6 +40,7 @@
 #include <glog/logging.h>
 
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 #include "hydra/backend/merge_tracker.h"
 
@@ -66,6 +67,11 @@ auto Reconciler::reconcile(Graph& graph) const -> Graph::Ptr {
 
   SharedDsgInfo target(SharedDsgInfo::Config{});
   target.graph = graph.clone();
+  const auto& metadata = graph.metadata.get();
+  const auto merges = metadata.value("node_merges", nlohmann::json::object());
+  for (const auto& [original, parent] : merges.items()) {
+    target.merges.emplace(std::stoull(original), parent.get<spark_dsg::NodeId>());
+  }
 
   auto info = std::make_shared<UpdateInfo>();
   info->full_update = true;
@@ -108,6 +114,7 @@ auto Reconciler::reconcile(Graph& graph) const -> Graph::Ptr {
     }
   }
 
+  target.updateMergesMetadata();
   return target.graph;
 }
 

@@ -119,7 +119,6 @@ void declare_config(FileDsgInput::Config& config) {
   using namespace config;
   name("FileDsgInput::Config");
   field<Path>(config.dsg_json, "dsg_json");
-  field(config.force_robot_id, "force_robot_id");
 
   check<Path::Exists>(config.dsg_json, "dsg_json");
 }

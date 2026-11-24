@@ -360,6 +360,7 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
         if (!node_update.attributes) {
           continue;
         }
+
         auto derived =
             dynamic_cast<KhronosObjectAttributes*>(node_update.attributes.get());
         if (derived) {
@@ -390,8 +391,7 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
   if (!mesh_compression_) {
-    LOG_FIRST_N(WARNING, 1)
-        << "MeshCompression turned off! Post-mesh callbacks will not run!";
+    return;
   }
 
   {

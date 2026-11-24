@@ -42,6 +42,8 @@
 #include <filesystem>
 #include <fstream>
 
+#include "hydra/utils/temp_path.h"
+
 namespace hydra {
 
 namespace fs = std::filesystem;
@@ -117,21 +119,22 @@ DataDirectory DataDirectory::child(const std::string& sub_path) const {
   return DataDirectory(sub_path, new_config);
 }
 
-void writeFileAtomic(const std::filesystem::path& filepath,
-                     const std::string& contents) {
-  auto tmp_path = filepath;
-  tmp_path += ".tmp";
+void DataDirectory::writeFileAtomic(const std::filesystem::path& filepath,
+                                    const std::string& contents) {
+  const auto parent = filepath.parent_path();
+  const auto root = fs::canonical(parent.empty() ? fs::path(".") : parent);
+  const utils::TempFile temporary(root, ".hydra-write-", true);
+  const auto& tmp_path = temporary.path;
   {
     std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
     out << contents;
     out.close();
     if (!out) {
-      std::filesystem::remove(tmp_path);
       throw std::runtime_error("failed to write '" + tmp_path.string() + "'");
     }
   }
 
-  std::filesystem::rename(tmp_path, filepath);
+  fs::rename(tmp_path, filepath);
 }
 
 bool DataDirectory::valid() const { return valid_; }

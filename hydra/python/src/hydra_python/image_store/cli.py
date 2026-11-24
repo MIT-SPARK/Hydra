@@ -171,7 +171,7 @@ def index(
 ):
     """Build/update <RUN>/image_store from Hydra/Khronos image logs.
 
-    Reads keyframe archives, track logs, track_bindings.json and merges.json; inputs
+    Reads keyframe archives, track logs, track_bindings.json and graph metadata; inputs
     default to RUN's keyframes/, tracks/ and hydra/ subdirectories."""
     from .indexer import index as run_index
 

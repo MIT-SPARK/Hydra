@@ -44,7 +44,7 @@ nodes); the indexer never rebinds or deletes them.
 Hydra and Khronos log raw files (contract: `FORMAT.md`): keyframe `InputData` archives
 `<keyframes>/<ts>.zip` (`<ts>_<sensor>.zip` for every sensor but the first one Hydra
 saved), Khronos track logs `<tracks>/<track_id>/track.json` (+ kept observation images),
-the frontend's `track_bindings.json` and the backend's `merges.json`.
+the frontend's `track_bindings.json` and the backend graph's `node_merges` metadata.
 `hydra_python.image_store.index` builds the store from them:
 
 ```
@@ -54,7 +54,7 @@ hydra image-store index RUN [--keyframes DIR] [--tracks DIR] [--hydra DIR] [--ds
 ```
 
 Defaults: `RUN/keyframes`, `RUN/tracks`, `RUN/hydra/{backend,frontend}` (the backend's
-`dsg.json` / `merges.json` may also sit in `RUN/hydra/` itself, where Khronos' backend
+`dsg.json` may also sit in `RUN/hydra/` itself, where Khronos' backend
 saves them), store `RUN/image_store`. Only `*.zip` archives are read (Hydra writes
 `<ts>.zip.tmp.XXXXXX` first); archives are told apart by the sensor name and stamp in
 their metadata, not by the file name. `ImageStore.open(RUN)` (or
@@ -92,7 +92,7 @@ What it produces:
   `node_deleted` (the frontend deleted the node), `node_missing` (the bound node, after
   merges, is not in the backend scene graph; checked only when that graph is saved) or
   `no_binding`.
-- **Aliases**: backend `merges.json` (final parents). A re-index replaces the aliases this
+- **Aliases**: backend graph `node_merges` metadata (final parents). A re-index replaces the aliases this
   robot's previous indexing recorded (meta `indexer.r<robot>.aliases`); aliases other
   writers recorded are kept.
 - **Anchors**: every frame, keyframe or not, is anchored to the nearer in time of the
@@ -108,7 +108,7 @@ What it produces:
   (else backend) scene graph holds, else 0.
 - **Bindings file**: `layers` keys are graph_updater layer names (`OBJECTS`); the object
   layer is found case-insensitively (else every layer is used). Several tracks may bind to
-  one node. Node merges come from `merges.json` only.
+  one node. Node merges come from backend graph metadata only.
 - **Track logs** must follow `FORMAT.md` §2 (`robot_id`, `track_id`, `absorbed_track_ids`,
   `extracted`, `semantic_label`, every observation key; `mask_rle` a string or `null`).
   A malformed `track.json` is skipped with a warning (`tracks_failed`).
