@@ -414,10 +414,7 @@ auto AgglomerativeIBClustering::cluster(const SceneGraphLayer& layer) const
     }
 
     cluster->score = info.score;
-    if (info.score >= config.score_threshold) {
-      cluster->best_query = info.index;
-    }
-
+    cluster->best_query = info.index;
     to_return.push_back(cluster);
   }
 

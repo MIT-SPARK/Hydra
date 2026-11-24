@@ -407,4 +407,26 @@ TEST(AgglomerativeIBClustering, GetClustersCorrect) {
   }
 }
 
+TEST(AgglomerativeIBClustering, RetainedLowScoreClustersKeepTheirBestQuery) {
+  EmbeddingGroup queries;
+  queries.embeddings = {Eigen::Vector2f(1, 0), Eigen::Vector2f(0, 1)};
+  queries.names = {"office", "hallway"};
+  AgglomerativeIBClustering::Config config;
+  config.queries = queries;
+  config.score_threshold = 0.9f;
+  config.null_task_preprune = false;
+
+  SceneGraphLayer layer(1);
+  auto attrs = std::make_unique<SemanticNodeAttributes>();
+  attrs->semantic_feature = Eigen::Vector2f(0.6, 0.8);
+  ASSERT_TRUE(layer.emplaceNode(1, std::move(attrs)));
+  const auto clusters = AgglomerativeIBClustering(config).cluster(layer);
+  ASSERT_EQ(clusters.size(), 1u);
+  EXPECT_EQ(clusters.front()->best_query, 1u);
+  EXPECT_NEAR(clusters.front()->score, 0.8f, 1.0e-6f);
+
+  config.filter_clusters = true;
+  EXPECT_TRUE(AgglomerativeIBClustering(config).cluster(layer).empty());
+}
+
 }  // namespace hydra
