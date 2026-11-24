@@ -26,6 +26,15 @@ If you are parsing sensor information from `sensor_msgs::msg::CameraInfo` messag
 Hydra will print out the input configuration and other global information before attempting to resolve the sensor information.
 You may also find setting the parameter `print_missing: true` useful (which will output every configuration field that was not specified by YAML parameter).
 
+Use `verbosity` to override `default_verbosity` for a module and `log_prefix` to label its log messages:
+
+```yaml
+default_verbosity: 1
+backend:
+  verbosity: 3  # Show backend messages through level 3.
+  log_prefix: '[backend] '  # Label messages without changing node IDs.
+```
+
 Finally, you should understand how the `config_utilities` factories work (see [here](https://github.com/MIT-SPARK/config_utilities/blob/main/docs/Factories.md)).
 Searching the code-base (both Hydra and Hydra-ROS) may be necessary to find all options for virtual configurations (that the code-base uses liberally).
 Something like
@@ -100,9 +109,3 @@ set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
 
 The uhumans2 (v2) office scene is *mostly* guaranteed to work out-of-the-box.
 See [here](../hydra_ros/launch/datasets/uhumans2.launch.yaml) to get a better sense for how everything is configured.
-
-Module diagnostics use `verbosity`, inheriting the active run's `default_verbosity`
-when omitted or null. An explicit value overrides that default; zero enables only
-level-zero diagnostics, and negative values suppress all nonnegative levels.
-Use `log_prefix` to customize the diagnostic tag. Node-symbol `prefix` fields
-retain their original meaning and are independent of logging.
