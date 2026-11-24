@@ -35,6 +35,7 @@
 #pragma once
 
 #include "hydra/active_window/active_window_output.h"
+#include "hydra/common/run_context.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/frontend/frontend_output.h"
 #include "hydra/utils/data_directory.h"
@@ -43,6 +44,7 @@ namespace hydra {
 
 struct VolumetricWindow;
 
+//! Factory implementations take their Config followed by RunContext::ConstPtr.
 class GraphBuilderFunctor {
  public:
   virtual ~GraphBuilderFunctor() = default;

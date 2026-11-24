@@ -42,9 +42,8 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
-#include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
-#include "hydra/common/pipeline_queues.h"
+#include "hydra/common/run_context.h"
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
@@ -61,8 +60,9 @@ static const auto registration =
     config::RegistrationWithConfig<GraphBuilder,
                                    GraphBuilder,
                                    GraphBuilder::Config,
+                                   RunContext::ConstPtr,
                                    SharedDsgInfo::Ptr,
-                                   SharedModuleState::Ptr,
+                                   std::shared_ptr<SharedModuleState>,
                                    std::unique_ptr<VolumetricWindow>>("GraphBuilder");
 
 }
@@ -89,8 +89,8 @@ void declare_config(GraphBuilder::Config& config) {
 
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
-  config.keyframe_selector.setOptional();
-  field(config.keyframe_selector, "keyframe_selector");
+  config.deformation_graph_builder.setOptional();
+  field(config.deformation_graph_builder, "deformation_graph_builder");
   config.keyframe_selector.setOptional();
   field(config.keyframe_selector, "keyframe_selector");
   config.freespace_places.setOptional();
@@ -111,10 +111,12 @@ GraphBuilder::Config::Config()
       deformation_graph_builder(DeformationGraphBuilder::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
+                           RunContext::ConstPtr context,
                            const SharedDsgInfo::Ptr& dsg,
-                           const SharedModuleState::Ptr& state,
+                           const std::shared_ptr<SharedModuleState>& state,
                            std::unique_ptr<VolumetricWindow>&& window)
-    : config(config::checkValid(config)),
+    : Module(context),
+      config(config::checkValid(config)),
       queue_(std::make_shared<InputQueue>()),
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       dsg_(dsg),
@@ -124,30 +126,29 @@ GraphBuilder::GraphBuilder(const Config& config,
       graph_connector_(config.graph_connector),
       map_window_(std::move(window)),
       surface_places_(config.surface_places.create(
-          GlobalInfo::instance().labelspace().surface_places_labels)),
-      sinks_(Sink::instantiate(config.sinks)) {
-  const auto& global_info = GlobalInfo::instance();
+          context->labelspace().surface_places_labels, context->config.robot)),
+      sinks_(Sink::instantiate(config.sinks, context->config.robot)) {
   if (config.enable_mesh_objects) {
-    segmenter_ = std::make_unique<MeshSegmenter>(
-        config.object_config, global_info.labelspace().object_labels);
+    segmenter_ = std::make_unique<MeshSegmenter>(config.object_config,
+                                                 context->labelspace().object_labels,
+                                                 context->config.robot);
   }
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
-  dsg_->graph->setMesh(global_info.createMesh());
-
   if (mesh_compression_) {
     addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   }
 
   // TODO(nathan) this needs to be pushed to an actual config at some point
-  functors_.emplace("pose_graph_tracker", config.pose_graph_tracker.create());
+  functors_.emplace("pose_graph_tracker", config.pose_graph_tracker.create(context));
   functors_.emplace("deformation_graph_builder",
-                    config.deformation_graph_builder.create());
-  functors_.emplace("keyframe_selector", config.keyframe_selector.create());
-  functors_.emplace("freespace_places", config.freespace_places.create());
-  functors_.emplace("traversability_places", config.traversability_places.create());
-  functors_.emplace("frontier_places", config.frontier_places.create());
+                    config.deformation_graph_builder.create(context));
+  functors_.emplace("keyframe_selector", config.keyframe_selector.create(context));
+  functors_.emplace("freespace_places", config.freespace_places.create(context));
+  functors_.emplace("traversability_places",
+                    config.traversability_places.create(context));
+  functors_.emplace("frontier_places", config.frontier_places.create(context));
   for (const auto& [_, functor] : functors_) {
     callbacks_.push_back([&](auto msg) {
       if (msg && functor) {
@@ -168,14 +169,21 @@ GraphBuilder::~GraphBuilder() {
 }
 
 void GraphBuilder::start() {
+  should_shutdown_ = false;
+  force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&GraphBuilder::spin, this));
   MLOG(0) << "started!";
 }
 
-void GraphBuilder::stop() { stopImpl(); }
+void GraphBuilder::stop(bool force) {
+  force_shutdown_ = force;
+  stopImpl();
+}
 
 void GraphBuilder::stopImpl() {
-  should_shutdown_ = true;
+  if (should_shutdown_.exchange(true)) {
+    return;
+  }
 
   if (spin_thread_) {
     MLOG(1) << "stopping frontend!";
@@ -186,8 +194,13 @@ void GraphBuilder::stopImpl() {
   }
 }
 
-void GraphBuilder::save(const DataDirectory& output) {
-  const auto output_path = output.path("frontend");
+void GraphBuilder::save(const DataDirectory* output) {
+  const auto& logs = output ? *output : context->logs;
+  if (!logs) {
+    return;
+  }
+
+  const auto output_path = logs.path("frontend");
   {  // the graph and the bindings are only consistent under the frontend lock
     std::lock_guard<std::mutex> lock(mutex_);
     dsg_->graph->save(output_path / "dsg.json", false);
@@ -205,16 +218,16 @@ void GraphBuilder::save(const DataDirectory& output) {
     }
   }
 
-  // functors flush their own output (e.g., queued keyframes) without blocking the
+  // functors flush their own logs (e.g., queued keyframes) without blocking the
   // frontend update loop; functors_ is fixed after construction
   for (const auto& [_, functor] : functors_) {
     if (functor) {
-      functor->save(output);
+      functor->save(logs);
     }
   }
 }
 
-std::string GraphBuilder::printInfo() const {
+std::string GraphBuilder::show() const {
   return config::toString(config) + "\n" + Sink::printSinks(sinks_);
 }
 
@@ -235,7 +248,11 @@ void GraphBuilder::spin() {
     }
 
     bool has_data = queue_->poll();
-    if (GlobalInfo::instance().force_shutdown() || !has_data) {
+    if (force_shutdown_) {
+      break;
+    }
+
+    if (!has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
     }
@@ -268,7 +285,7 @@ void GraphBuilder::spin() {
   }
 
   // Process pending collated packet if it exists
-  if (input && !GlobalInfo::instance().force_shutdown()) {
+  if (input && !force_shutdown_) {
     spinOnce(input);
   }
 }
@@ -288,6 +305,10 @@ void GraphBuilder::addSink(const Sink::Ptr& sink) {
   if (sink) {
     sinks_.push_back(sink);
   }
+}
+
+void GraphBuilder::setBackendQueue(const OutputQueue::Ptr& queue) {
+  backend_input_queue_ = queue;
 }
 
 void GraphBuilder::setLcdQueue(const OutputQueue::Ptr& queue) {
@@ -338,7 +359,10 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
-  PipelineQueues::instance().backend_queue.push(curr_output_);
+  if (backend_input_queue_) {
+    backend_input_queue_->push(curr_output_);
+  }
+
   if (lcd_input_queue_) {
     lcd_input_queue_->push(curr_output_);
   }
@@ -401,7 +425,17 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
 
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
+    auto mesh = dsg_->graph->mesh();
+    if (!mesh && last_mesh_update_->getNumVertices()) {
+      const auto props = last_mesh_update_->vertex_properties();
+      mesh = std::make_shared<Mesh>(
+          props.has_color, true, props.has_label, props.has_first_seen_stamp);
+      dsg_->graph->setMesh(mesh);
+    }
+
+    if (mesh) {
+      last_mesh_update_->updateMesh(*mesh, mesh_offsets_);
+    }
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);

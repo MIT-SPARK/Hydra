@@ -5,7 +5,6 @@
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/pipeline_queues.h>
 #include <hydra/input/sensor_extrinsics.h>
 #include <hydra/utils/pgmo_glog_sink.h>
 #include <hydra_multi/common/multi_global_info.h>

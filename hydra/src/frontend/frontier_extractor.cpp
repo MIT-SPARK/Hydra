@@ -37,7 +37,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    FrontierExtractor,
-                                   FrontierExtractor::Config>("FrontierExtractor");
+                                   FrontierExtractor::Config,
+                                   RunContext::ConstPtr>("FrontierExtractor");
 
 }
 
@@ -147,7 +148,7 @@ Frontier::Frontier(Eigen::Vector3d c,
 Frontier::Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
     : center(c), num_frontier_voxels(n), block_index(b), has_shape_information(false) {}
 
-FrontierExtractor::FrontierExtractor(const Config& config)
+FrontierExtractor::FrontierExtractor(const Config& config, RunContext::ConstPtr)
     : config(config), next_node_id_(config.prefix, 0) {}
 
 void FrontierExtractor::call(const ActiveWindowOutput& msg,

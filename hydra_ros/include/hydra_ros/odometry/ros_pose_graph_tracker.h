@@ -67,7 +67,7 @@ class RosPoseGraphTracker : public PoseGraphTracker {
     size_t queue_size = 1000;
   } const config;
 
-  explicit RosPoseGraphTracker(const Config& config);
+  explicit RosPoseGraphTracker(const Config& config, RunContext::ConstPtr context);
   virtual ~RosPoseGraphTracker() = default;
 
  protected:

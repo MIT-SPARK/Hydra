@@ -40,7 +40,6 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
 #include <ianvs/node_init.h>
 #include <ianvs/spin_functions.h>
 
@@ -51,8 +50,7 @@
 
 namespace hydra {
 
-struct RunSettings {
-  size_t robot_id = 0;
+struct NodeSettings {
   bool show_run_settings = true;
   bool exit_after_clock = false;
   bool force_shutdown = false;
@@ -61,16 +59,13 @@ struct RunSettings {
   int glog_level = 0;
   int glog_verbosity = 0;
   bool use_multithread_executor = true;
-  std::filesystem::path log_path;
-  hydra::DataDirectory::Config output;
   std::vector<config::VirtualConfig<AppPlugin, true>> node_plugins = {
       config::VirtualConfig<AppPlugin, true>{ConfigServerPlugin::Config{}}};
 };
 
-void declare_config(RunSettings& config) {
+void declare_config(NodeSettings& config) {
   using namespace config;
-  name("RunSettings");
-  field(config.robot_id, "robot_id");
+  name("NodeSettings");
   field(config.show_run_settings, "show_run_settings");
   field(config.exit_after_clock, "exit_after_clock");
   field(config.force_shutdown, "force_shutdown");
@@ -79,8 +74,6 @@ void declare_config(RunSettings& config) {
   field(config.glog_level, "glog_level");
   field(config.glog_verbosity, "glog_verbosity");
   field(config.use_multithread_executor, "use_multithread_executor");
-  field<Path::Absolute>(config.log_path, "log_path");
-  field(config.output, "output");
   field(config.node_plugins, "node_plugins");
 }
 
@@ -122,7 +115,7 @@ struct RosSink : google::LogSink {
 int main(int argc, char* argv[]) {
   config::initContext(argc, argv, true);
   config::setConfigSettingsFromContext();
-  const auto settings = config::fromContext<hydra::RunSettings>();
+  const auto settings = config::fromContext<hydra::NodeSettings>();
 
   FLAGS_minloglevel = settings.glog_level;
   FLAGS_v = settings.glog_verbosity;
@@ -155,25 +148,20 @@ int main(int argc, char* argv[]) {
       node_plugins.push_back(plugin.create());
     }
 
-    const auto global_config = config::fromContext<hydra::PipelineConfig>();
-    auto& info = hydra::GlobalInfo::init(global_config, settings.robot_id);
-    info.setForceShutdown(settings.force_shutdown);
-    LOG(INFO) << "Loaded pipeline config:\n" << config::toString(info.getConfig());
-
-    // create the output directory before the pipeline so that any overwrite happens
-    // before modules (e.g., keyframe logging) start writing into it
-    const hydra::DataDirectory output(settings.log_path, settings.output);
+    const auto run_config = config::fromContext<hydra::RunContext::Config>();
+    const auto context = std::make_shared<hydra::RunContext>(run_config);
+    LOG(INFO) << "Loaded run config:\n" << config::toString(context->config);
 
     auto config = config::fromContext<hydra::HydraRosPipeline::Config>();
-    hydra::HydraRosPipeline hydra(config);
+    hydra::HydraRosPipeline hydra(config, context);
     hydra.init();
 
     hydra.start();
     ianvs::spinAndWait(nh,
                        settings.exit_after_clock,
                        settings.use_multithread_executor ? &executor : nullptr);
-    hydra.stop();
-    hydra.save(output);
+    hydra.stop(settings.force_shutdown);
+    hydra.save();
   }  // end hydra scope
 
   if (ros_sink) {

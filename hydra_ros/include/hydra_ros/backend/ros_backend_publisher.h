@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <hydra/backend/backend_module.h>
+#include <hydra/common/robot_config.h>
 #include <ianvs/node_handle.h>
 #include <pose_graph_tools_ros/conversions.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -60,7 +61,7 @@ class RosBackendPublisher : public BackendModule::Sink {
     std::string tf_odom_frame;
   } const config;
 
-  explicit RosBackendPublisher(ianvs::NodeHandle nh);
+  explicit RosBackendPublisher(ianvs::NodeHandle nh, const RobotConfig& robot);
 
   virtual ~RosBackendPublisher() = default;
 
@@ -71,6 +72,7 @@ class RosBackendPublisher : public BackendModule::Sink {
   std::string printInfo() const override;
 
  protected:
+  const RobotConfig robot_;
   void publishMeshGraph(const uint64_t timestamp_ns,
                         const kimera_pgmo::DeformationGraph& dgraph) const;
 

@@ -35,10 +35,11 @@
 #include "hydra/backend/updates/update_frontiers_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <glog/logging.h>
 #include <spark_dsg/scene_graph.h>
 
-#include "hydra/common/global_info.h"
+#include "hydra/common/robot_prefix_config.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -53,7 +54,7 @@ static const auto registration =
                                    UpdateFrontiersFunctor::Config>(
         "UpdateFrontiersFunctor");
 
-}
+}  // namespace
 
 using timing::ScopedTimer;
 
@@ -63,7 +64,7 @@ UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
                             SceneGraph& unmerged_dsg,
                             SharedDsgInfo* dsg) {
     if (dsg) {
-      cleanup(info->timestamp_ns, unmerged_dsg, *dsg);
+      cleanup(info, unmerged_dsg, *dsg);
     }
   };
 
@@ -133,15 +134,15 @@ bool check_against_2d_places(const SharedDsgInfo& dsg,
   return false;
 }
 
-void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
+void UpdateFrontiersFunctor::cleanup(const UpdateInfo::ConstPtr& info,
                                      SceneGraph& unmerged_dsg,
                                      SharedDsgInfo& dsg) const {
-  ScopedTimer spin_timer("backend/cleanup_frontiers", timestamp_ns);
+  ScopedTimer spin_timer("backend/cleanup_frontiers", info->timestamp_ns);
   if (!dsg.graph->hasLayer(DsgLayers::PLACES)) {
     return;
   }
-  std::lock_guard<std::mutex> lock(dsg.mutex);
 
+  std::lock_guard<std::mutex> lock(dsg.mutex);
   for (const auto nid : deleted_frontiers_) {
     dsg.graph->removeNode(nid);
     unmerged_dsg.removeNode(nid);
@@ -149,22 +150,23 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
 
   const auto& places_layer = dsg.graph->getLayer(DsgLayers::PLACES);
   const auto& places_2d_layer = dsg.graph->getLayer(DsgLayers::MESH_PLACES);
-
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  const auto layer_key = dsg.graph->getLayerKey(DsgLayers::AGENTS);
-  if (!layer_key) {
+  const auto agent_layer = dsg.graph->getLayerKey(DsgLayers::AGENTS);
+  if (!agent_layer) {
     LOG(ERROR) << "Update frontiers functor could not find agents layer";
     return;
   }
-  const auto agents = dsg.graph->findLayer(layer_key->layer, prefix.key);
+
+  const RobotPrefixConfig prefix(info->robot_id);
+  const auto agents = dsg.graph->findLayer(agent_layer->layer, prefix.key);
   if (!agents || agents->numNodes() == 0) {
     return;
   }
-  NodeSymbol pgmo_key(prefix.key, agents->numNodes() - 1);
-  Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;
-  Eigen::Quaterniond agent_quat =
-      dsg.graph->getNode(pgmo_key).attributes<AgentNodeAttributes>().world_R_body;
-  Eigen::Vector3d agent_heading = agent_quat * Eigen::Vector3d(1, 0, 0);
+
+  // Agent nodes are ordered by pose graph key within the partition.
+  const auto nodes = agents->nodes();
+  const auto& pose = nodes.back().attributes<AgentNodeAttributes>();
+  const auto& agent_pos = pose.position;
+  const Eigen::Vector3d agent_heading = pose.world_R_body * Eigen::Vector3d::UnitX();
 
   std::unordered_set<NodeId> layer_nodes;
   std::unordered_set<NodeId> frontier_nodes;
@@ -173,6 +175,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
     if (!attrs) {
       continue;
     }
+
     if (attrs->real_place) {
       layer_nodes.insert(node.id);
     } else if (!attrs->is_predicted && !attrs->need_cleanup) {

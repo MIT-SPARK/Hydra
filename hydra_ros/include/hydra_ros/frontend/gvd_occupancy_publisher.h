@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/common/robot_config.h>
 #include <hydra/frontend/gvd_place_extractor.h>
 #include <hydra/places/gvd_places/gvd_voxel.h>
 
@@ -47,7 +48,7 @@ class GvdOccupancyPublisher : public GvdPlaceExtractor::Sink,
     std::string ns = "~/gvd";
   } const config;
 
-  explicit GvdOccupancyPublisher(const Config& config);
+  explicit GvdOccupancyPublisher(const Config& config, const RobotConfig& robot);
 
   virtual ~GvdOccupancyPublisher() = default;
 

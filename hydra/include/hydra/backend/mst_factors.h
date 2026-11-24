@@ -36,6 +36,7 @@
 #pragma once
 
 #include "hydra/backend/optimization_hook.h"
+#include "hydra/common/robot_config.h"
 
 namespace hydra {
 
@@ -48,7 +49,9 @@ class MstPlaceFactors : public OptimizationHook {
     double edge_variance = 10.0;
   } const config;
 
-  explicit MstPlaceFactors(const Config& config);
+  const RobotConfig robot;
+
+  explicit MstPlaceFactors(const Config& config, const RobotConfig& robot);
 
   virtual ~MstPlaceFactors() = default;
 

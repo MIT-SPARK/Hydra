@@ -46,13 +46,20 @@
 #include <list>
 #include <thread>
 
-#include "hydra/common/global_info.h"
+#include "hydra/common/config_utilities.h"
+#include "hydra/common/run_settings.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {
 namespace {
+
+MeshIntegrator::Config resolveConfig(MeshIntegrator::Config config) {
+  config.integrator_threads = config::ThreadNumConversion::getNumThreads(
+      config.integrator_threads.value_or(RunSettings::instance().default_num_threads));
+  return config::checkValid(config);
+}
 
 using spatial_hash::globalIndexFromLocalIndices;
 
@@ -99,16 +106,11 @@ void declare_config(MeshIntegrator::Config& config) {
   name("MeshIntegratorConfig");
   field(config.min_weight, "min_weight");
   field(config.compute_normals, "compute_normals");
-  field<ThreadNumConversion>(config.integrator_threads, "integrator_threads");
+  field(config.integrator_threads, "integrator_threads");
   check(config.min_weight, GT, 0.0f, "min_weight");
-  check(config.integrator_threads, GT, 0, "integrator_threads");
 }
 
-MeshIntegrator::Config::Config()
-    : integrator_threads(GlobalInfo::instance().getConfig().default_num_threads) {}
-
-MeshIntegrator::MeshIntegrator(const MeshIntegrator::Config& config)
-    : config(config::checkValid(config)) {}
+MeshIntegrator::MeshIntegrator(const Config& config) : config(resolveConfig(config)) {}
 
 void MeshIntegrator::allocateBlocks(const BlockIndices& blocks,
                                     VolumetricMap& map) const {
@@ -171,7 +173,7 @@ void MeshIntegrator::launchThreads(const BlockIndices& blocks,
                                    VolumetricMap& map) const {
   BlockIndexGetter index_getter(blocks);
   std::list<std::thread> threads;
-  for (int i = 0; i < config.integrator_threads; ++i) {
+  for (int i = 0; i < *config.integrator_threads; ++i) {
     threads.emplace_back(&MeshIntegrator::processBlocks, this, &map, &index_getter);
   }
 

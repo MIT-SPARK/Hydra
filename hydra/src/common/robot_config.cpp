@@ -32,30 +32,27 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <hydra/common/global_info.h>
+#include "hydra/common/robot_config.h"
 
-namespace hydra::test {
+#include <config_utilities/config.h>
 
-struct ConfigGuard {
-  ConfigGuard(bool init = true) {
-    if (init) {
-      PipelineConfig config;
-      GlobalInfo::init(config);
-    }
-  }
+namespace hydra {
 
-  [[nodiscard]] static ConfigGuard FixedLabels(size_t num_labels) {
-    Labelspace labelspace;
-    labelspace.total_labels = num_labels;
+void declare_config(RobotConfig::Frames& config) {
+  using namespace config;
+  name("RobotConfig::Frames");
+  field(config.robot, "robot_frame");
+  field(config.odom, "odom_frame");
+  field(config.map, "map_frame");
+}
 
-    PipelineConfig config;
-    config.labelspace = labelspace;
+void declare_config(RobotConfig& config) {
+  using namespace config;
+  name("RobotConfig");
+  field(config.robot_id, "robot_id");
+  field(config.frames, "frames", false);
+}
 
-    GlobalInfo::init(config);
-    return ConfigGuard(false);
-  }
+RobotPrefixConfig RobotConfig::prefix() const { return RobotPrefixConfig(robot_id); }
 
-  ~ConfigGuard() { GlobalInfo::instance().reset(); }
-};
-
-}  // namespace hydra::test
+}  // namespace hydra

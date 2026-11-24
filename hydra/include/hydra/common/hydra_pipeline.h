@@ -35,6 +35,7 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
+#include "hydra/common/run_context.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/utils/data_directory.h"
 #include "hydra/utils/logging.h"
@@ -64,7 +65,7 @@ class HydraPipeline {
     config::VirtualConfig<LoopClosureModule> lcd;
   } const config;
 
-  explicit HydraPipeline(const Config& config);
+  explicit HydraPipeline(const Config& config, RunContext::ConstPtr context);
 
   virtual ~HydraPipeline();
 
@@ -72,17 +73,21 @@ class HydraPipeline {
 
   virtual void start();
 
-  virtual void stop();
+  virtual void stop(bool force = false);
 
-  virtual void save(const DataDirectory& output) const;
+  virtual void save(const DataDirectory* output = nullptr) const;
 
  protected:
   void showModules() const;
 
+ private:
+  void initState();
+
  protected:
+  RunContext::ConstPtr context_;
+  std::shared_ptr<SharedModuleState> state_;
   SharedDsgInfo::Ptr frontend_dsg_;
   SharedDsgInfo::Ptr backend_dsg_;
-  SharedModuleState::Ptr state_;
 
   std::shared_ptr<ActiveWindowModule> active_window_;
   std::shared_ptr<GraphBuilder> frontend_;

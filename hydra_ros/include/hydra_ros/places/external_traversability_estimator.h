@@ -56,7 +56,7 @@ class ExternalTraversabilityEstimator : public TraversabilityEstimator {
 
   using State = spark_dsg::TraversabilityState;
 
-  ExternalTraversabilityEstimator(const Config& config);
+  ExternalTraversabilityEstimator(const Config& config, const RobotConfig& /* robot */);
   ~ExternalTraversabilityEstimator() override = default;
 
   void updateTraversability(const ActiveWindowOutput& msg,

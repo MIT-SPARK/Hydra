@@ -40,7 +40,6 @@
 #include <stdexcept>
 
 #include "hydra/backend/backend_module.h"
-#include "hydra/common/global_info.h"
 
 namespace hydra {
 
@@ -50,15 +49,16 @@ void optimize_graph(const OptimizationConfig& info) {
   }
 
   // TODO(nathan) maybe pull robot id from somewhere
-  const PipelineConfig global_config;
-  GlobalInfo::init(global_config, 0);
-  SharedModuleState::Ptr state(new SharedModuleState());
-  state->backend_graph = GlobalInfo::instance().createSharedDsg();
+  const auto context = std::make_shared<RunContext>(RunContext::Config{});
+
+  // config is overwritten by loaded graph
+  std::shared_ptr<SharedModuleState> state(new SharedModuleState());
+  state->backend_graph = std::make_shared<SharedDsgInfo>(SharedDsgInfo::Config{});
   state->backend_graph->graph = spark_dsg::SceneGraph::load(info.graph);
 
   auto dsg = state->backend_graph->clone();
   const auto config = config::fromYamlFile<BackendModule::Config>(info.config_path);
-  BackendModule backend(config, dsg, state);
+  BackendModule backend(config, context, dsg, state);
   LOG(INFO) << "Loading backend state!";
   backend.loadState(info.graph, info.deformation_graph);
   LOG(INFO) << "Loaded backend state!";

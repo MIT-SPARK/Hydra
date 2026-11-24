@@ -39,23 +39,25 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
-#include "hydra/common/global_info.h"
-
 namespace hydra {
 namespace {
 
 static const auto registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    PoseGraphFromOdom,
-                                   PoseGraphFromOdom::Config>("PoseGraphFromOdom");
+                                   PoseGraphFromOdom::Config,
+                                   RunContext::ConstPtr>("PoseGraphFromOdom");
 
 using pose_graph_tools::PoseGraph;
 using StampedPose = PoseGraphFromOdom::StampedPose;
 
-void addNode(PoseGraph& graph, const StampedPose& stamped_pose, size_t index) {
+void addNode(PoseGraph& graph,
+             const StampedPose& stamped_pose,
+             size_t index,
+             size_t robot_id) {
   auto& node = graph.nodes.emplace_back();
   node.stamp_ns = stamped_pose.stamp.count();
-  node.robot_id = GlobalInfo::instance().getRobotPrefix().id;
+  node.robot_id = robot_id;
   node.key = index;
   node.pose = stamped_pose.pose;
 }
@@ -77,12 +79,13 @@ void addEdge(PoseGraph& graph, const Eigen::Isometry3d& prev_T_curr) {
 
 PoseGraph makePoseGraph(const StampedPose& curr_pose,
                         const StampedPose& prev_pose,
-                        size_t prev_index) {
+                        size_t prev_index,
+                        size_t robot_id) {
   PoseGraph graph;
   graph.stamp_ns = curr_pose.stamp.count();
 
-  addNode(graph, prev_pose, prev_index);
-  addNode(graph, curr_pose, prev_index + 1);
+  addNode(graph, prev_pose, prev_index, robot_id);
+  addNode(graph, curr_pose, prev_index + 1, robot_id);
 
   Eigen::Isometry3d prev_T_curr = prev_pose.pose.inverse() * curr_pose.pose;
   addEdge(graph, prev_T_curr);
@@ -104,8 +107,9 @@ void declare_config(PoseGraphFromOdom::Config& config) {
   check(config.min_time_separation_s, GE, 0.0, "rotation_separation_weight");
 }
 
-PoseGraphFromOdom::PoseGraphFromOdom(const PoseGraphFromOdom::Config& config)
-    : PoseGraphTracker(config),
+PoseGraphFromOdom::PoseGraphFromOdom(const PoseGraphFromOdom::Config& config,
+                                     RunContext::ConstPtr context)
+    : PoseGraphTracker(config, context),
       config(config::checkValid(config)),
       num_poses_received_(0) {}
 
@@ -136,7 +140,8 @@ PoseGraphPacket PoseGraphFromOdom::update(uint64_t timestamp_ns,
     }
 
     const auto index = num_poses_received_ - 1;
-    packet.pose_graphs.push_back(makePoseGraph(curr_pose, prev_pose_, index));
+    packet.pose_graphs.push_back(
+        makePoseGraph(curr_pose, prev_pose_, index, robot_.prefix().id));
   }
 
   prev_pose_ = curr_pose;

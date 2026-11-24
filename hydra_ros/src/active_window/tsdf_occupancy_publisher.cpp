@@ -61,8 +61,10 @@ void declare_config(TsdfOccupancyPublisher::Config& config) {
   field(config.ns, "ns");
 }
 
-TsdfOccupancyPublisher::TsdfOccupancyPublisher(const Config& config)
-    : OccupancyPublisher(config, ianvs::NodeHandle::this_node(config.ns)),
+TsdfOccupancyPublisher::TsdfOccupancyPublisher(const Config& config,
+                                               const RobotConfig& robot)
+    : OccupancyPublisher(
+          config, ianvs::NodeHandle::this_node(config.ns), robot.frames.map),
       config(config::checkValid(config)) {}
 
 std::string TsdfOccupancyPublisher::printInfo() const {
@@ -80,8 +82,8 @@ namespace {
 static const auto registration_ =
     config::RegistrationWithConfig<ReconstructionModule::Sink,
                                    TsdfOccupancyPublisher,
-                                   TsdfOccupancyPublisher::Config>(
-        "TsdfOccupancyPublisher");
+                                   TsdfOccupancyPublisher::Config,
+                                   RobotConfig>("TsdfOccupancyPublisher");
 
 }
 }  // namespace hydra

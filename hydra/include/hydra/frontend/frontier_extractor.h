@@ -49,7 +49,7 @@ class FrontierExtractor : public GraphBuilderFunctor {
     bool compute_frontier_shape = false;
   } const config;
 
-  explicit FrontierExtractor(const Config& config);
+  explicit FrontierExtractor(const Config& config, RunContext::ConstPtr /* context */);
 
   void call(const ActiveWindowOutput& msg,
             SharedDsgInfo& dsg,

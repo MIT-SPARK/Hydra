@@ -64,12 +64,12 @@ struct VolumetricWindow;
 
 class GraphBuilder : public Module {
  public:
+  using Graph = spark_dsg::SceneGraph;
   using Ptr = std::shared_ptr<GraphBuilder>;
   using InputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
   using OutputQueue = MessageQueue<FrontendOutput::ConstPtr>;
   using InputCallback = std::function<void(const ActiveWindowOutput&)>;
-  using Sink =
-      OutputSink<uint64_t, const spark_dsg::SceneGraph&, const FrontendOutput&>;
+  using Sink = OutputSink<uint64_t, const Graph&, const FrontendOutput&>;
 
   struct Config : public VerbosityConfig {
     Config();
@@ -101,19 +101,20 @@ class GraphBuilder : public Module {
   } const config;
 
   GraphBuilder(const Config& config,
+               RunContext::ConstPtr context,
                const SharedDsgInfo::Ptr& dsg,
-               const SharedModuleState::Ptr& state,
+               const std::shared_ptr<SharedModuleState>& state,
                std::unique_ptr<VolumetricWindow>&& window);
 
   virtual ~GraphBuilder();
 
   void start() override;
 
-  void stop() override;
+  void stop(bool force) override;
 
-  void save(const DataDirectory& output) override;
+  void save(const DataDirectory* output = nullptr) override;
 
-  std::string printInfo() const override;
+  std::string show() const override;
 
   virtual void spin();
 
@@ -124,6 +125,8 @@ class GraphBuilder : public Module {
   void addSink(const Sink::Ptr& sink);
 
   void setLcdQueue(const OutputQueue::Ptr& queue);
+
+  void setBackendQueue(const OutputQueue::Ptr& queue);
 
  protected:
   void addInputCallback(InputCallback callback);
@@ -151,7 +154,7 @@ class GraphBuilder : public Module {
   std::atomic<bool> spin_finished_;
 
   SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
+  std::shared_ptr<SharedModuleState> state_;
   FrontendOutput::Ptr curr_output_;
 
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;
@@ -167,6 +170,7 @@ class GraphBuilder : public Module {
   std::map<std::string, std::unique_ptr<GraphBuilderFunctor>> functors_;
 
   OutputQueue::Ptr lcd_input_queue_;
+  OutputQueue::Ptr backend_input_queue_;
 
   Sink::List sinks_;
 

@@ -14,15 +14,15 @@ Conventions:
   `<name>.zip.tmp.XXXXXX`, JSON files `<name>.tmp`: read only `*.zip` and `*.json`.
 - JSON writers never emit `nan`/`inf` (written as `null`) and escape strings.
 
-## 1. Keyframes: Hydra `KeyframeSelector.log_path`
+## 1. Keyframes: Hydra keyframes (`frontend.keyframe_selector.log_keyframes`)
 
 ```
-<log_path>/<timestamp_ns>.zip            # InputData::save of each accepted keyframe
-<log_path>/<timestamp_ns>_<sensor>.zip   # same, for every sensor but the first one saved
+<log_path>/frontend/keyframes/<timestamp_ns>.zip            # InputData::save of each accepted keyframe
+<log_path>/frontend/keyframes/<timestamp_ns>_<sensor>.zip   # same, for every sensor but the first one saved
 ```
 - Each keyframe the selector accepts is saved once, by a background thread; pending
   keyframes are flushed when the pipeline saves.
-- The first sensor whose keyframe is saved (in this process) keeps `<timestamp_ns>.zip`.
+- The first sensor whose keyframe is saved in a run keeps `<timestamp_ns>.zip`.
   Every other sensor gets `_<sensor>`, with the characters of the sensor name outside
   `[A-Za-z0-9_.-]` replaced by `_`, so two sensors at one stamp never collide.
   Readers take the sensor and stamp from `metadata.yaml`, not from the file name, and
@@ -85,7 +85,7 @@ sensors:
     config: {type: camera, width: 640, height: 480, fx: 0, fy: 0, cx: 0, cy: 0,
              extrinsics: {type: param, body_R_sensor: {w, x, y, z}, body_p_sensor: [x, y, z]}, ...}
 ```
-- `robot_id` is `GlobalInfo::getRobotPrefix().id` of the Khronos process.
+- `robot_id` is the robot ID of the Khronos process.
 - `absorbed_track_ids`: tracks Khronos merged into this one; the frontend only sees
   deletes for them.
 - `extracted: false` if extraction did not produce an object (no scene graph node will

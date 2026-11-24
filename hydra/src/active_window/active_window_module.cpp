@@ -39,10 +39,12 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
-#include "hydra/common/global_info.h"
+#include "hydra/common/run_context.h"
 #include "hydra/reconstruction/integration_masking.h"
 
 namespace hydra {
+
+using WindowPtr = std::unique_ptr<VolumetricWindow>;
 
 void declare_config(ActiveWindowModule::Config& config) {
   using namespace config;
@@ -61,41 +63,40 @@ ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
       max_input_queue_size(0),
       volumetric_map({0.1, 16, 0.3, with_semantics, with_tracking}) {}
 
-using WindowPtr = std::unique_ptr<VolumetricWindow>;
-
 ActiveWindowModule::ActiveWindowModule(const Config& config,
+                                       RunContext::ConstPtr context,
                                        const OutputQueue::Ptr& queue,
                                        WindowPtr&& global_window)
-    : config(config::checkValid(config)),
+    : Module(context),
+      config(config::checkValid(config)),
       input_queue_(new InputQueue(config.max_input_queue_size)),
       output_queue_(queue),
-      sinks_(Sink::instantiate(config.sinks)),
+      sinks_(Sink::instantiate(config.sinks, context->config.robot)),
       map_(config.volumetric_map),
       map_window_(config.map_window ? config.map_window.create()
                                     : std::move(global_window)) {
-  const auto mesh_config = GlobalInfo::instance().getConfig().mesh;
-  if (config.validate_mesh_fields) {
-    if (config.volumetric_map.with_semantics && !mesh_config.with_labels) {
-      LOG(FATAL) << "Volumetric map contains semantics, but mesh does not have labels "
-                    "enabled!";
-    }
-
-    if (config.volumetric_map.with_tracking && !mesh_config.with_first_seen_stamps) {
-      LOG(FATAL) << "Volumetric map contains tracking layer, but mesh does not have "
-                    "first-seen stamps enabled!";
-    }
-  }
+  invalid_labels_.insert(context->labelspace().invalid_labels.begin(),
+                         context->labelspace().invalid_labels.end());
+  invalid_labels_.insert(context->labelspace().dynamic_labels.begin(),
+                         context->labelspace().dynamic_labels.end());
 }
 
 void ActiveWindowModule::start() {
+  should_shutdown_ = false;
+  force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&ActiveWindowModule::spin, this));
   MLOG(0) << "started!";
 }
 
-void ActiveWindowModule::stop() { stopImpl(); }
+void ActiveWindowModule::stop(bool force) {
+  force_shutdown_ = force;
+  stopImpl();
+}
 
 void ActiveWindowModule::stopImpl() {
-  should_shutdown_ = true;
+  if (should_shutdown_.exchange(true)) {
+    return;
+  }
 
   if (spin_thread_) {
     MLOG(1) << "stopping!";
@@ -112,7 +113,9 @@ void ActiveWindowModule::stopImpl() {
   }
 }
 
-std::string ActiveWindowModule::printInfo() const {
+void ActiveWindowModule::save(const DataDirectory*) {}
+
+std::string ActiveWindowModule::show() const {
   return config::toString(config) + "\n" + Sink::printSinks(sinks_);
 }
 
@@ -120,7 +123,11 @@ void ActiveWindowModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
     bool has_data = input_queue_->poll();
-    if (GlobalInfo::instance().force_shutdown() || !has_data) {
+    if (force_shutdown_) {
+      break;
+    }
+
+    if (!has_data) {
       should_shutdown = should_shutdown_;
     }
 
@@ -129,6 +136,7 @@ void ActiveWindowModule::spin() {
     }
 
     const auto msg = input_queue_->pop();
+    MLOG(3) << "Processing " << msg->timestamp_ns << " [ns]";
     auto output = spinOnce(msg);
     if (!output) {
       continue;
@@ -166,14 +174,8 @@ void ActiveWindowModule::addSink(const Sink::Ptr& sink) {
 }
 
 cv::Mat ActiveWindowModule::getDefaultIntegrationMask(const InputData& data) const {
-  // TODO(nathan) cache somewhere
   const auto& sensor = data.getSensor();
-  const auto& labelspace = GlobalInfo::instance().labelspace();
-  std::set<int32_t> invalid_labels;
-  invalid_labels.insert(labelspace.invalid_labels.begin(),
-                        labelspace.invalid_labels.end());
-  invalid_labels.insert(labelspace.dynamic_labels.begin(),
-                        labelspace.dynamic_labels.end());
+  auto invalid_labels = invalid_labels_;
   invalid_labels.insert(sensor.config.invalid_labels.begin(),
                         sensor.config.invalid_labels.end());
 

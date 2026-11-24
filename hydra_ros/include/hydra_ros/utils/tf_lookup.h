@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/common/robot_config.h>
 #include <hydra/input/input_module.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -67,9 +68,10 @@ struct TFLookup {
     std::chrono::nanoseconds buffer_size_ns() const;
   } const config;
 
-  explicit TFLookup(const Config& config);
+  explicit TFLookup(const Config& config, const RobotConfig::Frames& frames);
   PoseStatus getBodyPose(uint64_t timestamp_ns) const;
 
+  const RobotConfig::Frames frames;
   tf2_ros::Buffer buffer;
   tf2_ros::TransformListener listener;
 };

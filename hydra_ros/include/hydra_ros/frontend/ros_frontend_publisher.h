@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/common/robot_config.h>
 #include <hydra/frontend/graph_builder.h>
 #include <pose_graph_tools_ros/conversions.h>
 
@@ -57,7 +58,7 @@ class RosFrontendPublisher : public GraphBuilder::Sink {
     size_t mesh_delta_queue_size = 100;  // Store mesh delta to resend. 0 for infinite
   } const config;
 
-  explicit RosFrontendPublisher(ianvs::NodeHandle);
+  explicit RosFrontendPublisher(ianvs::NodeHandle nh, const RobotConfig& robot);
 
   void call(uint64_t timestamp_ns,
             const spark_dsg::SceneGraph& graph,
@@ -66,6 +67,7 @@ class RosFrontendPublisher : public GraphBuilder::Sink {
   std::string printInfo() const override;
 
  protected:
+  const RobotConfig robot_;
   void processMeshDeltaQuery(const MeshDeltaRequest req, MeshDeltaResponse resp);
 
   std::unique_ptr<DsgSender> dsg_sender_;

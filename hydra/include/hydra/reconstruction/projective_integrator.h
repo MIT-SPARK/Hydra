@@ -47,6 +47,7 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 #include <memory>
+#include <optional>
 
 #include "hydra/input/input_data.h"
 #include "hydra/reconstruction/projection_interpolators.h"
@@ -66,8 +67,6 @@ namespace hydra {
  */
 class ProjectiveIntegrator {
  public:
-  using SemanticIntegratorPtr = std::unique_ptr<const SemanticIntegrator>;
-
   struct Config : public VerbosityConfig {
     //! Set num_threads and verbosity config defaults
     Config();
@@ -98,11 +97,9 @@ class ProjectiveIntegrator {
     //! longer in memory, low max weight favors rapid updates
     float max_weight = 1.0e5f;
     //! Number of threads used to perform integration (defaults to all)
-    int num_threads;
-    //! Which interpolation to use in the image projection [nearest, bilinear,
-    //! adaptive]
-    config::VirtualConfig<ProjectionInterpolator> interpolation_method{
-        InterpolatorAdaptive::Config{}};
+    std::optional<int> num_threads;
+    //! Which interpolation to use in the image projection
+    config::VirtualConfig<ProjectionInterpolator> interpolation_method;
     //! Semantic integrator configuration (optional)
     config::VirtualConfig<SemanticIntegrator> semantic_integrator;
   } const config;
@@ -116,7 +113,8 @@ class ProjectiveIntegrator {
     int32_t label = -1;
   };
 
-  explicit ProjectiveIntegrator(const ProjectiveIntegrator::Config& config);
+  explicit ProjectiveIntegrator(const Config& config,
+                                const Labelspace* labelspace = nullptr);
 
   virtual ~ProjectiveIntegrator() = default;
 
@@ -215,7 +213,7 @@ class ProjectiveIntegrator {
 
  protected:
   const std::unique_ptr<const ProjectionInterpolator> interpolator_;
-  const SemanticIntegratorPtr semantic_integrator_;
+  const std::unique_ptr<const SemanticIntegrator> semantic_integrator_;
 };
 
 void declare_config(ProjectiveIntegrator::Config& config);

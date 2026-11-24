@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/dynamic_config.h>
+#include <hydra/common/robot_config.h>
 #include <hydra/frontend/keyframe_selector.h>
 #include <hydra_visualizer/utils/marker_group_pub.h>
 #include <ianvs/node_handle.h>
@@ -57,12 +58,13 @@ class KeyframeVisualizer : public KeyframeSelector::Sink {
     bool draw_both_image_plane_sides = true;
   } const config;
 
-  KeyframeVisualizer(const Config& config);
+  KeyframeVisualizer(const Config& config, const RobotConfig& robot);
 
   void call(uint64_t timestamp_ns,
             const KeyframeSelector::Keyframes& frames) const override;
 
  private:
+  const RobotConfig robot_;
   ianvs::NodeHandle nh_;
   MarkerGroupPub pubs_;
   config::DynamicConfig<Config> config_;

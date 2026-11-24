@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/robot_config.h>
 #include <hydra_visualizer/drawing.h>
 #include <kimera_pgmo/mesh_delta.h>
 
@@ -47,7 +47,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<MeshSegmenter::Sink,
                                    ObjectVisualizer,
-                                   ObjectVisualizer::Config>("ObjectVisualizer");
+                                   ObjectVisualizer::Config,
+                                   RobotConfig>("ObjectVisualizer");
 
 }
 
@@ -65,8 +66,9 @@ void declare_config(ObjectVisualizer::Config& config) {
   field(config.colormap, "colormap");
 }
 
-ObjectVisualizer::ObjectVisualizer(const Config& config)
+ObjectVisualizer::ObjectVisualizer(const Config& config, const RobotConfig& robot)
     : config(config::checkValid(config)),
+      robot_(robot),
       nh_(ianvs::NodeHandle::this_node(config.module_ns)),
       pubs_(nh_),
       colormap_(config.colormap) {}
@@ -95,7 +97,7 @@ void ObjectVisualizer::call(uint64_t timestamp_ns,
     auto arr = std::make_unique<MarkerArray>();
     auto& msg = arr->markers.emplace_back();
     msg.header.stamp = rclcpp::Time(timestamp_ns);
-    msg.header.frame_id = GlobalInfo::instance().getFrames().odom;
+    msg.header.frame_id = robot_.frames.odom;
     msg.ns = "active_vertices";
     msg.id = 0;
     std::vector<size_t> active(delta.getNumActiveVertices());
@@ -109,7 +111,7 @@ void ObjectVisualizer::call(uint64_t timestamp_ns,
     for (const auto& [label, indices] : label_indices) {
       auto& msg = arr->markers.emplace_back();
       msg.header.stamp = rclcpp::Time(timestamp_ns);
-      msg.header.frame_id = GlobalInfo::instance().getFrames().odom;
+      msg.header.frame_id = robot_.frames.odom;
       msg.ns = "label_vertices_" + std::to_string(label);
       msg.id = 0;
       fillMarkerFromCloud(delta, indices, msg);
@@ -122,7 +124,7 @@ void ObjectVisualizer::call(uint64_t timestamp_ns,
     auto arr = std::make_unique<MarkerArray>();
     auto& msg = arr->markers.emplace_back();
     msg.header.stamp = rclcpp::Time(timestamp_ns);
-    msg.header.frame_id = GlobalInfo::instance().getFrames().odom;
+    msg.header.frame_id = robot_.frames.odom;
     msg.type = Marker::LINE_LIST;
     msg.action = Marker::ADD;
     msg.ns = "object_clusters";

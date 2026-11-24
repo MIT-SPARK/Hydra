@@ -5,14 +5,14 @@ launch:
   - arg: {name: use_openset_places, default: 'false'}
   - arg: {name: use_gt_poses, default: 'true'}
   - arg: {name: labelspace, default: $(if $(var use_gt_semantics) uhumans2_$(var scene) ade20k_full)}
-  - arg: {name: log_prefix, default: uhumans2_$(var scene)}
+  - arg: {name: log_name, default: uhumans2_$(var scene)}
   - arg: {name: label_remap_path, default: $(find-pkg-share hydra)/config/label_remaps/uhumans2_$(var scene).yaml}
   - set_remap: {from: hydra/input/left_cam/depth_registered/image_rect, to: /tesse/depth_cam/mono/image_raw}
   - set_remap: {from: hydra/input/left_cam/rgb/image_raw, to: /tesse/left_cam/rgb/image_raw}
   - set_remap: {from: hydra/input/left_cam/rgb/camera_info, to: /tesse/left_cam/camera_info}
   - set_remap: {from: hydra/input/left_cam/semantic/image_raw, to: $(if $(var use_gt_semantics) /tesse/seg_cam/converted/image_raw /tesse/left_cam/semantic/image_raw)}
   - set_remap: {from: hydra/input/left_cam/feature, to: /tesse/left_cam/semantic/feature}
-  - let: {name: extra_yaml_gt, value: '{semantic_label_remap_filepath: $(var label_remap_path)}'}
+  - let: {name: extra_yaml_gt, value: '{input: {inputs: {left_cam: {receiver: {adapters: [{type: LabelRemapper, remap_path: $(var label_remap_path)}]}}}}}'}
   - let: {name: extra_yaml_no_gt, value: '{}'}
   - node:
       pkg: tf2_ros
@@ -43,7 +43,7 @@ launch:
       arg:
         - {name: dataset, value: uhumans2}
         - {name: labelspace, value: $(var labelspace)}
-        - {name: log_prefix, value: $(var log_prefix)}
+        - {name: log_name, value: $(var log_name)}
         - {name: robot_frame, value: $(if $(var use_gt_poses) base_link_gt base_link)}
         - {name: odom_frame, value: $(if $(var use_gt_poses) world odom)}
         - {name: map_frame, value: map}

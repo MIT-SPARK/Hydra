@@ -59,7 +59,8 @@ namespace {
 inline static const auto registration_ =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    RosPoseGraphTracker,
-                                   RosPoseGraphTracker::Config>("RosPoseGraphs");
+                                   RosPoseGraphTracker::Config,
+                                   RunContext::ConstPtr>("RosPoseGraphs");
 
 }
 
@@ -72,8 +73,9 @@ void declare_config(RosPoseGraphTracker::Config& config) {
   field(config.queue_size, "queue_size");
 }
 
-RosPoseGraphTracker::RosPoseGraphTracker(const Config& config)
-    : PoseGraphTracker(config), config(config::checkValid(config)) {
+RosPoseGraphTracker::RosPoseGraphTracker(const Config& config,
+                                         RunContext::ConstPtr context)
+    : PoseGraphTracker(config, context), config(config::checkValid(config)) {
   using pose_graph_tools::PoseGraphTypeAdapter;
   auto nh = ianvs::NodeHandle::this_node(config.ns);
   odom_sub_ = nh.create_subscription<PoseGraphTypeAdapter>(

@@ -2,13 +2,15 @@ target_sources(
   ${PROJECT_NAME}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/attribute_merger.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/config_utilities.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/global_info.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/run_context.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_update.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/hydra_pipeline.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/labelspace.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/module.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/node_matchers.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/pipeline_queues.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/robot_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/robot_prefix_config.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/run_settings.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_color_map.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/shared_dsg_info.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/shared_module_state.cpp

@@ -33,8 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <yaml-cpp/yaml.h>
+
 #include <Eigen/Geometry>
 #include <map>
+#include <optional>
 #include <string>
 
 namespace hydra {
@@ -50,3 +53,24 @@ struct QuaternionConverter {
 };
 
 }  // namespace hydra
+
+namespace YAML {
+
+template <typename T>
+struct convert<std::optional<T>> {
+  static Node encode(const std::optional<T>& value) {
+    return value ? convert<T>::encode(*value) : Node(NodeType::Null);
+  }
+
+  static bool decode(const Node& node, std::optional<T>& value) {
+    if (node.IsNull()) {
+      value.reset();
+    } else {
+      value = node.as<T>();
+    }
+
+    return true;
+  }
+};
+
+}  // namespace YAML

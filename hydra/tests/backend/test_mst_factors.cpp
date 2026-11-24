@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <hydra/backend/mst_factors.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/run_context.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_pgmo/deformation_graph_4dof.h>
 #include <spark_dsg/node_attributes.h>
@@ -14,7 +14,8 @@ namespace {
 
 TEST(MstPlaceFactors, BuildsIndependentExtrasWithMeshConnections) {
   auto dsg = test::makeSharedDsg();
-  const auto prefix = GlobalInfo::instance().getRobotPrefix().vertex_key;
+  const RobotConfig robot;
+  const auto prefix = robot.prefix().vertex_key;
   kimera_pgmo::DeformationGraph deformation_graph;
   gtsam::Values mesh_nodes;
   const auto vertex = gtsam::Symbol(prefix, 0);
@@ -34,7 +35,7 @@ TEST(MstPlaceFactors, BuildsIndependentExtrasWithMeshConnections) {
 
   dsg->graph->insertEdge(spark_dsg::NodeSymbol('p', 0), spark_dsg::NodeSymbol('p', 1));
   const auto base = deformation_graph.getOptimizationProblem();
-  MstPlaceFactors hook(MstPlaceFactors::Config{});
+  MstPlaceFactors hook(MstPlaceFactors::Config{}, robot);
   kimera_pgmo::OptimizationProblem extras;
   hook.updateProblem(0, *dsg->graph, deformation_graph, extras, nullptr);
   ASSERT_EQ(extras.initial.size(), 2u);

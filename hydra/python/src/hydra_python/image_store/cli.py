@@ -109,7 +109,7 @@ def index_options(f):
     """Input/store options shared by ``index`` (and ``tail``)."""
     options = [
         click.option(
-            "--keyframes", help="KeyframeSelector.log_path (<ts>.zip archives)"
+            "--keyframes", help="Hydra frontend/keyframes directory (<ts>.zip archives)"
         ),
         click.option(
             "--tracks", help="Khronos track logger log_path (<track_id>/track.json)"

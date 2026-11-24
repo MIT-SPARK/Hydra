@@ -53,6 +53,7 @@ static const auto registration =
     config::RegistrationWithConfig<ActiveWindowModule,
                                    ReconstructionModule,
                                    ReconstructionModule::Config,
+                                   RunContext::ConstPtr,
                                    ActiveWindowModule::OutputQueue::Ptr,
                                    std::unique_ptr<VolumetricWindow>>(
         "ReconstructionModule");
@@ -87,25 +88,35 @@ void declare_config(ReconstructionModule::Config& config) {
 }
 
 ReconstructionModule::ReconstructionModule(const Config& config,
+                                           RunContext::ConstPtr context,
                                            const OutputQueue::Ptr& queue,
                                            std::unique_ptr<VolumetricWindow>&& window)
-    : ActiveWindowModule(config, queue, std::move(window)),
+    : ActiveWindowModule(config, context, queue, std::move(window)),
       config(config::checkValid(config)),
       last_update_ns_(std::nullopt),
-      tsdf_integrators_(config.tsdf),
+      tsdf_integrators_(config.tsdf, &context->labelspace()),
       mesh_integrator_(std::make_unique<MeshIntegrator>(config.mesh)),
       footprint_integrator_(config.robot_footprint.create()) {
+  if (map_.hasSemantics()) {
+    return;
+  }
+
+  if (config.tsdf.mode != SensorMapMode::Strict &&
+      config.tsdf.default_config.semantic_integrator) {
+    LOG(ERROR) << "Semantic integrator specified but map has no semantic layer!";
+  }
+
   for (const auto& [name, tsdf_config] : config.tsdf.sensors) {
-    if (tsdf_config.semantic_integrator && !map_.config.with_semantics) {
+    if (tsdf_config.semantic_integrator) {
       LOG(ERROR) << "Semantic integrator specified for sensor " << name
-                 << " but map does not contain semantic layer!";
+                 << " but map has no semantic layer!";
     }
   }
 }
 
-ReconstructionModule::~ReconstructionModule() {}
+ReconstructionModule::~ReconstructionModule() { stop(false); }
 
-std::string ReconstructionModule::printInfo() const {
+std::string ReconstructionModule::show() const {
   return config::toString(config) + "\n" + Sink::printSinks(sinks_);
 }
 

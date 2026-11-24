@@ -60,7 +60,8 @@ static const auto policy_registration =
 static const auto functor_registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    KeyframeSelector,
-                                   KeyframeSelector::Config>("KeyframeSelector");
+                                   KeyframeSelector::Config,
+                                   RunContext::ConstPtr>("KeyframeSelector");
 
 const std::set<std::string> kSaveFields{"color",
                                         "color_mask",
@@ -198,7 +199,7 @@ void declare_config(KeyframeSelector::Config& config) {
   field(config.layers, "layers");
   field(config.sinks, "sinks");
   field(config.max_active_keyframes, "max_active_keyframes");
-  field<Path>(config.log_path, "log_path");
+  field(config.log_keyframes, "log_keyframes");
   field(config.save_fields, "save_fields");
   field(config.max_queue_size, "max_queue_size");
   field(config.save_options, "save_options");
@@ -211,17 +212,17 @@ KeyframeSelector::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("keyframes")),
       keyframe_policy(DistancePolicy::Config()) {}
 
-KeyframeSelector::KeyframeSelector(const Config& config)
+KeyframeSelector::KeyframeSelector(const Config& config, RunContext::ConstPtr context)
     : config(config::checkValid(config)),
-      sinks_(Sink::instantiate(config.sinks)),
+      sinks_(Sink::instantiate(config.sinks, context->config.robot)),
       policy_(config.keyframe_policy.create()),
       feature_selector_(config.feature_selector.create()) {
   for (const auto& layer : config.layers) {
     active_window_.emplace(layer, ActiveWindowTracker());
   }
 
-  if (!config.log_path.empty()) {
-    std::filesystem::create_directories(config.log_path);
+  if (config.log_keyframes && context->logs) {
+    log_path_ = context->logs.path("frontend/keyframes");
     save_thread_ = std::make_unique<std::thread>(&KeyframeSelector::saveSpin, this);
   }
 }
@@ -327,7 +328,7 @@ void KeyframeSelector::saveSpin() {
     }
 
     // InputData::save writes to a temporary file and renames it into place
-    const auto filepath = config.log_path / archiveName(*data);
+    const auto filepath = log_path_ / archiveName(*data);
     try {
       data->save(filepath, config.save_options);
     } catch (const std::exception& e) {

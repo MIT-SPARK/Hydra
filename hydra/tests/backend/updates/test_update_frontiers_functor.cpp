@@ -32,32 +32,54 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/pipeline_queues.h"
+#include <gtest/gtest.h>
+#include <hydra/backend/updates/update_frontiers_functor.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph.h>
 
-#include <glog/logging.h>
+using namespace spark_dsg;
 
 namespace hydra {
 
-PipelineQueues::~PipelineQueues() {
-  VLOG(2) << "backend_queue: " << backend_queue.size();
-  VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
-  VLOG(2) << "external_loop_closure_queue: " << external_loop_closure_queue.size();
+TEST(UpdateFrontiersFunctor, CleanupUsesLatestPoseInRobotPartition) {
+  SharedDsgInfo dsg({});
+  auto& graph = *dsg.graph;
+  ASSERT_TRUE(graph.emplaceNode(
+      DsgLayers::OBJECTS, "O0"_id, std::make_unique<ObjectNodeAttributes>()));
+
+  const auto rotation = Eigen::Quaterniond::Identity();
+  ASSERT_TRUE(graph.emplaceNode(
+      2,
+      "a8"_id,
+      std::make_unique<AgentNodeAttributes>(
+          std::chrono::seconds(3), rotation, Eigen::Vector3d(10, 0, 0), "a8"_id),
+      'a'));
+  ASSERT_TRUE(graph.emplaceNode(
+      2,
+      "b2"_id,
+      std::make_unique<AgentNodeAttributes>(
+          std::chrono::seconds(1), rotation, Eigen::Vector3d(5, 0, 0), "b2"_id),
+      'b'));
+  ASSERT_TRUE(graph.emplaceNode(
+      2,
+      "b5"_id,
+      std::make_unique<AgentNodeAttributes>(
+          std::chrono::seconds(2), rotation, Eigen::Vector3d::Zero(), "b5"_id),
+      'b'));
+
+  auto frontier = std::make_unique<FrontierNodeAttributes>();
+  frontier->real_place = false;
+  frontier->position = Eigen::Vector3d(0.5, 0, 0);
+  ASSERT_TRUE(graph.emplaceNode(DsgLayers::PLACES, "f0"_id, std::move(frontier)));
+
+  auto unmerged = graph.clone();
+  auto info = std::make_shared<UpdateInfo>();
+  info->robot_id = 1;
+  const UpdateFrontiersFunctor functor({});
+  functor.hooks().cleanup(info, *unmerged, &dsg);
+
+  EXPECT_TRUE(
+      graph.getNode("f0"_id).attributes<FrontierNodeAttributes>().anti_frontier);
 }
-
-PipelineQueues& PipelineQueues::instance() {
-  if (!s_instance_) {
-    s_instance_.reset(new PipelineQueues());
-  }
-
-  return *s_instance_;
-}
-
-void PipelineQueues::clear() {
-  backend_queue.clear();
-  backend_lcd_queue.clear();
-  external_loop_closure_queue.clear();
-}
-
-PipelineQueues::PipelineQueues() {}
 
 }  // namespace hydra

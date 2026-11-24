@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <hydra/active_window/reconstruction_module.h>
+#include <hydra/common/robot_config.h>
 
 #include "hydra_ros/utils/occupancy_publisher.h"
 
@@ -46,7 +47,7 @@ class TsdfOccupancyPublisher : public ReconstructionModule::Sink,
     std::string ns = "~/tsdf";
   } const config;
 
-  explicit TsdfOccupancyPublisher(const Config& config);
+  explicit TsdfOccupancyPublisher(const Config& config, const RobotConfig& robot);
 
   virtual ~TsdfOccupancyPublisher() = default;
 

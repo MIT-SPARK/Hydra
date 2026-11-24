@@ -33,37 +33,25 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/pose_graph.h>
-
-#include <memory>
-
-#include "hydra/common/message_queue.h"
-#include "hydra/loop_closure/registration_solution.h"
 
 namespace hydra {
 
-struct FrontendOutput;
-
-class PipelineQueues {
+class RunSettings {
  public:
-  ~PipelineQueues();
+  struct Config {
+    int default_verbosity = 1;
+    //! Non-positive counts use all available threads
+    int default_num_threads = -1;
+    bool timing_disabled = false;
+    bool disable_timer_output = true;
+    bool enable_pgmo_logging = true;
+    bool store_visualization_details = false;
+  };
 
-  static PipelineQueues& instance();
-
-  void clear();
-
-  //! Connection between frontend and backend
-  MessageQueue<std::shared_ptr<const FrontendOutput>> backend_queue;
-  //! Connection between backend and LCD module
-  MessageQueue<lcd::RegistrationSolution> backend_lcd_queue;
-  //! Queue for receiving (timestamped) external loop closures
-  MessageQueue<pose_graph_tools::PoseGraph> external_loop_closure_queue;
-
- private:
-  PipelineQueues();
-
-  // TODO(nathan) fix thread safety (by probably just having a single static instance)
-  inline static std::unique_ptr<PipelineQueues> s_instance_;
+  static const Config& instance();
+  static const Config& init(const Config& config);
 };
+
+void declare_config(RunSettings::Config& config);
 
 }  // namespace hydra

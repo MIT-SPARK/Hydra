@@ -4,8 +4,9 @@ external_library_paths: [hydra_ros]
 plugins:
   mesh: {type: MeshPlugin, coloring: {type: ''}}
 renderer:
-  layer_z_step: 5.5  # unit separation between layers
-  collapse_layers: false  # whether or not to apply offsets to each of the layers
+  graph:
+    layer_z_step: 5.5
+    collapse_layers: false
   layers:
     2:
       z_offset_scale: 1.0
@@ -22,7 +23,7 @@ renderer:
       z_offset_scale: 0.0
       visualize: true
       nodes: {scale: 0.15, alpha: 1.0, use_sphere: true, color: {type: PartitionColorAdapter}}
-      edges: {scale: 0.15, alpha: 1.0, draw_interlayer: false, color: {type: ''}}
+      edges: {scale: 0.15, alpha: 1.0, color: {type: ''}}
       text: {draw_layer: true, height: 0.9, scale: 0.8}
   interlayer_edges:
     - {from: 3*, to: 2p*, draw: false}

@@ -71,7 +71,6 @@ def mp3d(scenes, visualize, zmq_url, max_steps, force, output):
                 "habitat",
                 "ade20k_mp3d",
                 output_path=scene_output,
-                freeze_global_info=False,
                 zmq_url=zmq_url if visualize else None,
             )
             if pipeline is None:
@@ -87,14 +86,15 @@ def mp3d(scenes, visualize, zmq_url, max_steps, force, output):
                 rotation, translation = _decompose_pose(pose)
                 pipeline.step(
                     stamp,
-                    translation,
                     rotation,
+                    translation,
+                    rgb,
                     depth,
                     labels,
-                    rgb,
                 )
 
-            pipeline.save(f"{output}")
+            pipeline.stop()
+            pipeline.save()
 
         except Exception:
             click.secho(f"Pipeline failed for '{scene_path}'", fg="red")

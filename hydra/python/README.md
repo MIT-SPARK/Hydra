@@ -25,6 +25,67 @@ pip install /path/to/colcon_ws/src/hydra/hydra
 
 Without a Hydra build (CMake cannot find `hydra`), `pip install` installs only the pure-python parts and `import hydra_python` warns that the bindings are not built.
 
+### Run configuration and output
+
+Python uses the same `config_utilities` file merging, inline overrides, and
+substitutions as the ROS node:
+
+```python
+import hydra_python as hydra
+
+hydra.init_config_context([
+    "hydra",
+    "--config-utilities-file", "dataset.yaml",
+    "--config-utilities-file", "labels.yaml@labelspace",
+    "--config-utilities-yaml", "{robot_id: 0, log_path: /tmp/hydra-run}",
+])
+context = hydra.RunContext()
+pipeline = hydra.HydraPipeline(sensor, context)
+# pipeline.step(timestamp_ns, odom_R_body_wxyz, odom_t_body, rgb, depth, labels)
+pipeline.stop()  # drain pending work; stop(force=True) discards remaining work
+pipeline.save()
+```
+
+For a labelspace generated from a segmentation model, populate a `Labelspace`
+and pass it when constructing the context:
+
+```python
+labels = hydra.Labelspace()
+labels.label_names = {0: "unknown", 1: "floor", 2: "chair"}  # Use the model's IDs and names.
+labels.total_labels = max(labels.label_names) + 1
+labels.invalid_labels = {0}
+labels.object_labels = {2}
+labels.surface_places_labels = {1}
+context = hydra.RunContext(labelspace=labels)
+pipeline = hydra.HydraPipeline(sensor, context)
+```
+
+This overrides the parsed labelspace and copies its values into the run. Later
+changes to `labels` do not change the context. Other settings still come from
+`config_utilities`, and the supplied labelspace is included in the saved config.
+
+Each `init_config_context()` replaces the previous parsing context. Construct a
+new context and pipeline for a dataset with different settings or a different
+labelspace. Only one pipeline executes at a time. Construct a new pipeline for
+each run; pipelines do not provide a reset operation.
+
+`RunSettings` holds process defaults such as verbosity, thread counts, and timing
+options. A new context inherits the current defaults; explicit configuration
+overrides them. Constructing a pipeline restores the defaults captured by its
+context. Robot IDs and coordinate frames live in `RobotConfig`, and labelspaces
+and output paths belong to each `RunContext`; these do not carry over to the next
+dataset. Existing YAML keys (`default_num_threads`, `robot_id`, `map_frame`, etc.)
+remain at the root of the rendered configuration.
+
+The run's `log_path` is created before modules are constructed. `save()` uses that
+directory; `save(output)` overrides the destination for saved artifacts without
+changing the run's configured directory. With an empty `log_path`, default saving
+and startup logging are disabled, but an explicit save destination still works.
+Configure `frontend.keyframe_selector` with
+`{type: KeyframeSelector, log_keyframes: true}` to write accepted keyframes to
+`<log_path>/frontend/keyframes` during processing. A later save override does not
+relocate those streamed archives.
+
 ### Image store
 
 `hydra_python.image_store` indexes the image logs Hydra and Khronos write (keyframe archives, track logs) into an image store and reads it back; it does not need the compiled bindings.

@@ -92,7 +92,8 @@ void declare_config(RosCamera::Config& config);
 namespace input {
 
 config::VirtualConfig<Sensor> loadSensor(const config::VirtualConfig<Sensor>& sensor,
-                                         const std::string& name);
+                                         const std::string& name,
+                                         const std::string& robot_frame);
 
 }  // namespace input
 }  // namespace hydra

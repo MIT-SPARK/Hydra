@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/dynamic_config.h>
+#include <hydra/common/robot_config.h>
 #include <hydra/frontend/gvd_place_extractor.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
 #include <hydra_visualizer/layer_info.h>
@@ -56,7 +57,7 @@ class GvdPlacesVisualizer : public GvdPlaceExtractor::Sink {
     spark_dsg::Color block_color = spark_dsg::Color::purple();
   };
 
-  explicit GvdPlacesVisualizer(const Config& config);
+  explicit GvdPlacesVisualizer(const Config& config, const RobotConfig& robot);
 
   virtual ~GvdPlacesVisualizer() = default;
 
@@ -77,6 +78,7 @@ class GvdPlacesVisualizer : public GvdPlaceExtractor::Sink {
                           const places::GraphExtractor& extractor) const;
 
  protected:
+  const RobotConfig robot_;
   ianvs::NodeHandle nh_;
   MarkerGroupPub pubs_;
   config::DynamicConfig<Config> config_;

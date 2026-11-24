@@ -37,6 +37,7 @@
 #include <queue>
 #include <thread>
 
+#include "hydra/common/labelspace.h"
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
@@ -52,6 +53,7 @@ class LoopClosureModule : public Module {
   using NodeVec = std::vector<spark_dsg::NodeId>;
   using NodeIdSet = std::unordered_set<spark_dsg::NodeId>;
   using InputQueue = MessageQueue<std::shared_ptr<const FrontendOutput>>;
+  using OutputQueue = MessageQueue<lcd::RegistrationSolution>;
   using NodeIdQueue =
       std::priority_queue<spark_dsg::NodeId, NodeVec, std::greater<spark_dsg::NodeId>>;
 
@@ -59,23 +61,26 @@ class LoopClosureModule : public Module {
     Config();
 
     lcd::LcdDetector::Config detector;
-    bool visualize_dsg_lcd = false;
-    std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
     double lcd_agent_horizon_s = 1.5;
     double descriptor_creation_horizon_m = 10.0;
   } const config;
 
-  LoopClosureModule(const Config& config, const SharedModuleState::Ptr& state);
+  // TODO(nathan) make object label histogram have flexible dimension instead of
+  // requiring fixed size vectors
+  LoopClosureModule(const Config& config,
+                    RunContext::ConstPtr context,
+                    const std::shared_ptr<SharedModuleState>& state,
+                    const OutputQueue::Ptr& output = nullptr);
 
   virtual ~LoopClosureModule();
 
   void start() override;
 
-  void stop() override;
+  void stop(bool force) override;
 
-  void save(const DataDirectory& output) override;
+  void save(const DataDirectory* output = nullptr) override;
 
-  std::string printInfo() const override;
+  std::string show() const override;
 
   void spin();
 
@@ -96,12 +101,13 @@ class LoopClosureModule : public Module {
 
  protected:
   InputQueue::Ptr queue_;
+  OutputQueue::Ptr output_queue_;
 
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   uint64_t last_sequence_number_ = 0;
 
-  SharedModuleState::Ptr state_;
+  std::shared_ptr<SharedModuleState> state_;
   NodeIdQueue agent_queue_;
   std::list<spark_dsg::NodeId> potential_lcd_root_nodes_;
 

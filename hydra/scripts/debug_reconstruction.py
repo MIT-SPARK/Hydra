@@ -86,7 +86,7 @@ def run(
         last_stamp: int | None = None
         threshold_ns = int(min_separation_s * 1.0e9)
         camera = hydra.make_camera(**dataloader.intrinsics)
-        pipeline = hydra.ReconstructionPipeline(camera)
+        pipeline = hydra.ReconstructionPipeline(camera, hydra.RunContext())
         for stamp, pose, images in dataloader:
             if max_steps and frame_idx >= max_steps:
                 break
@@ -106,6 +106,7 @@ def run(
             click.pause("Press any key to continue to next frame...")
 
         click.pause("Press any key to exit...")
+        del pipeline
 
 
 if __name__ == "__main__":

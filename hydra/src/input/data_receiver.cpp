@@ -40,8 +40,6 @@
 
 #include <chrono>
 
-#include "hydra/common/global_info.h"
-
 namespace hydra {
 
 void declare_config(DataReceiver::Config& config) {
@@ -91,11 +89,8 @@ void DataReceiver::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
     const auto has_data = queue_.poll();
-    if (GlobalInfo::instance().force_shutdown() || !has_data) {
-      should_shutdown = should_shutdown_;
-    }
-
     if (!has_data) {
+      should_shutdown = should_shutdown_;
       continue;
     }
 

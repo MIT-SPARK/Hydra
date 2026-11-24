@@ -37,6 +37,7 @@
 
 #include <memory>
 
+#include "hydra/common/robot_config.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/utils/logging.h"
 
@@ -55,7 +56,7 @@ class DeformationGraphBuilder : public GraphBuilderFunctor {
     double horizon_s = 10.0;
   } const config;
 
-  DeformationGraphBuilder(const Config& config);
+  DeformationGraphBuilder(const Config& config, RunContext::ConstPtr context);
   virtual ~DeformationGraphBuilder();
 
   void call(const ActiveWindowOutput& msg,
@@ -64,6 +65,7 @@ class DeformationGraphBuilder : public GraphBuilderFunctor {
             const VolumetricWindow* window) override;
 
  protected:
+  const RobotConfig robot_;
   kimera_pgmo::Graph graph_;
   std::unique_ptr<kimera_pgmo::MeshCompression> compression_;
 };

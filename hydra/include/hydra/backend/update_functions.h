@@ -78,6 +78,8 @@ struct UpdateInfo {
   const std::unordered_map<spark_dsg::NodeId, size_t>* node_to_robot_id = nullptr;
   //! Archival information for mesh
   kimera_pgmo::MeshOffsetInfo mesh_offsets = {};
+  //! Robot constructing the graph when no per-node robot mapping is provided
+  size_t robot_id = 0;
 };
 
 struct UpdateFunctor {

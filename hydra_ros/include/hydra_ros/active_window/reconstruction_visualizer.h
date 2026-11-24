@@ -35,6 +35,7 @@
 #pragma once
 #include <config_utilities/dynamic_config.h>
 #include <hydra/active_window/active_window_module.h>
+#include <hydra/common/robot_config.h>
 #include <hydra/input/sensor_map.h>
 #include <hydra_visualizer/adapters/mesh_color.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
@@ -87,7 +88,7 @@ class ReconstructionVisualizer : public ActiveWindowModule::Sink {
     SensorMap<SensorDisplay>::Config sensor_displays;
   };
 
-  explicit ReconstructionVisualizer(const Config& config);
+  explicit ReconstructionVisualizer(const Config& config, const RobotConfig& robot);
 
   virtual ~ReconstructionVisualizer();
 
@@ -98,6 +99,7 @@ class ReconstructionVisualizer : public ActiveWindowModule::Sink {
             const ActiveWindowOutput& msg) const override;
 
  protected:
+  const RobotConfig robot_;
   void publishMesh(const Config& config, const ActiveWindowOutput& output) const;
 
   ianvs::NodeHandle nh_;

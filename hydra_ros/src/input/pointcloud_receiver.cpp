@@ -3,7 +3,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
 #include <ianvs/node_handle.h>
 
 #include "hydra_ros/input/pointcloud_adaptor.h"

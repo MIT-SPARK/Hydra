@@ -56,7 +56,8 @@
 #include <future>
 #include <vector>
 
-#include "hydra/common/global_info.h"
+#include "hydra/common/config_utilities.h"
+#include "hydra/common/run_settings.h"
 #include "hydra/input/sensor_utilities.h"
 #include "hydra/reconstruction/index_getter.h"
 #include "hydra/utils/printing.h"
@@ -67,6 +68,12 @@ using Measurement = ProjectiveIntegrator::VoxelMeasurement;
 using MapConfig = VolumetricMap::Config;
 
 namespace {
+
+ProjectiveIntegrator::Config resolveConfig(ProjectiveIntegrator::Config config) {
+  config.num_threads = config::ThreadNumConversion::getNumThreads(
+      config.num_threads.value_or(RunSettings::instance().default_num_threads));
+  return config::checkValid(config);
+}
 
 // Return whether or not a measurement is considered outside the truncation band and
 // shouldn't be considered for computing label and color information. Rejects all
@@ -84,7 +91,7 @@ inline bool measurementOutsideTruncation(const MapConfig& map_config,
 
 ProjectiveIntegrator::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("projective_integrator")),
-      num_threads(GlobalInfo::instance().getConfig().default_num_threads) {}
+      interpolation_method(InterpolatorAdaptive::Config{}) {}
 
 void declare_config(ProjectiveIntegrator::Config& config) {
   using namespace config;
@@ -102,7 +109,7 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   field(config.use_constant_weight, "use_constant_weight");
   field(config.min_measurement_weight, "min_measurement_weight");
   field(config.max_weight, "max_weight");
-  field<ThreadNumConversion>(config.num_threads, "num_threads");
+  field(config.num_threads, "num_threads");
   field(config.interpolation_method, "interpolation_method");
   config.semantic_integrator.setOptional();
   field(config.semantic_integrator, "semantic_integrator");
@@ -111,7 +118,7 @@ void declare_config(ProjectiveIntegrator::Config& config) {
                          !config.skip_extra_colors_and_labels;
   checkCondition(labels_ok,
                  "skip_extra must be false if extra_distance_labels are specified");
-  check(config.num_threads, GT, 0, "num_threads");
+
   check(config.min_measurement_weight, GE, 0.0f, "min_measurement_weight");
   check(config.max_weight, GT, 0, "max_weight");
   if (config.use_weight_dropoff) {
@@ -119,10 +126,11 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   }
 }
 
-ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config)
-    : config(config::checkValid(config)),
+ProjectiveIntegrator::ProjectiveIntegrator(const Config& config,
+                                           const Labelspace* labelspace)
+    : config(resolveConfig(config)),
       interpolator_(config.interpolation_method.create()),
-      semantic_integrator_(config.semantic_integrator.create()) {}
+      semantic_integrator_(config.semantic_integrator.create(labelspace)) {}
 
 void ProjectiveIntegrator::updateMap(const InputData& data,
                                      VolumetricMap& map,
@@ -161,7 +169,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
 
   // TODO(nathan) reconsider future/async
   std::vector<std::future<void>> threads;
-  for (int i = 0; i < config.num_threads; ++i) {
+  for (int i = 0; i < *config.num_threads; ++i) {
     threads.emplace_back(std::async(std::launch::async, [&]() {
       BlockIndex block_index;
       while (index_getter.getNextIndex(block_index)) {

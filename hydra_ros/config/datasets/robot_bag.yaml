@@ -1,7 +1,6 @@
 ---
 paths: [khronos, khronos_ros]
 input:
-  type: RosInput
   inputs:
     camera:
       receiver: {type: ImageReceiver, semantics_type: instance, use_exact: true, filters: [{type: InvalidDepthFilter, max_invalid_ratio: 0.4}]}
@@ -34,9 +33,8 @@ backend:
     agents: {type: UpdateAgentsFunctor}
     places: {type: UpdateRegionGrowingTraversabilityFunctor, layer: PLACES}
   pgmo:
-    embed_trajectory_delta_t: 5.0
     num_interp_pts: 3
     interp_horizon: 10.0
     optimizer: {type: KimeraRpgoOptimizer, solver: LM, gnc: {inlier_probability: 0.9, mu_step: 1.6, max_iterations: 100}}
     add_initial_prior: true
-    covariance: {odom: 1.0e-02, loop_close: 5.0e-02, sg_loop_close: 1.0e-01, prior: 1.0e-02, mesh_mesh: 1.0e-02, pose_mesh: 1.0e-02, place_mesh: 1.0e-02, place_edge: 10.0, place_merge: 10.0, object_merge: 10.0}
+    covariance: {odom: 1.0e-02, loop_close: 5.0e-02, prior: 1.0e-02, mesh_mesh: 1.0e-02, pose_mesh: 1.0e-02}

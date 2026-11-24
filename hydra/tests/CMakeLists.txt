@@ -19,6 +19,7 @@ add_executable(
   backend/updates/test_ib_objects_update_functor.cpp
   backend/updates/test_update_agents_functor.cpp
   backend/updates/test_update_buildings_functor.cpp
+  backend/updates/test_update_frontiers_functor.cpp
   backend/updates/test_update_gt_rooms_functor.cpp
   backend/updates/test_update_objects_functor.cpp
   backend/updates/test_update_places_functor.cpp
@@ -26,6 +27,7 @@ add_executable(
   common/test_graph_update.cpp
   common/test_node_matchers.cpp
   common/test_partial_graph.cpp
+  common/test_run_settings.cpp
   common/test_shared_dsg_info.cpp
   frontend/test_graph_connector.cpp
   frontend/test_mesh_compression.cpp

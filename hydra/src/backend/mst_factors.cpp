@@ -45,7 +45,6 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 
-#include "hydra/common/global_info.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -55,7 +54,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<OptimizationHook,
                                    MstPlaceFactors,
-                                   MstPlaceFactors::Config>("MstPlaceFactors");
+                                   MstPlaceFactors::Config,
+                                   RobotConfig>("MstPlaceFactors");
 
 }
 
@@ -71,8 +71,8 @@ void declare_config(MstPlaceFactors::Config& config) {
   check(config.edge_variance, GT, 0.0, "edge_variance");
 }
 
-MstPlaceFactors::MstPlaceFactors(const Config& config)
-    : config(config::checkValid(config)) {}
+MstPlaceFactors::MstPlaceFactors(const Config& config, const RobotConfig& robot)
+    : config(config::checkValid(config)), robot(robot) {}
 
 void MstPlaceFactors::updateProblem(
     uint64_t timestamp_ns,
@@ -86,7 +86,7 @@ void MstPlaceFactors::updateProblem(
     return;
   }
 
-  const auto this_vertex_key = GlobalInfo::instance().getRobotPrefix().vertex_key;
+  const auto this_vertex_key = robot.prefix().vertex_key;
   ScopedTimer timer("backend/mst_place_factors", timestamp_ns);
 
   MinimumSpanningTreeInfo mst_info;

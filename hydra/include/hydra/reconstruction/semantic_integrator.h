@@ -41,6 +41,8 @@
 
 namespace hydra {
 
+struct Labelspace;
+
 struct SemanticIntegrator {
   virtual ~SemanticIntegrator() = default;
 
@@ -67,14 +69,15 @@ class MLESemanticIntegrator : public SemanticIntegrator {
     double label_confidence = 0.9;
   } const config;
 
-  explicit MLESemanticIntegrator(const Config& config);
+  explicit MLESemanticIntegrator(const Config& config,
+                                 const Labelspace* labelspace = nullptr);
 
   void updateLikelihoods(uint32_t label,
                          float weight,
                          SemanticVoxel& voxel) const override;
 
  protected:
-  size_t total_labels_;
+  const size_t total_labels_;
 
   float init_likelihood_;
   Eigen::MatrixXf observation_likelihoods_;
@@ -86,7 +89,8 @@ class BinarySemanticIntegrator : public hydra::SemanticIntegrator {
  public:
   struct Config {};
 
-  explicit BinarySemanticIntegrator(const Config& /* config */) {};
+  explicit BinarySemanticIntegrator(const Config& config = {},
+                                    const Labelspace* labelspace = nullptr);
 
   void updateLikelihoods(uint32_t label,
                          float weight,
@@ -111,7 +115,8 @@ class FirstKSemanticIntegrator : public SemanticIntegrator {
     float max_weight = 0.0f;
   } const config;
 
-  explicit FirstKSemanticIntegrator(const Config& config);
+  explicit FirstKSemanticIntegrator(const Config& config,
+                                    const Labelspace* labelspace = nullptr);
 
   void updateLikelihoods(uint32_t label,
                          float weight,
@@ -132,7 +137,8 @@ class SingleLabelIntegrator : public SemanticIntegrator {
     std::set<int32_t> labels_to_ignore;
   } const config;
 
-  explicit SingleLabelIntegrator(const Config& config = {});
+  explicit SingleLabelIntegrator(const Config& config = {},
+                                 const Labelspace* labelspace = nullptr);
 
   void updateLikelihoods(uint32_t label,
                          float weight,

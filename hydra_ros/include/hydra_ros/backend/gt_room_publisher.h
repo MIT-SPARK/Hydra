@@ -18,7 +18,7 @@ class GtRoomPublisher : public UpdateGtRoomsFunctor::Sink {
     visualizer::DiscreteColormap::Config colormap;
   } const config;
 
-  explicit GtRoomPublisher(const Config&);
+  explicit GtRoomPublisher(const Config& config);
 
   virtual ~GtRoomPublisher() = default;
 

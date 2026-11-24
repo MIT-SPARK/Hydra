@@ -35,9 +35,12 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
+#include <functional>
 #include <list>
 #include <memory>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace hydra {
 
@@ -60,13 +63,16 @@ struct OutputSink {
   template <typename T>
   static Ptr fromMethod(void (T::*callback)(Args...), T* instance);
 
-  static List instantiate(const std::vector<Factory>& configs) {
+  template <typename... ConstructorArgs>
+  static List instantiate(const std::vector<Factory>& configs,
+                          ConstructorArgs... args) {
     List sinks;
     for (const auto& config : configs) {
       if (config) {
-        sinks.push_back(config.create());
+        sinks.push_back(config.create(args...));
       }
     }
+
     return sinks;
   }
 

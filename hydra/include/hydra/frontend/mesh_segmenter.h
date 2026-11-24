@@ -40,6 +40,7 @@
 #include <Eigen/Dense>
 
 #include "hydra/common/output_sink.h"
+#include "hydra/common/robot_config.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
 
 namespace kimera_pgmo {
@@ -73,7 +74,9 @@ class MeshSegmenter {
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
+  explicit MeshSegmenter(const Config& config,
+                         const std::set<uint32_t>& labels,
+                         const RobotConfig& robot);
 
   LabelClusters detect(uint64_t timestamp_ns,
                        const kimera_pgmo::MeshDelta& active,

@@ -38,6 +38,7 @@
 #include <memory>
 
 #include "hydra/common/output_sink.h"
+#include "hydra/common/robot_config.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/places/gvd_places/graph_extractor.h"
 #include "hydra/places/gvd_places/gvd_integrator.h"
@@ -71,7 +72,7 @@ class GvdPlaceExtractor : public GraphBuilderFunctor {
     Config() : VerbosityConfig("[gvd_places] ") {}
   } const config;
 
-  explicit GvdPlaceExtractor(const Config& config);
+  explicit GvdPlaceExtractor(const Config& config, RunContext::ConstPtr context);
 
   virtual ~GvdPlaceExtractor();
 

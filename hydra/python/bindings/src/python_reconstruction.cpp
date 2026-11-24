@@ -47,7 +47,8 @@
 #include "hydra/active_window/reconstruction_module.h"
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
-#include "hydra/common/global_info.h"
+#include "hydra/common/labelspace.h"
+#include "hydra/common/run_settings.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/input/input_filter.h"
 #include "hydra/utils/data_directory.h"
@@ -78,7 +79,9 @@ class PythonReconstruction {
     config::VirtualConfig<MeshCompressor> compression{MeshCompression::Config{}};
   } const config;
 
-  PythonReconstruction(const Config& config, const Sensor::Ptr& sensor);
+  PythonReconstruction(const Config& config,
+                       const Sensor::Ptr& sensor,
+                       RunContext::ConstPtr context);
 
   bool step(size_t timestamp_ns,
             const Eigen::Vector4d& odom_R_body,
@@ -89,10 +92,11 @@ class PythonReconstruction {
   bool stepImpl(const std::shared_ptr<SensorInputPacket>& packet,
                 const Eigen::Isometry3d& world_T_body);
 
-  void save(const std::filesystem::path& output);
+  void save(const std::optional<std::filesystem::path>& output);
 
   Mesh::Ptr mesh() const;
 
+  const RunContext::ConstPtr context;
   const Sensor::ConstPtr sensor;
 
  protected:
@@ -116,27 +120,29 @@ void declare_config(PythonReconstruction::Config& config) {
 }
 
 PythonReconstruction::PythonReconstruction(const Config& config,
-                                           const Sensor::Ptr& sensor)
-    : config(config::checkValid(config)),
-      sensor(sensor),
-      compressor_(config.compression.create()) {
+                                           const Sensor::Ptr& sensor,
+                                           RunContext::ConstPtr context)
+    : config(config::checkValid(config)), context(context), sensor(sensor) {
   if (!sensor) {
     throw std::runtime_error("invalid sensor!");
   }
+
+  RunSettings::init(context->config.settings);
+  compressor_ = config.compression.create();
 
   for (const auto& filter : config.filters) {
     filters_.push_back(filter.create());
   }
 
   queue_ = std::make_shared<ActiveWindowModule::OutputQueue>();
-  module_ =
-      std::make_shared<ReconstructionModule>(config.reconstruction, queue_, nullptr);
+  module_ = std::make_shared<ReconstructionModule>(
+      config.reconstruction, context, queue_, nullptr);
   if (compressor_) {
     mesh_ = std::make_shared<Mesh>();
   }
 
-  MLOG(2) << "\n" << config::toString(GlobalInfo::instance().getConfig());
-  MLOG(1) << "\n" << module_->printInfo();
+  MLOG(2) << "\n" << config::toString(context->config);
+  MLOG(1) << "\n" << module_->show();
 }
 
 bool PythonReconstruction::step(size_t timestamp_ns,
@@ -186,12 +192,8 @@ bool PythonReconstruction::stepImpl(const std::shared_ptr<SensorInputPacket>& pa
   return true;
 }
 
-void PythonReconstruction::save(const std::filesystem::path& output) {
-  if (output.empty()) {
-    return;
-  }
-
-  DataDirectory logs(output);
+void PythonReconstruction::save(const std::optional<std::filesystem::path>& output) {
+  const auto logs = output ? DataDirectory(*output) : context->logs;
   if (!logs) {
     return;
   }
@@ -210,13 +212,16 @@ using namespace pybind11::literals;
 
 void addBindings(pybind11::module_& m) {
   py::class_<PythonReconstruction>(m, "ReconstructionPipeline")
-      .def(py::init([](const Sensor::Ptr& sensor, const std::string& ns) {
+      .def(py::init([](const Sensor::Ptr& sensor,
+                       RunContext::ConstPtr context,
+                       const std::string& ns) {
              const auto config = config::fromContext<PythonReconstruction::Config>(ns);
-             return std::make_unique<PythonReconstruction>(config, sensor);
+             return std::make_unique<PythonReconstruction>(config, sensor, context);
            }),
            "sensor"_a,
+           "context"_a,
            "ns"_a = "")
-      .def("save", &PythonReconstruction::save)
+      .def("save", &PythonReconstruction::save, "output"_a = std::nullopt)
       .def_property_readonly("mesh", &PythonReconstruction::mesh)
       .def("step",
            &PythonReconstruction::step,

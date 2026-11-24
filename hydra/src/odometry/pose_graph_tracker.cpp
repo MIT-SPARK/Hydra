@@ -40,7 +40,6 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
-#include "hydra/common/global_info.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;
@@ -58,8 +57,8 @@ void declare_config(PoseGraphTracker::Config& config) {
 PoseGraphTracker::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("pose_graph")) {}
 
-PoseGraphTracker::PoseGraphTracker(const Config& config)
-    : config(config::checkValid(config)) {}
+PoseGraphTracker::PoseGraphTracker(const Config& config, RunContext::ConstPtr context)
+    : config(config::checkValid(config)), robot_(context->config.robot) {}
 
 void PoseGraphTracker::call(const ActiveWindowOutput& input,
                             SharedDsgInfo& dsg,
@@ -73,7 +72,7 @@ void PoseGraphTracker::call(const ActiveWindowOutput& input,
     packet.updateFrom(curr_packet);
   }
 
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+  const auto& prefix = robot_.prefix();
 
   // critical section for updating graph and output
   std::lock_guard<std::mutex> lock(dsg.mutex);

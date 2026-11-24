@@ -47,8 +47,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    TraversabilityPlaceExtractor,
-                                   TraversabilityPlaceExtractor::Config>(
-        "traversability");
+                                   TraversabilityPlaceExtractor::Config,
+                                   RunContext::ConstPtr>("traversability");
 
 }  // namespace
 
@@ -63,13 +63,14 @@ void declare_config(TraversabilityPlaceExtractor::Config& config) {
   field(config.sinks, "sinks");
 }
 
-TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
+TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config,
+                                                           RunContext::ConstPtr context)
     : config(config::checkValid(config)),
-      estimator_(config.estimator.create()),
+      estimator_(config.estimator.create(context->config.robot)),
       persistent_processing_(config.persistent_processing),
       transient_processing_(config.transient_processing),
       clustering_(config.clustering.create()),
-      sinks_(Sink::instantiate(config.sinks)) {}
+      sinks_(Sink::instantiate(config.sinks, context->config.robot)) {}
 
 void TraversabilityPlaceExtractor::call(const ActiveWindowOutput& msg,
                                         SharedDsgInfo& dsg,

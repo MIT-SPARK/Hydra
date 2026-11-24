@@ -68,6 +68,7 @@ class ActiveWindowModule : public Module {
   } const config;
 
   ActiveWindowModule(const Config& config,
+                     RunContext::ConstPtr context,
                      const OutputQueue::Ptr& output_queue,
                      std::unique_ptr<VolumetricWindow>&& global_window);
 
@@ -75,9 +76,11 @@ class ActiveWindowModule : public Module {
 
   void start() override;
 
-  void stop() override;
+  void stop(bool force) override;
 
-  std::string printInfo() const override;
+  void save(const DataDirectory* output = nullptr) override;
+
+  std::string show() const override;
 
   void spin();
 
@@ -107,6 +110,7 @@ class ActiveWindowModule : public Module {
 
   VolumetricMap map_;
   std::unique_ptr<VolumetricWindow> map_window_;
+  std::set<int32_t> invalid_labels_;
 };
 
 void declare_config(ActiveWindowModule::Config& config);

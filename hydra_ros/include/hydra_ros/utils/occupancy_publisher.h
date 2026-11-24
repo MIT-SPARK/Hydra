@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/common/global_info.h>
 #include <ianvs/node_handle.h>
 #include <spark_dsg/bounding_box.h>
 #include <spatial_hash/voxel_layer.h>
@@ -79,8 +78,11 @@ class OccupancyPublisher {
  public:
   using LayerT = spatial_hash::VoxelLayer<BlockT>;
 
-  OccupancyPublisher(const OccupancyPublisherConfig& config, ianvs::NodeHandle nh)
+  OccupancyPublisher(const OccupancyPublisherConfig& config,
+                     ianvs::NodeHandle nh,
+                     std::string frame)
       : config(config),
+        frame_(std::move(frame)),
         pub_(nh.create_publisher<nav_msgs::msg::OccupancyGrid>(
             "occupancy", rclcpp::QoS(1).transient_local())) {}
 
@@ -94,6 +96,7 @@ class OccupancyPublisher {
                const LayerT& layer) const;
 
  private:
+  const std::string frame_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pub_;
   mutable typename LayerT::Ptr layer_;
 };
@@ -260,7 +263,7 @@ void OccupancyPublisher<T>::publish(uint64_t timestamp_ns,
   }
 
   nav_msgs::msg::OccupancyGrid msg;
-  msg.header.frame_id = GlobalInfo::instance().getFrames().map;
+  msg.header.frame_id = frame_;
   msg.header.stamp = rclcpp::Time(timestamp_ns);
   msg.info.map_load_time = msg.header.stamp;
 

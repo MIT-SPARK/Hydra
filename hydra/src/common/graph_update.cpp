@@ -44,36 +44,8 @@
 #include <nlohmann/json.hpp>
 
 #include "hydra/common/attribute_merger.h"
+#include "hydra/common/config_utilities.h"
 #include "hydra/utils/data_directory.h"
-
-namespace YAML {
-
-template <typename T>
-struct convert<std::optional<T>> {
-  static Node encode(const std::optional<T>& opt) {
-    if (opt) {
-      return YAML::convert<T>::encode(opt.value());
-    }
-
-    Node node("");
-    node.SetTag("null");
-    return node;
-  }
-
-  static bool decode(const Node& node, std::optional<T>& opt) {
-    if (node) {
-      if (node.Tag() == "null") {
-        return true;
-      }
-
-      opt = node.as<T>();
-    }
-
-    return true;
-  }
-};
-
-}  // namespace YAML
 
 namespace hydra {
 

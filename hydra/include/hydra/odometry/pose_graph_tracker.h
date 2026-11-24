@@ -36,6 +36,7 @@
 #include <Eigen/Geometry>
 #include <memory>
 
+#include "hydra/common/robot_config.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/odometry/pose_graph_packet.h"
 #include "hydra/utils/logging.h"
@@ -49,7 +50,7 @@ class PoseGraphTracker : public GraphBuilderFunctor {
   } const config;
 
   using Ptr = std::unique_ptr<PoseGraphTracker>;
-  explicit PoseGraphTracker(const Config& config);
+  explicit PoseGraphTracker(const Config& config, RunContext::ConstPtr context);
   virtual ~PoseGraphTracker() = default;
 
   void call(const ActiveWindowOutput& msg,
@@ -58,6 +59,7 @@ class PoseGraphTracker : public GraphBuilderFunctor {
             const VolumetricWindow* window) override;
 
  protected:
+  const RobotConfig robot_;
   virtual PoseGraphPacket update(uint64_t timestamp_ns,
                                  const Eigen::Isometry3d& world_T_body) = 0;
 };

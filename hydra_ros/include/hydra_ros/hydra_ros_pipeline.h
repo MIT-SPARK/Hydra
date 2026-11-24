@@ -55,7 +55,7 @@ class HydraRosPipeline : public HydraPipeline {
     StatusMonitor::Config status_monitor;
   } const config;
 
-  explicit HydraRosPipeline(const Config& config);
+  explicit HydraRosPipeline(const Config& config, RunContext::ConstPtr context);
 
   virtual ~HydraRosPipeline();
 
@@ -63,7 +63,7 @@ class HydraRosPipeline : public HydraPipeline {
 
   void start() override;
 
-  void stop() override;
+  void stop(bool force = false) override;
 
  protected:
   std::unique_ptr<RosInputModule> input_;

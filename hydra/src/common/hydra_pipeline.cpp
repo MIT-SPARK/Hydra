@@ -39,16 +39,41 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/settings.h>
 #include <glog/logging.h>
+#include <spark_dsg/labelspace.h>
 
 #include "hydra/active_window/reconstruction_module.h"
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/backend/backend_module.h"
-#include "hydra/common/global_info.h"
+#include "hydra/common/run_context.h"
+#include "hydra/common/run_settings.h"
 #include "hydra/frontend/graph_builder.h"
 #include "hydra/loop_closure/loop_closure_module.h"  // IWYU pragma: keep
+#include "hydra/utils/pgmo_glog_sink.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+SharedDsgInfo::Ptr buildGraph(const RunContext& context) {
+  auto info = std::make_shared<SharedDsgInfo>(context.config.graph);
+  auto& graph = *info->graph;
+
+  const spark_dsg::Labelspace labelspace(context.labelspace().label_names);
+  if (labelspace) {
+    labelspace.save(graph, "mesh", false);
+    for (const auto& layer_name : context.config.semantic_layers) {
+      if (graph.layer_names().count(layer_name)) {
+        labelspace.save(graph, layer_name);
+      } else {
+        LOG(WARNING) << "Skipping saving labelspace for unknown '" << layer_name << "'";
+      }
+    }
+  }
+
+  return info;
+}
+
+}  // namespace
 
 using hydra::timing::ElapsedTimeRecorder;
 
@@ -72,34 +97,43 @@ HydraPipeline::Config::Config()
       frontend(GraphBuilder::Config()),
       backend(BackendModule::Config()) {}
 
-HydraPipeline::HydraPipeline(const Config& config) : config(config) {
-  auto& info = GlobalInfo::instance();
-  frontend_dsg_ = info.createSharedDsg();
-  backend_dsg_ = info.createSharedDsg();
-  state_.reset(new SharedModuleState());
-  state_->lcd_graph = info.createSharedDsg();
-  state_->backend_graph = info.createSharedDsg();
+HydraPipeline::HydraPipeline(const Config& config, RunContext::ConstPtr context)
+    : config(config), context_(std::move(context)) {
+  RunSettings::init(context_->config.settings);
+  logging::Logger::addSink(
+      "glog",
+      std::make_shared<PgmoGlogSink>(1, RunSettings::instance().enable_pgmo_logging));
+
+  initState();
 }
+
+HydraPipeline::~HydraPipeline() { stop(); }
 
 void HydraPipeline::init() {
-  frontend_ = config.frontend.create(frontend_dsg_, state_, config.map_window.create());
-  backend_ = config.backend.create(backend_dsg_, state_);
-  const auto queue = frontend_->queue();
-  active_window_ = config.active_window.create(queue, config.map_window.create());
-  lcd_ = config.lcd.create(state_);
-  if (lcd_) {
-    frontend_->setLcdQueue(lcd_->queue());
+  frontend_ = config.frontend.create(
+      context_, frontend_dsg_, state_, config.map_window.create());
+
+  ActiveWindowModule::OutputQueue::Ptr queue;
+  if (frontend_) {
+    queue = frontend_->queue();
   }
-}
 
-HydraPipeline::~HydraPipeline() {}
+  active_window_ =
+      config.active_window.create(context_, queue, config.map_window.create());
 
-void HydraPipeline::showModules() const {
-  MLOG(1) << "Active Window:\n" << active_window_->printInfo();
-  MLOG(1) << "Frontend:\n" << frontend_->printInfo();
-  MLOG(1) << "Backend:\n" << backend_->printInfo();
-  if (lcd_) {
-    MLOG(1) << "Loop Closure Detection:\n" << lcd_->printInfo();
+  backend_ = config.backend.create(context_, backend_dsg_, state_);
+  if (frontend_ && backend_) {
+    frontend_->setBackendQueue(backend_->queue());
+  }
+
+  LoopClosureModule::OutputQueue::Ptr lcd_queue;
+  if (backend_) {
+    lcd_queue = backend_->lcd_queue();
+  }
+
+  lcd_ = config.lcd.create(context_, state_, lcd_queue);
+  if (frontend_ && lcd_) {
+    frontend_->setLcdQueue(lcd_->queue());
   }
 }
 
@@ -114,32 +148,48 @@ void HydraPipeline::start() {
   }
 }
 
-void HydraPipeline::stop() {
-  active_window_->stop();
-  frontend_->stop();
-  backend_->stop();
+void HydraPipeline::stop(bool force) {
+  if (active_window_) {
+    active_window_->stop(force);
+  }
+
+  if (frontend_) {
+    frontend_->stop(force);
+  }
+
+  if (backend_) {
+    backend_->stop(force);
+  }
+
   if (lcd_) {
-    lcd_->stop();
+    lcd_->stop(force);
   }
 }
 
-void HydraPipeline::save(const DataDirectory& logs) const {
+void HydraPipeline::save(const DataDirectory* output) const {
+  const auto& logs = output ? *output : context_->logs;
   if (!logs) {
     return;
   }
 
   const auto log_dir = logs.path();
 
-  auto& info = GlobalInfo::instance();
-  auto node = config::toYaml(info.getConfig());
+  auto node = config::toYaml(context_->config);
+  const auto pipeline_node = config::toYaml(config);
+  for (const auto& entry : pipeline_node) {
+    node[entry.first.as<std::string>()] = entry.second;
+  }
+
+  node["labelspace"] = config::toYaml(context_->labelspace());
+  node["labelspace"]["type"] = "from_config";
   std::ofstream fout(log_dir / "hydra_config.yaml");
   fout << node;
 
-  active_window_->save(logs);
-  frontend_->save(logs);
-  backend_->save(logs);
+  active_window_->save(&logs);
+  frontend_->save(&logs);
+  backend_->save(&logs);
   if (lcd_) {
-    lcd_->save(logs);
+    lcd_->save(&logs);
   }
 
   // save timing information to avoid destructor weirdness with singletons
@@ -148,6 +198,28 @@ void HydraPipeline::save(const DataDirectory& logs) const {
   timer.logTimers(logs.path("timing"));
   timer.logStats(log_dir / "timing_stats.csv");
   MLOG(0) << "Saved timing information";
+}
+
+void HydraPipeline::showModules() const {
+  MLOG(1) << "Active Window:\n" << active_window_->show();
+  MLOG(1) << "Frontend:\n" << frontend_->show();
+  MLOG(1) << "Backend:\n" << backend_->show();
+  if (lcd_) {
+    MLOG(1) << "Loop Closure Detection:\n" << lcd_->show();
+  }
+}
+
+void HydraPipeline::initState() {
+  ElapsedTimeRecorder::reset();
+  auto& timer = ElapsedTimeRecorder::instance();
+  timer.timing_disabled = RunSettings::instance().timing_disabled;
+  timer.disable_output = RunSettings::instance().disable_timer_output;
+
+  frontend_dsg_ = buildGraph(*context_);
+  backend_dsg_ = buildGraph(*context_);
+  state_.reset(new SharedModuleState());
+  state_->lcd_graph = buildGraph(*context_);
+  state_->backend_graph = buildGraph(*context_);
 }
 
 }  // namespace hydra

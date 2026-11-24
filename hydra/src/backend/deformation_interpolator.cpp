@@ -38,7 +38,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_pgmo/mesh_types.h>
 #include <kimera_pgmo/utils/common_functions.h>
@@ -190,7 +189,7 @@ void DeformationInterpolator::interpolate(const SceneGraph& unmerged,
     }
   }
 
-  const auto this_robot = GlobalInfo::instance().getRobotPrefix().id;
+  const auto this_robot = info->robot_id;
   std::map<size_t, EntryList> robot_entries;
   for (const auto& node : view) {
     size_t robot_id = this_robot;

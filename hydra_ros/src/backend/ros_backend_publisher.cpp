@@ -38,7 +38,6 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/common/global_info.h>
 #include <ianvs/node_handle.h>
 #include <kimera_pgmo_ros/visualization_functions.h>
 #include <spark_dsg/node_attributes.h>
@@ -59,8 +58,8 @@ using visualization_msgs::msg::Marker;
 
 namespace {
 
-inline RosBackendPublisher::Config get_config() {
-  const auto map_frame = GlobalInfo::instance().getFrames().map;
+inline RosBackendPublisher::Config get_config(const RobotConfig& robot) {
+  const auto map_frame = robot.frames.map;
   auto config = config::fromContext<RosBackendPublisher::Config>("backend");
   config.dsg_sender = config.dsg_sender.with_name("backend").with_frame(map_frame);
   return config;
@@ -78,8 +77,9 @@ void declare_config(RosBackendPublisher::Config& config) {
   field(config.tf_odom_frame, "tf_odom_frame");
 }
 
-RosBackendPublisher::RosBackendPublisher(ianvs::NodeHandle nh)
-    : config(config::checkValid(get_config())),
+RosBackendPublisher::RosBackendPublisher(ianvs::NodeHandle nh, const RobotConfig& robot)
+    : config(config::checkValid(get_config(robot))),
+      robot_(robot),
       nh_(nh),
       dsg_sender_(config.dsg_sender, nh),
       pose_graph_pub_(nh.create_publisher<PoseGraphTypeAdapter>("pose_graph", 10)),
@@ -110,7 +110,7 @@ void RosBackendPublisher::publishPoseGraph(const uint64_t stamp,
 
   auto pose_graph = *dgraph.getPoseGraph(false, true);
   pose_graph.stamp_ns = stamp;
-  pose_graph.frame_id = GlobalInfo::instance().getFrames().map;
+  pose_graph.frame_id = robot_.frames.map;
   pose_graph_pub_->publish(pose_graph);
 }
 
@@ -122,7 +122,7 @@ void RosBackendPublisher::publishMeshGraph(const uint64_t stamp,
 
   auto mesh_graph = *dgraph.getPoseGraph(true, false);
   mesh_graph.stamp_ns = stamp;
-  mesh_graph.frame_id = GlobalInfo::instance().getFrames().map;
+  mesh_graph.frame_id = robot_.frames.map;
   mesh_graph_pub_->publish(mesh_graph);
 }
 
@@ -135,11 +135,8 @@ void RosBackendPublisher::visualizeDeformation(const uint64_t stamp,
 
   Marker mm_edges_msg;
   Marker pm_edges_msg;
-  kimera_pgmo::fillDeformationGraphMarkers(dgraph,
-                                           rclcpp::Time(stamp),
-                                           mm_edges_msg,
-                                           pm_edges_msg,
-                                           GlobalInfo::instance().getFrames().map);
+  kimera_pgmo::fillDeformationGraphMarkers(
+      dgraph, rclcpp::Time(stamp), mm_edges_msg, pm_edges_msg, robot_.frames.map);
 
   if (!mm_edges_msg.points.empty()) {
     mesh_mesh_viz_->publish(mm_edges_msg);
@@ -152,11 +149,11 @@ void RosBackendPublisher::visualizeDeformation(const uint64_t stamp,
 
 void RosBackendPublisher::publishTf(const SceneGraph& graph,
                                     const DeformationGraph& dgraph) const {
-  const auto& frames = GlobalInfo::instance().getFrames();
+  const auto& frames = robot_.frames;
   const auto map = config.tf_map_frame.empty() ? frames.map : config.tf_map_frame;
   const auto odom = config.tf_odom_frame.empty() ? frames.odom : config.tf_odom_frame;
 
-  const auto prefix = GlobalInfo::instance().getRobotPrefix();
+  const auto prefix = robot_.prefix();
   const auto layer_id = graph.getLayerKey(DsgLayers::AGENTS).value().layer;
   const auto agents = graph.findLayer(layer_id, prefix.key);
 

@@ -50,6 +50,7 @@
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_output.h"
+#include "hydra/loop_closure/registration_solution.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra {
@@ -82,6 +83,8 @@ using BackendInput = FrontendOutput;
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
   using Ptr = std::shared_ptr<BackendModule>;
+  using InputQueue = MessageQueue<std::shared_ptr<const FrontendOutput>>;
+  using LcdQueue = MessageQueue<lcd::RegistrationSolution>;
   using Sink = OutputSink<uint64_t,
                           const spark_dsg::SceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
@@ -104,8 +107,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   } const config;
 
   BackendModule(const Config& config,
+                RunContext::ConstPtr context,
                 const SharedDsgInfo::Ptr& dsg,
-                const SharedModuleState::Ptr& state);
+                const std::shared_ptr<SharedModuleState>& state);
 
   virtual ~BackendModule();
 
@@ -115,11 +119,11 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void start() override;
 
-  void stop() override;
+  void stop(bool force) override;
 
-  void save(const DataDirectory& output) override;
+  void save(const DataDirectory* output = nullptr) override;
 
-  std::string printInfo() const override;
+  std::string show() const override;
 
   void spin();
 
@@ -130,6 +134,12 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                  bool force_loopclosures = true);
 
   void addSink(const Sink::Ptr& sink);
+
+  void addExternalLoopClosure(const pose_graph_tools::PoseGraph& pose_graph);
+
+  InputQueue::Ptr queue() const;
+
+  LcdQueue::Ptr lcd_queue() const;
 
  protected:
   virtual bool spinOnce(bool force_update = true);
@@ -162,6 +172,10 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   UpdateInfo::Ptr getUpdateInfo(uint64_t timestamp_ns);
 
+  InputQueue::Ptr queue_;
+
+  LcdQueue::Ptr lcd_queue_;
+
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};
   bool force_optimize_ = false;
@@ -172,7 +186,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   SharedDsgInfo::Ptr private_dsg_;
   spark_dsg::SceneGraph::Ptr unmerged_graph_;
-  SharedModuleState::Ptr state_;
+  std::shared_ptr<SharedModuleState> state_;
 
   DsgUpdater::Ptr dsg_updater_;
   std::vector<OptimizationHook::Ptr> optimization_hooks_;

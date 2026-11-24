@@ -53,6 +53,7 @@ enum class SensorMapMode {
 template <typename T>
 struct SensorMapConfig {
   SensorMapMode mode = SensorMapMode::Single;
+  typename T::Config default_config;
   config::OrderedMap<std::string, typename T::Config> sensors;
 };
 
@@ -61,75 +62,44 @@ class SensorMap {
  public:
   using Config = SensorMapConfig<T>;
 
-  explicit SensorMap(const Config& config) : config(config) {}
+  template <typename... Args>
+  explicit SensorMap(const Config& config, Args... args);
+
   T* get(const std::string& name);
   const T* get(const std::string& name) const;
 
   const Config config;
 
  private:
-  mutable std::map<std::string, std::unique_ptr<T>> elements_;
+  std::unique_ptr<T> default_;
+  std::map<std::string, std::unique_ptr<T>> elements_;
 };
 
 template <typename T>
-struct SensorMapConversion {
-  static T toIntermediate(const config::OrderedMap<std::string, T>& value,
-                          std::string& error) {
-    if (value.size() > 1u) {
-      // NOTE(nathan) we rely having up to a single element with an empty name when
-      // faking a single config with the map. If there are multiple elements, something
-      // has gone wrong in the conversion process (the conversion likely used to point
-      // to a map created from one of the other multi-sensor modes)
-      error = "Multiple elements are ambiguous, something went wrong!";
-      return {};
-    }
-
-    return value.empty() ? T{} : value.front().second;
+template <typename... Args>
+SensorMap<T>::SensorMap(const Config& config, Args... args) : config(config) {
+  if (config.mode != SensorMapMode::Strict) {
+    default_ = std::make_unique<T>(config.default_config, args...);
   }
 
-  static void fromIntermediate(const T& intermediate,
-                               config::OrderedMap<std::string, T>& value,
-                               std::string& error) {
-    if (value.size() > 1u) {
-      error = "Multiple elements are ambiguous, something went wrong!";
-      return;
-    }
-
-    if (value.empty()) {
-      value.emplace_back(std::make_pair("", intermediate));
-    } else {
-      value[0].second = intermediate;
-    }
+  if (config.mode == SensorMapMode::Single) {
+    return;
   }
-};
+
+  for (const auto& [name, sensor] : config.sensors) {
+    elements_.emplace(name, std::make_unique<T>(sensor, args...));
+  }
+}
 
 template <typename T>
 T* SensorMap<T>::get(const std::string& name) {
+  if (config.mode == SensorMapMode::Single) {
+    return default_.get();
+  }
+
   auto iter = elements_.find(name);
   if (iter == elements_.end()) {
-    std::optional<typename T::Config> sensor_config;
-    for (const auto& [_name, candidate] : config.sensors) {
-      if (_name.empty() || _name == name) {
-        sensor_config = candidate;
-        break;
-      }
-    }
-
-    if (!sensor_config) {
-      switch (config.mode) {
-        case SensorMapMode::Single:
-          // this should be unreachable given how the sensor map works
-          throw std::runtime_error("Single mode requires a config!");
-        case SensorMapMode::Permissive:
-          sensor_config = typename T::Config();
-          break;
-        case SensorMapMode::Strict:
-        default:
-          return nullptr;
-      }
-    }
-
-    iter = elements_.emplace(name, std::make_unique<T>(*sensor_config)).first;
+    return config.mode == SensorMapMode::Permissive ? default_.get() : nullptr;
   }
 
   return iter->second.get();
@@ -150,7 +120,7 @@ void declare_config(SensorMapConfig<T>& config) {
               {SensorMapMode::Strict, "Strict"},
               {SensorMapMode::Permissive, "Permissive"}});
   if (config.mode == SensorMapMode::Single) {
-    field<SensorMapConversion<typename T::Config>>(config.sensors, "sensors");
+    field(config.default_config, "sensor", false);
   } else {
     field(config.sensors, "sensors");
   }

@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/common/robot_config.h>
 #include <hydra/places/traversability_estimator.h>
 #include <ianvs/node_handle.h>
 #include <spark_dsg/bounding_box.h>
@@ -60,7 +61,8 @@ class TsdfGradientOccupancyPublisher
     bool filter_disjoint = false;     // remove free space not connected to robot
   } const config;
 
-  explicit TsdfGradientOccupancyPublisher(const Config& config);
+  explicit TsdfGradientOccupancyPublisher(const Config& config,
+                                          const RobotConfig& robot);
 
   virtual ~TsdfGradientOccupancyPublisher() = default;
 
@@ -72,6 +74,7 @@ class TsdfGradientOccupancyPublisher
             const TsdfLayer& tsdf_layer) const override;
 
  private:
+  const RobotConfig robot_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr height_map_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr gradient_map_pub_;
