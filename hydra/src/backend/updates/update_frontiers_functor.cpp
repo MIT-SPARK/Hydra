@@ -54,7 +54,7 @@ static const auto registration =
                                    UpdateFrontiersFunctor::Config>(
         "UpdateFrontiersFunctor");
 
-}
+}  // namespace
 
 using timing::ScopedTimer;
 
@@ -150,22 +150,23 @@ void UpdateFrontiersFunctor::cleanup(const UpdateInfo::ConstPtr& info,
 
   const auto& places_layer = dsg.graph->getLayer(DsgLayers::PLACES);
   const auto& places_2d_layer = dsg.graph->getLayer(DsgLayers::MESH_PLACES);
-  const auto agents = dsg.graph->findLayer(DsgLayers::AGENTS);
-  if (!agents) {
+  const auto agent_layer = dsg.graph->getLayerKey(DsgLayers::AGENTS);
+  if (!agent_layer) {
     LOG(ERROR) << "Update frontiers functor could not find agents layer";
     return;
   }
 
-  if (agents->numNodes() == 0) {
+  const RobotPrefixConfig prefix(info->robot_id);
+  const auto agents = dsg.graph->findLayer(agent_layer->layer, prefix.key);
+  if (!agents || agents->numNodes() == 0) {
     return;
   }
 
-  const RobotPrefixConfig prefix(info->robot_id);
-  NodeSymbol pgmo_key(prefix.key, agents->numNodes() - 1);
-  Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;
-  Eigen::Quaterniond agent_quat =
-      dsg.graph->getNode(pgmo_key).attributes<AgentNodeAttributes>().world_R_body;
-  Eigen::Vector3d agent_heading = agent_quat * Eigen::Vector3d(1, 0, 0);
+  // Agent nodes are ordered by pose graph key within the partition.
+  const auto nodes = agents->nodes();
+  const auto& pose = nodes.back().attributes<AgentNodeAttributes>();
+  const auto& agent_pos = pose.position;
+  const Eigen::Vector3d agent_heading = pose.world_R_body * Eigen::Vector3d::UnitX();
 
   std::unordered_set<NodeId> layer_nodes;
   std::unordered_set<NodeId> frontier_nodes;

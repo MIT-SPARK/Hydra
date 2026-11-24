@@ -19,6 +19,7 @@ add_executable(
   backend/updates/test_ib_objects_update_functor.cpp
   backend/updates/test_update_agents_functor.cpp
   backend/updates/test_update_buildings_functor.cpp
+  backend/updates/test_update_frontiers_functor.cpp
   backend/updates/test_update_gt_rooms_functor.cpp
   backend/updates/test_update_objects_functor.cpp
   backend/updates/test_update_places_functor.cpp
