@@ -96,4 +96,51 @@ TEST(ViewSelector, ProjectionCorrect) {
   }
 }
 
+TEST(ViewSelector, UsesColumnAndRowBoundsForWideImages) {
+  const auto camera = createCamera(60.0, 90.0, {0.1, 5.0});
+  InputData data(camera);
+  data.range_image = cv::Mat(480, 640, CV_32FC1, cv::Scalar(0.0));
+  data.range_image.at<float>(240, 600) = 2.0f;
+  data.world_T_body = Eigen::Isometry3d::Identity();
+  const FeatureView view(data);
+  // Projects to (u=600, v=240): a valid column beyond the image's row count.
+  EXPECT_TRUE(view.pointInView(Eigen::Vector3d(0.875, 0.0, 1.0), 0.1));
+  // Nearby pixels with no range observation must not inherit that visibility.
+  EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.85, 0.0, 1.0), 0.1));
+  EXPECT_FALSE(view.pointInView(Eigen::Vector3d(1.0, 0.0, 1.0), 0.1));
+}
+
+TEST(VmfFeatureSelector, NormalizesViewsBeforeFittingDistribution) {
+  const auto camera = createCamera(60.0, 90.0, {0.1, 5.0});
+  InputData data(camera);
+  data.range_image = cv::Mat(480, 640, CV_32FC1, cv::Scalar(2.0));
+  data.world_T_body = Eigen::Isometry3d::Identity();
+  data.feature = 3.0f * getOneHot(0, 2);
+  FeatureSelector::FeatureList views;
+  views.emplace_back(data);
+  InputData second(camera);
+  second.range_image = data.range_image;
+  second.world_T_body = data.world_T_body;
+  second.feature = 7.0f * getOneHot(1, 2);
+  views.emplace_back(second);
+
+  spark_dsg::SemanticNodeAttributes attrs;
+  attrs.position = Eigen::Vector3d(0.0, 0.0, 1.0);
+  VMFFeatureSelector::Config config;
+  config.kappa_max = 500;
+  const VMFFeatureSelector selector(config);
+  ASSERT_TRUE(selector.select(views, attrs));
+  ASSERT_EQ(attrs.semantic_feature.size(), 2);
+  EXPECT_TRUE(
+      attrs.semantic_feature.isApprox(Eigen::Vector2f::Constant(std::sqrt(0.5f))));
+  ASSERT_EQ(attrs.feature_concentration.size(), 1);
+  // Two orthogonal unit views: Rbar = sqrt(1/2), kappa = 3/sqrt(2).
+  EXPECT_NEAR(attrs.feature_concentration(0, 0), 3.0f / std::sqrt(2.0f), 1.0e-5f);
+
+  config.kappa_max = 1;
+  const VMFFeatureSelector clipped(config);
+  ASSERT_TRUE(clipped.select(views, attrs));
+  EXPECT_FLOAT_EQ(attrs.feature_concentration(0, 0), 1.0f);
+}
+
 }  // namespace hydra

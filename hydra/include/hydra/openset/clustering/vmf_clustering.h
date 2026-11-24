@@ -43,6 +43,8 @@ class VmfClustering : public LayerClustering {
   struct Config : LayerClustering::Config, VerbosityConfig {
     //! Assigns zero query score to nodes without features instead of dropping them
     bool allow_empty_scores = true;
+    //! Multiplier for the reference median-concentration/median-degree scale
+    float propagation_strength = 1.0f;
     //! Max number of iterations of label propagation to perform
     size_t label_propagation_iterations = 20;
     //! Max change in any score before label propagation has converged

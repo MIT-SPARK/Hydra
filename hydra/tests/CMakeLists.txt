@@ -45,6 +45,7 @@ add_executable(
   openset/test_embedding_distances.cpp
   openset/test_vmf_distance.cpp
   openset/clustering/test_agglomerative_ib_clustering.cpp
+  openset/clustering/test_vmf_clustering.cpp
   places/gvd_places/test_graph_extractor.cpp
   places/gvd_places/test_graph_extractor_utilities.cpp
   places/gvd_places/test_gvd_graph.cpp
@@ -74,7 +75,7 @@ add_executable(
   utils/test_timing_utilities.cpp
 )
 target_include_directories(
-  test_${PROJECT_NAME} PUBLIC include PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+  test_${PROJECT_NAME} PUBLIC include PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src
 )
 target_link_libraries(
   test_${PROJECT_NAME} ${PROJECT_NAME} ${gflags_LIBRARIES} GTest::gtest_main

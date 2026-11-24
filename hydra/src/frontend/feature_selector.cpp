@@ -45,15 +45,13 @@ bool FeatureView::pointInView(const Eigen::Vector3d& point_w,
     *point_s = p_s;
   }
 
-  float u = 0.0;
-  float v = 0.0;
+  int u = 0;
+  int v = 0;
   if (!sensor.projectPointToImagePlane(p_s.cast<float>(), u, v)) {
     return false;
   }
 
-  const auto r = std::round(u);
-  const auto c = std::round(v);
-  if (c < 0 || c >= range_image.cols || r < 0 || r >= range_image.rows) {
+  if (u < 0 || u >= range_image.cols || v < 0 || v >= range_image.rows) {
     return false;
   }
 

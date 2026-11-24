@@ -40,188 +40,258 @@
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 
+#include <algorithm>
+#include <cmath>
+#include <queue>
+#include <unordered_set>
+
+#include "vmf_clustering_utilities.h"
+
 using namespace spark_dsg;
 
 namespace hydra {
 namespace {
 
-static const auto registration =
+const auto registration =
     config::RegistrationWithConfig<LayerClustering,
                                    VmfClustering,
                                    VmfClustering::Config>("VmfClustering");
 
-struct ScoreEntry {
-  Eigen::VectorXf scores;
-  float kappa;
-};
-
-using ScoreWorkspace = std::unordered_map<NodeId, ScoreEntry>;
-
-inline float median(std::vector<float>& values) {
-  if (values.empty()) {
-    return std::numeric_limits<float>::quiet_NaN();
-  }
-
+float median(std::vector<float> values) {
   std::sort(values.begin(), values.end());
   const auto mid = values.size() / 2;
-  if (values.size() % 2 == 0) {
-    // this is safe because values.size() >= 1 and 2 is the first value
-    // where this will trigger
-    return (values[mid] + values[mid + 1]) / 2.0;
-  } else {
-    return values[mid];
-  }
+  return values.size() % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2.0f;
 }
 
-ScoreWorkspace propagateScores(const SceneGraphLayer& layer,
-                               const ScoreWorkspace& workspace,
-                               float lambda) {
-  ScoreWorkspace updated;
-  for (const auto& node : layer.nodes()) {
-    auto iter = workspace.find(node.id);
-    if (iter == workspace.end()) {
-      continue;
-    }
-
-    size_t num_valid = 0;
-    Eigen::VectorXf scores;
-    for (const auto& sibling : node.siblings()) {
-      const auto sibling_iter = workspace.find(sibling);
-      if (sibling_iter == workspace.end()) {
-        continue;
-      }
-
-      if (num_valid) {
-        scores += sibling_iter->second.scores;
-      } else {
-        scores = sibling_iter->second.scores;
-      }
-      ++num_valid;
-    }
-
-    if (!num_valid) {
-      continue;
-    }
-
-    scores /= num_valid;
-    const auto alpha = iter->second.kappa / (iter->second.kappa + num_valid * lambda);
-    const auto new_scores = (1.0f - alpha) * iter->second.scores + alpha * scores;
-    updated.emplace(iter->first, ScoreEntry{new_scores, iter->second.kappa});
-  }
-
-  return updated;
-}
-
-using Components = std::vector<std::vector<NodeId>>;
-
-VmfClustering::Clusters buildClusters(const SceneGraphLayer& layer,
-                                      const EmbeddingGroup& queries,
-                                      const EmbeddingDistance& metric,
-                                      const Components& components) {
-  VmfClustering::Clusters to_return;
-  for (const auto& nodes : components) {
-    auto cluster = std::make_shared<LayerClustering::Cluster>();
-    cluster->nodes.insert(nodes.begin(), nodes.end());
-
-    auto iter = cluster->nodes.begin();
-    cluster->feature =
-        layer.getNode(*iter).attributes<SemanticNodeAttributes>().semantic_feature;
-    ++iter;
-    while (iter != cluster->nodes.end()) {
-      cluster->feature += cluster->feature =
-          layer.getNode(*iter).attributes<SemanticNodeAttributes>().semantic_feature;
-      ++iter;
-    }
-
-    cluster->feature /= cluster->nodes.size();
-
-    const auto info = queries.getBestScore(metric, cluster->feature);
-    cluster->score = info.score;
-    cluster->best_query = info.index;
-    to_return.push_back(cluster);
-  }
-
-  return to_return;
+bool validFeature(const SemanticNodeAttributes& attrs, Eigen::Index dimension) {
+  const auto& feature = attrs.semantic_feature;
+  return feature.size() == dimension && feature.allFinite() && feature.norm() > 0.0f &&
+         attrs.feature_concentration.size() == 1 &&
+         std::isfinite(attrs.feature_concentration(0, 0)) &&
+         attrs.feature_concentration(0, 0) >= 0.0f;
 }
 
 }  // namespace
+
+namespace vmf {
+
+ScoreWorkspace computeScores(const SceneGraphLayer& layer,
+                             const EmbeddingGroup& queries,
+                             const EmbeddingDistance& metric,
+                             bool allow_empty_scores) {
+  if (queries.empty()) {
+    return {};
+  }
+
+  const auto dimension = queries.embeddings.front().size();
+  for (const auto& query : queries.embeddings) {
+    if (dimension == 0 || query.size() != dimension || !query.allFinite() ||
+        query.norm() == 0.0f) {
+      return {};
+    }
+  }
+
+  ScoreWorkspace scores;
+  std::queue<NodeId> pending;
+  std::unordered_set<NodeId> supported;
+  for (const auto& node : layer.nodes()) {
+    const auto attrs = node.tryAttributes<SemanticNodeAttributes>();
+    if (!attrs) {
+      continue;
+    }
+
+    if (!validFeature(*attrs, dimension)) {
+      if (allow_empty_scores) {
+        scores.emplace(node.id,
+                       ScoreEntry{Eigen::VectorXf::Zero(queries.size()), 0.0f});
+      }
+
+      continue;
+    }
+
+    const auto kappa = attrs->feature_concentration(0, 0);
+    const Eigen::VectorXf values =
+        kappa * queries.getScores(metric, attrs->semantic_feature);
+    if (!values.allFinite()) {
+      continue;
+    }
+
+    scores.emplace(node.id, ScoreEntry{values, kappa});
+    if (kappa > 0.0f) {
+      supported.insert(node.id);
+      pending.push(node.id);
+    }
+  }
+
+  // Components without observation confidence cannot receive a meaningful label.
+  while (!pending.empty()) {
+    const auto id = pending.front();
+    pending.pop();
+    for (const auto sibling : layer.getNode(id).siblings()) {
+      if (scores.count(sibling) && supported.insert(sibling).second) {
+        pending.push(sibling);
+      }
+    }
+  }
+
+  for (auto iter = scores.begin(); iter != scores.end();) {
+    if (!supported.count(iter->first)) {
+      iter = scores.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+
+  return scores;
+}
+
+ScoreWorkspace propagateScores(const SceneGraphLayer& layer,
+                               const ScoreWorkspace& initial,
+                               const VmfClustering::Config& config) {
+  std::vector<float> kappas;
+  std::vector<float> degrees;
+  std::unordered_map<NodeId, size_t> degree;
+  for (const auto& [id, entry] : initial) {
+    if (entry.kappa > 0.0f) {
+      kappas.push_back(entry.kappa);
+    }
+
+    auto& count = degree[id];
+    for (const auto sibling : layer.getNode(id).siblings()) {
+      if (initial.count(sibling)) {
+        ++count;
+      }
+    }
+
+    if (count) {
+      degrees.push_back(count);
+    }
+  }
+
+  if (kappas.empty() || degrees.empty()) {
+    return initial;
+  }
+
+  const auto lambda = config.propagation_strength * median(kappas) / median(degrees);
+  auto current = initial;
+  const auto num_queries = initial.begin()->second.scores.size();
+  std::vector<bool> converged(num_queries, false);
+  for (size_t iteration = 0; iteration < config.label_propagation_iterations;
+       ++iteration) {
+    auto updated = current;
+    Eigen::VectorXf delta = Eigen::VectorXf::Zero(num_queries);
+    for (const auto& [id, entry] : initial) {
+      const auto count = degree.at(id);
+      if (!count) {
+        continue;
+      }
+
+      Eigen::VectorXf mean = Eigen::VectorXf::Zero(entry.scores.size());
+      for (const auto sibling : layer.getNode(id).siblings()) {
+        const auto iter = current.find(sibling);
+        if (iter != current.end()) {
+          mean += iter->second.scores;
+        }
+      }
+
+      mean /= count;
+      const auto alpha = entry.kappa / (entry.kappa + lambda * count);
+      auto& scores = updated.at(id).scores;
+      scores = alpha * entry.scores + (1.0f - alpha) * mean;
+      for (Eigen::Index q = 0; q < num_queries; ++q) {
+        if (converged[q]) {
+          scores(q) = current.at(id).scores(q);
+          continue;
+        }
+
+        delta(q) = std::max(delta(q), std::abs(scores(q) - current.at(id).scores(q)));
+      }
+    }
+
+    current = std::move(updated);
+    // FOUND-IT processes one query at a time, so each column stops independently.
+    for (Eigen::Index q = 0; q < num_queries; ++q) {
+      converged[q] = converged[q] || delta(q) < config.convergence_threshold;
+    }
+
+    if (std::all_of(
+            converged.begin(), converged.end(), [](bool value) { return value; })) {
+      break;
+    }
+  }
+
+  return current;
+}
+
+}  // namespace vmf
 
 void declare_config(VmfClustering::Config& config) {
   using namespace config;
   name("VmfClustering::Config");
   base<VerbosityConfig>(config);
   base<LayerClustering::Config>(config);
+  field(config.allow_empty_scores, "allow_empty_scores");
+  field(config.propagation_strength, "propagation_strength");
   field(config.label_propagation_iterations, "label_propagation_iterations");
   field(config.convergence_threshold, "convergence_threshold");
-  check(config.convergence_threshold, GE, 0.0, "convergence_threshold");
+  check(config.propagation_strength, GT, 0.0f, "propagation_strength");
+  check(config.convergence_threshold, GE, 0.0f, "convergence_threshold");
 }
 
 VmfClustering::VmfClustering(const Config& config)
     : LayerClustering(config), config(config::checkValid(config)) {}
 
 auto VmfClustering::cluster(const spark_dsg::SceneGraphLayer& layer) const -> Clusters {
-  if (!queries_ || queries_->empty()) {
-    LOG_FIRST_N(ERROR, 1) << "No queries present: cannot cluster";
+  if (!queries_ || queries_->empty() || !metric_) {
+    LOG_FIRST_N(ERROR, 1) << "Queries and a metric are required for vMF clustering";
     return {};
   }
 
-  // 1. Build up query scores as k_i * <x_i, q_j>
-  std::vector<float> kappas;
-  kappas.reserve(layer.numNodes());
-  ScoreWorkspace scores;
-  for (const auto& node : layer.nodes()) {
-    auto attrs = node.tryAttributes<SemanticNodeAttributes>();
-    if (!attrs) {
-      continue;
-    }
+  const auto initial =
+      vmf::computeScores(layer, *queries_, *metric_, config.allow_empty_scores);
+  const auto scores = vmf::propagateScores(layer, initial, config);
 
-    const auto has_vmf =
-        attrs->semantic_feature.size() > 0 && attrs->feature_concentration.size() == 1;
-    if (!has_vmf && config.allow_empty_scores) {
-      scores[node.id] = {Eigen::VectorXf::Zero(queries_->size()), 0.0f};
-      continue;
-    }
-
-    const auto kappa = attrs->feature_concentration(0, 0);
-    scores[node.id] = {kappa * queries_->getScores(*metric_, attrs->semantic_feature),
-                       kappa};
-    kappas.push_back(kappa);
+  std::unordered_map<NodeId, Eigen::Index> labels;
+  for (const auto& [id, entry] : scores) {
+    Eigen::Index label;
+    entry.scores.maxCoeff(&label);
+    labels.emplace(id, label);
   }
 
-  if (scores.empty()) {
-    return {};
-  }
-
-  // 2. Propagate scores as alpha_i * mean(k_n * <x_n, q_j>)
-  const auto lambda = median(kappas);
-  for (size_t i = 0; i < config.label_propagation_iterations; ++i) {
-    scores = propagateScores(layer, scores, lambda);
-  }
-
-  // 3. Pick the best scoring label
-  // TODO(nathan) threshold background scores
-  std::unordered_map<spark_dsg::NodeId, Eigen::Index> labels;
-  for (const auto& [node_id, entry] : scores) {
-    Eigen::Index best_label;
-    entry.scores.maxCoeff(&best_label);
-    labels.emplace(node_id, best_label);
-  }
-
-  // 4. Extract connected components as regions
   const auto components = graph_utilities::getConnectedComponents(
       layer,
       [&](const auto& node) { return labels.count(node.id); },
       [&](const auto& edge) {
         const auto source = labels.find(edge.source);
         const auto target = labels.find(edge.target);
-        if (source == labels.end() || target == labels.end()) {
-          return false;
-        }
-
-        return source->second == target->second;
+        return source != labels.end() && target != labels.end() &&
+               source->second == target->second;
       });
 
-  const auto clusters = buildClusters(layer, *queries_, *metric_, components);
+  Clusters clusters;
+  for (const auto& nodes : components) {
+    auto cluster = std::make_shared<Cluster>();
+    cluster->nodes.insert(nodes.begin(), nodes.end());
+    cluster->best_query = labels.at(nodes.front());
+    cluster->feature = Eigen::VectorXf::Zero(queries_->embeddings.front().size());
+    size_t count = 0;
+    for (const auto id : cluster->nodes) {
+      const auto& attrs = layer.getNode(id).attributes<SemanticNodeAttributes>();
+      if (validFeature(attrs, cluster->feature.size())) {
+        cluster->feature += attrs.semantic_feature;
+        ++count;
+      }
+    }
+
+    if (count) {
+      cluster->feature /= count;
+    }
+
+    cluster->score =
+        metric_->score(queries_->embeddings.at(cluster->best_query), cluster->feature);
+    clusters.push_back(cluster);
+  }
+
   MLOG(1) << "finished clustering with " << clusters.size() << " cluster(s)";
   return clusters;
 }
