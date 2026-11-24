@@ -38,6 +38,7 @@
 #include "hydra/reconstruction/marching_cubes.h"
 
 #include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 namespace hydra {
 
@@ -222,16 +223,18 @@ size_t MarchingCubes::meshCube(const SdfPoints& points,
                                const VoxelIndex& cube_index,
                                EdgeCache* cache,
                                bool compute_normals) {
+  static const auto log_config = hydra::VerbosityConfig::named("mesh");
+
   static constexpr auto NO_LABEL = std::numeric_limits<uint32_t>::max();
-  if (VLOG_IS_ON(15)) {
-    VLOG(15) << "[mesh] points: ";
+  if (log_config.enabled(15)) {
+    MLOG_WITH(log_config, 15) << "points: ";
     for (size_t i = 0; i < 8; ++i) {
-      VLOG(15) << " - " << i << ": " << points[i];
+      MLOG_WITH(log_config, 15) << " - " << i << ": " << points[i];
     }
   }
 
   const int index = calculateVertexConfig(points);
-  VLOG(15) << "[mesh] vertex sdf index: " << index;
+  MLOG_WITH(log_config, 15) << "vertex sdf index: " << index;
 
   if (index == 0) {
     return 0;  // no surface crossing in sdf cube

@@ -51,6 +51,10 @@ namespace hydra {
 class ZmqRoomLabelUpdater : public UpdateFunctor {
  public:
   struct Config : hydra::VerbosityConfig {
+    Config()
+        : hydra::VerbosityConfig(hydra::VerbosityConfig::named("ZmqRoomLabelUpdater")) {
+    }
+
     std::string url = "tcp://127.0.0.1:8002";
     size_t num_threads = 2;
     size_t poll_time_ms = 10;

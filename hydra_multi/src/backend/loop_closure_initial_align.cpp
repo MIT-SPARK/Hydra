@@ -114,10 +114,10 @@ void LoopClosureInitialAlignModule::updatePairwiseTransforms(
               Wfrom_T_from.compose(from_T_to).compose(Wto_T_to.inverse());
           pairwise_transforms_[from][to].push_back(Wfrom_T_Wto);
         } catch (const std::out_of_range& e) {
-          LOG(ERROR)
-              << "[Loop Closure Initial Align]: index not in deformation graph for to="
-              << to_node.string() << " -> from=" << from_node.string()
-              << " (error: " << e.what() << ")";
+          LOG(ERROR) << config.log_prefix
+                     << "index not in deformation graph for to=" << to_node.string()
+                     << " -> from=" << from_node.string() << " (error: " << e.what()
+                     << ")";
           break;
         }
       }

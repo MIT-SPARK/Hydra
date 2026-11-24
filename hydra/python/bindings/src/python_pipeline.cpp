@@ -193,7 +193,7 @@ bool PythonPipeline::stepImpl(const InputData::Ptr& input) {
   }
 
   if (!frontend_->spinOnce()) {
-    LOG(ERROR) << "[Hydra] Frontend failed to return output";
+    LOG(ERROR) << config.log_prefix << "Frontend failed to return output";
     return false;
   }
 

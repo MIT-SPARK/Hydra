@@ -157,7 +157,7 @@ void InputModule::dataSpin() {
 
     const auto odom_T_body = getBodyPose(*data);
     if (!odom_T_body) {
-      LOG(WARNING) << "[input] dropping input @ " << curr_time
+      LOG(WARNING) << config.log_prefix << "dropping input @ " << curr_time
                    << " [ns] due to missing pose";
       continue;
     }

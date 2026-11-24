@@ -62,7 +62,12 @@ MergeList callWithUnmerged(const UpdateFunctor& functor,
   }
 }
 
-GenericUpdateFunctor::Config defaultConfig() { return {5, "OBJECTS"}; }
+GenericUpdateFunctor::Config defaultConfig() {
+  GenericUpdateFunctor::Config config;
+  config.verbosity = 5;
+  config.layer = "OBJECTS";
+  return config;
+}
 
 }  // namespace
 

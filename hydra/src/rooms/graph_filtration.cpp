@@ -35,6 +35,7 @@
 #include "hydra/rooms/graph_filtration.h"
 
 #include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 #include <cmath>
@@ -558,6 +559,8 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                                              size_t start_index,
                                              size_t end_index,
                                              bool use_threshold) {
+  static const auto log_config = hydra::VerbosityConfig::named("Room Finder");
+
   if (start_index >= values.size()) {
     return std::nullopt;
   }
@@ -587,34 +590,34 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                         values[start_end_pair.first].distance);
   }
 
-  if (VLOG_IS_ON(20)) {
-    VLOG(20) << "Sequences:";
+  if (log_config.enabled(20)) {
+    MLOG_WITH(log_config, 20) << "Sequences:";
     for (size_t i = 0; i < sequences.size(); ++i) {
-      VLOG(20) << "  - " << i << ": " << seq_values.at(i) << " -> ["
-               << sequences[i].first << ", " << sequences[i].second
-               << "], lifetime=" << lifetimes[i];
+      MLOG_WITH(log_config, 20)
+          << "  - " << i << ": " << seq_values.at(i) << " -> [" << sequences[i].first
+          << ", " << sequences[i].second << "], lifetime=" << lifetimes[i];
     }
   }
 
   CHECK(!lifetimes.empty());
   const double max_lifetime = *std::max_element(lifetimes.begin(), lifetimes.end());
   const double threshold = use_threshold ? ratio : ratio * max_lifetime;
-  VLOG(5) << "[Room Finder] Max lifetime: " << max_lifetime << ", Ratio: " << ratio
-          << ", Threshold: " << threshold;
+  MLOG_WITH(log_config, 5) << "Max lifetime: " << max_lifetime << ", Ratio: " << ratio
+                           << ", Threshold: " << threshold;
 
   size_t best_sequence = 0;
   size_t best_components = 0;
-  VLOG(20) << "Best components:";
+  MLOG_WITH(log_config, 20) << "Best components:";
   for (size_t i = 0; i < lifetimes.size(); ++i) {
     if (lifetimes[i] < threshold) {
-      VLOG(20) << "  - " << i << ": below threshold (" << lifetimes[i] << " < "
-               << threshold << ")";
+      MLOG_WITH(log_config, 20) << "  - " << i << ": below threshold (" << lifetimes[i]
+                                << " < " << threshold << ")";
       continue;
     }
 
     const auto curr_components = values[sequences[i].first].num_components;
-    VLOG(20) << "  - " << i << ": components=" << curr_components
-             << " (best=" << best_components << ")";
+    MLOG_WITH(log_config, 20) << "  - " << i << ": components=" << curr_components
+                              << " (best=" << best_components << ")";
     // TODO(nathan) might want >= instead
     if (curr_components > best_components) {
       best_sequence = i;

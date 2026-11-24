@@ -39,6 +39,7 @@
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <opencv2/imgproc.hpp>
 #include <stdexcept>
@@ -181,18 +182,20 @@ bool InputData::inRange(float range_m) const {
 }
 
 bool InputData::finalize(bool vertices_in_world_frame, bool normalize_labels) {
+  static const auto log_config = hydra::VerbosityConfig::named("Input Conversion");
+
   if (!convertDepth(*this)) {
-    LOG(ERROR) << "[Input Conversion] Unable to normalize depth";
+    LOG(ERROR) << log_config.log_prefix << "Unable to normalize depth";
     return false;
   }
 
   if (!convertColor(*this)) {
-    LOG(ERROR) << "[Input Conversion] Unable to normalize color";
+    LOG(ERROR) << log_config.log_prefix << "Unable to normalize color";
     return false;
   }
 
   if (normalize_labels && !convertLabels(*this)) {
-    LOG(ERROR) << "[Input Conversion] Unable to normalize labels";
+    LOG(ERROR) << log_config.log_prefix << "Unable to normalize labels";
     return false;
   }
 
@@ -206,13 +209,13 @@ bool InputData::finalize(bool vertices_in_world_frame, bool normalize_labels) {
   convertToLabelType(traversability_image);
 
   if (!vertex_map.empty() && vertex_map.type() != InputData::VertexMatType) {
-    LOG(ERROR) << "[Input Conversion] pointcloud must be CV_32FC3, not "
+    LOG(ERROR) << log_config.log_prefix << "pointcloud must be CV_32FC3, not "
                << showTypeInfo(vertex_map);
     return false;
   }
 
   if (!sensor_->finalizeRepresentations(*this)) {
-    LOG(ERROR) << "[Input Conversion] Unable to compute inputs for integration";
+    LOG(ERROR) << log_config.log_prefix << "Unable to compute inputs for integration";
     return false;
   }
 

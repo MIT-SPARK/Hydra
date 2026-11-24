@@ -364,17 +364,17 @@ void MultiBackendModule::stopImpl() {
   should_shutdown_ = true;
 
   if (optimization_thread_) {
-    MLOG(3) << "[Hydra-Multi Backend] joining optimizer thread and stopping";
+    MLOG(3) << "joining optimizer thread and stopping";
     optimization_thread_->join();
     optimization_thread_.reset();
-    MLOG(3) << "[Hydra-Multi Backend] optimizer thread stopped!";
+    MLOG(3) << "optimizer thread stopped!";
   }
 
   if (spin_thread_) {
-    MLOG(3) << "[Hydra-Multi Backend] joining spin thread and stopping";
+    MLOG(3) << "joining spin thread and stopping";
     spin_thread_->join();
     spin_thread_.reset();
-    MLOG(3) << "[Hydra-Multi Backend] spin stopped!";
+    MLOG(3) << "spin stopped!";
   }
 }
 

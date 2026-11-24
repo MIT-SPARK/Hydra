@@ -32,7 +32,7 @@ Use `verbosity` to override `default_verbosity` for a module and `log_prefix` to
 default_verbosity: 1
 backend:
   verbosity: 3  # Show backend messages through level 3.
-  log_prefix: '[backend] '  # Label messages without changing node IDs.
+  log_prefix: '[backend] '  # Replace the default label without changing node IDs.
 ```
 
 Finally, you should understand how the `config_utilities` factories work (see [here](https://github.com/MIT-SPARK/config_utilities/blob/main/docs/Factories.md)).

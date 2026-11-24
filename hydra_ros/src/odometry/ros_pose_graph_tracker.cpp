@@ -103,7 +103,7 @@ PoseGraphPacket RosPoseGraphTracker::update(uint64_t, const Eigen::Isometry3d&) 
 
 void RosPoseGraphTracker::odomCallback(const PoseGraph& msg) {
   if (msg.nodes.empty()) {
-    LOG(WARNING) << "[RosPoseGraphTracker] Received empty pose graph, skipping!";
+    LOG(WARNING) << config.log_prefix << "Received empty pose graph, skipping!";
     return;
   }
 

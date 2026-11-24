@@ -103,7 +103,7 @@ MeshSegmenter::MeshSegmenter(const Config& config,
       next_node_id_('O', 0),
       labels_(labels),
       sinks_(Sink::instantiate(config.sinks, robot)) {
-  MLOG(2) << "[Mesh Segmenter] using labels: " << clustering::printLabels(labels_);
+  MLOG(2) << "using labels: " << clustering::printLabels(labels_);
   for (const auto& label : labels_) {
     active_nodes_[label] = std::set<NodeId>();
   }
@@ -116,13 +116,13 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
 
   LabelClusters label_clusters;
   if (!delta.getNumActiveVertices()) {
-    MLOG(2) << "[Mesh Segmenter] No active indices in mesh";
+    MLOG(2) << "No active indices in mesh";
     return label_clusters;
   }
 
   const auto label_indices = clustering::getLabelIndices(labels_, delta);
   if (label_indices.empty()) {
-    MLOG(2) << "[Mesh Segmenter] No vertices found matching desired labels";
+    MLOG(2) << "No vertices found matching desired labels";
     Sink::callAll(sinks_, stamp_ns, delta, label_indices, {});
     return label_clusters;
   }
@@ -148,8 +148,7 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
       }
     }
 
-    MLOG(2) << "[Mesh Segmenter] Found " << clusters.size() << " cluster(s) of label "
-            << label;
+    MLOG(2) << "Found " << clusters.size() << " cluster(s) of label " << label;
   }
 
   Sink::callAll(sinks_, stamp_ns, delta, label_indices, label_clusters);

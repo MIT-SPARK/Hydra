@@ -204,9 +204,9 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
         output_queue_->push(result);
       }
 
-      LOG(WARNING) << "[Hydra LCD] Found valid loop-closure: "
-                   << NodeSymbol(result.from_node).str() << " -> "
-                   << NodeSymbol(result.to_node).str();
+      LOG(WARNING) << config.log_prefix
+                   << "Found valid loop-closure: " << NodeSymbol(result.from_node).str()
+                   << " -> " << NodeSymbol(result.to_node).str();
     }
 
     // if should_shutdown_ is true and agent/place parent invariant is broken, this

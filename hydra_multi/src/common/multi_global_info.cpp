@@ -20,6 +20,7 @@ using hydra::timing::ElapsedTimeRecorder;
 decltype(MultiGlobalInfo::instance_) MultiGlobalInfo::instance_;
 
 void declare_config(MultiPipelineConfig& config) {
+  config::base<hydra::VerbosityConfig>(config);
   using namespace config;
   name("MultiPipeline::Config");
   field(config.timing_disabled, "timing_disabled");

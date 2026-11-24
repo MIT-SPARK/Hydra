@@ -235,7 +235,7 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map,
                                        MarchingCubes::EdgeCache* cache) const {
-  MLOG(15) << "[mesh] processing interior voxel: " << index.transpose();
+  MLOG(15) << "processing interior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
   if (!block || !mesh) {
@@ -302,7 +302,7 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map,
                                        MarchingCubes::EdgeCache* cache) const {
-  MLOG(15) << "[mesh] processing exterior voxel: " << index.transpose();
+  MLOG(15) << "processing exterior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
   if (!block || !mesh) {

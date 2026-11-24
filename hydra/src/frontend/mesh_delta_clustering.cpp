@@ -2,6 +2,7 @@
 
 #include <config_utilities/config.h>
 #include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <pcl/point_cloud.h>
 #define PCL_NO_PRECOMPILE
@@ -40,9 +41,11 @@ std::string printLabels(const std::set<uint32_t>& labels) {
 LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
                              const kimera_pgmo::MeshDelta& delta,
                              const std::unordered_set<size_t>* invalid) {
+  static const auto log_config = hydra::VerbosityConfig::named("Delta Clustering");
+
   LabelIndices label_indices;
   if (!kimera_pgmo::traits::get_vertex_properties(delta).has_label) {
-    LOG(WARNING) << "[Delta Clustering] Mesh missing labels!";
+    LOG(WARNING) << log_config.log_prefix << "Mesh missing labels!";
     return label_indices;
   }
 
@@ -67,7 +70,7 @@ LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
     iter->second.push_back(i);
   }
 
-  VLOG(2) << "[Delta Clustering] Seen labels: " << printLabels(seen_labels);
+  MLOG_WITH(log_config, 2) << "Seen labels: " << printLabels(seen_labels);
   return label_indices;
 }
 

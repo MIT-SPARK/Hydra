@@ -98,8 +98,7 @@ void GenericUpdateFunctor::call(const SceneGraph& unmerged,
   active_tracker.clear();  // reset from previous pass
   const auto view = info->full_update ? LayerView(layer) : active_tracker.view(layer);
   deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
-  MLOG(1) << "[Hydra Backend] " << config.layer << " update: " << layer.numNodes()
-          << " nodes";
+  MLOG(1) << "" << config.layer << " update: " << layer.numNodes() << " nodes";
 }
 
 MergeList GenericUpdateFunctor::findMerges(const SceneGraph& graph,

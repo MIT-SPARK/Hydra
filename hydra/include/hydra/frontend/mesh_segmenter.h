@@ -68,6 +68,9 @@ class MeshSegmenter {
                           const LabelClusters&>;
 
   struct Config : hydra::VerbosityConfig {
+    Config()
+        : hydra::VerbosityConfig(hydra::VerbosityConfig::named("Mesh Segmenter")) {}
+
     std::string layer_id = spark_dsg::DsgLayers::OBJECTS;
     clustering::ClusteringConfig clustering;
     spark_dsg::BoundingBox::Type bounding_box_type = spark_dsg::BoundingBox::Type::AABB;

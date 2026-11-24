@@ -49,6 +49,9 @@ enum class DilationThresholdMode {
 };
 
 struct RoomFinderConfig : hydra::VerbosityConfig {
+  RoomFinderConfig()
+      : hydra::VerbosityConfig(hydra::VerbosityConfig::named("Room Finder")) {}
+
   char room_prefix = 'R';
   double min_dilation_m = 0.1;
   double max_dilation_m = 0.7;

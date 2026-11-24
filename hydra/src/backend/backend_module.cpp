@@ -141,7 +141,7 @@ void BackendModule::start() {
   should_shutdown_ = false;
   force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
-  LOG(INFO) << "[Hydra Backend] started!";
+  LOG(INFO) << config.log_prefix << "started!";
 }
 
 void BackendModule::stopImpl() {
@@ -150,10 +150,10 @@ void BackendModule::stopImpl() {
   }
 
   if (spin_thread_) {
-    MLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
+    MLOG(2) << "joining optimizer thread and stopping";
     spin_thread_->join();
     spin_thread_.reset();
-    MLOG(2) << "[Hydra Backend] stopped!";
+    MLOG(2) << "stopped!";
   }
 
   if (config.finalize_on_shutdown) {
@@ -394,16 +394,15 @@ void BackendModule::updateFactorGraph(const FrontendOutput& input) {
       throw std::logic_error(e.what());
     }
   } else {
-    MLOG(10) << "[Hydra Backend] Dropping empty deformation graph @ "
-             << input.timestamp_ns << " [ns]";
+    MLOG(10) << "Dropping empty deformation graph @ " << input.timestamp_ns << " [ns]";
   }
 
   for (const auto& msg : input.agent_updates.pose_graphs) {
     status_log_.back().new_factors += msg.edges.size();
 
-    MLOG(5) << "[Hydra Backend] Adding pose graph message: " << msg;
+    MLOG(5) << "Adding pose graph message: " << msg;
     if (hasLoopClosure(msg)) {
-      LOG(INFO) << "[Hydra Backend] Input pose graph has loop closure @ "
+      LOG(INFO) << config.log_prefix << "Input pose graph has loop closure @ "
                 << msg.stamp_ns << " [ns]";
     }
 
@@ -474,7 +473,7 @@ bool BackendModule::updateFromLcdQueue() {
 void BackendModule::copyMeshDelta(const FrontendOutput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
   if (!input.mesh_update) {
-    LOG_FIRST_N(WARNING, 1) << "[Hydra Backend] invalid mesh update!";
+    LOG_FIRST_N(WARNING, 1) << config.log_prefix << "invalid mesh update!";
     return;
   }
 
