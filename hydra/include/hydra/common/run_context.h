@@ -37,39 +37,43 @@
 #include <spark_dsg/mesh.h>
 
 #include <atomic>
-#include <memory>
 
+#include "hydra/common/labelspace.h"
 #include "hydra/common/robot_prefix_config.h"
+#include "hydra/common/shared_dsg_info.h"
 
 namespace hydra {
 
-/**
- * @brief Configuration struct for spark_dsg::Mesh
- * Note that per-vertex timestamps are required and can not be turned off
- */
-struct MeshFieldConfig {
-  //! Whether or not the mesh should have colors
-  bool with_colors = true;
-  //! Whether or not the mesh should have labels
-  bool with_labels = true;
-  //! Whether or not the mesh should have first-seen stamps
-  bool with_first_seen_stamps = true;
-};
+struct RunContext {
+ public:
+  explicit RunContext(size_t robot_id = 0);
 
-void declare_config(MeshFieldConfig& config);
+  //! Layer names for the scene graph that Hydra builds
+  SharedDsgInfo::Config graph;
+  //! @brief Layers in the scene graph that use the labelspace
+  std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
+                                           spark_dsg::DsgLayers::MESH_PLACES};
 
-struct FrameConfig {
-  //! Body frame for robot constructing the scene graph (see REP 105)
-  std::string robot = "base_link";
-  //! Frame odometry estimates are relative to (see REP 105)
-  std::string odom = "odom";
-  //! Frame that the optimized scene graph is in (see REP 105)
-  std::string map = "map";
-};
+  //! Frame information for Hydra
+  struct Frames {
+    //! Body frame for robot constructing the scene graph (see REP 105)
+    std::string robot = "base_link";
+    //! Frame odometry estimates are relative to (see REP 105)
+    std::string odom = "odom";
+    //! Frame that the optimized scene graph is in (see REP 105)
+    std::string map = "map";
+  } frames;
 
-void declare_config(FrameConfig& config);
+  //! Which mesh fields to enable
+  struct MeshFields {
+    //! Whether or not the mesh should have colors
+    bool with_colors = true;
+    //! Whether or not the mesh should have labels
+    bool with_labels = true;
+    //! Whether or not the mesh should have first-seen stamps
+    bool with_first_seen_stamps = true;
+  } mesh;
 
-struct PipelineConfig {
   //! If true, disable all performance timers
   bool timing_disabled = false;
   //! If true, don't show latest elapsed for timers
@@ -82,46 +86,19 @@ struct PipelineConfig {
   int default_verbosity = 1;
   //! Default number of threads for multi-threaded integrators to use
   int default_num_threads = -1;  // -1 means use all available threads.
-  //! Frame information for Hydra
-  FrameConfig frames;
-  //! Configuration for scene graph mesh fields
-  MeshFieldConfig mesh;
-};
 
-void declare_config(PipelineConfig& config);
-
-class GlobalInfo {
- public:
-  static GlobalInfo& instance();
-
-  static GlobalInfo& init(const PipelineConfig& config, int robot_id = 0);
-
-  // this invalidates any instances (mostly intended for testing)
-  static void reset();
-
-  bool force_shutdown() const;
-
-  void setForceShutdown(bool force_shutdown);
-
-  const PipelineConfig& getConfig() const;
-
-  const FrameConfig& getFrames() const;
-
-  const RobotPrefixConfig& getRobotPrefix() const;
+  RobotPrefixConfig robot_prefix() const;
 
   spark_dsg::Mesh::Ptr createMesh() const;
 
- private:
-  GlobalInfo();
-
-  void initFromConfig(const PipelineConfig& config, int robot_id);
+  const Labelspace& labelspace() const;
 
  private:
-  static std::unique_ptr<GlobalInfo> instance_;
-  std::atomic<bool> force_shutdown_;
-
-  PipelineConfig config_;
-  RobotPrefixConfig robot_prefix_;
+  size_t robot_id_;
 };
+
+void declare_config(const RunContext::Frames& config);
+void declare_config(const RunContext::MeshFields& config);
+void declare_config(const RunContext& config);
 
 }  // namespace hydra

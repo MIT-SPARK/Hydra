@@ -65,12 +65,12 @@ struct VolumetricWindow;
 
 class GraphBuilder : public Module {
  public:
+  using Graph = spark_dsg::SceneGraph;
   using Ptr = std::shared_ptr<GraphBuilder>;
   using InputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
   using OutputQueue = MessageQueue<FrontendOutput::ConstPtr>;
   using InputCallback = std::function<void(const ActiveWindowOutput&)>;
-  using Sink =
-      OutputSink<uint64_t, const spark_dsg::SceneGraph&, const FrontendOutput&>;
+  using Sink = OutputSink<uint64_t, Graph&, const FrontendOutput&>;
 
   struct Config : public VerbosityConfig {
     Config();
@@ -104,7 +104,7 @@ class GraphBuilder : public Module {
   GraphBuilder(const Config& config,
                const Labelspace& labelspace,
                const SharedDsgInfo::Ptr& dsg,
-               const SharedModuleState::Ptr& state,
+               const std::shared_ptr<SharedModuleState>& state,
                std::unique_ptr<VolumetricWindow>&& window);
 
   virtual ~GraphBuilder();
@@ -113,9 +113,9 @@ class GraphBuilder : public Module {
 
   void stop() override;
 
-  void save(const DataDirectory& output) override;
+  void save() override;
 
-  std::string printInfo() const override;
+  std::string show() const override;
 
   virtual void spin();
 
@@ -155,7 +155,7 @@ class GraphBuilder : public Module {
   std::atomic<bool> spin_finished_;
 
   SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
+  std::shared_ptr<SharedModuleState> state_;
   FrontendOutput::Ptr curr_output_;
 
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;

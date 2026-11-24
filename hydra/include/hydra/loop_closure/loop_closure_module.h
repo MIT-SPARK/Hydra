@@ -69,7 +69,7 @@ class LoopClosureModule : public Module {
   // requiring fixed size vectors
   LoopClosureModule(const Config& config,
                     const Labelspace& labelspace,
-                    const SharedModuleState::Ptr& state,
+                    const std::shared_ptr<SharedModuleState>& state,
                     const OutputQueue::Ptr& output = nullptr);
 
   virtual ~LoopClosureModule();
@@ -78,9 +78,9 @@ class LoopClosureModule : public Module {
 
   void stop() override;
 
-  void save(const DataDirectory& output) override;
+  void save() override;
 
-  std::string printInfo() const override;
+  std::string show() const override;
 
   void spin();
 
@@ -107,7 +107,7 @@ class LoopClosureModule : public Module {
   std::unique_ptr<std::thread> spin_thread_;
   uint64_t last_sequence_number_ = 0;
 
-  SharedModuleState::Ptr state_;
+  std::shared_ptr<SharedModuleState> state_;
   NodeIdQueue agent_queue_;
   std::list<spark_dsg::NodeId> potential_lcd_root_nodes_;
 

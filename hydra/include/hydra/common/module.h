@@ -33,21 +33,47 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+
+#include <atomic>
+#include <memory>
+#include <string>
+
 #include "hydra/utils/data_directory.h"
 
 namespace hydra {
 
-/**
- * @brief Core class representing a module that does some work
- */
+class RunContext;
+
+//! Core class representing a module that does some work
 class Module {
  public:
   using Ptr = std::shared_ptr<Module>;
-  virtual ~Module() = default;
+
+  //! Initialize the module with the current run context
+  explicit Module(const RunContext& context);
+
+  virtual ~Module();
+
+  //! Start any background threads for the module
   virtual void start() = 0;
-  virtual void stop() = 0;
-  virtual void save(const DataDirectory& /* output */) {}
-  virtual std::string printInfo() const { return ""; }
+
+  /**
+   * @brief Stop the module
+   * @param force Force module to exit without processing remaing data
+   */
+  virtual void stop(bool force) = 0;
+
+  //! Save any data for the module once done processing
+  virtual void save(const DataDirectory* output) = 0;
+
+  //! Show configuration info for the module
+  virtual std::string show() const = 0;
+
+  //! Context for current run of Hydra
+  const RunContext& context;
+
+ protected:
+  std::atomic<bool> force_shutdown_;
 };
 
 }  // namespace hydra

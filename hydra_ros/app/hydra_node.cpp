@@ -40,7 +40,6 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
 #include <ianvs/node_init.h>
 #include <ianvs/spin_functions.h>
 

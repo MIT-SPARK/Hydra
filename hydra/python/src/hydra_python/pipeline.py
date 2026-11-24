@@ -161,7 +161,6 @@ def load_pipeline(
     config_path=None,
     output_path=None,
     config_verbosity=0,
-    freeze_global_info=True,
     zmq_url=None,
 ):
     """Load Hydra pipeline from configs."""

@@ -38,7 +38,6 @@
 #include <glog/logging.h>
 #include <spark_dsg/scene_graph.h>
 
-#include "hydra/common/global_info.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -140,8 +139,8 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
   if (!dsg.graph->hasLayer(DsgLayers::PLACES)) {
     return;
   }
-  std::lock_guard<std::mutex> lock(dsg.mutex);
 
+  std::lock_guard<std::mutex> lock(dsg.mutex);
   for (const auto nid : deleted_frontiers_) {
     dsg.graph->removeNode(nid);
     unmerged_dsg.removeNode(nid);
@@ -149,17 +148,16 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
 
   const auto& places_layer = dsg.graph->getLayer(DsgLayers::PLACES);
   const auto& places_2d_layer = dsg.graph->getLayer(DsgLayers::MESH_PLACES);
-
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  const auto layer_key = dsg.graph->getLayerKey(DsgLayers::AGENTS);
-  if (!layer_key) {
+  const auto agents = dsg.graph->findLayer(DsgLayers::AGENTS);
+  if (!agents) {
     LOG(ERROR) << "Update frontiers functor could not find agents layer";
     return;
   }
-  const auto agents = dsg.graph->findLayer(layer_key->layer, prefix.key);
-  if (!agents || agents->numNodes() == 0) {
+
+  if (agents->numNodes() == 0) {
     return;
   }
+
   NodeSymbol pgmo_key(prefix.key, agents->numNodes() - 1);
   Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;
   Eigen::Quaterniond agent_quat =
@@ -173,6 +171,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
     if (!attrs) {
       continue;
     }
+
     if (attrs->real_place) {
       layer_nodes.insert(node.id);
     } else if (!attrs->is_predicted && !attrs->need_cleanup) {

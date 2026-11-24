@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/global_info.h"
+#include "hydra/common/run_context.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
@@ -51,27 +51,25 @@ namespace hydra {
 using ColorMapPtr = std::shared_ptr<SemanticColorMap>;
 using timing::ElapsedTimeRecorder;
 
-decltype(GlobalInfo::instance_) GlobalInfo::instance_;
-
-void declare_config(MeshFieldConfig& config) {
+void declare_config(RunContext::MeshFields& config) {
   using namespace config;
-  name("MeshFieldConfig");
+  name("RunContext::Config::MeshFields");
   field(config.with_colors, "with_colors");
   field(config.with_first_seen_stamps, "with_first_seen_stamps");
   field(config.with_labels, "with_labels");
 }
 
-void declare_config(FrameConfig& frames) {
+void declare_config(RunContext::Frames& frames) {
   using namespace config;
-  name("FrameConfig");
+  name("RunContext::Config::Frames");
   field(frames.robot, "robot_frame");
   field(frames.odom, "odom_frame");
   field(frames.map, "map_frame");
 }
 
-void declare_config(PipelineConfig& config) {
+void declare_config(RunContext& config) {
   using namespace config;
-  name("PipelineConfig");
+  name("RunContext::Config");
   field(config.timing_disabled, "timing_disabled");
   field(config.disable_timer_output, "disable_timer_output");
   field(config.enable_pgmo_logging, "enable_pgmo_logging");
@@ -79,14 +77,16 @@ void declare_config(PipelineConfig& config) {
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
   field(config.mesh, "mesh");
+  field(config.semantic_layers, "semantic_layers");
+  field(config.graph, "graph");
 
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
 }
 
-GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
+RunContext::RunContext(size_t robot_id) : robot_id_(robot_id), force_shutdown_(false) {}
 
-void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
+void RunContext::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
 
@@ -99,45 +99,20 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   }
 }
 
-GlobalInfo& GlobalInfo::instance() {
-  if (!instance_) {
-    instance_.reset(new GlobalInfo());
-  }
-
-  return *instance_;
-}
-
-GlobalInfo& GlobalInfo::init(const PipelineConfig& config, int robot_id) {
-  auto& curr = instance();
-  curr.initFromConfig(config, robot_id);
-  return curr;
-}
-
-void GlobalInfo::reset() { instance_.reset(new GlobalInfo()); }
-
-void GlobalInfo::setForceShutdown(bool force_shutdown) {
+void RunContext::setForceShutdown(bool force_shutdown) {
   force_shutdown_ = force_shutdown;
 }
 
-bool GlobalInfo::force_shutdown() const { return force_shutdown_; }
+bool RunContext::force_shutdown() const { return force_shutdown_; }
 
-const PipelineConfig& GlobalInfo::getConfig() const { return config_; }
-
-const FrameConfig& GlobalInfo::getFrames() const { return config_.frames; }
-
-const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefix_; }
-
-spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {
-  // we force the mesh to have last seen stamps
-  return std::make_shared<spark_dsg::Mesh>(config_.mesh.with_colors,
-                                           true,
-                                           config_.mesh.with_labels,
-                                           config_.mesh.with_first_seen_stamps);
+RobotPrefixConfig RunContext::robot_prefix() const {
+  return RobotPrefixConfig(robot_id_);
 }
 
-std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {
-  out << config::toString(config.getConfig());
-  return out;
+spark_dsg::Mesh::Ptr RunContext::createMesh() const {
+  // we force the mesh to have last seen stamps
+  return std::make_shared<spark_dsg::Mesh>(
+      mesh.with_colors, true, mesh.with_labels, mesh.with_first_seen_stamps);
 }
 
 }  // namespace hydra

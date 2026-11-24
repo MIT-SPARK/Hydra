@@ -44,8 +44,7 @@
 #include "hydra/active_window/reconstruction_module.h"
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/backend/backend_module.h"
-#include "hydra/common/global_info.h"
-#include "hydra/common/labelspace.h"
+#include "hydra/common/run_context.h"
 #include "hydra/frontend/graph_builder.h"
 #include "hydra/loop_closure/loop_closure_module.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
@@ -53,16 +52,14 @@
 namespace hydra {
 namespace {
 
-SharedDsgInfo::Ptr buildGraph(const Labelspace& label_info,
-                              const SharedDsgInfo::Config& config,
-                              const std::vector<std::string>& semantic_layers) {
-  auto info = std::make_shared<SharedDsgInfo>(config);
+SharedDsgInfo::Ptr buildGraph(const RunContext& context) {
+  auto info = std::make_shared<SharedDsgInfo>(context.graph);
   auto& graph = *info->graph;
 
-  const spark_dsg::Labelspace labelspace(label_info.label_names);
+  const spark_dsg::Labelspace labelspace(context.labelspace().label_names);
   if (labelspace) {
     labelspace.save(graph, "mesh", false);
-    for (const auto& layer_name : semantic_layers) {
+    for (const auto& layer_name : context.semantic_layers) {
       if (graph.layer_names().count(layer_name)) {
         labelspace.save(graph, layer_name);
       } else {
@@ -82,8 +79,6 @@ void declare_config(HydraPipeline::Config& config) {
   using namespace config;
   name("HydraPipeline::Config");
   base<VerbosityConfig>(config);
-  field(config.semantic_layers, "semantic_layers");
-  field(config.graph, "graph");
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field(config.active_window, "active_window");
@@ -101,7 +96,7 @@ HydraPipeline::Config::Config()
       backend(BackendModule::Config()) {}
 
 HydraPipeline::HydraPipeline(const Config& config,
-                             std::unique_ptr<Labelspace>&& labelspace)
+                             std::unique_ptr<RunContext>&& context)
     : config(config) {
   labelspace_ = std::move(labelspace);
   if (!labelspace_) {
@@ -115,7 +110,7 @@ HydraPipeline::~HydraPipeline() {}
 
 void HydraPipeline::init() {
   frontend_ = config.frontend.create(
-      *labelspace_, frontend_dsg_, state_, config.map_window.create());
+      *context_, frontend_dsg_, state_, config.map_window.create());
 
   ActiveWindowModule::OutputQueue::Ptr queue;
   if (frontend_) {
@@ -123,7 +118,7 @@ void HydraPipeline::init() {
   }
 
   active_window_ =
-      config.active_window.create(*labelspace_, queue, config.map_window.create());
+      config.active_window.create(*context_, queue, config.map_window.create());
 
   backend_ = config.backend.create(backend_dsg_, state_);
   if (frontend_ && backend_) {
@@ -135,7 +130,7 @@ void HydraPipeline::init() {
     lcd_queue = backend_->lcd_queue();
   }
 
-  lcd_ = config.lcd.create(*labelspace_, state_, lcd_queue);
+  lcd_ = config.lcd.create(*context_, state_, lcd_queue);
   if (frontend_ && lcd_) {
     frontend_->setLcdQueue(lcd_->queue());
   }
@@ -191,11 +186,11 @@ void HydraPipeline::save(const DataDirectory& logs) const {
 void HydraPipeline::initState() { initStateImpl(); }
 
 void HydraPipeline::showModules() const {
-  MLOG(1) << "Active Window:\n" << active_window_->printInfo();
-  MLOG(1) << "Frontend:\n" << frontend_->printInfo();
-  MLOG(1) << "Backend:\n" << backend_->printInfo();
+  MLOG(1) << "Active Window:\n" << active_window_->show();
+  MLOG(1) << "Frontend:\n" << frontend_->show();
+  MLOG(1) << "Backend:\n" << backend_->show();
   if (lcd_) {
-    MLOG(1) << "Loop Closure Detection:\n" << lcd_->printInfo();
+    MLOG(1) << "Loop Closure Detection:\n" << lcd_->show();
   }
 }
 
@@ -205,12 +200,11 @@ void HydraPipeline::initStateImpl() {
   backend_.reset();
   lcd_.reset();
 
-  frontend_dsg_ = buildGraph(*labelspace_, config.graph, config.semantic_layers);
-  backend_dsg_ = buildGraph(*labelspace_, config.graph, config.semantic_layers);
+  frontend_dsg_ = buildGraph(*context_);
+  backend_dsg_ = buildGraph(*context_);
   state_.reset(new SharedModuleState());
-  state_->lcd_graph = buildGraph(*labelspace_, config.graph, config.semantic_layers);
-  state_->backend_graph =
-      buildGraph(*labelspace_, config.graph, config.semantic_layers);
+  state_->lcd_graph = buildGraph(*context_);
+  state_->backend_graph = buildGraph(*context_);
 }
 
 }  // namespace hydra

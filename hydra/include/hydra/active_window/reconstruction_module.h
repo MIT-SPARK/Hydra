@@ -58,13 +58,13 @@ class ReconstructionModule : public ActiveWindowModule {
   } const config;
 
   ReconstructionModule(const Config& config,
-                       const Labelspace& labelspace,
+                       const RunContext& context,
                        const OutputQueue::Ptr& output_queue,
                        std::unique_ptr<VolumetricWindow>&& window);
 
   virtual ~ReconstructionModule();
 
-  std::string printInfo() const override;
+  std::string show() const override;
 
  protected:
   bool shouldUpdate(uint64_t timestamp_ns) const;

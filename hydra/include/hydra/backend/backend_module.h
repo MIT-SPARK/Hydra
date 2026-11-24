@@ -108,7 +108,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   BackendModule(const Config& config,
                 const SharedDsgInfo::Ptr& dsg,
-                const SharedModuleState::Ptr& state);
+                const std::shared_ptr<SharedModuleState>& state);
 
   virtual ~BackendModule();
 
@@ -120,9 +120,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void stop() override;
 
-  void save(const DataDirectory& output) override;
+  void save() override;
 
-  std::string printInfo() const override;
+  std::string show() const override;
 
   void spin();
 
@@ -185,7 +185,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   SharedDsgInfo::Ptr private_dsg_;
   spark_dsg::SceneGraph::Ptr unmerged_graph_;
-  SharedModuleState::Ptr state_;
+  std::shared_ptr<SharedModuleState> state_;
 
   DsgUpdater::Ptr dsg_updater_;
   std::vector<OptimizationHook::Ptr> optimization_hooks_;

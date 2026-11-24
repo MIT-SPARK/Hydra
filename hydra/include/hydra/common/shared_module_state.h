@@ -33,16 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
 
 #include "hydra/common/shared_dsg_info.h"
 
 namespace hydra {
 
 struct SharedModuleState {
-  using Ptr = std::shared_ptr<SharedModuleState>;
   SharedModuleState();
-
   ~SharedModuleState();
 
   // mutexes are considered ordered (for avoiding deadlock):
