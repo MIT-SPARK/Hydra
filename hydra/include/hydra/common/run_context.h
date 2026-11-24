@@ -34,9 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/virtual_config.h>
-#include <spark_dsg/mesh.h>
-
-#include <atomic>
 
 #include "hydra/common/labelspace.h"
 #include "hydra/common/robot_prefix_config.h"
@@ -64,16 +61,6 @@ struct RunContext {
     std::string map = "map";
   } frames;
 
-  //! Which mesh fields to enable
-  struct MeshFields {
-    //! Whether or not the mesh should have colors
-    bool with_colors = true;
-    //! Whether or not the mesh should have labels
-    bool with_labels = true;
-    //! Whether or not the mesh should have first-seen stamps
-    bool with_first_seen_stamps = true;
-  } mesh;
-
   //! If true, disable all performance timers
   bool timing_disabled = false;
   //! If true, don't show latest elapsed for timers
@@ -89,8 +76,6 @@ struct RunContext {
 
   RobotPrefixConfig robot_prefix() const;
 
-  spark_dsg::Mesh::Ptr createMesh() const;
-
   const Labelspace& labelspace() const;
 
  private:
@@ -98,7 +83,6 @@ struct RunContext {
 };
 
 void declare_config(const RunContext::Frames& config);
-void declare_config(const RunContext::MeshFields& config);
 void declare_config(const RunContext& config);
 
 }  // namespace hydra

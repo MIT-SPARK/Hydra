@@ -40,7 +40,6 @@
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/printing.h>
 
-#include "hydra/common/global_info.h"
 #include "hydra/frontend/frontend_output.h"
 #include "hydra/utils/timing_utilities.h"
 

@@ -71,7 +71,6 @@ def mp3d(scenes, visualize, zmq_url, max_steps, force, output):
                 "habitat",
                 "ade20k_mp3d",
                 output_path=scene_output,
-                freeze_global_info=False,
                 zmq_url=zmq_url if visualize else None,
             )
             if pipeline is None:

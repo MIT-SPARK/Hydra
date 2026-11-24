@@ -38,7 +38,6 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/common/global_info.h>
 #include <ianvs/node_handle.h>
 #include <kimera_pgmo_ros/visualization_functions.h>
 #include <spark_dsg/node_attributes.h>

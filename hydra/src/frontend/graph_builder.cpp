@@ -42,8 +42,8 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
-#include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
+#include "hydra/common/run_context.h"
 #include "hydra/frontend/deformation_graph_builder.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/frontend/mesh_segmenter.h"
@@ -60,9 +60,9 @@ static const auto registration =
     config::RegistrationWithConfig<GraphBuilder,
                                    GraphBuilder,
                                    GraphBuilder::Config,
-                                   Labelspace,
+                                   RunContext,
                                    SharedDsgInfo::Ptr,
-                                   SharedModuleState::Ptr,
+                                   std::shared_ptr<SharedModuleState>,
                                    std::unique_ptr<VolumetricWindow>>("GraphBuilder");
 
 }
@@ -111,11 +111,12 @@ GraphBuilder::Config::Config()
       deformation_graph_builder(DeformationGraphBuilder::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
-                           const Labelspace& labelspace,
+                           const RunContext& context,
                            const SharedDsgInfo::Ptr& dsg,
-                           const SharedModuleState::Ptr& state,
+                           const std::shared_ptr<SharedModuleState>& state,
                            std::unique_ptr<VolumetricWindow>&& window)
-    : config(config::checkValid(config)),
+    : Module(context),
+      config(config::checkValid(config)),
       queue_(std::make_shared<InputQueue>()),
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       dsg_(dsg),
@@ -124,18 +125,16 @@ GraphBuilder::GraphBuilder(const Config& config,
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(std::move(window)),
-      surface_places_(config.surface_places.create(labelspace.surface_places_labels)),
+      surface_places_(
+          config.surface_places.create(context.labelspace().surface_places_labels)),
       sinks_(Sink::instantiate(config.sinks)) {
   if (config.enable_mesh_objects) {
-    segmenter_ =
-        std::make_unique<MeshSegmenter>(config.object_config, labelspace.object_labels);
+    segmenter_ = std::make_unique<MeshSegmenter>(config.object_config,
+                                                 context.labelspace().object_labels);
   }
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
-  const auto& global_info = GlobalInfo::instance();
-  dsg_->graph->setMesh(global_info.createMesh());
-
   if (mesh_compression_) {
     addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   }
@@ -172,7 +171,10 @@ void GraphBuilder::start() {
   MLOG(0) << "started!";
 }
 
-void GraphBuilder::stop() { stopImpl(); }
+void GraphBuilder::stop(bool force) {
+  force_shutdown_ = force;
+  stopImpl();
+}
 
 void GraphBuilder::stopImpl() {
   should_shutdown_ = true;
@@ -186,7 +188,7 @@ void GraphBuilder::stopImpl() {
   }
 }
 
-void GraphBuilder::save(const DataDirectory& output) {
+void GraphBuilder::save(const DataDirectory* output) {
   const auto output_path = output.path("frontend");
   {  // the graph and the bindings are only consistent under the frontend lock
     std::lock_guard<std::mutex> lock(mutex_);
@@ -214,7 +216,7 @@ void GraphBuilder::save(const DataDirectory& output) {
   }
 }
 
-std::string GraphBuilder::printInfo() const {
+std::string GraphBuilder::show() const {
   return config::toString(config) + "\n" + Sink::printSinks(sinks_);
 }
 
@@ -235,7 +237,7 @@ void GraphBuilder::spin() {
     }
 
     bool has_data = queue_->poll();
-    if (GlobalInfo::instance().force_shutdown() || !has_data) {
+    if (force_shutdown_ || !has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
     }
@@ -268,7 +270,7 @@ void GraphBuilder::spin() {
   }
 
   // Process pending collated packet if it exists
-  if (input && !GlobalInfo::instance().force_shutdown()) {
+  if (input && !force_shutdown_) {
     spinOnce(input);
   }
 }
@@ -408,7 +410,17 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
 
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
+    auto mesh = dsg_->graph->mesh();
+    if (!mesh && last_mesh_update_->getNumVertices()) {
+      const auto props = last_mesh_update_->vertex_properties();
+      mesh = std::make_shared<Mesh>(
+          props.has_color, true, props.has_label, props.has_first_seen_stamp);
+      dsg_->graph->setMesh(mesh);
+    }
+
+    if (mesh) {
+      last_mesh_update_->updateMesh(*mesh, mesh_offsets_);
+    }
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);

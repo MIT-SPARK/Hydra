@@ -40,7 +40,6 @@
 #include <stdexcept>
 
 #include "hydra/backend/backend_module.h"
-#include "hydra/common/global_info.h"
 
 namespace hydra {
 

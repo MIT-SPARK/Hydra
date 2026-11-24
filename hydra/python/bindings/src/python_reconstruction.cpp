@@ -47,7 +47,6 @@
 #include "hydra/active_window/reconstruction_module.h"
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
-#include "hydra/common/global_info.h"
 #include "hydra/common/labelspace.h"
 #include "hydra/frontend/mesh_compression.h"
 #include "hydra/input/input_filter.h"

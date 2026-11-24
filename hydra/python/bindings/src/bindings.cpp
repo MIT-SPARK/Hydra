@@ -46,7 +46,6 @@
 #include "hydra/bindings/python_reconstruction.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
-#include "hydra/common/global_info.h"
 #include "hydra/utils/app_plugin.h"
 
 namespace py = pybind11;
@@ -131,22 +130,14 @@ PYBIND11_MODULE(_hydra_bindings, m) {
 
   m.def(
       "init_config_context",
-      [](const std::vector<std::string>& args,
-         bool init_settings,
-         bool init_global_info) {
+      [](const std::vector<std::string>& args, bool init_settings) {
         config::initContext(args);
         if (init_settings) {
           config::setConfigSettingsFromContext();
         }
-
-        if (init_global_info) {
-          const auto global_config = config::fromContext<PipelineConfig>();
-          GlobalInfo::init(global_config);
-        }
       },
       "args"_a,
-      "init_settings"_a = true,
-      "init_global_info"_a = true);
+      "init_settings"_a = true);
 
   py::class_<Eigen::Quaterniond>(m, "Quaterniond")
       .def(py::init([]() { return Eigen::Quaterniond::Identity(); }))

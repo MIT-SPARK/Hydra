@@ -38,7 +38,6 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
-#include <hydra/common/global_info.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>

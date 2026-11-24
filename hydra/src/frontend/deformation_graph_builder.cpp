@@ -40,7 +40,6 @@
 #include <kimera_pgmo/compression/block_compression.h>
 #include <kimera_pgmo/utils/common_functions.h>
 
-#include "hydra/common/global_info.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/timing_utilities.h"
 

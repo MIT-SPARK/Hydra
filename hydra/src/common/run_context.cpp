@@ -51,14 +51,6 @@ namespace hydra {
 using ColorMapPtr = std::shared_ptr<SemanticColorMap>;
 using timing::ElapsedTimeRecorder;
 
-void declare_config(RunContext::MeshFields& config) {
-  using namespace config;
-  name("RunContext::Config::MeshFields");
-  field(config.with_colors, "with_colors");
-  field(config.with_first_seen_stamps, "with_first_seen_stamps");
-  field(config.with_labels, "with_labels");
-}
-
 void declare_config(RunContext::Frames& frames) {
   using namespace config;
   name("RunContext::Config::Frames");
@@ -76,7 +68,6 @@ void declare_config(RunContext& config) {
   field(config.default_verbosity, "default_verbosity");
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
-  field(config.mesh, "mesh");
   field(config.semantic_layers, "semantic_layers");
   field(config.graph, "graph");
 
@@ -84,7 +75,7 @@ void declare_config(RunContext& config) {
   field(config.frames, "frames", false);
 }
 
-RunContext::RunContext(size_t robot_id) : robot_id_(robot_id), force_shutdown_(false) {}
+RunContext::RunContext(size_t robot_id) : robot_id_(robot_id) {}
 
 void RunContext::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
@@ -99,20 +90,8 @@ void RunContext::initFromConfig(const PipelineConfig& config, int robot_id) {
   }
 }
 
-void RunContext::setForceShutdown(bool force_shutdown) {
-  force_shutdown_ = force_shutdown;
-}
-
-bool RunContext::force_shutdown() const { return force_shutdown_; }
-
 RobotPrefixConfig RunContext::robot_prefix() const {
   return RobotPrefixConfig(robot_id_);
-}
-
-spark_dsg::Mesh::Ptr RunContext::createMesh() const {
-  // we force the mesh to have last seen stamps
-  return std::make_shared<spark_dsg::Mesh>(
-      mesh.with_colors, true, mesh.with_labels, mesh.with_first_seen_stamps);
 }
 
 }  // namespace hydra

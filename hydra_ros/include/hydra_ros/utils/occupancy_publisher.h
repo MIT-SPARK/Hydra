@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/common/global_info.h>
 #include <ianvs/node_handle.h>
 #include <spark_dsg/bounding_box.h>
 #include <spatial_hash/voxel_layer.h>

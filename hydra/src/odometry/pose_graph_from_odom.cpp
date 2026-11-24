@@ -39,8 +39,6 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
-#include "hydra/common/global_info.h"
-
 namespace hydra {
 namespace {
 
