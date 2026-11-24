@@ -33,12 +33,12 @@ We'll use the Zed2i camera as a working example. The camera provides the followi
 The first step is to set up the segmentation network by including `closed_set.launch.yaml` from `semantic_inference`:
 ```yaml
 - group:  # semantic segmentation
-  - push_ros_namespace: zed
+  - push_ros_namespace: {namespace: zed}
   - set_remap: {from: color/image_raw, to: zed_node/left/image_rect_color}
   - include:
       file: $(find-pkg-share semantic_inference_ros)/launch/closed_set.launch.yaml
       arg:
-        - {name: labelspace_name, value: $(arg labelspace_name)}
+        - {name: labelspace_name, value: $(var labelspace_name)}
 ```
 
 There are three key points.
@@ -46,7 +46,7 @@ There are three key points.
 The first is that we namespace everything in the `zed` namespace to make connecting inputs to the node responsible for segmentation easier, and is good practice for multi-camera setups:
 ```yaml
 - group:
-  - push_ros_namespace: zed
+  - push_ros_namespace: {namespace: zed}
 ```
 
 The second is that we remap the input of the closed set node:
@@ -57,7 +57,7 @@ The second is that we remap the input of the closed set node:
 The third is that we need to set the labelspace that `semantic_inference` uses:
 ```yaml
   arg:
-    - {name: labelspace_name, value: $(arg labelspace_name)}
+    - {name: labelspace_name, value: $(var labelspace_name)}
 ```
 This remaps the output of the network (the 150 categories from ade20k) to a condense labelspace of 50ish labels.
 
@@ -74,6 +74,7 @@ Next, we add remappings to connect the input topics for Hydra to the camera:
 > **Note** <br>
 > We know the topics that Hydra expects for inputs based on the input name (`camera`) and receiver type (`ImageReceiver`) that's specified in the input configuration (which we'll look at in more detail later).
 
+Declare `config_path` as the path to your copy of `example_config.yaml`, and `log_path` as the output directory (for example, `$(env HOME)/.hydra/zed2i`).
 We then add Hydra:
 ```yaml
 - node:  # hydra
@@ -81,10 +82,10 @@ We then add Hydra:
     exec: hydra_ros_node
     name: hydra
     args: >
-      --config-utilities-yaml {map_frame: map, odom_frame: odom, robot_frame: zed_camera_link, sensor_frame: zed_left_camera_frame}
-      --config-utilities-file $(find-pkg-share hydra_ros)/doc/examples/example_config.yaml
-      --config-utilities-file $(find-pkg-share hydra)/config/label_spaces/$(var labelspace_name)_label_space.yaml
-      --config-utilities-yaml {log_path: $(env HOME)/.hydra/$(var dataset)}
+      --config-utilities-yaml {map_frame: map, odom_frame: odom, robot_frame: zed_camera_link, input: {inputs: {camera: {sensor: {extrinsics: {sensor_frame: zed_left_camera_frame}}}}}}
+      --config-utilities-file $(var config_path)
+      --config-utilities-file $(find-pkg-share hydra)/config/label_spaces/$(var labelspace_name)_label_space.yaml@labelspace
+      --config-utilities-yaml {log_path: $(var log_path)}
 ```
 
 > **Note** <br>
@@ -92,12 +93,12 @@ We then add Hydra:
 
 The frame IDs that we identified earlier are specified here:
 ```yaml
-{map_frame: map, odom_frame: odom, robot_frame: zed_camera_link, sensor_frame: zed_left_camera_frame}
+{map_frame: map, odom_frame: odom, robot_frame: zed_camera_link, input: {inputs: {camera: {sensor: {extrinsics: {sensor_frame: zed_left_camera_frame}}}}}}
 ```
 
 When Hydra shuts down, it will save the scene graph and various artifacts to
 ```yaml
-{log_path: $(env HOME)/.hydra/$(var dataset)}
+{log_path: $(var log_path)}
 ```
 
 #### Visualization
@@ -109,13 +110,13 @@ Finally, we want to connect the output topic from Hydra (`hydra/backend/dsg`) to
     file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
 ```
 
-The full launch file can be found [here](./examples/example_camera.launch.yaml)
+The full launch file can be found [here](./examples/example_camera.launch.yaml). Pass `config_path:=/absolute/path/to/example_config.yaml` when launching it.
 
 ### Configuring Hydra
 
 When making the launch file for Hydra, we included this line:
 ```yaml
-      --config-utilities-file $(find-pkg-share hydra_ros)/doc/examples/example_config.yaml
+      --config-utilities-file $(var config_path)
 ```
 which points Hydra to [this](./examples/example_config.yaml) file.
 
@@ -126,7 +127,6 @@ This file is divided into several parts, which we'll also walk through.
 This block sets up the input(s) for Hydra:
 ```yaml
 input:
-  type: RosInput
   inputs:
     camera:
       receiver:
@@ -168,5 +168,7 @@ These are specified in this block:
   update_functors:
     agents: {type: UpdateAgentsFunctor}
     objects: {type: UpdateObjectsFunctor}
-    surface_places: {type: Update2dPlacesFunctor, min_size: 3}
+    surface_places: {type: Update2dPlacesFunctor}
 ```
+
+Loop-closure presets in `hydra/config/lcd` describe a `LoopClosureModule` and must be loaded under `lcd` (for example, `--config-utilities-file /path/to/default.yaml@lcd`). The GNN presets additionally require a build with `HYDRA_GNN=ON` and the model paths supplied through `--config-utilities-var object_model_path=/path/to/objects.pt` and `--config-utilities-var places_model_path=/path/to/places.pt`. When using `hydra.launch.yaml`, supply these paths with the `object_model_path` and `places_model_path` launch arguments.

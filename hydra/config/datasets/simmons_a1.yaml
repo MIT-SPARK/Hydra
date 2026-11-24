@@ -12,7 +12,6 @@ active_window:
       type: MLESemanticIntegrator
 frontend:
   mesh_compression: {resolution: 0.005}
-  pgmo: {horizon_s: 100.0, resolution: 2.5}
   objects:
     min_cluster_size: 25
     cluster_tolerance: 0.18
@@ -28,13 +27,12 @@ frontend:
         parent_l1_separation: 20
         parent_cos_angle_separation: 0.2
     graph:
-      type: CompressionGraphExtractor
       compression_distance_m: 1.0
       min_node_distance_m: 0.4
-      min_edge_distance_m: 0.3
-      add_heuristic_edges: false
+      overlap_edges: {enable: false}
+      freespace_edges: {enable: false}
+  deformation_graph_builder: {horizon_s: 100.0, resolution: 2.5}
 backend:
-  add_places_to_deformation_graph: true
   optimize_on_lc: true
   enable_node_merging: true
   update_functors:
@@ -68,7 +66,6 @@ backend:
       type: ZmqRoomLabelUpdater
   pgmo:
     run_mode: FULL  # kimera_pgmo run mode FULL is required
-    embed_trajectory_delta_t: 5.0
     num_interp_pts: 3
     interp_horizon: 10.0
     optimizer:
@@ -82,11 +79,8 @@ backend:
     covariance:
       odom: 1.0e-02
       loop_close: 5.0e-02
-      sg_loop_close: 1.0e-01
       prior: 1.0e-02
       mesh_mesh: 1.0e-01
       pose_mesh: 1.0e-01
-      place_mesh: 1.0e-01
-      place_edge: 10.0
-      place_merge: 10.0
-      object_merge: 10.0
+  optimization_hooks:
+    - {type: MstPlaceFactors, mesh_variance: 1.0e-01, edge_variance: 10.0}

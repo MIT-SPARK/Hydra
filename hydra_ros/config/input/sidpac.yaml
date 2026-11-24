@@ -1,16 +1,15 @@
 ---
 input:
-  type: RosInput
   inputs:
-    - receiver:
+    camera:
+      receiver:
         type: ImageReceiver
         semantics_type: closed_set
         queue_size: 30
       sensor:
         type: camera_info
-        min_range: $(arg sensor_min_range)
-        max_range: $(arg sensor_max_range)
-        camera_info_topic: $(arg rgb_info_topic)
+        min_range: $<var sensor_min_range>
+        max_range: $<var sensor_max_range>
         extrinsics:
           type: param
           body_p_sensor: [0.00012, -0.00084, 0.00026]

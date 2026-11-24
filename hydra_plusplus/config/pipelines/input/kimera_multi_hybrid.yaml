@@ -1,6 +1,5 @@
 ---
 input:
-  type: RosInput
   tf_lookup: {verbosity: 1}
   clear_queue_on_fail: true
   inputs:

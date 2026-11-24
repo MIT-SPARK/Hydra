@@ -1,16 +1,15 @@
 ---
 input:
-  type: RosInput
   inputs:
-    - receiver:
+    camera:
+      receiver:
         type: ImageReceiver
         semantics_type: closed_set
         queue_size: 30
       sensor:
         type: camera_info
-        min_range: $(arg sensor_min_range)
-        max_range: $(arg sensor_max_range)
-        camera_info_topic: $(arg rgb_info_topic)
+        min_range: $<var sensor_min_range>
+        max_range: $<var sensor_max_range>
         extrinsics:
           type: kimera
-          sensor_filepath: $(arg kimera_sensor_filepath)
+          sensor_filepath: $<var kimera_sensor_filepath>

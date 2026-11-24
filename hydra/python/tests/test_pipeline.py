@@ -170,3 +170,18 @@ def test_reconstruction_restores_context_settings(tmp_path):
     with (tmp_path / "hydra_config.yaml").open() as stream:
         config = yaml.safe_load(stream)
     assert config["default_num_threads"] == 1
+
+
+@pytest.mark.parametrize("dataset,horizon", [("habitat", 15.0), ("sidpac", 100.0)])
+def test_dataset_deformation_settings(tmp_path, dataset, horizon):
+    """Dataset deformation tuning reaches the constructed frontend and saved config."""
+    sensor = hydra.make_camera(40.0, 40.0, 23.5, 23.5, 48, 48)
+    pipeline = hydra.load_pipeline(sensor, dataset, "ade20k_mp3d", output_path=tmp_path)
+    assert step(pipeline, 1)
+    pipeline.stop()
+    pipeline.save()
+    assert saved_mesh(tmp_path).num_vertices() > 0
+    with (tmp_path / "hydra_config.yaml").open() as stream:
+        config = yaml.safe_load(stream)
+    assert config["frontend"]["deformation_graph_builder"]["horizon_s"] == horizon
+    assert config["frontend"]["deformation_graph_builder"]["resolution"] == 2.5

@@ -89,6 +89,8 @@ void declare_config(GraphBuilder::Config& config) {
 
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
+  config.deformation_graph_builder.setOptional();
+  field(config.deformation_graph_builder, "deformation_graph_builder");
   config.keyframe_selector.setOptional();
   field(config.keyframe_selector, "keyframe_selector");
   config.freespace_places.setOptional();

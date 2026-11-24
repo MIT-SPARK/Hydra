@@ -1,7 +1,6 @@
 ---
 backend:
   type: MultiBackendModule
-  add_places_to_deformation_graph: false
   optimize_on_lc: true
   enable_node_merging: true
   update_functors:
@@ -36,12 +35,8 @@ backend:
     trans_sigma: 10.0
   pgmo:
     run_mode: FULL  # kimera_pgmo run mode FULL is required
-    embed_trajectory_delta_t: 5.0
     num_interp_pts: 3
     interp_horizon: 10.0
-    enable_sparsify: false
-    trans_node_dist: 1.0
-    rot_node_dist: 1.2
     optimizer:
       type: KimeraRpgoOptimizer
       solver: LM
@@ -52,11 +47,7 @@ backend:
     covariance:
       odom: 1.0e-02
       loop_close: 5.0e-02
-      sg_loop_close: 1.0e-01
       prior: 1.0e-02
       mesh_mesh: 1.0e-02
       pose_mesh: 1.0e-02
-      place_mesh: 1.0e-02
-      place_edge: 10.0
-      place_merge: 10.0
-      object_merge: 10.0
+  sg_loop_closure_variance: 1.0e-01

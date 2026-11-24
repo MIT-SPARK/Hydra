@@ -12,7 +12,7 @@ active_window:
       tracker: {type: MaxIouTracker, track_by: pixels, min_semantic_iou: 0.3, min_cross_iou: 0.3, voxel_size: 0.2, min_num_observations: 5}
       projective_integrator: {semantic_integrator: {type: SingleLabelIntegrator, labels_to_ignore: []}}
     velodyne16:
-      object_detector: {type: InstanceForwarding, min_cluster_size: 5, grid_size: 0.2, max_range: 15.0, verbosity: 0, instance_filter: {type: CategoryFilter}}
+      object_detector: {type: InstanceForwarding, min_cluster_size: 5, max_range: 15.0, verbosity: 0, instance_filter: {type: CategoryFilter}}
       tracker: {type: MaxIouTracker, track_by: voxels, min_semantic_iou: 0.1, min_cross_iou: 0.3, voxel_size: 0.4, min_num_observations: 2}
       projective_integrator:
         use_constant_weight: true
@@ -27,4 +27,5 @@ active_window:
         sensors:
           rgbd: {}
           velodyne16: {height_scale: 32.0}
+  min_output_separation: 0.5
 frontend: {enable_mesh_objects: false}

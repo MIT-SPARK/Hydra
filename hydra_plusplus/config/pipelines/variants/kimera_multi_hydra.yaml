@@ -1,4 +1,5 @@
 ---
+map_window: {type: spatial, max_radius_m: 15.0}  # NOTE(hyungtae) Radius should be larger than `max_range` + `voxel_size` * `voxels_per_side`
 active_window:
   type: ReconstructionModule
   tsdf:
@@ -18,6 +19,7 @@ active_window:
         sensors:
           rgbd: {}
           velodyne16: {height_scale: 32.0, overlay_alpha: 1.0}
+  full_update_separation_s: 0.5
 frontend:
   enable_mesh_objects: true
   objects:
