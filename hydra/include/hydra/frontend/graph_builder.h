@@ -69,7 +69,7 @@ class GraphBuilder : public Module {
   using InputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
   using OutputQueue = MessageQueue<FrontendOutput::ConstPtr>;
   using InputCallback = std::function<void(const ActiveWindowOutput&)>;
-  using Sink = OutputSink<uint64_t, Graph&, const FrontendOutput&>;
+  using Sink = OutputSink<uint64_t, const Graph&, const FrontendOutput&>;
 
   struct Config : public VerbosityConfig {
     Config();

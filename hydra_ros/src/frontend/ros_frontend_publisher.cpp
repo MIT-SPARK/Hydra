@@ -89,7 +89,7 @@ RosFrontendPublisher::RosFrontendPublisher(ianvs::NodeHandle nh,
 }
 
 void RosFrontendPublisher::call(uint64_t timestamp_ns,
-                                SceneGraph& graph,
+                                const SceneGraph& graph,
                                 const FrontendOutput& output) const {
   // TODO(nathan) make sure pgmo stamps the deformation graph
   if (output.deformation_graph && mesh_graph_pub_->get_subscription_count()) {

@@ -122,9 +122,15 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   ::hydra::python::python_sensors::addBindings(m);
 
   py::class_<RunContext, std::shared_ptr<RunContext>>(m, "RunContext")
-      .def(py::init([]() {
-        return std::make_shared<RunContext>(config::fromContext<RunContext::Config>());
-      }))
+      .def(py::init([](const Labelspace* labelspace) {
+             auto cfg = config::fromContext<RunContext::Config>();
+             if (labelspace) {
+               cfg.labelspace = *labelspace;
+             }
+
+             return std::make_shared<RunContext>(cfg);
+           }),
+           "labelspace"_a = py::none())
       .def_property_readonly(
           "labelspace", [](const RunContext& context) { return context.labelspace(); })
       .def_property_readonly(

@@ -46,6 +46,24 @@ pipeline.stop()  # drain pending work; stop(force=True) discards remaining work
 pipeline.save()
 ```
 
+For a labelspace generated from a segmentation model, populate a `Labelspace`
+and pass it when constructing the context:
+
+```python
+labels = hydra.Labelspace()
+labels.label_names = {0: "unknown", 1: "floor", 2: "chair"}  # Use the model's IDs and names.
+labels.total_labels = max(labels.label_names) + 1
+labels.invalid_labels = {0}
+labels.object_labels = {2}
+labels.surface_places_labels = {1}
+context = hydra.RunContext(labelspace=labels)
+pipeline = hydra.HydraPipeline(sensor, context)
+```
+
+This overrides the parsed labelspace and copies its values into the run. Later
+changes to `labels` do not change the context. Other settings still come from
+`config_utilities`, and the supplied labelspace is included in the saved config.
+
 Each `init_config_context()` replaces the previous parsing context. Construct a
 new context and pipeline for a dataset with different settings or a different
 labelspace. Only one pipeline executes at a time. Construct a new pipeline for

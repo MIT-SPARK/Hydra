@@ -13,7 +13,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def make_pipeline(path, robot_id, label, name, *, log_keyframes=False, num_threads=1):
+def make_pipeline(
+    path, robot_id, label, name, *, log_keyframes=False, num_threads=1, labelspace=None
+):
     hydra.init_config_context(
         [
             "hydra",
@@ -62,7 +64,7 @@ def make_pipeline(path, robot_id, label, name, *, log_keyframes=False, num_threa
             ),
         ]
     )
-    context = hydra.RunContext()
+    context = hydra.RunContext(labelspace=labelspace)
     sensor = hydra.make_camera(40.0, 40.0, 23.5, 23.5, 48, 48)
     return hydra.HydraPipeline(sensor, context, show_config=False), context
 
@@ -86,20 +88,45 @@ def saved_mesh(path):
     return mesh
 
 
-def test_sequential_labelspaces(tmp_path):
+@pytest.mark.parametrize("python_labelspace", [False, True])
+def test_sequential_labelspaces(tmp_path, python_labelspace):
     """Different runs use their own semantic dimensions, names, and robot IDs."""
     results = []
+    contexts = []
     for index, (robot_id, label, name) in enumerate(
         [(0, 1, "wall"), (2, 4, "chair"), (0, 1, "wall")]
     ):
         path = tmp_path / str(index)
-        pipeline, context = make_pipeline(path, robot_id, label, name)
+        expected_name = f"model_{name}" if python_labelspace else name
+        expected_total = label + (2 if python_labelspace else 1)
+        if index == 2:
+            context = contexts[0]
+            sensor = hydra.make_camera(40.0, 40.0, 23.5, 23.5, 48, 48)
+            pipeline = hydra.HydraPipeline(sensor, context, show_config=False)
+        else:
+            labels = None
+            if python_labelspace:
+                labels = hydra.Labelspace()
+                labels.total_labels = expected_total
+                labels.invalid_labels = {0}
+                labels.label_names = {label: expected_name}
+
+            configured_label = 0 if python_labelspace else label
+            pipeline, context = make_pipeline(
+                path, robot_id, configured_label, name, labelspace=labels
+            )
+            contexts.append(context)
+            if labels is not None:
+                labels.total_labels = 1
+                labels.label_names = {}
+
         assert context.robot_id == robot_id
-        assert context.labelspace.label_names == {label: name}
+        assert context.labelspace.total_labels == expected_total
+        assert context.labelspace.label_names == {label: expected_name}
         assert step(pipeline, label)
         assert step(pipeline, label, 2_000_000_000)
         pipeline.stop()
-        pipeline.save()
+        pipeline.save(path)
         graph = dsg.DynamicSceneGraph.load(str(path / "frontend/dsg_with_mesh.json"))
         agents = list(graph.get_layer(2, ord("a") + robot_id).nodes)
         assert agents
@@ -110,7 +137,10 @@ def test_sequential_labelspaces(tmp_path):
         with (path / "hydra_config.yaml").open() as stream:
             config = yaml.safe_load(stream)
         assert config["robot_id"] == robot_id
-        assert config["labelspace"]["total_semantic_labels"] == label + 1
+        assert config["labelspace"]["total_semantic_labels"] == expected_total
+        assert config["labelspace"]["label_names"] == [
+            {"label": label, "name": expected_name}
+        ]
         del pipeline
 
     assert results[0] == results[2]
