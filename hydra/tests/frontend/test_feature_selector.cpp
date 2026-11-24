@@ -38,6 +38,7 @@
 #include "hydra/frontend/feature_selector.h"
 #include "hydra/input/camera.h"
 #include "hydra/input/input_data.h"
+#include "hydra/input/lidar.h"
 
 namespace hydra {
 namespace {
@@ -108,6 +109,41 @@ TEST(ViewSelector, UsesColumnAndRowBoundsForWideImages) {
   // Nearby pixels with no range observation must not inherit that visibility.
   EXPECT_FALSE(view.pointInView(Eigen::Vector3d(0.85, 0.0, 1.0), 0.1));
   EXPECT_FALSE(view.pointInView(Eigen::Vector3d(1.0, 0.0, 1.0), 0.1));
+}
+
+TEST(ViewSelector, UsesLidarRangeImageBinning) {
+  Lidar::Config config;
+  config.min_range = 1.0;
+  config.max_range = 5.0;
+  config.horizontal_fov = 180.0;
+  config.horizontal_resolution = 180.0 / 640.0;
+  config.vertical_fov = 90.0;
+  config.vertical_resolution = 90.0 / 480.0;
+  config.extrinsics = ParamSensorExtrinsics::Config();
+  const auto lidar = std::make_shared<Lidar>(config, "test_lidar");
+
+  // Projects to (320.75, 240), so the return is stored in column 321.
+  const Eigen::Vector3f point(2.0f, -0.00736f, 0.0f);
+  InputData data(lidar);
+  data.world_T_body = Eigen::Isometry3d::Identity();
+  data.vertex_map = cv::Mat(1, 1, InputData::VertexMatType);
+  data.vertex_map.at<InputData::VertexType>(0, 0) = {point.x(), point.y(), point.z()};
+  ASSERT_TRUE(lidar->finalizeRepresentations(data));
+  ASSERT_GT(data.range_image.at<InputData::RangeType>(240, 321), 0.0f);
+  EXPECT_TRUE(FeatureView(data).pointInView(point.cast<double>(), 0.1));
+}
+
+TEST(ViewSelector, InterpolatesRangeAcrossSmoothSurfaces) {
+  const auto camera = createCamera(60.0, 90.0, {0.1, 5.0});
+  InputData data(camera);
+  data.world_T_body = Eigen::Isometry3d::Identity();
+  data.range_image = cv::Mat(480, 640, InputData::RangeMatType, cv::Scalar(0.0f));
+  data.range_image(cv::Rect(320, 240, 1, 2)).setTo(1.0f);
+  data.range_image(cv::Rect(321, 240, 1, 2)).setTo(1.16f);
+
+  // At (320.25, 240), the interpolated range is 1.04 m.
+  const Eigen::Vector3d point(1.05 * 0.25 / 320.0, 0.0, 1.05);
+  EXPECT_TRUE(FeatureView(data).pointInView(point, 0.02f));
 }
 
 TEST(VmfFeatureSelector, NormalizesViewsBeforeFittingDistribution) {

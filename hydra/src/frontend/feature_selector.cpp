@@ -4,8 +4,11 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 
+#include <cmath>
+
 #include "hydra/input/input_data.h"
 #include "hydra/openset/vmf_distance.h"
+#include "hydra/reconstruction/projection_interpolators.h"
 
 namespace hydra {
 namespace {
@@ -45,21 +48,20 @@ bool FeatureView::pointInView(const Eigen::Vector3d& point_w,
     *point_s = p_s;
   }
 
-  int u = 0;
-  int v = 0;
-  if (!sensor.projectPointToImagePlane(p_s.cast<float>(), u, v)) {
+  float u = 0.0f;
+  float v = 0.0f;
+  if (!sensor.projectPointToImagePlane(p_s.cast<float>(), u, v) || !std::isfinite(u) ||
+      !std::isfinite(v)) {
     return false;
   }
 
-  if (u < 0 || u >= range_image.cols || v < 0 || v >= range_image.rows) {
+  static const InterpolatorAdaptive interpolator(InterpolatorAdaptive::Config{});
+  const auto weights = interpolator.computeWeights(u, v, range_image);
+  if (!weights.valid) {
     return false;
   }
 
-  const auto range = range_image.at<InputData::RangeType>(v, u);
-  if (range < 1.0e-6f || !std::isfinite(range)) {
-    return false;
-  }
-
+  const auto range = interpolator.interpolateRange(range_image, weights);
   // This is positive if the point is occluded by the observed range image
   const auto diff = p_s.norm() - range;
   return diff < max_range_difference_m;

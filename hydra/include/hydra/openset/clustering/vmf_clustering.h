@@ -33,6 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+
+#include <unordered_map>
+
 #include "hydra/openset/layer_clustering.h"
 #include "hydra/utils/logging.h"
 
@@ -41,7 +44,7 @@ namespace hydra {
 class VmfClustering : public LayerClustering {
  public:
   struct Config : LayerClustering::Config, VerbosityConfig {
-    //! Assigns zero query score to nodes without features instead of dropping them
+    //! Lets nodes without features receive query scores through propagation
     bool allow_empty_scores = true;
     //! Multiplier for the reference median-concentration/median-degree scale
     float propagation_strength = 1.0f;
@@ -57,5 +60,26 @@ class VmfClustering : public LayerClustering {
 };
 
 void declare_config(VmfClustering::Config& config);
+
+namespace vmf {
+
+struct ScoreEntry {
+  Eigen::VectorXf scores;
+  float kappa;
+};
+
+using ScoreWorkspace = std::unordered_map<spark_dsg::NodeId, ScoreEntry>;
+
+ScoreWorkspace computeScores(const spark_dsg::SceneGraphLayer& layer,
+                             const EmbeddingGroup& queries,
+                             const EmbeddingDistance& metric,
+                             bool allow_empty_scores);
+
+// The initial scores must use node IDs from the layer and a common query order.
+ScoreWorkspace propagateScores(const spark_dsg::SceneGraphLayer& layer,
+                               const ScoreWorkspace& initial,
+                               const VmfClustering::Config& config);
+
+}  // namespace vmf
 
 }  // namespace hydra

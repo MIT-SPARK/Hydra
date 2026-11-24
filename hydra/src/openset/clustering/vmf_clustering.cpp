@@ -45,8 +45,6 @@
 #include <queue>
 #include <unordered_set>
 
-#include "vmf_clustering_utilities.h"
-
 using namespace spark_dsg;
 
 namespace hydra {
@@ -253,6 +251,11 @@ auto VmfClustering::cluster(const spark_dsg::SceneGraphLayer& layer) const -> Cl
 
   std::unordered_map<NodeId, Eigen::Index> labels;
   for (const auto& [id, entry] : scores) {
+    // Unreached nodes still have their initial zero scores and no observation.
+    if (entry.kappa == 0.0f && (entry.scores.array() == 0.0f).all()) {
+      continue;
+    }
+
     Eigen::Index label;
     entry.scores.maxCoeff(&label);
     labels.emplace(id, label);
