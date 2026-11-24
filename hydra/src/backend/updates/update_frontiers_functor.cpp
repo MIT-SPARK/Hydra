@@ -35,9 +35,11 @@
 #include "hydra/backend/updates/update_frontiers_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <glog/logging.h>
 #include <spark_dsg/scene_graph.h>
 
+#include "hydra/common/robot_prefix_config.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -62,7 +64,7 @@ UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
                             SceneGraph& unmerged_dsg,
                             SharedDsgInfo* dsg) {
     if (dsg) {
-      cleanup(info->timestamp_ns, unmerged_dsg, *dsg);
+      cleanup(info, unmerged_dsg, *dsg);
     }
   };
 
@@ -132,10 +134,10 @@ bool check_against_2d_places(const SharedDsgInfo& dsg,
   return false;
 }
 
-void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
+void UpdateFrontiersFunctor::cleanup(const UpdateInfo::ConstPtr& info,
                                      SceneGraph& unmerged_dsg,
                                      SharedDsgInfo& dsg) const {
-  ScopedTimer spin_timer("backend/cleanup_frontiers", timestamp_ns);
+  ScopedTimer spin_timer("backend/cleanup_frontiers", info->timestamp_ns);
   if (!dsg.graph->hasLayer(DsgLayers::PLACES)) {
     return;
   }
@@ -158,6 +160,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
     return;
   }
 
+  const RobotPrefixConfig prefix(info->robot_id);
   NodeSymbol pgmo_key(prefix.key, agents->numNodes() - 1);
   Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;
   Eigen::Quaterniond agent_quat =

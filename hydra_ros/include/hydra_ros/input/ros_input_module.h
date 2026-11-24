@@ -48,14 +48,16 @@ class RosInputModule : public InputModule {
     bool clear_queue_on_fail = true;
 
     //!  @brief Get config for base class
-    InputModule::Config remapSensors() const;
+    InputModule::Config remapSensors(const RobotConfig& robot) const;
   } const config;
 
-  RosInputModule(const Config& config, const DataQueue::Ptr& output_queue);
+  RosInputModule(const Config& config,
+                 RunContext::ConstPtr context,
+                 const DataQueue::Ptr& output_queue);
 
   virtual ~RosInputModule();
 
-  std::string printInfo() const override;
+  std::string show() const override;
 
  protected:
   PoseStatus getBodyPose(const InputData& packet) override;

@@ -38,7 +38,7 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/robot_config.h>
 #include <hydra/input/camera.h>
 #include <hydra_visualizer/color/color_parsing.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
@@ -54,7 +54,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<KeyframeSelector::Sink,
                                    KeyframeVisualizer,
-                                   KeyframeVisualizer::Config>("KeyframeVisualizer");
+                                   KeyframeVisualizer::Config,
+                                   RobotConfig>("KeyframeVisualizer");
 
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
@@ -216,15 +217,16 @@ void declare_config(KeyframeVisualizer::Config& config) {
   checkInRange(config.image_plane_alpha, 0.0, 1.0, "image_plane_alpha");
 }
 
-KeyframeVisualizer::KeyframeVisualizer(const Config& config)
-    : nh_(ianvs::NodeHandle::this_node(config.ns)),
+KeyframeVisualizer::KeyframeVisualizer(const Config& config, const RobotConfig& robot)
+    : robot_(robot),
+      nh_(ianvs::NodeHandle::this_node(config.ns)),
       pubs_(nh_),
       config_("keyframe_visualizer", config) {}
 
 void KeyframeVisualizer::call(uint64_t timestamp_ns,
                               const KeyframeSelector::Keyframes& frames) const {
   std_msgs::msg::Header header;
-  header.frame_id = GlobalInfo::instance().getFrames().odom;
+  header.frame_id = robot_.frames.odom;
   header.stamp = rclcpp::Time(timestamp_ns);
   pubs_.publish("frustums", header, [&]() -> MarkerArray {
     return drawCameraFrustums(config_.get(), frames);

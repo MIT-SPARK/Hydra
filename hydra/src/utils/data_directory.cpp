@@ -83,6 +83,10 @@ DataDirectory::DataDirectory() : valid_(false) {}
 DataDirectory::DataDirectory(const std::filesystem::path& output_path,
                              std::optional<Config> _config)
     : config(_config.value_or(Config{})), valid_(false), root_path_(output_path) {
+  if (output_path.empty()) {
+    return;
+  }
+
   if (config.use_timestamp) {
     root_path_ /= getDateTime(config.timestamp_format);
   }
@@ -114,9 +118,14 @@ fs::path DataDirectory::path(const std::filesystem::path& sub_path) const {
 }
 
 DataDirectory DataDirectory::child(const std::string& sub_path) const {
+  if (!valid_) {
+    return {};
+  }
+
   Config new_config = config;
   new_config.overwrite = false;  // no need to clear children
-  return DataDirectory(sub_path, new_config);
+  new_config.use_timestamp = false;
+  return DataDirectory(root_path_ / sub_path, new_config);
 }
 
 void DataDirectory::writeFileAtomic(const std::filesystem::path& filepath,

@@ -46,7 +46,7 @@
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/backend/backend_utilities.h"
-#include "hydra/common/global_info.h"
+#include "hydra/common/run_context.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -62,8 +62,9 @@ static const auto registration =
     config::RegistrationWithConfig<BackendModule,
                                    BackendModule,
                                    BackendModule::Config,
+                                   RunContext::ConstPtr,
                                    SharedDsgInfo::Ptr,
-                                   SharedModuleState::Ptr>("BackendModule");
+                                   std::shared_ptr<SharedModuleState>>("BackendModule");
 
 void writeBackendStatus(const std::vector<BackendModuleStatus>& entries,
                         const std::filesystem::path& filename) {
@@ -112,36 +113,41 @@ void declare_config(BackendModule::Config& config) {
 }
 
 BackendModule::BackendModule(const Config& config,
+                             RunContext::ConstPtr context,
                              const SharedDsgInfo::Ptr& dsg,
-                             const SharedModuleState::Ptr& state)
+                             const std::shared_ptr<SharedModuleState>& state)
     : KimeraPgmoInterface(config.pgmo),
+      Module(context),
       config(config::checkValid(config)),
       queue_(new InputQueue()),
       lcd_queue_(new LcdQueue()),
       private_dsg_(dsg),
       state_(state),
       external_lc_receiver_(config.external_loop_closures),
-      sinks_(Sink::instantiate(config.sinks)) {
+      sinks_(Sink::instantiate(config.sinks, context->config.robot)) {
   for (const auto& hook : config.optimization_hooks) {
-    optimization_hooks_.push_back(hook.create());
+    optimization_hooks_.push_back(hook.create(context->config.robot));
   }
 
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
-  private_dsg_->graph->setMesh(GlobalInfo::instance().createMesh());
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
-  dsg_updater_.reset(new DsgUpdater(config, unmerged_graph_, private_dsg_));
+  dsg_updater_.reset(new DsgUpdater(this->config, unmerged_graph_, private_dsg_));
 }
 
 BackendModule::~BackendModule() { stopImpl(); }
 
 void BackendModule::start() {
+  should_shutdown_ = false;
+  force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
   LOG(INFO) << "[Hydra Backend] started!";
 }
 
 void BackendModule::stopImpl() {
-  should_shutdown_ = true;
+  if (should_shutdown_.exchange(true)) {
+    return;
+  }
 
   if (spin_thread_) {
     VLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
@@ -157,14 +163,22 @@ void BackendModule::stopImpl() {
   }
 }
 
-void BackendModule::stop() { stopImpl(); }
+void BackendModule::stop(bool force) {
+  force_shutdown_ = force;
+  stopImpl();
+}
 
-void BackendModule::save(const DataDirectory& output) {
+void BackendModule::save(const DataDirectory* output) {
+  const auto& logs = output ? *output : context->logs;
+  if (!logs) {
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(mutex_);
-  dsg_updater_->save(output, "backend");
+  dsg_updater_->save(logs, "backend");
 
-  const auto backend_path = output.path("backend");
-  const auto filename = output.path("backend") / "pgmo_status.csv";
+  const auto backend_path = logs.path("backend");
+  const auto filename = logs.path("backend") / "pgmo_status.csv";
   writeBackendStatus(status_log_, filename);
 
   deformation_graph_->save(backend_path / "deformation_graph.json");
@@ -193,7 +207,7 @@ void BackendModule::save(const DataDirectory& output) {
   }
 }
 
-std::string BackendModule::printInfo() const {
+std::string BackendModule::show() const {
   return config::toString(config) + "\n" + Sink::printSinks(sinks_);
 }
 
@@ -201,7 +215,11 @@ void BackendModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
     bool has_data = queue_->poll();
-    if (GlobalInfo::instance().force_shutdown() || !has_data) {
+    if (force_shutdown_) {
+      break;
+    }
+
+    if (!has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
     }
@@ -296,6 +314,7 @@ UpdateInfo::Ptr BackendModule::getUpdateInfo(uint64_t timestamp_ns) {
     info.reset(new UpdateInfo{timestamp_ns});
   }
 
+  info->robot_id = context->robot_prefix().id;
   return info;
 }
 
@@ -461,7 +480,16 @@ void BackendModule::copyMeshDelta(const FrontendOutput& input) {
 
   {  // mesh critical section
     std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
-    input.mesh_update->updateMesh(*private_dsg_->graph->mesh(), mesh_offsets_);
+    auto mesh = private_dsg_->graph->mesh();
+    if (!mesh) {
+      const auto props = input.mesh_update->vertex_properties();
+      mesh = std::make_shared<Mesh>(
+          props.has_color, true, props.has_label, props.has_first_seen_stamp);
+      private_dsg_->graph->setMesh(mesh);
+      unmerged_graph_->setMesh(mesh);
+    }
+
+    input.mesh_update->updateMesh(*mesh, mesh_offsets_);
     input.mesh_update->updateVertices(original_vertices_);
   }  // mesh critical section
 
@@ -518,7 +546,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
                                    original_vertices_,
-                                   GlobalInfo::instance().getRobotPrefix().vertex_key,
+                                   context->robot_prefix().vertex_key,
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
                                    last_deformed_vertices_);
@@ -526,13 +554,11 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 }
 
 void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
-  deformation_graph_->removePriorsWithPrefix(
-      GlobalInfo::instance().getRobotPrefix().key);
+  deformation_graph_->removePriorsWithPrefix(context->robot_prefix().key);
   std::vector<std::pair<gtsam::Key, gtsam::Pose3>> agent_measurements;
   for (const auto& node : meas.nodes) {
-    agent_measurements.push_back(
-        {gtsam::Symbol(GlobalInfo::instance().getRobotPrefix().key, node.key),
-         gtsam::Pose3(node.pose.matrix())});
+    agent_measurements.push_back({gtsam::Symbol(context->robot_prefix().key, node.key),
+                                  gtsam::Pose3(node.pose.matrix())});
   }
 
   deformation_graph_->processNodeMeasurements(agent_measurements);
@@ -579,7 +605,7 @@ void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
       continue;
     }
 
-    const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+    const auto& prefix = context->robot_prefix();
     const gtsam::Pose3 pose(edge.pose.matrix());
     const gtsam::Symbol src_key(prefix.key, edge.key_from);
     const gtsam::Symbol dest_key(prefix.key, edge.key_to);

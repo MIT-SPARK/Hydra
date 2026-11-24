@@ -39,7 +39,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/run_context.h>
 
 #include "hydra_ros/input/ros_sensors.h"
 
@@ -50,6 +50,7 @@ static const auto registration =
     config::RegistrationWithConfig<InputModule,
                                    RosInputModule,
                                    RosInputModule::Config,
+                                   RunContext::ConstPtr,
                                    InputModule::DataQueue::Ptr>("RosInput");
 
 inline bool isNumber(const std::string& name) {
@@ -68,7 +69,8 @@ void declare_config(RosInputModule::Config& config) {
   field(config.clear_queue_on_fail, "clear_queue_on_fail");
 }
 
-InputModule::Config RosInputModule::Config::remapSensors() const {
+InputModule::Config RosInputModule::Config::remapSensors(
+    const RobotConfig& robot) const {
   InputModule::Config to_return = *this;
   to_return.inputs.clear();  // technically not needed, but...
 
@@ -83,21 +85,23 @@ InputModule::Config RosInputModule::Config::remapSensors() const {
 
     to_return.inputs[sensor_name] = input_pair;
     to_return.inputs[sensor_name].sensor =
-        input::loadSensor(input_pair.sensor, sensor_name);
+        input::loadSensor(input_pair.sensor, sensor_name, robot.frames.robot);
   }
 
   return to_return;
 }
 
-RosInputModule::RosInputModule(const Config& config, const DataQueue::Ptr& queue)
-    : InputModule(config.remapSensors(), queue),
+RosInputModule::RosInputModule(const Config& config,
+                               RunContext::ConstPtr context,
+                               const DataQueue::Ptr& queue)
+    : InputModule(config.remapSensors(context->config.robot), context, queue),
       config(config),
-      lookup_(config.tf_lookup),
+      lookup_(config.tf_lookup, context->config.robot.frames),
       have_first_pose_(false) {}
 
-RosInputModule::~RosInputModule() = default;
+RosInputModule::~RosInputModule() { stop(); }
 
-std::string RosInputModule::printInfo() const { return config::toString(config); }
+std::string RosInputModule::show() const { return config::toString(config); }
 
 PoseStatus RosInputModule::getBodyPose(const InputData& packet) {
   const auto pose_status = lookup_.getBodyPose(packet.timestamp_ns);

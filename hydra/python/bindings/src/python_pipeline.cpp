@@ -42,8 +42,8 @@
 #include <hydra/active_window/reconstruction_module.h>
 #include <hydra/backend/backend_module.h>
 #include <hydra/backend/zmq_interfaces.h>
-#include <hydra/common/global_info.h>
 #include <hydra/common/hydra_pipeline.h>
+#include <hydra/common/run_context.h>
 #include <hydra/frontend/graph_builder.h>
 #include <hydra/input/camera.h>
 #include <hydra/loop_closure/loop_closure_module.h>
@@ -57,6 +57,7 @@
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
+#include "hydra/input/input_adapter.h"
 #include "hydra/input/input_filter.h"
 
 using namespace spark_dsg;
@@ -69,11 +70,12 @@ class PythonPipeline : public HydraPipeline {
     template <typename T>
     using VirtualConfig = config::VirtualConfig<T>;
     std::vector<config::VirtualConfig<InputFilter, true>> filters;
+    std::vector<config::VirtualConfig<InputAdapter, true>> adapters;
   } const config;
 
   PythonPipeline(const Config& config,
                  const Sensor::Ptr& sensor,
-                 std::unique_ptr<Labelspace>&& labelspace,
+                 RunContext::ConstPtr context,
                  size_t max_queue_size,
                  bool show_config);
 
@@ -83,9 +85,7 @@ class PythonPipeline : public HydraPipeline {
 
   void start() override;
 
-  void stop() override;
-
-  void reset();
+  void stop(bool force = false) override;
 
   bool step(const std::shared_ptr<SensorInputPacket>& packet,
             const Eigen::Isometry3d& world_T_body);
@@ -99,30 +99,29 @@ class PythonPipeline : public HydraPipeline {
   const size_t max_queue_size_;
   SensorInputPacket::Ptr last_input_;
   std::vector<std::unique_ptr<InputFilter>> filters_;
+  std::vector<std::unique_ptr<InputAdapter>> adapters_;
 };
 
 void declare_config(PythonPipeline::Config& config) {
   using namespace config;
   name("PythonPipeline::Config");
   base<HydraPipeline::Config>(config);
+  field(config.filters, "filters");
+  field(config.adapters, "adapters");
 }
 
 PythonPipeline::PythonPipeline(const Config& _config,
                                const Sensor::Ptr& sensor,
-                               std::unique_ptr<Labelspace>&& labelspace,
+                               RunContext::ConstPtr context,
                                size_t max_queue_size,
                                bool show_config)
-    : HydraPipeline(_config, std::move(labelspace)),
+    : HydraPipeline(_config, context),
       config(_config),
       sensor(sensor),
       running_(false),
       max_queue_size_(max_queue_size) {
   if (!sensor) {
     throw std::runtime_error("Invalid sensor!");
-  }
-
-  for (const auto& filter : config.filters) {
-    filters_.push_back(filter.create());
   }
 
   init();
@@ -136,6 +135,13 @@ PythonPipeline::PythonPipeline(const Config& _config,
 void PythonPipeline::init() {
   HydraPipeline::init();
   active_window_->queue()->set_max_size(max_queue_size_);
+  for (const auto& filter : config.filters) {
+    filters_.push_back(filter.create());
+  }
+
+  for (const auto& adapter : config.adapters) {
+    adapters_.push_back(adapter.create());
+  }
 }
 
 void PythonPipeline::start() {
@@ -143,15 +149,9 @@ void PythonPipeline::start() {
   HydraPipeline::start();
 }
 
-void PythonPipeline::stop() {
-  HydraPipeline::stop();
+void PythonPipeline::stop(bool force) {
+  HydraPipeline::stop(force);
   running_ = false;
-}
-
-void PythonPipeline::reset() {
-  stop();       // make sure everything is done
-  initState();  // resets scene graphs
-  init();       // created modules
 }
 
 bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
@@ -160,6 +160,12 @@ bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
   input->timestamp_ns = packet->timestamp_ns;
   input->world_T_body = odom_T_body;
   packet->fillInputData(*input);
+  for (const auto& adapter : adapters_) {
+    if (adapter) {
+      adapter->update(*input);
+    }
+  }
+
   for (const auto& filter : filters_) {
     if (!filter) {
       continue;
@@ -204,34 +210,30 @@ void addBindings(pybind11::module_& m) {
   namespace fs = std::filesystem;
   py::class_<PythonPipeline>(m, "HydraPipeline")
       .def(py::init([](const Sensor::Ptr& sensor,
-                       const Labelspace& labelspace,
-                       int id,
+                       RunContext::ConstPtr context,
                        size_t max_queue_size,
                        bool show_config) {
              const auto config = config::fromContext<PythonPipeline::Config>();
-             const auto global_config = config::fromContext<PipelineConfig>();
-             GlobalInfo::init(global_config, id);
              return std::make_unique<PythonPipeline>(
-                 config,
-                 sensor,
-                 std::make_unique<Labelspace>(labelspace),
-                 max_queue_size,
-                 show_config);
+                 config, sensor, context, max_queue_size, show_config);
            }),
            "sensor"_a,
-           "labelspace"_a = Labelspace{},
-           "robot_id"_a = 0,
+           "context"_a,
            "max_queue_size"_a = 5,
            "show_config"_a = true)
       .def("start", &PythonPipeline::start)
-      .def("stop", &PythonPipeline::stop)
+      .def("stop", &PythonPipeline::stop, "force"_a = false)
       .def(
           "save",
-          [](const PythonPipeline& pipeline, const fs::path& output) {
-            pipeline.save(DataDirectory(output));
+          [](const PythonPipeline& pipeline, const std::optional<fs::path>& output) {
+            if (output) {
+              const DataDirectory directory(*output);
+              pipeline.save(&directory);
+            } else {
+              pipeline.save();
+            }
           },
-          "output"_a)
-      .def("reset", &PythonPipeline::reset)
+          "output"_a = std::nullopt)
       .def(
           "step",
           [](PythonPipeline& pipeline,

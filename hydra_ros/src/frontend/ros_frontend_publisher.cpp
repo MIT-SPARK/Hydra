@@ -39,7 +39,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/robot_config.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo_ros/conversion/mesh_delta.h>
 
@@ -52,8 +52,8 @@ using rclcpp::CallbackGroupType;
 
 namespace {
 
-inline RosFrontendPublisher::Config get_config() {
-  const auto odom_frame = GlobalInfo::instance().getFrames().odom;
+inline RosFrontendPublisher::Config get_config(const RobotConfig& robot) {
+  const auto odom_frame = robot.frames.odom;
   auto config = config::fromContext<RosFrontendPublisher::Config>("frontend");
   config.dsg_sender = config.dsg_sender.with_name("frontend").with_frame(odom_frame);
   return config;
@@ -68,8 +68,10 @@ void declare_config(RosFrontendPublisher::Config& config) {
   field(config.mesh_delta_queue_size, "mesh_delta_queue_size");
 }
 
-RosFrontendPublisher::RosFrontendPublisher(ianvs::NodeHandle nh)
-    : config(config::checkValid(get_config())),
+RosFrontendPublisher::RosFrontendPublisher(ianvs::NodeHandle nh,
+                                           const RobotConfig& robot)
+    : config(config::checkValid(get_config(robot))),
+      robot_(robot),
       dsg_sender_(new DsgSender(config.dsg_sender, nh)) {
   auto group = nh.as<BaseInterface>()->create_callback_group(
       CallbackGroupType::MutuallyExclusive);
@@ -87,7 +89,7 @@ RosFrontendPublisher::RosFrontendPublisher(ianvs::NodeHandle nh)
 }
 
 void RosFrontendPublisher::call(uint64_t timestamp_ns,
-                                const SceneGraph& graph,
+                                SceneGraph& graph,
                                 const FrontendOutput& output) const {
   // TODO(nathan) make sure pgmo stamps the deformation graph
   if (output.deformation_graph && mesh_graph_pub_->get_subscription_count()) {
@@ -98,7 +100,7 @@ void RosFrontendPublisher::call(uint64_t timestamp_ns,
     output.mesh_update->timestamp_ns = timestamp_ns;
     auto delta_msg = std::make_shared<MeshDeltaMsg>();
     kimera_pgmo::conversions::to_ros(*output.mesh_update, *delta_msg);
-    delta_msg->header.frame_id = GlobalInfo::instance().getFrames().odom;
+    delta_msg->header.frame_id = robot_.frames.odom;
     mesh_update_pub_->publish(*delta_msg);
 
     stored_delta_.insert({output.mesh_update->info.sequence_number, delta_msg});

@@ -189,7 +189,7 @@ void DeformationInterpolator::interpolate(const SceneGraph& unmerged,
     }
   }
 
-  const auto this_robot = GlobalInfo::instance().getRobotPrefix().id;
+  const auto this_robot = info->robot_id;
   std::map<size_t, EntryList> robot_entries;
   for (const auto& node : view) {
     size_t robot_id = this_robot;

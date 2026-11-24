@@ -40,7 +40,7 @@
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/run_context.h>
 #include <ianvs/message_wait_functor.h>
 
 #include <rclcpp/rclcpp.hpp>
@@ -217,6 +217,7 @@ namespace input {
 using VirtualSensor = config::VirtualConfig<Sensor>;
 
 VirtualSensor loadExtrinsics(const VirtualSensor& sensor,
+                             const std::string& robot_frame,
                              const std::string& sensor_frame = "") {
   if (!sensor) {
     return sensor;
@@ -231,9 +232,7 @@ VirtualSensor loadExtrinsics(const VirtualSensor& sensor,
   const auto contents = config::toYaml(base_config.extrinsics);
   const auto derived = config::fromYaml<RosExtrinsics::Config>(contents);
   const auto frame = derived.sensor_frame.empty() ? sensor_frame : derived.sensor_frame;
-  const auto parent = derived.robot_frame.empty()
-                          ? GlobalInfo::instance().getFrames().robot
-                          : derived.robot_frame;
+  const auto parent = derived.robot_frame.empty() ? robot_frame : derived.robot_frame;
   if (frame.empty()) {
     LOG(ERROR) << "sensor frame required if not constructing from camera info!";
     return {};
@@ -245,9 +244,11 @@ VirtualSensor loadExtrinsics(const VirtualSensor& sensor,
   return config::fromYaml<VirtualSensor>(base_contents);
 }
 
-VirtualSensor loadSensor(const VirtualSensor& sensor, const std::string& sensor_name) {
+VirtualSensor loadSensor(const VirtualSensor& sensor,
+                         const std::string& sensor_name,
+                         const std::string& robot_frame) {
   if (!sensor || sensor.getType() != "camera_info") {
-    return loadExtrinsics(sensor);
+    return loadExtrinsics(sensor, robot_frame);
   }
 
   const auto contents = config::toYaml(sensor);
@@ -265,7 +266,7 @@ VirtualSensor loadSensor(const VirtualSensor& sensor, const std::string& sensor_
   fillConfigFromInfo(*msg, config);
 
   VirtualSensor new_sensor(config);
-  new_sensor = loadExtrinsics(new_sensor, msg->header.frame_id);
+  new_sensor = loadExtrinsics(new_sensor, robot_frame, msg->header.frame_id);
   LOG(INFO) << "Initialized camera as " << std::endl << config::toString(new_sensor);
   return new_sensor;
 }

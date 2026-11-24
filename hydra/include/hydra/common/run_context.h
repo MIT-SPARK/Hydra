@@ -35,54 +35,51 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
+#include <memory>
+#include <vector>
+
 #include "hydra/common/labelspace.h"
-#include "hydra/common/robot_prefix_config.h"
+#include "hydra/common/robot_config.h"
+#include "hydra/common/run_settings.h"
 #include "hydra/common/shared_dsg_info.h"
+#include "hydra/utils/data_directory.h"
 
 namespace hydra {
 
-struct RunContext {
+class RunContext {
  public:
-  explicit RunContext(size_t robot_id = 0);
+  using ConstPtr = std::shared_ptr<const RunContext>;
 
-  //! Layer names for the scene graph that Hydra builds
-  SharedDsgInfo::Config graph;
-  //! @brief Layers in the scene graph that use the labelspace
-  std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
-                                           spark_dsg::DsgLayers::MESH_PLACES};
+  struct Config {
+    RobotConfig robot;
+    RunSettings::Config settings = RunSettings::instance();
+    //! Base artifact directory; an empty path disables run logging
+    std::filesystem::path log_path;
+    //! Directory allocation and overwrite settings
+    DataDirectory::Config output;
+    //! Layer names for the scene graph
+    SharedDsgInfo::Config graph;
+    //! Graph layers whose labels use the run labelspace
+    std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
+                                             spark_dsg::DsgLayers::MESH_PLACES};
+    //! Source of semantic labels, resolved when constructing the context
+    config::VirtualConfig<Labelspace> labelspace{Labelspace{}};
+  };
 
-  //! Frame information for Hydra
-  struct Frames {
-    //! Body frame for robot constructing the scene graph (see REP 105)
-    std::string robot = "base_link";
-    //! Frame odometry estimates are relative to (see REP 105)
-    std::string odom = "odom";
-    //! Frame that the optimized scene graph is in (see REP 105)
-    std::string map = "map";
-  } frames;
+  explicit RunContext(const Config& config);
+  RunContext(const RunContext&) = delete;
+  RunContext& operator=(const RunContext&) = delete;
 
-  //! If true, disable all performance timers
-  bool timing_disabled = false;
-  //! If true, don't show latest elapsed for timers
-  bool disable_timer_output = true;
-  //! If true, forward pgmo custom logging to glog
-  bool enable_pgmo_logging = true;
-  //! If true, store additional details for the khronos spatio-temporal viualizer.
-  bool store_visualization_details = false;
-  //! Default settings for other modules. Can be overwritten by other module configs.
-  int default_verbosity = 1;
-  //! Default number of threads for multi-threaded integrators to use
-  int default_num_threads = -1;  // -1 means use all available threads.
+  const Config config;
+  const DataDirectory logs;
 
   RobotPrefixConfig robot_prefix() const;
-
   const Labelspace& labelspace() const;
 
  private:
-  size_t robot_id_;
+  std::unique_ptr<Labelspace> labelspace_;
 };
 
-void declare_config(const RunContext::Frames& config);
-void declare_config(const RunContext& config);
+void declare_config(RunContext::Config& config);
 
 }  // namespace hydra

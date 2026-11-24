@@ -38,7 +38,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/robot_config.h>
 
 #include <cmath>
 #include <queue>
@@ -70,8 +70,10 @@ void declare_config(TsdfGradientOccupancyPublisher::Config& config) {
   checkInRange(config.min_confidence, 0.0f, 1.0f, "min_confidence");
 }
 
-TsdfGradientOccupancyPublisher::TsdfGradientOccupancyPublisher(const Config& config)
+TsdfGradientOccupancyPublisher::TsdfGradientOccupancyPublisher(const Config& config,
+                                                               const RobotConfig& robot)
     : config(config::checkValid(config)),
+      robot_(robot),
       pub_(ianvs::NodeHandle::this_node(config.ns)
                .create_publisher<nav_msgs::msg::OccupancyGrid>(
                    "occupancy", rclcpp::QoS(1).transient_local())),
@@ -104,7 +106,7 @@ void TsdfGradientOccupancyPublisher::call(const HeightMap& height_map,
   publishGradientMapViz(gradient_map, tsdf_layer, timestamp_ns, robot_z);
 
   nav_msgs::msg::OccupancyGrid msg;
-  msg.header.frame_id = GlobalInfo::instance().getFrames().map;
+  msg.header.frame_id = robot_.frames.map;
   msg.header.stamp = rclcpp::Time(timestamp_ns);
   msg.info.map_load_time = msg.header.stamp;
   fillOccupancyGrid(gradient_map, world_T_body, tsdf_layer, msg);
@@ -312,7 +314,7 @@ void TsdfGradientOccupancyPublisher::publishHeightMapViz(const HeightMap& height
   const Eigen::Vector2f dims = (x_max - x_min) / voxel_size;
 
   nav_msgs::msg::OccupancyGrid msg;
-  msg.header.frame_id = GlobalInfo::instance().getFrames().map;
+  msg.header.frame_id = robot_.frames.map;
   msg.header.stamp = rclcpp::Time(timestamp_ns);
   msg.info.map_load_time = msg.header.stamp;
   msg.info.resolution = voxel_size;
@@ -380,7 +382,7 @@ void TsdfGradientOccupancyPublisher::publishGradientMapViz(
   const Eigen::Vector2f dims = (x_max - x_min) / voxel_size;
 
   nav_msgs::msg::OccupancyGrid msg;
-  msg.header.frame_id = GlobalInfo::instance().getFrames().map;
+  msg.header.frame_id = robot_.frames.map;
   msg.header.stamp = rclcpp::Time(timestamp_ns);
   msg.info.map_load_time = msg.header.stamp;
   msg.info.resolution = voxel_size;
@@ -421,8 +423,8 @@ namespace {
 static const auto registration_ =
     config::RegistrationWithConfig<hydra::places::GradientTraversabilityEstimator::Sink,
                                    TsdfGradientOccupancyPublisher,
-                                   TsdfGradientOccupancyPublisher::Config>(
-        "TsdfGradientOccupancyPublisher");
+                                   TsdfGradientOccupancyPublisher::Config,
+                                   RobotConfig>("TsdfGradientOccupancyPublisher");
 
 }  // namespace
 

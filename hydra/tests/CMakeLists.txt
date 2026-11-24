@@ -26,6 +26,7 @@ add_executable(
   common/test_graph_update.cpp
   common/test_node_matchers.cpp
   common/test_partial_graph.cpp
+  common/test_run_settings.cpp
   common/test_shared_dsg_info.cpp
   frontend/test_graph_connector.cpp
   frontend/test_mesh_compression.cpp

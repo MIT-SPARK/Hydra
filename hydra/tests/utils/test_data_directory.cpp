@@ -99,6 +99,23 @@ TEST(DataDirectory, FailedReplacementPreservesDestination) {
             1);
 }
 
+TEST(DataDirectory, ChildrenStayInTheRunDirectoryAndPreserveArtifacts) {
+  const auto temp = utils::TempDirectory::system_default("hydra-run-", true);
+  DataDirectory::Config config;
+  config.overwrite = true;
+  config.use_timestamp = true;
+  config.timestamp_format = "run";
+  const DataDirectory output(temp.path, config);
+  const auto child = output.child("snapshots/1");
+  const auto file = child.path() / "artifact";
+  std::ofstream(file) << "saved";
+
+  EXPECT_TRUE(std::filesystem::equivalent(child.path(), temp.path / "run/snapshots/1"));
+  const auto reopened = output.child("snapshots/1");
+  EXPECT_EQ(readFile(reopened.path() / "artifact"), "saved");
+  EXPECT_FALSE(DataDirectory().child("snapshots"));
+}
+
 TEST(TempDirectory, ScopedCleanupPreservesRetainedDirectories) {
   const auto root = utils::TempDirectory::system_default("hydra-temp-", true);
   std::filesystem::path removed, retained;

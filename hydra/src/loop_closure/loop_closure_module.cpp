@@ -52,8 +52,10 @@ static const auto registration =
     config::RegistrationWithConfig<LoopClosureModule,
                                    LoopClosureModule,
                                    LoopClosureModule::Config,
-                                   Labelspace,
-                                   SharedModuleState::Ptr>("LoopClosureModule");
+                                   RunContext::ConstPtr,
+                                   std::shared_ptr<SharedModuleState>,
+                                   LoopClosureModule::OutputQueue::Ptr>(
+        "LoopClosureModule");
 
 }
 
@@ -72,28 +74,38 @@ LoopClosureModule::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("lcd")) {}
 
 LoopClosureModule::LoopClosureModule(const Config& config,
-                                     const Labelspace& labelspace,
-                                     const SharedModuleState::Ptr& state,
+                                     RunContext::ConstPtr context,
+                                     const std::shared_ptr<SharedModuleState>& state,
                                      const OutputQueue::Ptr& output)
-    : config(config),
+    : Module(context),
+      config(config),
       queue_(std::make_shared<InputQueue>()),
       output_queue_(output),
       state_(state),
       lcd_graph_(new SceneGraph()) {
-  lcd_detector_.reset(new lcd::LcdDetector(config.detector, labelspace.total_labels));
+  lcd_detector_.reset(
+      new lcd::LcdDetector(config.detector, context->labelspace().total_labels));
 }
 
 LoopClosureModule::~LoopClosureModule() { stopImpl(); }
 
 void LoopClosureModule::start() {
+  should_shutdown_ = false;
+  force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&LoopClosureModule::spin, this));
   MLOG(0) << "LCD started!";
 }
 
-void LoopClosureModule::stop() { stopImpl(); }
+void LoopClosureModule::stop(bool force) {
+  force_shutdown_ = force;
+  stopImpl();
+}
 
 void LoopClosureModule::stopImpl() {
-  should_shutdown_ = true;
+  if (should_shutdown_.exchange(true)) {
+    return;
+  }
+
   if (spin_thread_) {
     MLOG(1) << "joining thread";
     spin_thread_->join();
@@ -102,19 +114,28 @@ void LoopClosureModule::stopImpl() {
   }
 }
 
-void LoopClosureModule::save(const DataDirectory& output) {
-  const auto log_path = output.path("lcd");
+void LoopClosureModule::save(const DataDirectory* output) {
+  const auto& logs = output ? *output : context->logs;
+  if (!logs) {
+    return;
+  }
+
+  const auto log_path = logs.path("lcd");
   lcd_detector_->dumpDescriptors(log_path);
   lcd_graph_->save(log_path / "dsg.json", false);
 }
 
-std::string LoopClosureModule::printInfo() const { return config::toString(config); }
+std::string LoopClosureModule::show() const { return config::toString(config); }
 
 void LoopClosureModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
     bool has_data = queue_->poll();
-    if (GlobalInfo::instance().force_shutdown() || !has_data) {
+    if (force_shutdown_) {
+      break;
+    }
+
+    if (!has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
     }

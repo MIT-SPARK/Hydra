@@ -33,11 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-
 #include <config_utilities/virtual_config.h>
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/output_sink.h"
+#include "hydra/common/robot_config.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/places/traversability_clustering.h"
 #include "hydra/places/traversability_estimator.h"
@@ -64,7 +64,8 @@ class TraversabilityPlaceExtractor : public GraphBuilderFunctor {
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit TraversabilityPlaceExtractor(const Config& config);
+  explicit TraversabilityPlaceExtractor(const Config& config,
+                                        RunContext::ConstPtr context);
 
   virtual ~TraversabilityPlaceExtractor() = default;
 

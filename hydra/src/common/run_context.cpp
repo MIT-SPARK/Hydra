@@ -35,63 +35,33 @@
 #include "hydra/common/run_context.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
-#include <spark_dsg/labelspace.h>
-#include <spark_dsg/scene_graph.h>
 
-#include "hydra/common/semantic_color_map.h"
-#include "hydra/utils/pgmo_glog_sink.h"
-#include "hydra/utils/timing_utilities.h"
+#include "hydra/common/run_settings.h"
 
 namespace hydra {
 
-using ColorMapPtr = std::shared_ptr<SemanticColorMap>;
-using timing::ElapsedTimeRecorder;
-
-void declare_config(RunContext::Frames& frames) {
-  using namespace config;
-  name("RunContext::Config::Frames");
-  field(frames.robot, "robot_frame");
-  field(frames.odom, "odom_frame");
-  field(frames.map, "map_frame");
-}
-
-void declare_config(RunContext& config) {
+void declare_config(RunContext::Config& config) {
   using namespace config;
   name("RunContext::Config");
-  field(config.timing_disabled, "timing_disabled");
-  field(config.disable_timer_output, "disable_timer_output");
-  field(config.enable_pgmo_logging, "enable_pgmo_logging");
-  field(config.default_verbosity, "default_verbosity");
-  field(config.default_num_threads, "default_num_threads");
-  field(config.store_visualization_details, "store_visualization_details");
+  field(config.robot, "robot", false);
+  field(config.settings, "settings", false);
+  field<Path>(config.log_path, "log_path");
+  field(config.output, "output");
+  field(config.labelspace, "labelspace");
   field(config.semantic_layers, "semantic_layers");
   field(config.graph, "graph");
-
-  // the following subconfigs should not be namespaced
-  field(config.frames, "frames", false);
 }
 
-RunContext::RunContext(size_t robot_id) : robot_id_(robot_id) {}
-
-void RunContext::initFromConfig(const PipelineConfig& config, int robot_id) {
-  config_ = config::checkValid(config);
-  robot_prefix_ = RobotPrefixConfig(robot_id);
-
-  auto& timer = ElapsedTimeRecorder::instance();
-  timer.timing_disabled = config_.timing_disabled;
-  timer.disable_output = config_.disable_timer_output;
-
-  if (config_.enable_pgmo_logging) {
-    logging::Logger::addSink("glog", std::make_shared<PgmoGlogSink>());
-  }
+RunContext::RunContext(const Config& config)
+    : config(config::checkValid(config)), logs(config.log_path, config.output) {
+  RunSettings::init(config.settings);
+  labelspace_ = config.labelspace.create();
 }
 
-RobotPrefixConfig RunContext::robot_prefix() const {
-  return RobotPrefixConfig(robot_id_);
-}
+RobotPrefixConfig RunContext::robot_prefix() const { return config.robot.prefix(); }
+
+const Labelspace& RunContext::labelspace() const { return *labelspace_; }
 
 }  // namespace hydra

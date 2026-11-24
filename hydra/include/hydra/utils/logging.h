@@ -33,28 +33,34 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <optional>
 #include <string>
+
+#include "hydra/common/config_utilities.h"
 
 namespace hydra {
 
 struct VerbosityConfig {
-  int verbosity = 0;
+  //! An unset value inherits the current run default
+  std::optional<int> verbosity = 0;
   std::string prefix = "";
 
   VerbosityConfig() = default;
   VerbosityConfig(int verbosity);
-  VerbosityConfig(const std::string& prefix, int verbosity = 0);
+  VerbosityConfig(const std::string& prefix, std::optional<int> verbosity = 0);
 
   //! Make a copy of the verbosity config with a prefix derived from the provided name
   VerbosityConfig with_name(const std::string& name) const;
 
   static VerbosityConfig default_verbosity(const std::string& name = "");
+
+  int get_verbosity() const;
 };
 
 void declare_config(VerbosityConfig& config);
 
 // NOTE(nathan) you need to include <glog/logging.h> for this to work, but
 // I don't want have <glog/logging.h> included in a bunch of header files
-#define MLOG(V) LOG_IF(INFO, config.verbosity >= V) << config.prefix
+#define MLOG(V) LOG_IF(INFO, config.get_verbosity() >= V) << config.prefix
 
 }  // namespace hydra

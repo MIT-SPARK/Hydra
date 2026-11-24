@@ -35,14 +35,12 @@
 #include <gtest/gtest.h>
 #include <hydra/odometry/pose_graph_from_odom.h>
 
-#include "hydra_test/config_guard.h"
-
 namespace hydra {
 namespace {
 
 struct TestablePoseGraphFromOdom : public PoseGraphFromOdom {
   explicit TestablePoseGraphFromOdom(const PoseGraphFromOdom::Config& config)
-      : PoseGraphFromOdom(config) {}
+      : PoseGraphFromOdom(config, std::make_shared<RunContext>(RunContext::Config{})) {}
   virtual ~TestablePoseGraphFromOdom() = default;
   using PoseGraphFromOdom::update;
 };
@@ -50,8 +48,6 @@ struct TestablePoseGraphFromOdom : public PoseGraphFromOdom {
 }  // namespace
 
 TEST(PoseGraphFromOdom, GraphBuildingCorrect) {
-  test::ConfigGuard guard;
-
   PoseGraphFromOdom::Config config;
   config.min_pose_separation = 0.0;
   config.min_time_separation_s = 0.0;

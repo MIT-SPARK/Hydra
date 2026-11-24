@@ -35,6 +35,7 @@
 #pragma once
 #include <chrono>
 
+#include "hydra/common/robot_config.h"
 #include "hydra/odometry/pose_graph_tracker.h"
 
 namespace hydra {
@@ -55,7 +56,7 @@ class PoseGraphFromOdom : public PoseGraphTracker {
     Eigen::Isometry3d pose;
   };
 
-  explicit PoseGraphFromOdom(const Config& config);
+  explicit PoseGraphFromOdom(const Config& config, RunContext::ConstPtr context);
 
   ~PoseGraphFromOdom() = default;
 

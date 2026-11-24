@@ -68,7 +68,7 @@ class LoopClosureModule : public Module {
   // TODO(nathan) make object label histogram have flexible dimension instead of
   // requiring fixed size vectors
   LoopClosureModule(const Config& config,
-                    const Labelspace& labelspace,
+                    RunContext::ConstPtr context,
                     const std::shared_ptr<SharedModuleState>& state,
                     const OutputQueue::Ptr& output = nullptr);
 
@@ -76,9 +76,9 @@ class LoopClosureModule : public Module {
 
   void start() override;
 
-  void stop() override;
+  void stop(bool force) override;
 
-  void save() override;
+  void save(const DataDirectory* output = nullptr) override;
 
   std::string show() const override;
 

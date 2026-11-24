@@ -45,6 +45,7 @@
 #include <thread>
 
 #include "hydra/common/output_sink.h"
+#include "hydra/common/robot_config.h"
 #include "hydra/frontend/feature_selector.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/utils/active_window_tracker.h"
@@ -113,10 +114,8 @@ class KeyframeSelector : public GraphBuilderFunctor {
     //! when a feature selector is configured, else dropped (they are already queued for
     //! saving).
     size_t max_active_keyframes = 50;
-    //! Directory to save accepted keyframes to (empty = off): <timestamp_ns>.zip for
-    //! the first sensor saved, <timestamp_ns>_<sensor name>.zip for any other sensor
-    //! (name characters outside [A-Za-z0-9_.-] replaced by '_')
-    std::filesystem::path log_path;
+    //! Save accepted keyframes under frontend/keyframes in the run log directory
+    bool log_keyframes = false;
     //! Images to keep in saved keyframes (color, color_mask, depth, range, labels,
     //! instances, vertices, traversability, features)
     std::vector<std::string> save_fields{"color", "depth"};
@@ -126,7 +125,7 @@ class KeyframeSelector : public GraphBuilderFunctor {
     InputData::SaveOptions save_options{InputData::SaveOptions::FloatCompression::ZIP};
   } const config;
 
-  KeyframeSelector(const Config& config);
+  KeyframeSelector(const Config& config, RunContext::ConstPtr context);
 
   virtual ~KeyframeSelector();
 
@@ -180,6 +179,7 @@ class KeyframeSelector : public GraphBuilderFunctor {
   std::deque<InputData::ConstPtr> save_queue_;
   bool saving_ = false;
   bool should_shutdown_ = false;
+  std::filesystem::path log_path_;
   std::unique_ptr<std::thread> save_thread_;
   //! Sensor whose keyframes are saved without a sensor suffix (the first one saved)
   std::optional<std::string> primary_sensor_;

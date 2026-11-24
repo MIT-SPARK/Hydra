@@ -46,8 +46,8 @@ using spark_dsg::TraversabilityState;
 static const auto registration =
     config::RegistrationWithConfig<TraversabilityEstimator,
                                    ExternalTraversabilityEstimator,
-                                   ExternalTraversabilityEstimator::Config>(
-        "ExternalTraversabilityEstimator");
+                                   ExternalTraversabilityEstimator::Config,
+                                   RobotConfig>("ExternalTraversabilityEstimator");
 
 void declare_config(ExternalTraversabilityEstimator::Config& config) {
   using namespace config;
@@ -57,7 +57,8 @@ void declare_config(ExternalTraversabilityEstimator::Config& config) {
   checkCondition(!config.input_topic.empty(), "'input_topic' must be specified");
 }
 
-ExternalTraversabilityEstimator::ExternalTraversabilityEstimator(const Config& config)
+ExternalTraversabilityEstimator::ExternalTraversabilityEstimator(const Config& config,
+                                                                 const RobotConfig&)
     : TraversabilityEstimator(TraversabilityEstimator::Config{}),
       config(config::checkValid(config)) {
   auto nh = ianvs::NodeHandle::this_node();

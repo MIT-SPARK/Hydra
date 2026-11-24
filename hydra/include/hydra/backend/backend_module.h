@@ -107,6 +107,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   } const config;
 
   BackendModule(const Config& config,
+                RunContext::ConstPtr context,
                 const SharedDsgInfo::Ptr& dsg,
                 const std::shared_ptr<SharedModuleState>& state);
 
@@ -118,9 +119,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void start() override;
 
-  void stop() override;
+  void stop(bool force) override;
 
-  void save() override;
+  void save(const DataDirectory* output = nullptr) override;
 
   std::string show() const override;
 

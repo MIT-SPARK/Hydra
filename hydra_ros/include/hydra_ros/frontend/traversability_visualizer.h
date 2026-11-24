@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-
 #include <config_utilities/dynamic_config.h>
+#include <hydra/common/robot_config.h>
 #include <hydra/frontend/traversability_place_extractor.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
 #include <ianvs/node_handle.h>
@@ -72,7 +72,7 @@ class TraversabilityVisualizer : public places::TraversabilityPlaceExtractor::Si
     double alpha = 0.3;
   };
 
-  explicit TraversabilityVisualizer(const Config& config);
+  explicit TraversabilityVisualizer(const Config& config, const RobotConfig& robot);
 
   virtual ~TraversabilityVisualizer() = default;
 
@@ -83,6 +83,7 @@ class TraversabilityVisualizer : public places::TraversabilityPlaceExtractor::Si
             const places::TraversabilityLayer& layer) const override;
 
  protected:
+  const RobotConfig robot_;
   config::DynamicConfig<Config> config_;
   Config active_config_;  // Current config to use for a call.
   mutable std::mutex config_mutex_;
@@ -106,7 +107,8 @@ class TraversabilityVisualizer : public places::TraversabilityPlaceExtractor::Si
   inline static const auto registration_ =
       config::RegistrationWithConfig<places::TraversabilityPlaceExtractor::Sink,
                                      TraversabilityVisualizer,
-                                     Config>("TraversabilityVisualizer");
+                                     Config,
+                                     RobotConfig>("TraversabilityVisualizer");
 };
 
 void declare_config(TraversabilityVisualizer::Config& config);

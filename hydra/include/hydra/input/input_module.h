@@ -69,15 +69,19 @@ class InputModule : public Module {
     size_t summary_period_ms = 500;
   } const config;
 
-  InputModule(const Config& config, const DataQueue::Ptr& output_queue);
+  InputModule(const Config& config,
+              RunContext::ConstPtr context,
+              const DataQueue::Ptr& output_queue);
 
   virtual ~InputModule();
 
   void start() override;
 
-  void stop() override;
+  void stop(bool force = false) override;
 
-  std::string printInfo() const override;
+  void save(const DataDirectory* output = nullptr) override;
+
+  std::string show() const override;
 
  protected:
   void dataSpin();

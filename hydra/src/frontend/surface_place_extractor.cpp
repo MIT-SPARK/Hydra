@@ -60,7 +60,8 @@ static const auto registration_ =
     config::RegistrationWithConfig<SurfacePlaceExtractor,
                                    SurfacePlaceExtractor,
                                    SurfacePlaceExtractor::Config,
-                                   std::set<uint32_t>>("place_2d");
+                                   std::set<uint32_t>,
+                                   RobotConfig>("place_2d");
 
 inline bool placeIsEmpty(const Place2dNodeAttributes& attrs) {
   return attrs.mesh_connections.size() == 0 || attrs.boundary.size() < 3;
@@ -127,9 +128,10 @@ void declare_config(SurfacePlaceExtractor::Config& config) {
 SurfacePlaceExtractor::Config::Config() : VerbosityConfig("[places_2d] ") {}
 
 SurfacePlaceExtractor::SurfacePlaceExtractor(const Config& config,
-                                             const std::set<uint32_t>& labels)
+                                             const std::set<uint32_t>& labels,
+                                             const RobotConfig& robot)
     : config(config::checkValid(config)),
-      sinks_(Sink::instantiate(config.sinks)),
+      sinks_(Sink::instantiate(config.sinks, robot)),
       labels_(labels),
       next_node_id_(config.prefix, 0) {
   MLOG(1) << "using labels: " << clustering::printLabels(labels_);

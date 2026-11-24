@@ -64,24 +64,26 @@ ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
       volumetric_map({0.1, 16, 0.3, with_semantics, with_tracking}) {}
 
 ActiveWindowModule::ActiveWindowModule(const Config& config,
-                                       const RunContext& context,
+                                       RunContext::ConstPtr context,
                                        const OutputQueue::Ptr& queue,
                                        WindowPtr&& global_window)
     : Module(context),
       config(config::checkValid(config)),
       input_queue_(new InputQueue(config.max_input_queue_size)),
       output_queue_(queue),
-      sinks_(Sink::instantiate(config.sinks)),
+      sinks_(Sink::instantiate(config.sinks, context->config.robot)),
       map_(config.volumetric_map),
       map_window_(config.map_window ? config.map_window.create()
                                     : std::move(global_window)) {
-  invalid_labels_.insert(context.labelspace().invalid_labels.begin(),
-                         context.labelspace().invalid_labels.end());
-  invalid_labels_.insert(context.labelspace().dynamic_labels.begin(),
-                         context.labelspace().dynamic_labels.end());
+  invalid_labels_.insert(context->labelspace().invalid_labels.begin(),
+                         context->labelspace().invalid_labels.end());
+  invalid_labels_.insert(context->labelspace().dynamic_labels.begin(),
+                         context->labelspace().dynamic_labels.end());
 }
 
 void ActiveWindowModule::start() {
+  should_shutdown_ = false;
+  force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&ActiveWindowModule::spin, this));
   MLOG(0) << "started!";
 }
@@ -92,7 +94,9 @@ void ActiveWindowModule::stop(bool force) {
 }
 
 void ActiveWindowModule::stopImpl() {
-  should_shutdown_ = true;
+  if (should_shutdown_.exchange(true)) {
+    return;
+  }
 
   if (spin_thread_) {
     MLOG(1) << "stopping!";
@@ -119,7 +123,11 @@ void ActiveWindowModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
     bool has_data = input_queue_->poll();
-    if (force_shutdown_ || !has_data) {
+    if (force_shutdown_) {
+      break;
+    }
+
+    if (!has_data) {
       should_shutdown = should_shutdown_;
     }
 

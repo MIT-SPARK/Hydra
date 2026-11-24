@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/robot_config.h>
 #include <hydra_visualizer/color/color_parsing.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
 #include <spark_dsg/colormaps.h>
@@ -62,8 +62,10 @@ void declare_config(TraversabilityVisualizer::Config& config) {
   checkInRange(config.alpha, 0.0, 1.0, "alpha", false);
 }
 
-TraversabilityVisualizer::TraversabilityVisualizer(const Config& config)
-    : config_("traversability_visualizer",
+TraversabilityVisualizer::TraversabilityVisualizer(const Config& config,
+                                                   const RobotConfig& robot)
+    : robot_(robot),
+      config_("traversability_visualizer",
               config::checkValid(config),
               [this]() { onConfigUpdate(); }),
       nh_(ianvs::NodeHandle::this_node(config.ns)),
@@ -95,7 +97,7 @@ void TraversabilityVisualizer::call(uint64_t timestamp_ns,
                                     const Eigen::Vector3d& world_t_body,
                                     const places::TraversabilityLayer& layer) const {
   std_msgs::msg::Header header;
-  header.frame_id = GlobalInfo::instance().getFrames().map;
+  header.frame_id = robot_.frames.map;
   header.stamp = rclcpp::Time(timestamp_ns);
   std::lock_guard<std::mutex> lock(config_mutex_);
   visualizeLayer(header, world_t_body, layer);

@@ -46,14 +46,14 @@ namespace {
 static const auto registration_ =
     config::RegistrationWithConfig<TraversabilityEstimator,
                                    HeightTraversabilityEstimator,
-                                   HeightTraversabilityEstimator::Config>(
-        "HeightTraversabilityEstimator");
+                                   HeightTraversabilityEstimator::Config,
+                                   RobotConfig>("HeightTraversabilityEstimator");
 
 static const auto gradient_registration_ =
     config::RegistrationWithConfig<TraversabilityEstimator,
                                    GradientTraversabilityEstimator,
-                                   GradientTraversabilityEstimator::Config>(
-        "GradientTraversabilityEstimator");
+                                   GradientTraversabilityEstimator::Config,
+                                   RobotConfig>("GradientTraversabilityEstimator");
 
 BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) {
   BlockIndexSet block_indices;
@@ -242,7 +242,8 @@ void declare_config(HeightTraversabilityEstimator::Config& config) {
                  "'height_above' and 'height_below' don't span any volume");
 }
 
-HeightTraversabilityEstimator::HeightTraversabilityEstimator(const Config& config)
+HeightTraversabilityEstimator::HeightTraversabilityEstimator(const Config& config,
+                                                             const RobotConfig&)
     : TraversabilityEstimator(config), config(config::checkValid(config)) {}
 
 void HeightTraversabilityEstimator::updateTraversability(const ActiveWindowOutput& msg,
@@ -395,10 +396,11 @@ void declare_config(GradientTraversabilityEstimator::Config& config) {
                  "'height_above' and 'height_below' don't span any volume");
 }
 
-GradientTraversabilityEstimator::GradientTraversabilityEstimator(const Config& config)
+GradientTraversabilityEstimator::GradientTraversabilityEstimator(
+    const Config& config, const RobotConfig& robot)
     : TraversabilityEstimator(config),
       config(config::checkValid(config)),
-      sinks_(Sink::instantiate(config.sinks)) {}
+      sinks_(Sink::instantiate(config.sinks, robot)) {}
 
 void GradientTraversabilityEstimator::updateTraversability(
     const ActiveWindowOutput& msg, TraversabilityLayer& layer) {

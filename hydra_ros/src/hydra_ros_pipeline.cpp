@@ -40,7 +40,7 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <hydra/active_window/active_window_module.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/run_context.h>
 #include <pose_graph_tools_ros/conversions.h>
 
 #include <cstdint>
@@ -58,15 +58,12 @@ void declare_config(HydraRosPipeline::Config& config) {
   name("HydraRosConfig");
   base<HydraPipeline::Config>(config);
   field(config.preprint_config, "preprint_config");
-  config.labelspace.setOptional();
-  field(config.labelspace, "labelspace");
   field(config.input, "input");
   field(config.status_monitor, "status_monitor");
 }
 
-HydraRosPipeline::HydraRosPipeline(const Config& config)
-    : HydraPipeline(config, config.labelspace.create()),
-      config(config::checkValid(config)) {
+HydraRosPipeline::HydraRosPipeline(const Config& config, RunContext::ConstPtr context)
+    : HydraPipeline(config, context), config(config::checkValid(config)) {
   if (config.preprint_config) {
     LOG(INFO) << "Using configuration to start Hydra\n" << config::toString(config);
   }
@@ -74,14 +71,16 @@ HydraRosPipeline::HydraRosPipeline(const Config& config)
   MLOG(1) << "Starting Hydra-ROS with input\n" << config::toString(config.input);
 }
 
-HydraRosPipeline::~HydraRosPipeline() {}
+HydraRosPipeline::~HydraRosPipeline() { stop(); }
 
 void HydraRosPipeline::init() {
   HydraPipeline::init();
 
   auto nh = ianvs::NodeHandle::this_node("~");
-  backend_->addSink(std::make_shared<RosBackendPublisher>(nh / "backend"));
-  frontend_->addSink(std::make_shared<RosFrontendPublisher>(nh / "frontend"));
+  backend_->addSink(
+      std::make_shared<RosBackendPublisher>(nh / "backend", context_->config.robot));
+  frontend_->addSink(
+      std::make_shared<RosFrontendPublisher>(nh / "frontend", context_->config.robot));
   external_loop_closure_sub_ = std::make_unique<ExternalLoopClosureSubscriber>(
       nh, [this](const auto& lc) { backend_->addExternalLoopClosure(lc); });
 
@@ -97,7 +96,8 @@ void HydraRosPipeline::init() {
         monitor_->recordModuleCallback("active_window", nanoseconds(stamp));
       }));
 
-  input_ = std::make_unique<RosInputModule>(config.input, active_window_->queue());
+  input_ =
+      std::make_unique<RosInputModule>(config.input, context_, active_window_->queue());
 }
 
 void HydraRosPipeline::start() {
@@ -106,10 +106,13 @@ void HydraRosPipeline::start() {
   monitor_->start();
 }
 
-void HydraRosPipeline::stop() {
+void HydraRosPipeline::stop(bool force) {
   // enforce stop order to make sure every data packet is processed
-  input_->stop();
-  HydraPipeline::stop();
+  if (input_) {
+    input_->stop(force);
+  }
+
+  HydraPipeline::stop(force);
 }
 
 }  // namespace hydra

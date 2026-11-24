@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/printing.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/robot_config.h>
 #include <hydra/frontend/gvd_place_extractor.h>
 #include <hydra_visualizer/color/color_parsing.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
@@ -53,7 +53,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<GvdPlaceExtractor::Sink,
                                    GvdPlacesVisualizer,
-                                   GvdPlacesVisualizer::Config>("GvdPlacesVisualizer");
+                                   GvdPlacesVisualizer::Config,
+                                   RobotConfig>("GvdPlacesVisualizer");
 
 }
 
@@ -79,8 +80,9 @@ void declare_config(GvdPlacesVisualizer::Config& config) {
   checkInRange(config.compressed_alpha, 0.0, 1.0, "compressed_alpha", false, true);
 }
 
-GvdPlacesVisualizer::GvdPlacesVisualizer(const Config& config)
-    : nh_(ianvs::NodeHandle::this_node(config.ns)),
+GvdPlacesVisualizer::GvdPlacesVisualizer(const Config& config, const RobotConfig& robot)
+    : robot_(robot),
+      nh_(ianvs::NodeHandle::this_node(config.ns)),
       pubs_(nh_),
       config_("gvd_places_visualizer", config) {}
 
@@ -93,7 +95,7 @@ void GvdPlacesVisualizer::call(uint64_t timestamp_ns,
                                const GvdLayer& gvd,
                                const GraphExtractor& extractor) const {
   std_msgs::msg::Header header;
-  header.frame_id = GlobalInfo::instance().getFrames().map;
+  header.frame_id = robot_.frames.map;
   header.stamp = rclcpp::Time(timestamp_ns);
 
   const auto config = config_.get();

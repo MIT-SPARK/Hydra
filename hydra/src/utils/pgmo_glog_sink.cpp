@@ -38,9 +38,14 @@
 
 namespace hydra {
 
-PgmoGlogSink::PgmoGlogSink(int debug_verbosity) : debug_verbosity(debug_verbosity) {}
+PgmoGlogSink::PgmoGlogSink(int debug_verbosity, bool enabled)
+    : enabled(enabled), debug_verbosity(debug_verbosity) {}
 
 void PgmoGlogSink::dispatch(const logging::LogEntry& entry) const {
+  if (!enabled) {
+    return;
+  }
+
   switch (entry.level) {
     case logging::Level::DEBUG:
       VLOG(debug_verbosity) << entry.prefix() << entry.message();

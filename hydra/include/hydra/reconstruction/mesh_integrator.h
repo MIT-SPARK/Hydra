@@ -47,10 +47,9 @@ class MeshIntegrator {
   using BlockIndexGetter = IndexGetter<BlockIndex>;
 
   struct Config {
-    Config();
-
     float min_weight = 1.0e-4f;
-    int integrator_threads;
+    //! Inherit the run thread count when unset; non-positive counts use all threads
+    std::optional<int> integrator_threads;
     //! Request normals; currently unsupported by spark_dsg::Mesh.
     bool compute_normals = true;
   } const config;

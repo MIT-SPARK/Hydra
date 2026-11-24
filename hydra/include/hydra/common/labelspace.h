@@ -41,6 +41,8 @@
 namespace hydra {
 
 struct Labelspace {
+  virtual ~Labelspace() = default;
+
   //! Number of total labels in the labelspace
   size_t total_labels = 0;
   //! Labels that should be treated as dynamic

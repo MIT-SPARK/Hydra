@@ -60,8 +60,11 @@ void declare_config(InputModule::Config& config) {
 InputModule::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("input")) {}
 
-InputModule::InputModule(const Config& _config, const DataQueue::Ptr& output_queue)
-    : config(config::checkValid(_config)),
+InputModule::InputModule(const Config& _config,
+                         RunContext::ConstPtr context,
+                         const DataQueue::Ptr& output_queue)
+    : Module(context),
+      config(config::checkValid(_config)),
       input_queue_(new DataQueue()),
       output_queue_(output_queue) {
   for (const auto& [name, pair] : config.inputs) {
@@ -85,7 +88,12 @@ void InputModule::start() {
   MLOG(0) << "started!";
 }
 
-void InputModule::stop() { stopImpl(); }
+void InputModule::stop(bool force) {
+  force_shutdown_ = force;
+  stopImpl();
+}
+
+void InputModule::save(const DataDirectory*) {}
 
 void InputModule::stopImpl() {
   should_shutdown_ = true;
@@ -102,11 +110,11 @@ void InputModule::stopImpl() {
   }
 }
 
-std::string InputModule::printInfo() const { return config::toString(config); }
+std::string InputModule::show() const { return config::toString(config); }
 
 void InputModule::summarize() const {
   using namespace std::chrono;
-  if (config.verbosity < 2 || config.summary_period_ms == 0) {
+  if (config.get_verbosity() < 2 || config.summary_period_ms == 0) {
     return;
   }
 

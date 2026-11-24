@@ -38,11 +38,10 @@
 #include <memory>
 #include <string>
 
+#include "hydra/common/run_context.h"
 #include "hydra/utils/data_directory.h"
 
 namespace hydra {
-
-class RunContext;
 
 //! Core class representing a module that does some work
 class Module {
@@ -50,7 +49,7 @@ class Module {
   using Ptr = std::shared_ptr<Module>;
 
   //! Initialize the module with the current run context
-  explicit Module(const RunContext& context);
+  explicit Module(RunContext::ConstPtr context);
 
   virtual ~Module();
 
@@ -59,18 +58,18 @@ class Module {
 
   /**
    * @brief Stop the module
-   * @param force Force module to exit without processing remaing data
+   * @param force Force module to exit without processing remaining data
    */
   virtual void stop(bool force) = 0;
 
-  //! Save any data for the module once done processing
-  virtual void save(const DataDirectory* output) = 0;
+  //! Save artifacts to output, or to the run log directory when output is null
+  virtual void save(const DataDirectory* output = nullptr) = 0;
 
   //! Show configuration info for the module
   virtual std::string show() const = 0;
 
   //! Context for current run of Hydra
-  const RunContext& context;
+  const RunContext::ConstPtr context;
 
  protected:
   std::atomic<bool> force_shutdown_;

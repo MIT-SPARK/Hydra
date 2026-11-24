@@ -46,8 +46,8 @@ using spark_dsg::SceneGraph;
 namespace hydra {
 namespace {
 
-static const auto sink_registration =
-    config::RegistrationWithConfig<BackendModule::Sink, ZmqSink, ZmqSink::Config>(
+static const auto sink_registration = config::
+    RegistrationWithConfig<BackendModule::Sink, ZmqSink, ZmqSink::Config, RobotConfig>(
         "ZmqSink");
 
 }  // namespace
@@ -60,7 +60,8 @@ void declare_config(ZmqSink::Config& config) {
   field(config.send_mesh, "send_mesh");
 }
 
-ZmqSink::ZmqSink(const Config& config) : config(config::checkValid(config)) {
+ZmqSink::ZmqSink(const Config& config, const RobotConfig&)
+    : config(config::checkValid(config)) {
   sender_ = std::make_unique<spark_dsg::ZmqSender>(config.url, config.num_threads);
 }
 

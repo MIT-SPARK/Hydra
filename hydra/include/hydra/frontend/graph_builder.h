@@ -101,7 +101,7 @@ class GraphBuilder : public Module {
   } const config;
 
   GraphBuilder(const Config& config,
-               const RunContext& context,
+               RunContext::ConstPtr context,
                const SharedDsgInfo::Ptr& dsg,
                const std::shared_ptr<SharedModuleState>& state,
                std::unique_ptr<VolumetricWindow>&& window);
@@ -112,7 +112,7 @@ class GraphBuilder : public Module {
 
   void stop(bool force) override;
 
-  void save(const DataDirectory* output) override;
+  void save(const DataDirectory* output = nullptr) override;
 
   std::string show() const override;
 

@@ -68,7 +68,7 @@ class ActiveWindowModule : public Module {
   } const config;
 
   ActiveWindowModule(const Config& config,
-                     const RunContext& context,
+                     RunContext::ConstPtr context,
                      const OutputQueue::Ptr& output_queue,
                      std::unique_ptr<VolumetricWindow>&& global_window);
 
@@ -78,7 +78,7 @@ class ActiveWindowModule : public Module {
 
   void stop(bool force) override;
 
-  void save(const DataDirectory* output) override;
+  void save(const DataDirectory* output = nullptr) override;
 
   std::string show() const override;
 

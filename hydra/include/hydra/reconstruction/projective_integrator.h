@@ -47,6 +47,7 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 #include <memory>
+#include <optional>
 
 #include "hydra/input/input_data.h"
 #include "hydra/reconstruction/projection_interpolators.h"
@@ -96,7 +97,7 @@ class ProjectiveIntegrator {
     //! longer in memory, low max weight favors rapid updates
     float max_weight = 1.0e5f;
     //! Number of threads used to perform integration (defaults to all)
-    int num_threads;
+    std::optional<int> num_threads;
     //! Which interpolation to use in the image projection
     config::VirtualConfig<ProjectionInterpolator> interpolation_method;
     //! Semantic integrator configuration (optional)
@@ -112,7 +113,7 @@ class ProjectiveIntegrator {
     int32_t label = -1;
   };
 
-  explicit ProjectiveIntegrator(const ProjectiveIntegrator::Config& config,
+  explicit ProjectiveIntegrator(const Config& config,
                                 const Labelspace* labelspace = nullptr);
 
   virtual ~ProjectiveIntegrator() = default;

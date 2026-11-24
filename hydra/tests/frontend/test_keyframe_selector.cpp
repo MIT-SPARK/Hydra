@@ -46,6 +46,12 @@
 namespace hydra {
 namespace {
 
+RunContext::ConstPtr makeContext(const std::filesystem::path& log_path = {}) {
+  RunContext::Config config;
+  config.log_path = log_path;
+  return std::make_shared<RunContext>(config);
+}
+
 Sensor::ConstPtr makeCamera(const std::string& name = "camera") {
   Camera::Config config;
   config.width = 4;
@@ -126,7 +132,7 @@ TEST(KeyframeSelector, SelectFields) {
 
 TEST(KeyframeSelector, SavesAcceptedKeyframes) {
   const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
-  const auto log_path = temp / "keyframes";
+  const auto log_path = temp / "frontend/keyframes";
   const auto sensor = makeCamera();
 
   KeyframeSelector::Config config;
@@ -134,12 +140,12 @@ TEST(KeyframeSelector, SavesAcceptedKeyframes) {
   policy.min_pose_separation = 1.0;
   policy.min_time_separation_s = 0.0;
   config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
-  config.log_path = log_path;
+  config.log_keyframes = true;
 
   auto dsg = test::makeSharedDsg();
   FrontendOutput output(0, 0);
   {
-    KeyframeSelector selector(config);
+    KeyframeSelector selector(config, makeContext(temp.path));
     ActiveWindowOutput msg(makeInput(sensor, 10, 0.0));
     msg.sensor_data.push_back(makeInput(sensor, 20, 0.5));  // dropped: not far enough
     msg.sensor_data.push_back(makeInput(sensor, 30, 2.0));
@@ -190,7 +196,8 @@ TEST(KeyframeSelector, SavesDescriptorsOnlyWhenRequested) {
   for (const bool with_features : {false, true}) {
     KeyframeSelector::Config config;
     config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
-    config.log_path = root / (with_features ? "on" : "off");
+    config.log_keyframes = true;
+    const auto run_path = root / (with_features ? "on" : "off");
     if (with_features) {
       config.save_fields.push_back("features");
     }
@@ -198,13 +205,13 @@ TEST(KeyframeSelector, SavesDescriptorsOnlyWhenRequested) {
     auto input = makeInput(sensor, 10);
     input->label_features.emplace(3, FeatureVector::Constant(2, 0.5));
     {
-      KeyframeSelector selector(config);
+      KeyframeSelector selector(config, makeContext(run_path));
       ActiveWindowOutput msg(input);
       selector.call(msg, *dsg, output, nullptr);
       selector.flush();
     }
 
-    const auto loaded = InputData::load(config.log_path / "10.zip");
+    const auto loaded = InputData::load(run_path / "frontend/keyframes/10.zip");
     ASSERT_TRUE(loaded);
     if (!with_features) {  // default: descriptors are dropped
       EXPECT_EQ(loaded->feature.size(), 0);
@@ -225,7 +232,7 @@ TEST(KeyframeSelector, SavesDescriptorsOnlyWhenRequested) {
 
 TEST(KeyframeSelector, SensorSuffixForSecondarySensors) {
   const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
-  const auto log_path = temp / "keyframes_multi";
+  const auto log_path = temp / "frontend/keyframes";
   const auto front = makeCamera("front");
   const auto rear = makeCamera("rear cam/1");
 
@@ -234,12 +241,12 @@ TEST(KeyframeSelector, SensorSuffixForSecondarySensors) {
   policy.min_pose_separation = 0.0;
   policy.min_time_separation_s = 0.0;
   config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
-  config.log_path = log_path;
+  config.log_keyframes = true;
 
   auto dsg = test::makeSharedDsg();
   FrontendOutput output(0, 0);
   {
-    KeyframeSelector selector(config);
+    KeyframeSelector selector(config, makeContext(temp.path));
     ActiveWindowOutput msg(makeInput(front, 10));
     msg.sensor_data.push_back(makeInput(rear, 10));  // same stamp, other sensor
     msg.sensor_data.push_back(makeInput(front, 20));
@@ -257,20 +264,20 @@ TEST(KeyframeSelector, SensorSuffixForSecondarySensors) {
 
 TEST(KeyframeSelector, FlushOnDestruction) {
   const auto temp = utils::TempDirectory::system_default("hydra-keyframes-", true);
-  const auto& log_path = temp.path;
+  const auto log_path = temp / "frontend/keyframes";
   KeyframeSelector::Config config;
   DistancePolicy::Config policy;
   policy.min_pose_separation = 0.0;
   policy.min_time_separation_s = 0.0;
   config.keyframe_policy = config::VirtualConfig<KeyframePolicy>(policy);
-  config.log_path = log_path;
+  config.log_keyframes = true;
   config.max_queue_size = 0;
 
   const auto sensor = makeCamera();
   auto dsg = test::makeSharedDsg();
   FrontendOutput output(0, 0);
   {
-    KeyframeSelector selector(config);
+    KeyframeSelector selector(config, makeContext(temp.path));
     ActiveWindowOutput msg(makeInput(sensor, 1));
     for (size_t i = 2; i <= 20; ++i) {
       msg.sensor_data.push_back(makeInput(sensor, i));
@@ -306,7 +313,7 @@ TEST(KeyframeSelector, ReleasesViewsLeavingWindowWithoutFeatureSelector) {
   const auto sensor = makeCamera();
   auto dsg = test::makeSharedDsg();
   FrontendOutput output(0, 0);
-  KeyframeSelectorAccess selector(config);
+  KeyframeSelectorAccess selector(config, makeContext());
   for (size_t i = 0; i < 50; ++i) {
     ActiveWindowOutput msg(makeInput(sensor, i + 1, 2.0 * i));
     selector.call(msg, *dsg, output, &window);
@@ -331,7 +338,7 @@ TEST(KeyframeSelector, BoundsActiveKeyframesOfStationaryRobot) {
   const auto sensor = makeCamera();
   auto dsg = test::makeSharedDsg();
   FrontendOutput output(0, 0);
-  KeyframeSelectorAccess selector(config);
+  KeyframeSelectorAccess selector(config, makeContext());
   // a stationary robot: every frame is a keyframe (time), none ever leaves the window
   for (size_t i = 0; i < 100; ++i) {
     ActiveWindowOutput msg(makeInput(sensor, (i + 1) * 1'000'000'000));
@@ -357,7 +364,7 @@ TEST(KeyframeSelector, UnboundedActiveKeyframesWhenDisabled) {
   const auto sensor = makeCamera();
   auto dsg = test::makeSharedDsg();
   FrontendOutput output(0, 0);
-  KeyframeSelectorAccess selector(config);
+  KeyframeSelectorAccess selector(config, makeContext());
   for (size_t i = 0; i < 60; ++i) {
     ActiveWindowOutput msg(makeInput(sensor, (i + 1) * 1'000'000'000));
     selector.call(msg, *dsg, output, nullptr);

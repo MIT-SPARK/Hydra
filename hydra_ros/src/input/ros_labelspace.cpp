@@ -39,7 +39,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/run_context.h>
 #include <ianvs/message_wait_functor.h>
 
 #include <nlohmann/json.hpp>

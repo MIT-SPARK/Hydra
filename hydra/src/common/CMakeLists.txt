@@ -6,8 +6,11 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_update.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/hydra_pipeline.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/labelspace.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/module.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/node_matchers.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/robot_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/robot_prefix_config.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/run_settings.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_color_map.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/shared_dsg_info.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/shared_module_state.cpp

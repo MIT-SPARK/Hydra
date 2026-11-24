@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/config.h>
-#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/enum.h>
 
 namespace hydra {
@@ -54,6 +53,7 @@ enum class SensorMapMode {
 template <typename T>
 struct SensorMapConfig {
   SensorMapMode mode = SensorMapMode::Single;
+  typename T::Config default_config;
   config::OrderedMap<std::string, typename T::Config> sensors;
 };
 
@@ -77,19 +77,12 @@ class SensorMap {
 
 template <typename T>
 template <typename... Args>
-SensorMap<T>::SensorMap(const Config& config, Args... args)
-    : config(config),
-      default_(std::make_unique<T>(config::fromYaml<typename T::Config>(YAML::Node()),
-                                   args...)) {
-  // NOTE(nathan) the above field initializer is janky because there are configs that by
-  // default are initialized to invalid values that get resolved through parsing (even
-  // if there is nothing to parse). Would be ideal to be able to do this without pulling
-  // in YAML
-  if (config.mode == SensorMapMode::Single) {
-    if (!config.sensors.empty()) {
-      default_ = std::make_unique<T>(config.sensors.front().second, args...);
-    }
+SensorMap<T>::SensorMap(const Config& config, Args... args) : config(config) {
+  if (config.mode != SensorMapMode::Strict) {
+    default_ = std::make_unique<T>(config.default_config, args...);
+  }
 
+  if (config.mode == SensorMapMode::Single) {
     return;
   }
 
@@ -118,38 +111,6 @@ const T* SensorMap<T>::get(const std::string& name) const {
 }
 
 template <typename T>
-struct SensorMapConversion {
-  static T toIntermediate(const config::OrderedMap<std::string, T>& value,
-                          std::string& error) {
-    if (value.size() > 1u) {
-      // NOTE(nathan) we rely having up to a single element with an empty name when
-      // faking a single config with the map. If there are multiple elements, something
-      // has gone wrong in the conversion process (the conversion likely used to point
-      // to a map created from one of the other multi-sensor modes)
-      error = "Multiple elements are ambiguous, something went wrong!";
-      return {};
-    }
-
-    return value.empty() ? T{} : value.front().second;
-  }
-
-  static void fromIntermediate(const T& intermediate,
-                               config::OrderedMap<std::string, T>& value,
-                               std::string& error) {
-    if (value.size() > 1u) {
-      error = "Multiple elements are ambiguous, something went wrong!";
-      return;
-    }
-
-    if (value.empty()) {
-      value.emplace_back(std::make_pair("", intermediate));
-    } else {
-      value[0].second = intermediate;
-    }
-  }
-};
-
-template <typename T>
 void declare_config(SensorMapConfig<T>& config) {
   using namespace config;
   name<SensorMapConfig<T>>();
@@ -159,7 +120,7 @@ void declare_config(SensorMapConfig<T>& config) {
               {SensorMapMode::Strict, "Strict"},
               {SensorMapMode::Permissive, "Permissive"}});
   if (config.mode == SensorMapMode::Single) {
-    field<SensorMapConversion<typename T::Config>>(config.sensors, "sensors");
+    field(config.default_config, "sensor", false);
   } else {
     field(config.sensors, "sensors");
   }

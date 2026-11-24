@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/common/robot_config.h>
 #include <hydra/frontend/mesh_segmenter.h>
 #include <hydra_visualizer/color/colormap_utilities.h>
 #include <ianvs/lazy_publisher_group.h>
@@ -52,7 +53,7 @@ class ObjectVisualizer : public MeshSegmenter::Sink {
     visualizer::CategoricalColormap::Config colormap;
   } const config;
 
-  explicit ObjectVisualizer(const Config& config);
+  explicit ObjectVisualizer(const Config& config, const RobotConfig& robot);
 
   ~ObjectVisualizer() = default;
 
@@ -64,6 +65,7 @@ class ObjectVisualizer : public MeshSegmenter::Sink {
             const MeshSegmenter::LabelClusters& clusters) const override;
 
  protected:
+  const RobotConfig robot_;
   void fillMarkerFromCloud(const kimera_pgmo::MeshDelta& delta,
                            const std::vector<size_t>& indices,
                            visualization_msgs::msg::Marker& marker) const;

@@ -53,7 +53,7 @@ class ZmqSink : public BackendModule::Sink {
     size_t num_threads = 2;
   } const config;
 
-  explicit ZmqSink(const Config& config);
+  explicit ZmqSink(const Config& config, const RobotConfig& /* robot */);
   virtual ~ZmqSink();
   void call(uint64_t timestamp_ns,
             const spark_dsg::SceneGraph& graph,

@@ -86,14 +86,15 @@ def mp3d(scenes, visualize, zmq_url, max_steps, force, output):
                 rotation, translation = _decompose_pose(pose)
                 pipeline.step(
                     stamp,
-                    translation,
                     rotation,
+                    translation,
+                    rgb,
                     depth,
                     labels,
-                    rgb,
                 )
 
-            pipeline.save(f"{output}")
+            pipeline.stop()
+            pipeline.save()
 
         except Exception:
             click.secho(f"Pipeline failed for '{scene_path}'", fg="red")

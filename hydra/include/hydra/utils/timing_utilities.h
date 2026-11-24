@@ -66,7 +66,7 @@ class ElapsedTimeRecorder {
 
   static ElapsedTimeRecorder& instance();
 
-  void reset();
+  static void reset();
 
   void start(const std::string& timer_name, const uint64_t timestamp);
 

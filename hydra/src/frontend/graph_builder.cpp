@@ -60,7 +60,7 @@ static const auto registration =
     config::RegistrationWithConfig<GraphBuilder,
                                    GraphBuilder,
                                    GraphBuilder::Config,
-                                   RunContext,
+                                   RunContext::ConstPtr,
                                    SharedDsgInfo::Ptr,
                                    std::shared_ptr<SharedModuleState>,
                                    std::unique_ptr<VolumetricWindow>>("GraphBuilder");
@@ -91,8 +91,6 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.pose_graph_tracker, "pose_graph_tracker");
   config.keyframe_selector.setOptional();
   field(config.keyframe_selector, "keyframe_selector");
-  config.keyframe_selector.setOptional();
-  field(config.keyframe_selector, "keyframe_selector");
   config.freespace_places.setOptional();
   field(config.freespace_places, "freespace_places");
   config.traversability_places.setOptional();
@@ -111,7 +109,7 @@ GraphBuilder::Config::Config()
       deformation_graph_builder(DeformationGraphBuilder::Config()) {}
 
 GraphBuilder::GraphBuilder(const Config& config,
-                           const RunContext& context,
+                           RunContext::ConstPtr context,
                            const SharedDsgInfo::Ptr& dsg,
                            const std::shared_ptr<SharedModuleState>& state,
                            std::unique_ptr<VolumetricWindow>&& window)
@@ -125,12 +123,13 @@ GraphBuilder::GraphBuilder(const Config& config,
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(std::move(window)),
-      surface_places_(
-          config.surface_places.create(context.labelspace().surface_places_labels)),
-      sinks_(Sink::instantiate(config.sinks)) {
+      surface_places_(config.surface_places.create(
+          context->labelspace().surface_places_labels, context->config.robot)),
+      sinks_(Sink::instantiate(config.sinks, context->config.robot)) {
   if (config.enable_mesh_objects) {
     segmenter_ = std::make_unique<MeshSegmenter>(config.object_config,
-                                                 context.labelspace().object_labels);
+                                                 context->labelspace().object_labels,
+                                                 context->config.robot);
   }
 
   CHECK(dsg_ != nullptr);
@@ -140,13 +139,14 @@ GraphBuilder::GraphBuilder(const Config& config,
   }
 
   // TODO(nathan) this needs to be pushed to an actual config at some point
-  functors_.emplace("pose_graph_tracker", config.pose_graph_tracker.create());
+  functors_.emplace("pose_graph_tracker", config.pose_graph_tracker.create(context));
   functors_.emplace("deformation_graph_builder",
-                    config.deformation_graph_builder.create());
-  functors_.emplace("keyframe_selector", config.keyframe_selector.create());
-  functors_.emplace("freespace_places", config.freespace_places.create());
-  functors_.emplace("traversability_places", config.traversability_places.create());
-  functors_.emplace("frontier_places", config.frontier_places.create());
+                    config.deformation_graph_builder.create(context));
+  functors_.emplace("keyframe_selector", config.keyframe_selector.create(context));
+  functors_.emplace("freespace_places", config.freespace_places.create(context));
+  functors_.emplace("traversability_places",
+                    config.traversability_places.create(context));
+  functors_.emplace("frontier_places", config.frontier_places.create(context));
   for (const auto& [_, functor] : functors_) {
     callbacks_.push_back([&](auto msg) {
       if (msg && functor) {
@@ -167,6 +167,8 @@ GraphBuilder::~GraphBuilder() {
 }
 
 void GraphBuilder::start() {
+  should_shutdown_ = false;
+  force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&GraphBuilder::spin, this));
   MLOG(0) << "started!";
 }
@@ -177,7 +179,9 @@ void GraphBuilder::stop(bool force) {
 }
 
 void GraphBuilder::stopImpl() {
-  should_shutdown_ = true;
+  if (should_shutdown_.exchange(true)) {
+    return;
+  }
 
   if (spin_thread_) {
     MLOG(1) << "stopping frontend!";
@@ -189,7 +193,12 @@ void GraphBuilder::stopImpl() {
 }
 
 void GraphBuilder::save(const DataDirectory* output) {
-  const auto output_path = output.path("frontend");
+  const auto& logs = output ? *output : context->logs;
+  if (!logs) {
+    return;
+  }
+
+  const auto output_path = logs.path("frontend");
   {  // the graph and the bindings are only consistent under the frontend lock
     std::lock_guard<std::mutex> lock(mutex_);
     dsg_->graph->save(output_path / "dsg.json", false);
@@ -207,11 +216,11 @@ void GraphBuilder::save(const DataDirectory* output) {
     }
   }
 
-  // functors flush their own output (e.g., queued keyframes) without blocking the
+  // functors flush their own logs (e.g., queued keyframes) without blocking the
   // frontend update loop; functors_ is fixed after construction
   for (const auto& [_, functor] : functors_) {
     if (functor) {
-      functor->save(output);
+      functor->save(logs);
     }
   }
 }
@@ -237,7 +246,11 @@ void GraphBuilder::spin() {
     }
 
     bool has_data = queue_->poll();
-    if (force_shutdown_ || !has_data) {
+    if (force_shutdown_) {
+      break;
+    }
+
+    if (!has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
     }

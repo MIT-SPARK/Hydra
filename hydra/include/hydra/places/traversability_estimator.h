@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-
 #include <hydra/common/output_sink.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/scene_graph.h>
@@ -42,6 +41,7 @@
 #include <optional>
 
 #include "hydra/active_window/active_window_output.h"
+#include "hydra/common/robot_config.h"
 #include "hydra/places/traversability_layer.h"
 #include "hydra/reconstruction/voxel_types.h"
 
@@ -149,7 +149,7 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
     float min_weight = 1.0e-6f;
   };
 
-  HeightTraversabilityEstimator(const Config& config);
+  HeightTraversabilityEstimator(const Config& config, const RobotConfig& /* robot */);
   ~HeightTraversabilityEstimator() override = default;
 
   void updateTraversability(const ActiveWindowOutput& msg,
@@ -206,7 +206,7 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
     std::vector<Sink::Factory> sinks;
   };
 
-  GradientTraversabilityEstimator(const Config& config);
+  GradientTraversabilityEstimator(const Config& config, const RobotConfig& robot);
   ~GradientTraversabilityEstimator() override = default;
 
   void updateTraversability(const ActiveWindowOutput& msg,

@@ -105,7 +105,7 @@ void addPoints(MeshDelta& delta,
 TEST(MeshSegmenter, TestClustering) {
   MeshSegmenter::Config config;
   config.clustering.min_cluster_size = 4;
-  MeshSegmenter segmenter(config, {1, 2});
+  MeshSegmenter segmenter(config, {1, 2}, RobotConfig{});
 
   MeshDelta delta({0, 0, 0});
   addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
@@ -122,7 +122,7 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
 
   MeshSegmenter::Config config;
   config.clustering.min_cluster_size = 4;
-  MeshSegmenter segmenter(config, {1, 2});
+  MeshSegmenter segmenter(config, {1, 2}, RobotConfig{});
 
   SceneGraph graph;
   kimera_pgmo::MeshOffsetInfo offsets;
@@ -180,7 +180,7 @@ TEST(MeshSegmenter, TestDeletedObject) {
 
   MeshSegmenter::Config config;
   config.clustering.min_cluster_size = 4;
-  MeshSegmenter segmenter(config, {1, 2});
+  MeshSegmenter segmenter(config, {1, 2}, RobotConfig{});
 
   SceneGraph graph;
   kimera_pgmo::MeshOffsetInfo offsets;
@@ -221,7 +221,7 @@ TEST(MeshSegmenter, TestArchivedObject) {
 
   MeshSegmenter::Config config;
   config.clustering.min_cluster_size = 4;
-  MeshSegmenter segmenter(config, {1, 2});
+  MeshSegmenter segmenter(config, {1, 2}, RobotConfig{});
 
   SceneGraph graph;
   kimera_pgmo::MeshOffsetInfo offsets;
@@ -268,7 +268,7 @@ TEST(MeshSegmenter, TestDeltaWithOffset) {
 
   MeshSegmenter::Config config;
   config.clustering.min_cluster_size = 4;
-  MeshSegmenter segmenter(config, {1, 2});
+  MeshSegmenter segmenter(config, {1, 2}, RobotConfig{});
 
   SceneGraph graph;
   kimera_pgmo::MeshOffsetInfo offsets;

@@ -53,8 +53,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    DeformationGraphBuilder,
-                                   DeformationGraphBuilder::Config>(
-        "DeformationGraphBuilder");
+                                   DeformationGraphBuilder::Config,
+                                   RunContext::ConstPtr>("DeformationGraphBuilder");
 
 }
 
@@ -73,8 +73,10 @@ void declare_config(DeformationGraphBuilder::Config& config) {
 DeformationGraphBuilder::Config::Config()
     : VerbosityConfig(VerbosityConfig::default_verbosity("dgraph_compression")) {}
 
-DeformationGraphBuilder::DeformationGraphBuilder(const Config& config)
+DeformationGraphBuilder::DeformationGraphBuilder(const Config& config,
+                                                 RunContext::ConstPtr context)
     : config(config::checkValid(config)),
+      robot_(context->config.robot),
       compression_(new kimera_pgmo::BlockCompression(config.resolution)) {}
 
 DeformationGraphBuilder::~DeformationGraphBuilder() = default;
@@ -100,7 +102,7 @@ void DeformationGraphBuilder::call(const ActiveWindowOutput& input,
   Vertices::Ptr vertices(new Vertices());
   compression_->getVertices(vertices);
 
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+  const auto& prefix = robot_.prefix();
   const auto edges = graph_.addPointsAndSurfaces(indices, faces);
   auto new_graph = makePoseGraph(prefix.id, time_s, edges, indices, *vertices);
 

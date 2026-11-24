@@ -32,15 +32,14 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
 #include "hydra/common/module.h"
 
 #include "hydra/common/run_context.h"
 
 namespace hydra {
 
-Module::Module(const RunContext& _context)
-    : context(_context), force_shutdown_(false) {}
+Module::Module(RunContext::ConstPtr context)
+    : context(std::move(context)), force_shutdown_(false) {}
 
 Module::~Module() = default;
 

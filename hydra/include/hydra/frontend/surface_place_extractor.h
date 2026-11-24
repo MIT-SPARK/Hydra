@@ -38,6 +38,7 @@
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/output_sink.h"
+#include "hydra/common/robot_config.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
 #include "hydra/utils/logging.h"
 
@@ -70,7 +71,9 @@ class SurfacePlaceExtractor {
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  SurfacePlaceExtractor(const Config& config, const std::set<uint32_t>& labels);
+  SurfacePlaceExtractor(const Config& config,
+                        const std::set<uint32_t>& labels,
+                        const RobotConfig& robot);
 
   void detect(const ActiveWindowOutput& msg,
               const kimera_pgmo::MeshDelta& mesh_delta,

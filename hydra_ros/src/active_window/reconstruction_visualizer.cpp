@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/robot_config.h>
 #include <hydra_visualizer/color/color_parsing.h>
 #include <hydra_visualizer/drawing.h>
 
@@ -57,8 +57,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<ActiveWindowModule::Sink,
                                    ReconstructionVisualizer,
-                                   ReconstructionVisualizer::Config>(
-        "ReconstructionVisualizer");
+                                   ReconstructionVisualizer::Config,
+                                   RobotConfig>("ReconstructionVisualizer");
 
 bool isVoxelObserved(const ReconstructionVisualizer::Config& config,
                      const TsdfVoxel& voxel) {
@@ -118,8 +118,10 @@ void declare_config(ReconstructionVisualizer::Config& config) {
   checkInRange(config.mesh_block_alpha, 0.0, 1.0, "mesh_block_alpha", false);
 }
 
-ReconstructionVisualizer::ReconstructionVisualizer(const Config& config)
-    : nh_(ianvs::NodeHandle::this_node(config.ns)),
+ReconstructionVisualizer::ReconstructionVisualizer(const Config& config,
+                                                   const RobotConfig& robot)
+    : robot_(robot),
+      nh_(ianvs::NodeHandle::this_node(config.ns)),
       pubs_(nh_),
       config_("reconstruction_visualizer", config),
       active_mesh_pub_(nh_.create_publisher<kimera_pgmo_msgs::msg::Mesh>("mesh", 1)),
@@ -147,7 +149,7 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
   const auto pose = output.world_T_body();
 
   std_msgs::msg::Header header;
-  header.frame_id = GlobalInfo::instance().getFrames().map;
+  header.frame_id = robot_.frames.map;
   header.stamp = rclcpp::Time(timestamp_ns);
 
   auto pose_msg = std::make_unique<geometry_msgs::msg::PoseStamped>();
@@ -205,7 +207,7 @@ void ReconstructionVisualizer::call(uint64_t timestamp_ns,
 
     std_msgs::msg::Header header;
     header.stamp = rclcpp::Time(output.timestamp_ns);
-    header.frame_id = GlobalInfo::instance().getFrames().map;
+    header.frame_id = robot_.frames.map;
     const auto sensor_name = data.getSensor().name;
 
     DisplayConfig display_config;
@@ -251,7 +253,7 @@ void ReconstructionVisualizer::publishMesh(const Config& config,
                                            const ActiveWindowOutput& out) const {
   std_msgs::msg::Header header;
   header.stamp = rclcpp::Time(out.timestamp_ns);
-  header.frame_id = GlobalInfo::instance().getFrames().map;
+  header.frame_id = robot_.frames.map;
 
   const auto& mesh = out.map().getMeshLayer();
   ActiveBlockColoring block_cmap(config.mesh_block_color);

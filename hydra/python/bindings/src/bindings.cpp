@@ -35,8 +35,11 @@
 #include <config_utilities/config.h>
 #include <config_utilities/external_registry.h>
 #include <config_utilities/parsing/context.h>
+#include <config_utilities/parsing/yaml.h>
+#include <config_utilities/printing.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl/filesystem.h>
 
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/labelspace.h"
@@ -46,6 +49,7 @@
 #include "hydra/bindings/python_reconstruction.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
+#include "hydra/common/run_context.h"
 #include "hydra/utils/app_plugin.h"
 
 namespace py = pybind11;
@@ -117,11 +121,25 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   ::hydra::python::python_sensor_input::addBindings(m);
   ::hydra::python::python_sensors::addBindings(m);
 
+  py::class_<RunContext, std::shared_ptr<RunContext>>(m, "RunContext")
+      .def(py::init([]() {
+        return std::make_shared<RunContext>(config::fromContext<RunContext::Config>());
+      }))
+      .def_property_readonly(
+          "labelspace", [](const RunContext& context) { return context.labelspace(); })
+      .def_property_readonly(
+          "robot_id",
+          [](const RunContext& context) { return context.config.robot.robot_id; })
+      .def_property_readonly(
+          "log_path", [](const RunContext& context) { return context.config.log_path; })
+      .def("__repr__",
+           [](const RunContext& context) { return config::toString(context.config); });
+
   py::class_<ExternalPluginConfig>(m, "ExternalPluginConfig")
       .def(py::init<>())
       .def_readwrite("allow", &ExternalPluginConfig::allow)
-      .def_readwrite("verbose", &ExternalPluginConfig::allow)
-      .def_readwrite("trace_allocations", &ExternalPluginConfig::allow)
+      .def_readwrite("verbose", &ExternalPluginConfig::verbose)
+      .def_readwrite("trace_allocations", &ExternalPluginConfig::trace_allocations)
       .def_readwrite("paths", &ExternalPluginConfig::paths);
 
   m.def("init_plugins",
@@ -131,6 +149,7 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   m.def(
       "init_config_context",
       [](const std::vector<std::string>& args, bool init_settings) {
+        config::clearContext();
         config::initContext(args);
         if (init_settings) {
           config::setConfigSettingsFromContext();

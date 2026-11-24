@@ -55,7 +55,7 @@ struct UpdateFrontiersFunctor : public UpdateFunctor {
             SharedDsgInfo&,
             const UpdateInfo::ConstPtr&) const override;
 
-  void cleanup(uint64_t timestamp_ns,
+  void cleanup(const UpdateInfo::ConstPtr& info,
                spark_dsg::SceneGraph& unmerged_dsg,
                SharedDsgInfo& dsg) const;
 

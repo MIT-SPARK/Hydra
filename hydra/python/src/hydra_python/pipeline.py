@@ -34,17 +34,17 @@
 #
 """Module containing python utilites for loading a valid config."""
 
+import json
 import logging
 import pathlib
-
-import yaml
 
 from hydra_python._hydra_bindings import (
     Camera,
     CameraConfig,
     ExtrinsicsConfig,
     HydraPipeline,
-    set_glog_dir,
+    RunContext,
+    init_config_context,
 )
 
 
@@ -63,34 +63,13 @@ def get_config_path(dataset=None):
     raise RuntimeError("invalid config path")
 
 
-def update_nested(contents, other):
-    """Merge two config trees recursively."""
-    for key, value in other.items():
-        if key not in contents:
-            contents[key] = {}
-
-        if isinstance(value, dict):
-            update_nested(contents[key], value)
-        else:
-            contents[key] = value
-
-
 def load_configs(
     dataset: str,
     labelspace: str = "ade20k_mp3d",
     config_path=None,
     bounding_box_type: str = "AABB",
 ):
-    """
-    Load various configs to construct the Hydra pipeline.
-
-    dataset_name: Dataset name to load config from
-    labelspace_name: Labelspace name to use
-    bounding_box_type: Type of bounding box to use
-
-    Returns:
-        (Optional[PythonConfig]) Pipline config or none if invalid
-    """
+    """Build config_utilities arguments for the dataset and labelspace."""
     config_path = (
         get_config_path()
         if config_path is None
@@ -98,35 +77,19 @@ def load_configs(
     )
     dataset_path = config_path / "datasets" / f"{dataset}.yaml"
     labelspace_path = config_path / "label_spaces" / f"{labelspace}_label_space.yaml"
-    if not dataset_path.exists():
-        logging.error(f"invalid dataset path: {dataset_path}")
-        return None
+    for path in (dataset_path, labelspace_path):
+        if not path.is_file():
+            raise FileNotFoundError(path)
 
-    if not labelspace_path.exists():
-        logging.error(f"invalid labelspace path: {labelspace_path}")
-        return None
-
-    contents = {}
-    with dataset_path.open("r") as fin:
-        update_nested(contents, yaml.safe_load(fin.read()))
-
-    with labelspace_path.open("r") as fin:
-        update_nested(contents, yaml.safe_load(fin.read()))
-
-    overrides = {
-        "frontend": {
-            "type": "GraphBuilder",
-            "objects": {"bounding_box_type": bounding_box_type},
-        },
-        "backend": {"type": "BackendModule"},
-        "reconstruction": {
-            "type": "ReconstructionModule",
-            "show_stats": False,
-            "pose_graphs": {"make_pose_graph": True},
-        },
-    }
-    update_nested(contents, overrides)
-    return contents
+    return [
+        "hydra",
+        "--config-utilities-file",
+        str(dataset_path),
+        "--config-utilities-file",
+        f"{labelspace_path}@labelspace",
+        "--config-utilities-yaml",
+        json.dumps({"frontend": {"objects": {"bounding_box_type": bounding_box_type}}}),
+    ]
 
 
 def make_camera(
@@ -164,25 +127,25 @@ def load_pipeline(
     zmq_url=None,
 ):
     """Load Hydra pipeline from configs."""
-    contents = load_configs(config_name, labelspace=labelspace, config_path=config_path)
-    if not contents:
-        return None
+    args = load_configs(config_name, labelspace=labelspace, config_path=config_path)
+    if output_path is not None:
+        args.extend(
+            [
+                "--config-utilities-yaml",
+                json.dumps({"log_path": str(output_path)}),
+            ]
+        )
 
-    if output_path:
-        update_nested(contents, {"log_path": str(output_path)})
-        glog_dir = output_path / "logs"
-        if not glog_dir.exists():
-            glog_dir.mkdir(parents=True)
+    if zmq_url is not None:
+        args.extend(
+            [
+                "--config-utilities-yaml",
+                json.dumps(
+                    {"backend": {"sinks": [{"type": "ZmqSink", "url": zmq_url}]}}
+                ),
+            ]
+        )
 
-        set_glog_dir(glog_dir)
-
-    pipeline = HydraPipeline.from_config(
-        yaml.safe_dump(contents),
-        sensor,
-        robot_id=0,
-        config_verbosity=config_verbosity,
-        use_step_mode=True,
-        zmq_url="" if zmq_url is None else zmq_url,
-    )
-
-    return pipeline
+    init_config_context(args)
+    context = RunContext()
+    return HydraPipeline(sensor, context, show_config=config_verbosity > 0)

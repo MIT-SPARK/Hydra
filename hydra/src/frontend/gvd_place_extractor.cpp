@@ -61,7 +61,8 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<GraphBuilderFunctor,
                                    GvdPlaceExtractor,
-                                   GvdPlaceExtractor::Config>("gvd");
+                                   GvdPlaceExtractor::Config,
+                                   RunContext::ConstPtr>("gvd");
 
 bool attributesInvalid(const PlaceNodeAttributes& attrs) {
   if (std::isnan(attrs.distance)) {
@@ -98,10 +99,10 @@ void declare_config(GvdPlaceExtractor::Config& config) {
   field(config.sinks, "sinks");
 }
 
-GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
+GvdPlaceExtractor::GvdPlaceExtractor(const Config& c, RunContext::ConstPtr context)
     : config(config::checkValid(c)),
       tsdf_interpolator_(config.tsdf_interpolator.create()),
-      sinks_(Sink::instantiate(config.sinks)) {
+      sinks_(Sink::instantiate(config.sinks, context->config.robot)) {
   if (tsdf_interpolator_) {
     MLOG(0) << "Downsampling TSDF when creating places!";
   }

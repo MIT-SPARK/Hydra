@@ -38,7 +38,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <hydra/common/global_info.h>
+#include <hydra/common/robot_config.h>
 #include <ianvs/node_handle.h>
 #include <tf2_ros/transform_listener.h>
 
@@ -137,8 +137,9 @@ void declare_config(TFLookup::Config& config) {
   field(config.verbosity, "verbosity");
 }
 
-TFLookup::TFLookup(const Config& config)
+TFLookup::TFLookup(const Config& config, const RobotConfig::Frames& frames)
     : config(config),
+      frames(frames),
       buffer(ianvs::NodeHandle::this_node().clock(), config.buffer_size_ns()),
       listener(buffer) {}
 
@@ -146,8 +147,8 @@ PoseStatus TFLookup::getBodyPose(uint64_t timestamp_ns) const {
   rclcpp::Time curr_ros_time(timestamp_ns);
   return lookupTransform(buffer,
                          curr_ros_time,
-                         GlobalInfo::instance().getFrames().odom,
-                         GlobalInfo::instance().getFrames().robot,
+                         frames.odom,
+                         frames.robot,
                          config.max_tries,
                          config.wait_duration_s,
                          config.verbosity);

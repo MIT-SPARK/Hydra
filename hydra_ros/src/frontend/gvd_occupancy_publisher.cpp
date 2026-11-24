@@ -61,9 +61,10 @@ void declare_config(GvdOccupancyPublisher::Config& config) {
   field(config.ns, "ns");
 }
 
-GvdOccupancyPublisher::GvdOccupancyPublisher(const Config& config)
-    : OccupancyPublisher<places::GvdBlock>(config,
-                                           ianvs::NodeHandle::this_node(config.ns)),
+GvdOccupancyPublisher::GvdOccupancyPublisher(const Config& config,
+                                             const RobotConfig& robot)
+    : OccupancyPublisher<places::GvdBlock>(
+          config, ianvs::NodeHandle::this_node(config.ns), robot.frames.map),
       config(config::checkValid(config)) {}
 
 std::string GvdOccupancyPublisher::printInfo() const {
@@ -82,8 +83,8 @@ namespace {
 static const auto registration_ =
     config::RegistrationWithConfig<GvdPlaceExtractor::Sink,
                                    GvdOccupancyPublisher,
-                                   GvdOccupancyPublisher::Config>(
-        "GvdOccupancyPublisher");
+                                   GvdOccupancyPublisher::Config,
+                                   RobotConfig>("GvdOccupancyPublisher");
 
 }
 }  // namespace hydra
