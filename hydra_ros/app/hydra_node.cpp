@@ -36,6 +36,7 @@
 #include <config_utilities/external_registry.h>
 #include <config_utilities/formatting/asl.h>
 #include <config_utilities/logging/log_to_spdlog.h>
+#include <config_utilities/logging/set_logger.h>
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
@@ -94,8 +95,8 @@ int main(int argc, char* argv[]) {
     hydra::logging::setSinks({ianvs::makeRosSink(nh.logger())});
   }
 
-  config::internal::Logger::setLogger(
-      std::make_shared<config::internal::SpdlogLogger>(hydra::logging::logger()));
+  config::setCustomLogger(
+      std::make_unique<config::SpdlogLogger>(hydra::logging::logger()));
   if (settings.show_run_settings) {
     HYDRA_LOG(INFO, "Using node settings\n{}", config::toString(settings));
   }

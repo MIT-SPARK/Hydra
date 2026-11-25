@@ -36,6 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/logging/log_to_spdlog.h>
+#include <config_utilities/logging/set_logger.h>
 #include <kimera_pgmo/utils/logging.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -117,8 +118,7 @@ spdlog::level::level_enum parseLevel(const std::string& level) {
 }
 
 void configureConfigLogging() {
-  config::internal::Logger::setLogger(
-      std::make_shared<config::internal::SpdlogLogger>(logger()));
+  config::setCustomLogger(std::make_unique<config::SpdlogLogger>(logger()));
 }
 
 void setLogLevel(const std::string& level) {

@@ -2,6 +2,7 @@
 #include <config_utilities/external_registry.h>
 #include <config_utilities/formatting/asl.h>
 #include <config_utilities/logging/log_to_spdlog.h>
+#include <config_utilities/logging/set_logger.h>
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/types/path.h>
 #include <hydra/utils/logging.h>
@@ -49,8 +50,8 @@ int main(int argc, char* argv[]) {
 
   hydra::logging::setLogLevel(settings.log_level);
 
-  config::internal::Logger::setLogger(
-      std::make_shared<config::internal::SpdlogLogger>(hydra::logging::logger()));
+  config::setCustomLogger(
+      std::make_unique<config::SpdlogLogger>(hydra::logging::logger()));
 
   auto node = std::make_shared<rclcpp::Node>("hydra_multi_ros_node");
   ianvs::NodeHandle nh(*node);
