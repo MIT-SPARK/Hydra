@@ -20,6 +20,7 @@
   <depend>kimera_pgmo_msgs</depend>
   <depend>pose_graph_tools_ros</depend>
   <depend>rclcpp</depend>
+  <depend>rcutils</depend>
   <depend>rclcpp_components</depend>
   <depend>std_msgs</depend>
   <depend>tf2_eigen</depend>

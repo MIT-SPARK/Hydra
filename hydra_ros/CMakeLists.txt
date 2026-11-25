@@ -22,6 +22,7 @@ find_package(kimera_pgmo_ros REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common)
 find_package(pose_graph_tools_ros REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rcutils REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
@@ -89,6 +90,7 @@ ament_target_dependencies(
   PUBLIC
   geometry_msgs
   hydra_msgs
+  rcutils
   semantic_inference_msgs
   std_msgs
 )
@@ -140,6 +142,7 @@ ament_export_dependencies(
   hydra_visualizer
   kimera_pgmo_ros
   pose_graph_tools_ros
+  rcutils
   semantic_inference_msgs
   tf2_eigen
   tf2_ros

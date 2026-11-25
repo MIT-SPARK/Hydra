@@ -59,6 +59,8 @@ namespace hydra {
 struct VerbosityConfig {
   //! An unset value inherits the current run default
   std::optional<int> verbosity = std::nullopt;
+  //! Include the configured component label in messages
+  bool show_log_prefix = false;
   std::string log_name;
   std::string log_prefix = "[";
   std::string log_suffix = "] ";
@@ -67,10 +69,10 @@ struct VerbosityConfig {
   VerbosityConfig(const std::string& name = "",
                   std::optional<int> verbosity = std::nullopt);
 
-  //! Copy with a different name while preserving verbosity and delimiters
+  //! Copy with a different name while preserving verbosity and label settings
   VerbosityConfig with_name(const std::string& name) const;
 
-  //! Render the component label, or an empty string when the name is empty
+  //! Render the component label when enabled and named
   std::string get_log_prefix() const;
 
   bool enabled(int level) const { return get_verbosity() >= level; }

@@ -21,7 +21,8 @@ available for essential messages.
 
 `log_name` is the component name. `log_prefix` and `log_suffix` surround it
 and default to `[` and `] `. These fields are independent of node-symbol
-`prefix` fields. An empty `log_name` suppresses the label.
+`prefix` fields. Labels are hidden by default; set `show_log_prefix: true` in
+a module's configuration to include its label. An empty `log_name` also hides it.
 
 Construct configs with `VerbosityConfig("component")`. `with_name` changes the
 name while preserving verbosity and delimiters.
@@ -59,6 +60,10 @@ so both this filter and module verbosity apply. `forward_logs_to_ros` selects RO
 forwarding in the Hydra node without duplicate console emission.
 Forwarded messages use the node's `spdlog` child logger at ROS debug level, so
 `log_level` controls their severity without changing the node's own ROS threshold.
+ROS supplies the timestamp, severity, and logger name. The sink passes the original
+source location as metadata rather than adding it to the message. To include it
+once, set `RCUTILS_CONSOLE_OUTPUT_FORMAT` to
+`[{severity}] [{name}] [{file_name}:{line_number}] {message}`.
 
 Python exposes `set_log_level("info")`, `set_log_directory(path,
 stderr_level="error")`, and `set_log_to_stderr()`. File output appends to

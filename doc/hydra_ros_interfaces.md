@@ -26,12 +26,13 @@ If you are parsing sensor information from `sensor_msgs::msg::CameraInfo` messag
 Hydra will print out the input configuration and other global information before attempting to resolve the sensor information.
 You may also find setting the parameter `print_missing: true` useful (which will output every configuration field that was not specified by YAML parameter).
 
-Use `verbosity` to override `default_verbosity` and set the log label's name and delimiters as shown below:
+Use `verbosity` to override `default_verbosity`. Module labels are hidden by default; enable and customize them as shown below:
 
 ```yaml
 default_verbosity: 1
 backend:
   verbosity: 3  # Show backend messages through level 3.
+  show_log_prefix: true
   log_name: backend  # Names log messages without changing node IDs.
   log_prefix: '['
   log_suffix: '] '

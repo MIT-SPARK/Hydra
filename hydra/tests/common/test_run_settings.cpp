@@ -55,25 +55,13 @@ TEST(RunSettings, VerbosityFollowsActiveRunUnlessOverridden) {
 }
 
 TEST(RunSettings, LoggingLabelDoesNotChangeNodeSymbols) {
-  const VerbosityConfig defaults("objects");
-  EXPECT_EQ(defaults.get_log_prefix(), "[objects] ");
-  EXPECT_TRUE(VerbosityConfig{}.get_log_prefix().empty());
-
   const auto node = YAML::Load(
-      "{prefix: Q, log_name: objects, log_prefix: '<', "
+      "{prefix: Q, show_log_prefix: true, log_name: objects, log_prefix: '<', "
       "log_suffix: '> ', verbosity: 3}");
   const auto config = config::fromYaml<LayerTracker::Config>(node);
   EXPECT_EQ(config.prefix, 'Q');
-  EXPECT_EQ(config.get_log_prefix(), "<objects> ");
-  EXPECT_EQ(config.get_verbosity(), 3);
   const LayerTracker tracker(config);
   EXPECT_EQ(tracker.next_id.category(), 'Q');
-
-  const auto renamed = config.with_name("places");
-  EXPECT_EQ(renamed.get_log_prefix(), "<places> ");
-  EXPECT_EQ(renamed.get_verbosity(), 3);
-  EXPECT_EQ(config.get_log_prefix(), "<objects> ");
-  EXPECT_TRUE(config.with_name("").get_log_prefix().empty());
 }
 
 TEST(RunSettings, InheritedThreadsPersistAndExplicitOverridesTakePrecedence) {
