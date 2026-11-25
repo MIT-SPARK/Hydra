@@ -11,7 +11,7 @@ repositories:
   kimera_pgmo:
     type: git
     url: https://github.com/MIT-SPARK/Kimera-PGMO.git
-    version: main
+    version: develop
   kimera_rpgo:
     type: git
     url: https://github.com/MIT-SPARK/Kimera-RPGO.git
@@ -27,11 +27,11 @@ repositories:
   spark_dsg:
     type: git
     url: https://github.com/MIT-SPARK/Spark-DSG.git
-    version: main
+    version: develop
   spatial_hash:
     type: git
     url: https://github.com/MIT-SPARK/Spatial-Hash.git
-    version: main
+    version: develop
   teaser_plusplus:
     type: git
     url: https://github.com/MIT-SPARK/TEASER-plusplus.git
