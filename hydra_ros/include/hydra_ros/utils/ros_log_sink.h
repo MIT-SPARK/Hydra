@@ -3,6 +3,7 @@
 #include <rcutils/logging.h>
 #include <spdlog/sinks/base_sink.h>
 
+#include <filesystem>
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
 #include <string>
@@ -38,8 +39,12 @@ class RosSink : public spdlog::sinks::base_sink<std::mutex> {
         break;
     }
 
+    const auto filename =
+        entry.source.empty()
+            ? std::string{}
+            : std::filesystem::path(entry.source.filename).filename().string();
     const rcutils_log_location_t location{entry.source.funcname,
-                                          entry.source.filename,
+                                          filename.c_str(),
                                           static_cast<size_t>(entry.source.line)};
     const auto payload = std::string(entry.payload.data(), entry.payload.size());
     rcutils_log(entry.source.empty() ? nullptr : &location,

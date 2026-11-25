@@ -61,8 +61,9 @@ forwarding in the Hydra node without duplicate console emission.
 Forwarded messages use the node's `spdlog` child logger at ROS debug level, so
 `log_level` controls their severity without changing the node's own ROS threshold.
 ROS supplies the timestamp, severity, and logger name. The sink passes the original
-source location as metadata rather than adding it to the message. To include it
-once, set `RCUTILS_CONSOLE_OUTPUT_FORMAT` to
+source filename and line as metadata rather than adding them to the message.
+Directory paths are omitted to match file logging. To include the location once,
+set `RCUTILS_CONSOLE_OUTPUT_FORMAT` to
 `[{severity}] [{name}] [{file_name}:{line_number}] {message}`.
 
 Python exposes `set_log_level("info")`, `set_log_directory(path,
