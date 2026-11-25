@@ -1,60 +1,36 @@
 # Logging
 
-Hydra uses spdlog 1.12 or newer with fmt. Use the same spdlog build configuration
-throughout an application; its imported CMake target supplies the matching fmt
-settings. Configuration logging can also be routed through config_utilities'
-optional spdlog backend.
+Hydra uses spdlog 1.12 or newer with fmt.
 
-## Module diagnostics
+## Configuration
 
-Configurations that own module diagnostics inherit `hydra::VerbosityConfig` and
-register that base in `declare_config`. Unset or null `verbosity` inherits the
-active run's `default_verbosity` when a message is evaluated. An explicit value
-stays fixed across runs, including zero. Levels are cumulative: zero enables
-level-zero diagnostics, and a negative threshold suppresses nonnegative levels.
-The process fallback is 1.
+Use `log_level` to choose the minimum severity and `default_verbosity` to set
+how much diagnostic detail to show. Individual modules can override `verbosity`:
 
-Use level 1 for lifecycle messages and summaries, level 2 for per-update
-output, and level 3 for normal diagnostic details. Reserve level 4 for very
-detailed traces and level 5 for data dumps or test diagnostics. Level 0 remains
-available for essential messages.
-
-`log_name` is the component name. `log_prefix` and `log_suffix` surround it
-and default to `[` and `] `. These fields are independent of node-symbol
-`prefix` fields. Labels are hidden by default; set `show_log_prefix: true` in
-a module's configuration to include its label. An empty `log_name` also hides it.
-
-Construct configs with `VerbosityConfig("component")`. `with_name` changes the
-name while preserving verbosity and delimiters.
-
-```cpp
-MLOG(2, "Processed {} nodes", count);
-MLOG_WITH(other_config, 2, "Processing {}", node);
-MLOG_NAMED(INFO, "Started");
-MLOG_NAMED(WARN, "Missing sensor {}", name);
-MLOG_NAMED(ERROR, "Failed to load {}", path);
-HYDRA_CHECK_EQ(actual, expected, "Unexpected node count");
+```yaml
+log_level: info
+default_verbosity: 1
+backend:
+  verbosity: 3
+  show_log_prefix: true
 ```
 
-`MLOG` uses the local `config`; `MLOG_WITH` accepts one explicitly. Diagnostic
-arguments are evaluated only when the message is enabled. Native fmt formatting
-is preferred, with stream operators adapted automatically for other types.
-Configurations and Eigen matrices can be logged directly.
+An unset module verbosity inherits `default_verbosity`, which defaults to 1.
+Each verbosity level includes the lower levels. Use levels 1–3 for summaries,
+per-update output, and diagnostic details. Reserve 4 for very detailed traces
+and 5 for data dumps or tests. Level 0 is for essential messages.
 
-`MLOG_NAMED` uses the local `config` and accepts `INFO`, `WARN`, and `ERROR`.
-`MLOG_NAMED_WITH` accepts an explicit configuration. Both render the configured
-label and follow the severity filter without checking module verbosity.
+Module labels are hidden by default. Set `show_log_prefix: true` to show them.
+`log_name` chooses the label. `log_prefix` and `log_suffix` surround it and
+default to `[` and `] `.
 
-Warnings and errors bypass module verbosity. `HYDRA_CHECK` and its comparison
-variants, `HYDRA_CHECK_NOTNULL`, and `HYDRA_LOG(FATAL, ...)` preserve terminating
-invariant failures, including in release builds. Messages retain their original
-source file and line, and fatal failures flush before termination. If diagnostic
-formatting or logging throws, a fallback diagnostic is attempted and the process
-still aborts.
+`log_level` accepts `trace`, `debug`, `info`, `warning`, `error`, `critical`, or
+`off`. Module diagnostics use info severity, so `log_level` must allow info to
+see them. Warnings and errors do not use module verbosity.
 
-## Application controls
+## Saving logs
 
-Set `log_to_file: true` to save diagnostics alongside the run's other artifacts:
+Set `log_to_file: true` to save `hydra.log` alongside the run's other artifacts:
 
 ```yaml
 log_path: /path/to/run
@@ -62,50 +38,45 @@ log_to_file: true
 output: {use_timestamp: true}
 ```
 
-This top-level configuration works for both Python pipelines and the ROS node.
-It appends to `hydra.log` in the allocated run directory, including any timestamp
-subdirectory, while keeping console or ROS output. It defaults to false and
-requires a nonempty `log_path`. Directory allocation and overwrite rules apply
-before the file opens; with `output.allocate: false`, the directory must exist.
+This works for both Python and ROS. Logs are appended in the run directory,
+including the timestamp subdirectory when enabled. Console or ROS output stays
+active. With `output.allocate: false`, the directory must already exist.
 
-Switching runs moves diagnostic file output to the active context's directory.
-A run with `log_to_file: false` removes the previous run's file destination.
-Reusing a context restores its file destination without clearing its artifacts.
-A `save` output override does not move diagnostic logs. Activate runs after the
-previous run's workers have stopped.
+Switching runs changes the log file to the active run's directory. Giving
+`save` a different output path does not move the log file.
 
-`log_level` selects a textual minimum severity: `trace`, `debug`, `info`,
-`warning`, `error`, `critical`, or `off`. Module diagnostics emit at info severity,
-so both this filter and module verbosity apply. `forward_logs_to_ros` selects ROS
-forwarding in the Hydra node without duplicate console emission.
-Forwarded messages use the node's `spdlog` child logger at ROS debug level, so
-`log_level` controls their severity without changing the node's own ROS threshold.
-ROS supplies the timestamp, severity, and logger name. The sink passes the original
-source filename and line as metadata rather than adding them to the message.
-Directory paths are omitted to match file logging. To include the location once,
-set `RCUTILS_CONSOLE_OUTPUT_FORMAT` to
-`[{severity}] [{name}] [{file_name}:{line_number}] {message}`.
+## ROS output
 
-The shared ROS sink lives in ianvs. Applications that manage destinations can use
-`ianvs::makeRosSink(ros_logger)` with `hydra::logging::setSinks`. For a standalone
-spdlog logger, `ianvs::setRosSink(logger, ros_logger)` replaces its destinations
-with ROS forwarding. Both helpers are in `<ianvs/ros_log_sink.h>` and require
-linking `ianvs::ianvs_spdlog`.
+Set `forward_logs_to_ros: true` to send Hydra logs through ROS. `log_level`
+controls which messages are forwarded. To include the source filename and line
+number in console output:
 
-Python exposes `set_log_level("info")`, `set_log_directory(path,
-stderr_level="error")`, and `set_log_to_stderr()`. File output appends to
-`hydra.log`; changing destinations preserves severity and module verbosity.
-C++ applications use the corresponding functions in `hydra::logging`, or supply
-native spdlog sinks with `setSinks`.
+```bash
+export RCUTILS_CONSOLE_OUTPUT_FORMAT='[{severity}] [{name}] [{file_name}:{line_number}] {message}'
+```
 
-Destinations are process-wide. Reconfigure them between runs after workers stop.
-Reactivating a run context restores its run defaults, including PGMO's logging
-enable flag. PGMO uses its own native spdlog logger with the selected sinks;
-its debug messages use debug severity.
+## Python controls
 
-The glog-specific configuration keys and Python APIs have been removed without
-aliases. Use `default_verbosity` instead of the separate global glog verbosity,
-`log_name` instead of the old verbosity-config `prefix`, and the application
-controls above for severity and destinations. Use `log_prefix` and `log_suffix`
-to customize label delimiters. Other dependencies may still use
-glog; this migration removes Hydra's direct dependency on it.
+Use `hydra_python.set_log_level("debug")` to change severity.
+`set_log_directory(path)` writes to a separate log directory, and
+`set_log_to_stderr()` returns to console output.
+
+Logging destinations are shared across pipelines in the same application.
+Change them between runs after workers have stopped.
+
+## Writing module messages
+
+Add `VerbosityConfig` as a base class and call
+`config::base<VerbosityConfig>(config)` in `declare_config`. Give each module a
+short snake_case name, such as `VerbosityConfig("mesh_segmenter")`.
+
+```cpp
+MLOG(2, "Processed {} nodes", count);
+MLOG_NAMED(WARN, "Missing sensor {}", name);
+```
+
+`MLOG` uses the local `config`. `MLOG_NAMED` accepts `INFO`, `WARN`, and `ERROR`
+and does not check module verbosity. For another configuration, use
+`MLOG_WITH` or `MLOG_NAMED_WITH`.
+
+See [logging.h](../hydra/include/hydra/utils/logging.h) for the C++ helpers.

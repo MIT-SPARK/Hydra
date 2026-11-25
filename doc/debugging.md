@@ -6,10 +6,7 @@ When this happens, there are several ways to get more information about what mig
 
 ### Running hydra with GDB to get a backtrace
 
-The most helpful piece of information is to get a backtrace of where a segfault is occurring or other issue is occurring.
-Fatal checks report their original source file and line before terminating through
-`hydra::logging::fail`. Use GDB to obtain a backtrace for a fatal check, uncaught
-exception, or segmentation fault.
+Use GDB to get a backtrace when Hydra crashes.
 You may have to install GDB (`sudo apt install gdb gdbserver`) if you haven't already. You can then run:
 
 ```
@@ -23,9 +20,6 @@ Run `gdb` in another terminal and enter the commands `target remote localhost:<P
 It might take a minute or so for `gdb` to load all the component libraries for Hydra.
 Once Hydra fully starts up, start the rosbag (or other data source) that you are using, and wait until the crash is reproduced.
 Entering `bt` into the prompt should get you a similar backtrace to the example one below:
-
-The example below predates the spdlog migration but illustrates the same debugging
-workflow.
 
 ```
 Thread 1 "hydra_dsg_build" received signal SIGABRT, Aborted.
