@@ -10,7 +10,10 @@ namespace hydra {
 
 class RosSink : public spdlog::sinks::base_sink<std::mutex> {
  public:
-  explicit RosSink(const rclcpp::Logger& logger) : logger_(logger) {}
+  explicit RosSink(rclcpp::Logger logger) : logger_(logger.get_child("spdlog")) {
+    // Let spdlog filter forwarded messages without changing the node's threshold.
+    logger_.set_level(rclcpp::Logger::Level::Debug);
+  }
 
  protected:
   void sink_it_(const spdlog::details::log_msg& entry) override {

@@ -219,7 +219,7 @@ MultiBackendModule::~MultiBackendModule() { stopImpl(); }
 void MultiBackendModule::start() {
   spin_thread_.reset(new std::thread(&MultiBackendModule::spin, this));
   optimization_thread_.reset(new std::thread(&MultiBackendModule::optimizeSpin, this));
-  HYDRA_LOG(INFO, " [Hydra-Multi Backend] started!");
+  MLOG_NAMED(INFO, "Started");
 }
 
 void MultiBackendModule::stop() { stopImpl(); }

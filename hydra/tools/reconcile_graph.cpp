@@ -65,8 +65,9 @@ void AppArgs::add_to_app(CLI::App& app) {
       ->description("Graph to reconcile");
   app.add_option("--namespace", config_ns)->description("Config namespace to use");
   app.add_option("-o,--output", output)->description("File to output to");
-  app.add_option("-l,--log-level", log_level)->description("GLOG log level");
-  app.add_option("--verbosity", verbosity)->description("GLOG verbosity");
+  app.add_option("-l,--log-level", log_level)
+      ->description("Minimum logging severity (e.g., info or warning)");
+  app.add_option("--verbosity", verbosity)->description("Default module verbosity");
 }
 
 void printCounts(spark_dsg::SceneGraph& graph) {

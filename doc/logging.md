@@ -57,6 +57,8 @@ still aborts.
 `warning`, `error`, `critical`, or `off`. Module diagnostics emit at info severity,
 so both this filter and module verbosity apply. `forward_logs_to_ros` selects ROS
 forwarding in the Hydra node without duplicate console emission.
+Forwarded messages use the node's `spdlog` child logger at ROS debug level, so
+`log_level` controls their severity without changing the node's own ROS threshold.
 
 Python exposes `set_log_level("info")`, `set_log_directory(path,
 stderr_level="error")`, and `set_log_to_stderr()`. File output appends to
