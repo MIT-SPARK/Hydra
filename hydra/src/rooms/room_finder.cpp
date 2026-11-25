@@ -178,7 +178,7 @@ InitialClusters RoomFinder::getBestComponents(
       false,
       get_distance);
 
-  MLOG(10) << "Filtration: " << filtration;
+  MLOG(5) << "Filtration: " << filtration;
 
   auto window = getTrimmedFiltration(filtration,
                                      config.min_dilation_m,
@@ -324,7 +324,7 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
   }
 
   if (!last_results_.valid) {
-    LOG(WARNING) << config.get_log_prefix() << "clustering failed: using components";
+    MLOG_NAMED(WARN) << "clustering failed: using components";
     last_results_.fillFromInitialClusters(components);
   }
 

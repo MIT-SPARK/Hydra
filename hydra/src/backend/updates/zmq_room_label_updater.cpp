@@ -64,7 +64,7 @@ ZmqRoomLabelUpdater::ZmqRoomLabelUpdater(const Config& config)
 ZmqRoomLabelUpdater::~ZmqRoomLabelUpdater() {
   should_shutdown_ = true;
   if (thread_) {
-    MLOG(2) << "joining zmq thread and stopping";
+    MLOG(1) << "joining zmq thread and stopping";
     thread_->join();
     thread_.reset();
     MLOG(2) << "stopped!";

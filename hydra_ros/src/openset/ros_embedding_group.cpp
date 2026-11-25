@@ -65,7 +65,7 @@ RosEmbeddingGroup::RosEmbeddingGroup(const Config& config) {
 
   auto client = nh.create_client<EncodeFeature>("embed");
   while (!client->wait_for_service(10ms) && rclcpp::ok()) {
-    MLOG(3) << "Waiting for embedding encoder on '" << service_name << "'...";
+    MLOG(2) << "Waiting for embedding encoder on '" << service_name << "'...";
   }
 
   if (!rclcpp::ok()) {

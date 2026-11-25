@@ -141,7 +141,7 @@ void BackendModule::start() {
   should_shutdown_ = false;
   force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
-  LOG(INFO) << config.get_log_prefix() << "started!";
+  MLOG_NAMED(INFO) << "started!";
 }
 
 void BackendModule::stopImpl() {
@@ -150,7 +150,7 @@ void BackendModule::stopImpl() {
   }
 
   if (spin_thread_) {
-    MLOG(2) << "joining optimizer thread and stopping";
+    MLOG(1) << "joining optimizer thread and stopping";
     spin_thread_->join();
     spin_thread_.reset();
     MLOG(2) << "stopped!";
@@ -394,16 +394,16 @@ void BackendModule::updateFactorGraph(const FrontendOutput& input) {
       throw std::logic_error(e.what());
     }
   } else {
-    MLOG(10) << "Dropping empty deformation graph @ " << input.timestamp_ns << " [ns]";
+    MLOG(4) << "Dropping empty deformation graph @ " << input.timestamp_ns << " [ns]";
   }
 
   for (const auto& msg : input.agent_updates.pose_graphs) {
     status_log_.back().new_factors += msg.edges.size();
 
-    MLOG(5) << "Adding pose graph message: " << msg;
+    MLOG(3) << "Adding pose graph message: " << msg;
     if (hasLoopClosure(msg)) {
-      LOG(INFO) << config.get_log_prefix() << "Input pose graph has loop closure @ "
-                << msg.stamp_ns << " [ns]";
+      MLOG_NAMED(INFO) << "Input pose graph has loop closure @ " << msg.stamp_ns
+                       << " [ns]";
     }
 
     processIncrementalPoseGraph(

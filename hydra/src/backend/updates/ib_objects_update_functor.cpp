@@ -255,7 +255,7 @@ std::set<size_t> IBObjectsUpdateFunctor::addSegmentEdges(SceneGraph& graph) cons
     auto& attrs = node.attributes<SemanticNodeAttributes>();
     const auto result = tasks_->getBestScore(*metric_, attrs.semantic_feature);
     if (result.score < config.min_segment_score) {
-      MLOG(1) << "Skipping segment with score: " << result.score;
+      MLOG(3) << "Skipping segment with score: " << result.score;
       ignored_.insert(node.id);
       attrs.is_active = false;
       continue;
@@ -318,7 +318,7 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
 
     const auto clusters = new_component->ws.getClusters();
     for (const auto& cluster : clusters) {
-      MLOG(5) << "Cluster: " << displayNodeSymbolContainer(cluster);
+      MLOG(3) << "Cluster: " << displayNodeSymbolContainer(cluster);
 
       auto attrs = getMergedAttributes(graph, cluster);
       if (!attrs) {
@@ -329,7 +329,7 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
       const auto derived = dynamic_cast<SemanticNodeAttributes*>(attrs.get());
       const auto result = tasks_->getBestScore(*metric_, derived->semantic_feature);
       if (result.score < config.min_object_score) {
-        MLOG(1) << "Skipping object with score: " << result.score;
+        MLOG(3) << "Skipping object with score: " << result.score;
         continue;
       }
 

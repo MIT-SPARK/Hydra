@@ -115,7 +115,7 @@ void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
     std::chrono::nanoseconds last_time_ns(last_received_->timestamp_ns);
     std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
     if (separation_s.count() < config.input_separation_s) {
-      MLOG(3) << "Dropping input @ " << timestamp << " [ns] with separation of "
+      MLOG(2) << "Dropping input @ " << timestamp << " [ns] with separation of "
               << separation_s.count() << " [s]";
       return;
     }

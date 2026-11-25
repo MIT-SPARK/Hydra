@@ -199,22 +199,22 @@ std::function<std::array<uint8_t, 4>(const uint8_t*)> initColorParser(
 PointcloudAdaptor::PointcloudAdaptor(const sensor_msgs::msg::PointCloud2& cloud) {
   for (const auto& field : cloud.fields) {
     if (field.name == "x") {
-      VLOG(10) << "found x field: " << sensor_msgs::msg::to_yaml(field);
+      VLOG(4) << "found x field: " << sensor_msgs::msg::to_yaml(field);
       x_parser_ = initFloatParser(field);
     } else if (field.name == "y") {
-      VLOG(10) << "found y field: " << sensor_msgs::msg::to_yaml(field);
+      VLOG(4) << "found y field: " << sensor_msgs::msg::to_yaml(field);
       y_parser_ = initFloatParser(field);
     } else if (field.name == "z") {
-      VLOG(10) << "found z field: " << sensor_msgs::msg::to_yaml(field);
+      VLOG(4) << "found z field: " << sensor_msgs::msg::to_yaml(field);
       z_parser_ = initFloatParser(field);
     } else if (field.name == "rgb" || field.name == "rgba") {
-      VLOG(10) << "found color field: " << sensor_msgs::msg::to_yaml(field);
+      VLOG(4) << "found color field: " << sensor_msgs::msg::to_yaml(field);
       color_parser_ = initColorParser(field);
     } else if (field.name == "label" || field.name == "ring") {
-      VLOG(10) << "found label field: " << sensor_msgs::msg::to_yaml(field);
+      VLOG(4) << "found label field: " << sensor_msgs::msg::to_yaml(field);
       label_parser_ = initIntParser(field);
     } else {
-      VLOG(10) << "unknown field: " << sensor_msgs::msg::to_yaml(field);
+      VLOG(4) << "unknown field: " << sensor_msgs::msg::to_yaml(field);
     }
   }
 }

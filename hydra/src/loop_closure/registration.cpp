@@ -119,8 +119,6 @@ RegistrationSolution getFullSolutionFromLayer(const SceneGraph& graph,
                                               const LayerRegistrationSolution& solution,
                                               NodeId query_agent_id,
                                               NodeId match_root) {
-  static const auto log_config = VerbosityConfig("lcd_registration");
-
   if (!solution.valid || solution.inliers.empty()) {
     return {};
   }
@@ -135,14 +133,12 @@ RegistrationSolution getFullSolutionFromLayer(const SceneGraph& graph,
   gtsam::Pose3 to_T_from = to_pose_info.world_T_body.inverse() * solution.dest_T_src *
                            from_pose_info.world_T_body;
 
-  MLOG_WITH(log_config, 3) << "Solution of " << NodeSymbol(query_agent_id).str()
-                           << " -> " << NodeSymbol(to_pose_info.id).str() << ":";
-  MLOG_WITH(log_config, 3) << "  - world_T_from: "
-                           << getPoseRepr(from_pose_info.world_T_body);
-  MLOG_WITH(log_config, 3) << "  - world_T_to:   "
-                           << getPoseRepr(to_pose_info.world_T_body);
-  MLOG_WITH(log_config, 3) << "  - dest_T_src:   " << getPoseRepr(solution.dest_T_src);
-  MLOG_WITH(log_config, 3) << "  - to_T_from:    " << getPoseRepr(to_T_from);
+  VLOG(2) << "Solution of " << NodeSymbol(query_agent_id).str() << " -> "
+          << NodeSymbol(to_pose_info.id).str() << ":";
+  VLOG(2) << "  - world_T_from: " << getPoseRepr(from_pose_info.world_T_body);
+  VLOG(2) << "  - world_T_to:   " << getPoseRepr(to_pose_info.world_T_body);
+  VLOG(2) << "  - dest_T_src:   " << getPoseRepr(solution.dest_T_src);
+  VLOG(2) << "  - to_T_from:    " << getPoseRepr(to_T_from);
 
   return {true,
           from_pose_info.id,

@@ -183,7 +183,7 @@ LayerSearchResults searchDescriptors(
   size_t num_default_match = 0;
   size_t num_shared_nodes = 0;
 
-  MLOG_WITH(match_config, 10) << "--------------------------------------------------";
+  MLOG_WITH(match_config, 4) << "--------------------------------------------------";
 
   for (const auto& valid_id : valid_matches) {
     if (root_leaf_map.at(valid_id).count(query_id)) {
@@ -209,7 +209,7 @@ LayerSearchResults searchDescriptors(
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
     if (same_robot && diff_s.count() < match_config.min_time_separation_s) {
-      MLOG_WITH(match_config, 10)
+      MLOG_WITH(match_config, 4)
           << "diff: " << diff_s.count()
           << " (threshold: " << match_config.min_time_separation_s << ")";
       ++num_inside_horizon;

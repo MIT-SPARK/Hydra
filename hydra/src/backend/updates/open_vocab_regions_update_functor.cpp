@@ -74,7 +74,7 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
   std::set<NodeId> new_nodes;
   for (size_t i = 0; i < clusters.size(); ++i) {
     if (clusters[i]->nodes.size() < config.min_num_nodes) {
-      MLOG(3) << "Dropping cluster of " << clusters[i]->nodes.size() << " node(s)";
+      MLOG(2) << "Dropping cluster of " << clusters[i]->nodes.size() << " node(s)";
       continue;
     }
 

@@ -498,8 +498,8 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
   }
 
   const auto& latest_node = dsg.getNode(agent_id);
-  MLOG(2) << "************************************************************";
-  MLOG(2) << "LCD Matching: " << NodeSymbol(latest_node.id).str();
+  MLOG(3) << "************************************************************";
+  MLOG(3) << "LCD Matching: " << NodeSymbol(latest_node.id).str();
 
   matches_.clear();
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
@@ -507,7 +507,7 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
     const auto& layer = internal_index_to_layer_.at(idx);
     auto descriptor = layer_factories_[layer]->construct(dsg, latest_node);
     if (descriptor) {
-      MLOG(2) << "level " << idx << ": " << showVector(descriptor->values, 3, 20, 9);
+      MLOG(3) << "level " << idx << ": " << showVector(descriptor->values, 3, 20, 9);
       matches_[idx] = searchDescriptors(*descriptor,
                                         config,
                                         prev_valid_roots,
@@ -516,7 +516,7 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
                                         agent_id);
       prev_valid_roots = matches_[idx].valid_matches;
     } else {
-      MLOG(2) << "level " << idx << " -> ?";
+      MLOG(3) << "level " << idx << " -> ?";
       prev_valid_roots = std::set<NodeId>();
       break;
     }
@@ -537,13 +537,13 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
     return {};
   }
 
-  MLOG(2) << "-----------------------------------------------------------";
-  MLOG(2) << "LCD results for node " << NodeSymbol(agent_id).str() << " against "
+  MLOG(3) << "-----------------------------------------------------------";
+  MLOG(3) << "LCD results for node " << NodeSymbol(agent_id).str() << " against "
           << numDescriptors() / 2 << " roots";
   for (const auto& id_match_pair : matches_) {
     const auto& scores = id_match_pair.second.score;
     const auto best_score = std::max_element(scores.begin(), scores.end());
-    MLOG(2) << " - index " << id_match_pair.first << ": "
+    MLOG(3) << " - index " << id_match_pair.first << ": "
             << id_match_pair.second.valid_matches.size() << " valid matches, "
             << id_match_pair.second.match_root.size()
             << " registration matches (best score "
@@ -551,16 +551,16 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
             << ")";
 
     for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
-      MLOG(2) << "   - #" << i
+      MLOG(3) << "   - #" << i
               << ": query=" << NodeSymbol(id_match_pair.second.query_root).str()
               << ", match=" << NodeSymbol(id_match_pair.second.match_root[i]).str()
               << " -> " << id_match_pair.second.score[i];
     }
   }
 
-  MLOG(2) << "-----------------------------------------------------------";
+  MLOG(3) << "-----------------------------------------------------------";
   const auto results = registerAndVerify(dsg, matches_, agent_id, timestamp);
-  MLOG(2) << "************************************************************";
+  MLOG(3) << "************************************************************";
 
   return results;
 }

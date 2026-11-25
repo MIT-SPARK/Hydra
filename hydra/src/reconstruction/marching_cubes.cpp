@@ -38,7 +38,6 @@
 #include "hydra/reconstruction/marching_cubes.h"
 
 #include <glog/logging.h>
-#include <hydra/utils/logging.h>
 
 namespace hydra {
 
@@ -159,9 +158,9 @@ SdfPoint MarchingCubes::interpolateEdge(const SdfPoints& points,
     edge_point.color = interpColor(point0, point1, 0.5);
     edge_point.label = interpLabel(point0, point1, 0.5);
 
-    VLOG(15) << "- t=n/a" << ", v0=" << point0.pos.transpose()
-             << ", v1=" << point1.pos.transpose()
-             << ", coord: " << edge_point.pos.transpose();
+    VLOG(4) << "- t=n/a" << ", v0=" << point0.pos.transpose()
+            << ", v1=" << point1.pos.transpose()
+            << ", coord: " << edge_point.pos.transpose();
     return edge_point;
   }
 
@@ -171,9 +170,9 @@ SdfPoint MarchingCubes::interpolateEdge(const SdfPoints& points,
   edge_point.color = interpColor(point0, point1, t);
   edge_point.label = interpLabel(point0, point1, t);
 
-  VLOG(15) << "- t=" << t << ", v0=" << point0.pos.transpose()
-           << ", v1=" << point1.pos.transpose()
-           << ", coord: " << edge_point.pos.transpose();
+  VLOG(4) << "- t=" << t << ", v0=" << point0.pos.transpose()
+          << ", v1=" << point1.pos.transpose()
+          << ", coord: " << edge_point.pos.transpose();
   return edge_point;
 }
 
@@ -223,18 +222,16 @@ size_t MarchingCubes::meshCube(const SdfPoints& points,
                                const VoxelIndex& cube_index,
                                EdgeCache* cache,
                                bool compute_normals) {
-  static const auto log_config = VerbosityConfig("marching_cubes");
-
   static constexpr auto NO_LABEL = std::numeric_limits<uint32_t>::max();
-  if (log_config.enabled(15)) {
-    MLOG_WITH(log_config, 15) << "points: ";
+  if (VLOG_IS_ON(4)) {
+    VLOG(4) << "points: ";
     for (size_t i = 0; i < 8; ++i) {
-      MLOG_WITH(log_config, 15) << " - " << i << ": " << points[i];
+      VLOG(4) << " - " << i << ": " << points[i];
     }
   }
 
   const int index = calculateVertexConfig(points);
-  MLOG_WITH(log_config, 15) << "vertex sdf index: " << index;
+  VLOG(4) << "vertex sdf index: " << index;
 
   if (index == 0) {
     return 0;  // no surface crossing in sdf cube

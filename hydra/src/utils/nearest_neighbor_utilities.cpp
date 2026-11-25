@@ -91,7 +91,7 @@ NearestNodeFinder::NearestNodeFinder(const SceneGraphLayer& layer,
                                      const std::unordered_set<NodeId>& nodes)
     : num_nodes(nodes.size()) {
   std::vector<NodeId> node_vector(nodes.begin(), nodes.end());
-  VLOG(10) << "Making node finder with " << nodes.size() << " nodes";
+  VLOG(4) << "Making node finder with " << nodes.size() << " nodes";
   internals_.reset(new Detail(layer, node_vector));
 }
 

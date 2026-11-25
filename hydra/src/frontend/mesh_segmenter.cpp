@@ -103,7 +103,7 @@ MeshSegmenter::MeshSegmenter(const Config& config,
       next_node_id_('O', 0),
       labels_(labels),
       sinks_(Sink::instantiate(config.sinks, robot)) {
-  MLOG(2) << "using labels: " << clustering::printLabels(labels_);
+  MLOG(1) << "using labels: " << clustering::printLabels(labels_);
   for (const auto& label : labels_) {
     active_nodes_[label] = std::set<NodeId>();
   }
@@ -174,12 +174,12 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
       auto& attrs = graph.getNode(node_id).attributes<ObjectNodeAttributes>();
 
       // remap and prune mesh connections
-      MLOG(20) << "Updating node " << NodeSymbol(node_id).str() << " with connections "
-               << attrs.mesh_connections;
+      MLOG(5) << "Updating node " << NodeSymbol(node_id).str() << " with connections "
+              << attrs.mesh_connections;
       kimera_pgmo::MeshOffsetInfo::RemapStats stats;
       offsets.remapVertexIndices(attrs.mesh_connections, &stats);
-      MLOG(20) << "After update: " << attrs.mesh_connections << std::boolalpha
-               << " (active: " << !stats.all_archived << ")";
+      MLOG(5) << "After update: " << attrs.mesh_connections << std::boolalpha
+              << " (active: " << !stats.all_archived << ")";
       if (attrs.mesh_connections.size() < config.clustering.min_cluster_size) {
         graph.removeNode(node_id);
         iter = label_nodes.erase(iter);
@@ -196,8 +196,8 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
   }
 
   for (const auto& [label, label_nodes] : active_nodes_) {
-    MLOG(10) << "Active nodes for label " << label << ": "
-             << displayNodeSymbolContainer(label_nodes);
+    MLOG(5) << "Active nodes for label " << label << ": "
+            << displayNodeSymbolContainer(label_nodes);
   }
 }
 

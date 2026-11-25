@@ -108,8 +108,8 @@ RoomMetrics scoreRooms(const RoomIndices& gt_rooms, const RoomIndices& est_rooms
   }
 
   Eigen::IOFormat fmt(6, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
-  VLOG(10) << "GT: " << max_gt_overlaps.format(fmt);
-  VLOG(10) << "EST: " << max_est_overlaps.format(fmt);
+  VLOG(4) << "GT: " << max_gt_overlaps.format(fmt);
+  VLOG(4) << "EST: " << max_est_overlaps.format(fmt);
 
   const auto total_est_size =
       std::accumulate(results.est_sizes.begin(), results.est_sizes.end(), size_t{0});

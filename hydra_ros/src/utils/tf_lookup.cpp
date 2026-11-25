@@ -71,12 +71,12 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
 
   bool have_transform = false;
   std::string err_str;
-  MLOG(3) << "Looking up transform " << target << "_T_" << source << stamp_suffix;
+  MLOG(2) << "Looking up transform " << target << "_T_" << source << stamp_suffix;
 
   const auto lookup_time = stamp.value_or(rclcpp::Time());
   size_t attempt_number = 0;
   while (rclcpp::ok()) {
-    MLOG(3) << "Attempting to lookup tf @ " << lookup_time.nanoseconds()
+    MLOG(2) << "Attempting to lookup tf @ " << lookup_time.nanoseconds()
             << " [ns]: " << attempt_number << " / "
             << (max_tries ? std::to_string(max_tries) : "n/a");
     if (max_tries && attempt_number >= max_tries) {

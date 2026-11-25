@@ -43,7 +43,7 @@ void MultiGlobalInfo::configureTimers() {
 
 void MultiGlobalInfo::initFromConfig(const MultiPipelineConfig& config) {
   config_ = config::checkValid(config);
-  VLOG(5) << "Loading from config: " << config::toString(config);
+  VLOG(3) << "Loading from config: " << config::toString(config);
   configureTimers();
 
   if (config_.enable_pgmo_logging) {

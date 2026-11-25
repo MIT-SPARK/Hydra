@@ -154,7 +154,7 @@ void LayerConnector::connectChildren(SceneGraph& graph,
     return;
   }
 
-  MLOG(5) << "Detecting interlayer edges for layer " << config.parent_layer << " with "
+  MLOG(3) << "Detecting interlayer edges for layer " << config.parent_layer << " with "
           << active_parents.size() << " parents and " << active_children.size()
           << " children";
 

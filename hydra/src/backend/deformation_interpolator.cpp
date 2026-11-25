@@ -223,7 +223,7 @@ void DeformationInterpolator::interpolate(const SceneGraph& unmerged,
 
     const auto deform_func = [&](const Eigen::Isometry3d& transform, size_t index) {
       auto entry = entries.entries[index];
-      MLOG(5) << "node " << spark_dsg::NodeSymbol(entry->id).str()
+      MLOG(4) << "node " << spark_dsg::NodeSymbol(entry->id).str()
               << " -> transform: " << printTransform(transform);
 
       entry->update(unmerged.getNode(entry->id).attributes(), transform);

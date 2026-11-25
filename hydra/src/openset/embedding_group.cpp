@@ -86,13 +86,13 @@ Eigen::VectorXf EmbeddingGroup::getDistances(const EmbeddingDistance& dist,
 Eigen::VectorXf EmbeddingGroup::getScores(const EmbeddingDistance& dist,
                                           const FeatureVector& embedding) const {
   const auto fmt = getDefaultFormat();
-  VLOG(30) << "====================================================================";
-  VLOG(30) << "Embedding: " << embedding.format(fmt);
-  VLOG(30) << "====================================================================";
+  VLOG(5) << "====================================================================";
+  VLOG(5) << "Embedding: " << embedding.format(fmt);
+  VLOG(5) << "====================================================================";
   Eigen::VectorXf scores(embeddings.size());
   for (size_t i = 0; i < embeddings.size(); ++i) {
     scores(i) = dist.score(embeddings[i], embedding);
-    VLOG(30) << "(i=" << i << "): " << scores(i) << " @ " << embeddings[i].format(fmt);
+    VLOG(5) << "(i=" << i << "): " << scores(i) << " @ " << embeddings[i].format(fmt);
   }
 
   return scores;

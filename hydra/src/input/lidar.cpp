@@ -285,7 +285,7 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
 
   const auto total_lidar = input.vertex_map.rows * input.vertex_map.cols;
   const auto percent_invalid = static_cast<double>(num_invalid) / total_lidar;
-  VLOG(5) << "Converted lidar points! invalid: " << num_invalid << " / " << total_lidar
+  VLOG(3) << "Converted lidar points! invalid: " << num_invalid << " / " << total_lidar
           << " (percent: " << percent_invalid << ")";
   input.label_image = labels;
   input.instance_image = instances;

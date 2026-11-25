@@ -48,13 +48,13 @@ void UnitInterface::init() {
   LOG(INFO) << " [Robot " << config.robot_id << " (" << config.robot_name
             << ") unit interface] created!";
   for (const auto& [input_name, input] : inputs_) {
-    MLOG(3) << "Initializing input: " << input_name;
+    MLOG(1) << "Initializing input: " << input_name;
     CHECK(input) << "Invalid input: '" << input_name << "'";
     input->init();
   }
 
   for (const auto& [output_name, output] : outputs_) {
-    MLOG(3) << "Initializing output: " << output_name;
+    MLOG(1) << "Initializing output: " << output_name;
     CHECK(output) << "Invalid input: '" << output_name << "'";
     output->init();
   }
@@ -68,24 +68,24 @@ void UnitInterface::spinOnce() {
   }
 
   for (const auto& [output_name, output] : outputs_) {
-    MLOG(3) << "Triggering output: " << output_name;
+    MLOG(2) << "Triggering output: " << output_name;
     output->trigger();
   }
 }
 
 void UnitInterface::stop() {
-  MLOG(3) << "Shutting down interface for " << config.robot_name;
+  MLOG(1) << "Shutting down interface for " << config.robot_name;
   should_shutdown_ = true;
   for (const auto& [input_name, input] : inputs_) {
-    MLOG(3) << "Shutting down input: " << input_name;
+    MLOG(1) << "Shutting down input: " << input_name;
     input->stop();
   }
 
   for (const auto& [output_name, output] : outputs_) {
-    MLOG(3) << "Shutting down output: " << output_name;
+    MLOG(1) << "Shutting down output: " << output_name;
     output->stop();
   }
-  MLOG(3) << config.robot_name << " interface stopped";
+  MLOG(1) << config.robot_name << " interface stopped";
 }
 
 void UnitInterface::save(const DataDirectory& output) {

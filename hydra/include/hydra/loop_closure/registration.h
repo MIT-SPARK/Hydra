@@ -159,13 +159,13 @@ LayerRegistrationSolution registerDsgLayer(
 
   const auto src_pruned = pruneSet(src, problem.src_nodes);
   if (!src_pruned.empty()) {
-    MLOG(3) << "Found invalid source nodes in registration: "
+    MLOG(2) << "Found invalid source nodes in registration: "
             << spark_dsg::displayNodeSymbolContainer(src_pruned);
   }
 
   const auto dest_pruned = pruneSet(dest, problem.dest_nodes);
   if (!dest_pruned.empty()) {
-    MLOG(3) << "Found invalid destination nodes in registration: "
+    MLOG(2) << "Found invalid destination nodes in registration: "
             << spark_dsg::displayNodeSymbolContainer(dest_pruned);
   }
 
@@ -207,9 +207,9 @@ LayerRegistrationSolution registerDsgLayer(
     return {};
   }
 
-  MLOG(20) << "=======================================================";
-  MLOG(20) << "Source: " << std::endl << src_points;
-  MLOG(20) << "Dest: " << std::endl << dest_points;
+  MLOG(5) << "=======================================================";
+  MLOG(5) << "Source: " << std::endl << src_points;
+  MLOG(5) << "Dest: " << std::endl << dest_points;
 
   MLOG(1) << "Registering layer " << src.id << " with " << correspondences.size()
           << " correspondences out of " << problem.src_nodes.size() << " source and "

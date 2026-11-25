@@ -22,17 +22,17 @@ void InterfaceContainer::start() {
 
 void InterfaceContainer::stop() {
   for (const auto& id_interface : interfaces_) {
-    VLOG(3) << "stopping: " << id_interface.first;
+    VLOG(2) << "stopping: " << id_interface.first;
     id_interface.second->stop();
-    VLOG(3) << "stopped: " << id_interface.first;
+    VLOG(2) << "stopped: " << id_interface.first;
   }
 }
 
 void InterfaceContainer::save(const DataDirectory& output) {
   for (const auto& id_interface : interfaces_) {
-    VLOG(3) << "saving: " << id_interface.first;
+    VLOG(2) << "saving: " << id_interface.first;
     id_interface.second->save(output);
-    VLOG(3) << "saved: " << id_interface.first;
+    VLOG(2) << "saved: " << id_interface.first;
   }
 }
 

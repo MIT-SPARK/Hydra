@@ -155,7 +155,7 @@ void MeshIntegrator::generateMesh(VolumetricMap& map,
   allocateBlocks(blocks, map);
 
   launchThreads(blocks, map);
-  showUpdateInfo(map, blocks, 5);
+  showUpdateInfo(map, blocks, 4);
 
   for (const auto& block_idx : blocks) {
     map.getMeshLayer().getBlock(block_idx).updated = true;
@@ -189,7 +189,7 @@ void MeshIntegrator::processBlocks(VolumetricMap* map,
 
   while (index_getter->getNextIndex(block_index)) {
     MarchingCubes::EdgeCache cache(map->config.voxels_per_side);
-    MLOG(10) << "Extracting interior for block: " << showIndex(block_index);
+    MLOG(4) << "Extracting interior for block: " << showIndex(block_index);
 
     VoxelIndex v_idx;
     const int limit = map->config.voxels_per_side - 1;
@@ -200,7 +200,7 @@ void MeshIntegrator::processBlocks(VolumetricMap* map,
         }
       }
     }
-    MLOG(10) << "Extracting exterior for block: " << showIndex(block_index);
+    MLOG(4) << "Extracting exterior for block: " << showIndex(block_index);
     const auto vps = static_cast<int>(map->config.voxels_per_side);
 
     // Max X plane
@@ -235,7 +235,7 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map,
                                        MarchingCubes::EdgeCache* cache) const {
-  MLOG(15) << "processing interior voxel: " << index.transpose();
+  MLOG(4) << "processing interior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
   if (!block || !mesh) {
@@ -302,7 +302,7 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map,
                                        MarchingCubes::EdgeCache* cache) const {
-  MLOG(15) << "processing exterior voxel: " << index.transpose();
+  MLOG(4) << "processing exterior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
   if (!block || !mesh) {

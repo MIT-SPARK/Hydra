@@ -152,12 +152,12 @@ void InputModule::dataSpin() {
     }
 
     const auto curr_time = data->timestamp_ns;
-    MLOG(3) << "popped input @ " << curr_time << " [ns]";
+    MLOG(2) << "popped input @ " << curr_time << " [ns]";
 
     const auto odom_T_body = getBodyPose(*data);
     if (!odom_T_body) {
-      LOG(WARNING) << config.get_log_prefix() << "dropping input @ " << curr_time
-                   << " [ns] due to missing pose";
+      MLOG_NAMED(WARN) << "dropping input @ " << curr_time
+                       << " [ns] due to missing pose";
       continue;
     }
 

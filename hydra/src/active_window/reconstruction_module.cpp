@@ -131,13 +131,13 @@ bool ReconstructionModule::shouldUpdate(uint64_t timestamp_ns) const {
 
 ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& data) {
   if (!data) {
-    LOG(ERROR) << config.get_log_prefix() << "received invalid input!";
+    MLOG_NAMED(ERROR) << "received invalid input!";
     return nullptr;
   }
 
   const auto stamp = data->timestamp_ns;
   const auto fmt = getDefaultFormat();
-  MLOG(3) << "Got input @ " << stamp
+  MLOG(2) << "Got input @ " << stamp
           << " [ns] with pose: p=" << data->world_T_body.translation().format(fmt)
           << ", q=" << printRotation(data->world_T_body.rotation());
 

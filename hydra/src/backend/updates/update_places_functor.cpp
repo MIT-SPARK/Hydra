@@ -83,7 +83,7 @@ void UpdatePlacesFunctor::filterMissing(SceneGraph& graph,
     return;
   }
 
-  MLOG(5) << "could not update " << displayNodeSymbolContainer(missing_nodes);
+  MLOG(3) << "could not update " << displayNodeSymbolContainer(missing_nodes);
 
   for (const auto& node_id : missing_nodes) {
     if (!graph.hasNode(node_id)) {
@@ -110,8 +110,8 @@ size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
   for (const auto& node : view) {
     if (!places_values.exists(node.id)) {
       // this happens for the GT version
-      MLOG(10) << "missing place " << NodeSymbol(node.id).str()
-               << " from places factors.";
+      MLOG(4) << "missing place " << NodeSymbol(node.id).str()
+              << " from places factors.";
       continue;
     }
 

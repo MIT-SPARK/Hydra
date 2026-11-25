@@ -106,11 +106,11 @@ void UpdateAgentsFunctor::call(const SceneGraph&,
       const auto diff = prev_pose.between(pose);
       const auto q_diff = Eigen::Quaterniond(diff.rotation().matrix());
       const auto p_diff = diff.translation();
-      MLOG(10) << "Updating agent " << NodeSymbol(node.id).str() << " pose from "
-               << NodeSymbol(attrs.external_key).str() << ":"
-               << "\n - original: " << toString(q_prev, p_prev)
-               << "\n - new:      " << toString(attrs.world_R_body, attrs.position)
-               << "\n - diff:     " << toString(q_diff, p_diff);
+      MLOG(4) << "Updating agent " << NodeSymbol(node.id).str() << " pose from "
+              << NodeSymbol(attrs.external_key).str() << ":"
+              << "\n - original: " << toString(q_prev, p_prev)
+              << "\n - new:      " << toString(attrs.world_R_body, attrs.position)
+              << "\n - diff:     " << toString(q_diff, p_diff);
     }
 
     if (!missing_nodes.empty()) {

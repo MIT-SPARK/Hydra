@@ -20,8 +20,7 @@ MultiPipeline::MultiPipeline(const MultiPipelineConfig& pipeline_config,
   }
 
   backend_ = config.backend.create(interfaces_->states());
-  LOG(INFO) << config.get_log_prefix() << "Initialized pipeline with:\n"
-            << config::toString(config);
+  MLOG_NAMED(INFO) << "Initialized pipeline with:\n" << config::toString(config);
 }
 
 MultiPipeline::~MultiPipeline() {}
@@ -44,12 +43,11 @@ void MultiPipeline::save(const DataDirectory& output) {
   }
 
   const auto& config = MultiGlobalInfo::instance().getConfig();
-  LOG(INFO) << config.get_log_prefix() << "saving timing information to "
-            << output.path();
+  MLOG_NAMED(INFO) << "saving timing information to " << output.path();
   const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
   timer.logTimers(output.path("timing"));
   timer.logStats(output.path() / "timing_stats.csv");
-  LOG(INFO) << config.get_log_prefix() << "saved timing information";
+  MLOG_NAMED(INFO) << "saved timing information";
 
   auto node = config::toYaml(config);
   std::ofstream fout(output.path() / "hydra_multi_config.yaml");

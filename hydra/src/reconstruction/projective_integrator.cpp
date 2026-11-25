@@ -162,7 +162,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
                                         const InputData& data,
                                         const cv::Mat& integration_mask,
                                         VolumetricMap& map) const {
-  MLOG(3) << "Updating " << block_indices.size() << " blocks.";
+  MLOG(2) << "Updating " << block_indices.size() << " blocks.";
 
   // Update all blocks in parallel.
   IndexGetter<BlockIndex> index_getter(block_indices);
@@ -211,7 +211,7 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   }
 
   if (was_updated) {
-    MLOG(10) << "integrator updated block " << showIndex(block_index);
+    MLOG(4) << "integrator updated block " << showIndex(block_index);
     blocks.tsdf->setUpdated();
   }
 }

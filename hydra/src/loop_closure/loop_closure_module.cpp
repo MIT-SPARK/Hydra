@@ -190,7 +190,7 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
     const auto to_cache = getPlacesToCache(attrs.position);
 
     if (!to_cache.empty()) {
-      MLOG(3) << "Constructing descriptors for "
+      MLOG(2) << "Constructing descriptors for "
               << displayNodeSymbolContainer(to_cache);
       lcd_detector_->updateDescriptorCache(*lcd_graph_, to_cache, timestamp_ns);
     }
@@ -203,9 +203,9 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
         output_queue_->push(result);
       }
 
-      LOG(WARNING) << config.get_log_prefix()
-                   << "Found valid loop-closure: " << NodeSymbol(result.from_node).str()
-                   << " -> " << NodeSymbol(result.to_node).str();
+      MLOG_NAMED(WARN) << "Found valid loop-closure: "
+                       << NodeSymbol(result.from_node).str() << " -> "
+                       << NodeSymbol(result.to_node).str();
     }
 
     // if should_shutdown_ is true and agent/place parent invariant is broken, this
@@ -216,14 +216,14 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 
 size_t LoopClosureModule::processFrontendOutput() {
   const FrontendOutput::ConstPtr& msg = queue_->front();
-  MLOG(3) << "Received archived places: "
+  MLOG(2) << "Received archived places: "
           << displayNodeSymbolContainer(msg->archived_places);
 
   potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
                                    msg->archived_places.begin(),
                                    msg->archived_places.end());
 
-  MLOG(3) << "Adding nodes: " << displayNodeSymbolContainer(msg->new_agent_nodes);
+  MLOG(2) << "Adding nodes: " << displayNodeSymbolContainer(msg->new_agent_nodes);
   for (const auto& node : msg->new_agent_nodes) {
     agent_queue_.push(node);
   }
@@ -241,7 +241,7 @@ auto LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos)
   while (iter != potential_lcd_root_nodes_.end()) {
     auto node_opt = lcd_graph_->findNode(*iter);
     if (!node_opt) {
-      MLOG(3) << "Deleted place " << NodeSymbol(*iter).str() << " found in LCD queue";
+      MLOG(2) << "Deleted place " << NodeSymbol(*iter).str() << " found in LCD queue";
       iter = potential_lcd_root_nodes_.erase(iter);
       continue;
     }

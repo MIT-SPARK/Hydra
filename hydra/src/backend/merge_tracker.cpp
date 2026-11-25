@@ -86,8 +86,8 @@ size_t MergeTracker::applyMerges(const SceneGraph& unmerged,
   for (const auto& orig_merge : proposals) {
     const auto merge = orig_merge.remap(prior_merges);
     if (merge.from == merge.to) {
-      VLOG(10) << "Found present merge: " << orig_merge << " (remapped: " << merge
-               << ")";
+      VLOG(4) << "Found present merge: " << orig_merge << " (remapped: " << merge
+              << ")";
       to_update.insert(merge.to);
       continue;
     }
@@ -99,7 +99,7 @@ size_t MergeTracker::applyMerges(const SceneGraph& unmerged,
       continue;
     }
 
-    VLOG(5) << "Applied merge: " << merge << " (original: " << orig_merge << ")";
+    VLOG(3) << "Applied merge: " << merge << " (original: " << orig_merge << ")";
 
     ++num_applied;
     to_update.insert(merge.to);

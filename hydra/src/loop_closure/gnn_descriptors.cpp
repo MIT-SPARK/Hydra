@@ -168,17 +168,17 @@ Descriptor::Ptr ObjectGnnDescriptor::construct(const SceneGraph& graph,
   }
 
   auto input = makeInput(graph, descriptor->nodes);
-  VLOG(20) << "Inputs:";
-  VLOG(20) << "  - x: " << std::endl << input.at("x").map<float>();
-  VLOG(20) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
+  VLOG(5) << "Inputs:";
+  VLOG(5) << "  - x: " << std::endl << input.at("x").map<float>();
+  VLOG(5) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
   if (!use_pos_in_feature_) {
-    VLOG(20) << "  - pos: " << std::endl << input.at("pos").map<float>();
+    VLOG(5) << "  - pos: " << std::endl << input.at("pos").map<float>();
   }
 
   auto output = (*model_)(input).at("output");
-  VLOG(20) << "--------------------------------------";
-  VLOG(20) << "Output type: " << output;
-  VLOG(20) << "Output:" << std::endl << output.map<float>();
+  VLOG(5) << "--------------------------------------";
+  VLOG(5) << "Output type: " << output;
+  VLOG(5) << "Output:" << std::endl << output.map<float>();
   descriptor->values = output.map<float>().transpose();
   return descriptor;
 }
@@ -266,24 +266,24 @@ Descriptor::Ptr PlaceGnnDescriptor::construct(const SceneGraph& graph,
   }
 
   auto input = makeInput(graph, descriptor->nodes);
-  VLOG(20) << "Inputs:";
-  VLOG(20) << "  - x: " << std::endl << input.at("x").map<float>();
-  VLOG(20) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
+  VLOG(5) << "Inputs:";
+  VLOG(5) << "  - x: " << std::endl << input.at("x").map<float>();
+  VLOG(5) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
   if (!use_pos_in_feature_) {
-    VLOG(20) << "  - pos: " << std::endl << input.at("pos").map<float>();
+    VLOG(5) << "  - pos: " << std::endl << input.at("pos").map<float>();
   }
 
   auto output = (*model_)(input).at("output");
-  VLOG(20) << "--------------------------------------";
-  VLOG(20) << "Output type: " << output;
-  VLOG(20) << "Output:" << std::endl << output.map<float>();
+  VLOG(5) << "--------------------------------------";
+  VLOG(5) << "Output type: " << output;
+  VLOG(5) << "Output:" << std::endl << output.map<float>();
   descriptor->values = output.map<float>().transpose();
   return descriptor;
 }
 
 ObjectGnnDescriptor::LabelEmbeddings loadLabelEmbeddings(const std::string& filename) {
   ObjectGnnDescriptor::LabelEmbeddings embeddings;
-  VLOG(5) << "Reading embeddings from: " << filename;
+  VLOG(3) << "Reading embeddings from: " << filename;
 
   YAML::Node root = YAML::LoadFile(filename);
   if (!root["embeddings"]) {
