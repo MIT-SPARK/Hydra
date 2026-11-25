@@ -90,7 +90,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                           const kimera_pgmo::DeformationGraph&>;
 
   struct Config : DsgUpdater::Config {
-    Config() { log_prefix = "[Hydra Backend] "; }
+    Config() { log_prefix = "[backend] "; }
 
     //! Optimize the graph on every detected loop closure
     bool optimize_on_lc = true;

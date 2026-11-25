@@ -42,7 +42,7 @@ namespace hydra {
 class InvalidDepthFilter : public InputFilter {
  public:
   struct Config : VerbosityConfig {
-    Config() : VerbosityConfig("[InvalidDepthFilter] ") {}
+    Config() : VerbosityConfig("[depth_filter] ") {}
     //! Ratio of nonfinite to finite depth values to discard frame
     double max_invalid_ratio = 1.0;
     //! Count +inf depth (no return within the sensor range) as valid

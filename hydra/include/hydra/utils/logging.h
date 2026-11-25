@@ -53,6 +53,7 @@ struct VerbosityConfig {
   //! Make a copy of the verbosity config with a prefix derived from the provided name
   VerbosityConfig with_name(const std::string& name) const;
 
+  //! Use short snake_case names for default component log prefixes
   static VerbosityConfig named(const std::string& name = "");
 
   bool enabled(int level) const { return get_verbosity() >= level; }

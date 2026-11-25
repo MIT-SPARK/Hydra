@@ -49,7 +49,8 @@
 namespace hydra::lcd {
 
 struct LayerRegistrationConfig : VerbosityConfig {
-  LayerRegistrationConfig() : VerbosityConfig(VerbosityConfig::named("DSG LCD")) {}
+  LayerRegistrationConfig()
+      : VerbosityConfig(VerbosityConfig::named("lcd_registration")) {}
 
   size_t min_correspondences = 5;
   size_t min_inliers = 5;

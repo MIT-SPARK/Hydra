@@ -71,7 +71,7 @@ void declare_config(DeformationGraphBuilder::Config& config) {
 }
 
 DeformationGraphBuilder::Config::Config()
-    : VerbosityConfig(VerbosityConfig::named("dgraph_compression")) {}
+    : VerbosityConfig(VerbosityConfig::named("dgraph_builder")) {}
 
 DeformationGraphBuilder::DeformationGraphBuilder(const Config& config,
                                                  RunContext::ConstPtr context)

@@ -61,7 +61,7 @@ namespace hydra {
 class RosPoseGraphTracker : public PoseGraphTracker {
  public:
   struct Config : PoseGraphTracker::Config {
-    Config() { log_prefix = "[RosPoseGraphTracker] "; }
+    Config() { log_prefix = "[ros_pose_graph] "; }
 
     //! ROS namespace
     std::string ns = "~";

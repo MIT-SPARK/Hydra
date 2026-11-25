@@ -51,7 +51,7 @@ namespace hydra {
 class ZmqRoomLabelUpdater : public UpdateFunctor {
  public:
   struct Config : VerbosityConfig {
-    Config() : VerbosityConfig(VerbosityConfig::named("ZmqRoomLabelUpdater")) {}
+    Config() : VerbosityConfig(VerbosityConfig::named("room_labels")) {}
 
     std::string url = "tcp://127.0.0.1:8002";
     size_t num_threads = 2;

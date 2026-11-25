@@ -223,7 +223,7 @@ size_t MarchingCubes::meshCube(const SdfPoints& points,
                                const VoxelIndex& cube_index,
                                EdgeCache* cache,
                                bool compute_normals) {
-  static const auto log_config = VerbosityConfig::named("mesh");
+  static const auto log_config = VerbosityConfig::named("marching_cubes");
 
   static constexpr auto NO_LABEL = std::numeric_limits<uint32_t>::max();
   if (log_config.enabled(15)) {

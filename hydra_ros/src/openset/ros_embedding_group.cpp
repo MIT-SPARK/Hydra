@@ -33,7 +33,7 @@ void declare_config(RosEmbeddingGroup::Config& config) {
   field(config.prompts, "prompts");
 }
 
-RosEmbeddingGroup::Config::Config() : VerbosityConfig("[RosEmbeddingGroup] ") {}
+RosEmbeddingGroup::Config::Config() : VerbosityConfig("[ros_embeddings] ") {}
 
 RosEmbeddingGroup::RosEmbeddingGroup(const Config& config) {
   if (config.prompts.empty()) {

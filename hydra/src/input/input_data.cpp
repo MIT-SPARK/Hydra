@@ -182,7 +182,7 @@ bool InputData::inRange(float range_m) const {
 }
 
 bool InputData::finalize(bool vertices_in_world_frame, bool normalize_labels) {
-  static const auto log_config = VerbosityConfig::named("Input Conversion");
+  static const auto log_config = VerbosityConfig::named("input_conversion");
 
   if (!convertDepth(*this)) {
     LOG(ERROR) << log_config.log_prefix << "Unable to normalize depth";

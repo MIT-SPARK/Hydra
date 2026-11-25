@@ -49,7 +49,7 @@ enum class DilationThresholdMode {
 };
 
 struct RoomFinderConfig : VerbosityConfig {
-  RoomFinderConfig() : VerbosityConfig(VerbosityConfig::named("Room Finder")) {}
+  RoomFinderConfig() : VerbosityConfig(VerbosityConfig::named("room_finder")) {}
 
   char room_prefix = 'R';
   double min_dilation_m = 0.1;

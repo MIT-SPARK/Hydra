@@ -18,7 +18,7 @@ namespace hydra_multi {
 
 struct MultiPipelineConfig : hydra::VerbosityConfig {
   MultiPipelineConfig()
-      : hydra::VerbosityConfig(hydra::VerbosityConfig::named("Hydra-Multi")) {}
+      : hydra::VerbosityConfig(hydra::VerbosityConfig::named("multi_pipeline")) {}
 
   bool timing_disabled = false;
   bool disable_timer_output = true;
