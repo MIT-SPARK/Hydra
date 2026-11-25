@@ -97,7 +97,7 @@ Sensor::Ptr Sensor::fromRecord(const YAML::Node& node,
 void Sensor::setStaticMask(const cv::Mat& mask) { static_mask_ = mask.clone(); }
 
 void declare_config(Sensor::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("Sensor");
   field(config.min_range, "min_range", "m");

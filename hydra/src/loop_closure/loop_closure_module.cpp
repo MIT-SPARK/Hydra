@@ -70,8 +70,7 @@ void declare_config(LoopClosureModule::Config& config) {
   field(config.descriptor_creation_horizon_m, "descriptor_creation_horizon_m");
 }
 
-LoopClosureModule::Config::Config()
-    : VerbosityConfig(hydra::VerbosityConfig::named("lcd")) {}
+LoopClosureModule::Config::Config() : VerbosityConfig(VerbosityConfig::named("lcd")) {}
 
 LoopClosureModule::LoopClosureModule(const Config& config,
                                      RunContext::ConstPtr context,

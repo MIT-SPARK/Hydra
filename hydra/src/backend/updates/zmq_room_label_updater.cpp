@@ -111,7 +111,7 @@ void ZmqRoomLabelUpdater::call(const SceneGraph&,
 }
 
 void declare_config(ZmqRoomLabelUpdater::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("ZmqRoomLabelUpdater::Config");
   field(config.url, "url");

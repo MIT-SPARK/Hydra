@@ -177,7 +177,7 @@ void declare_config(LcdDetector::Config::Variances& config) {
 }
 
 void declare_config(LcdDetector::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("LcdDetectorConfig");
   field(config.objects, "objects");

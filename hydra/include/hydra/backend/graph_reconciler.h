@@ -44,7 +44,7 @@ namespace hydra {
 struct Reconciler {
   using Graph = spark_dsg::SceneGraph;
 
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     using FunctorConfig = config::VirtualConfig<UpdateFunctor, true>;
 
     config::OrderedMap<std::string, FunctorConfig> update_functors;

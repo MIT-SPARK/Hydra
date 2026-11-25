@@ -48,9 +48,8 @@ enum class DilationThresholdMode {
   PLATEAU_THRESHOLD
 };
 
-struct RoomFinderConfig : hydra::VerbosityConfig {
-  RoomFinderConfig()
-      : hydra::VerbosityConfig(hydra::VerbosityConfig::named("Room Finder")) {}
+struct RoomFinderConfig : VerbosityConfig {
+  RoomFinderConfig() : VerbosityConfig(VerbosityConfig::named("Room Finder")) {}
 
   char room_prefix = 'R';
   double min_dilation_m = 0.1;

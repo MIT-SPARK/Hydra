@@ -128,7 +128,7 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
 }
 
 void declare_config(TFLookup::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("TFLookup::Config");
   field(config.wait_duration_s, "wait_duration_s");

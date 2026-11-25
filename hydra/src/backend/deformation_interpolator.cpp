@@ -67,7 +67,7 @@ using spark_dsg::NodeSymbol;
 using spark_dsg::SemanticNodeAttributes;
 
 void declare_config(DeformationInterpolator::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("DeformationInterpolator::Config");
   field(config.num_control_points, "num_control_points");

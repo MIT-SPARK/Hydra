@@ -118,7 +118,7 @@ bool isVisible(const FeatureSelector& selector,
 using hydra::timing::ScopedTimer;
 
 void declare_config(DistancePolicy::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name<DistancePolicy::Config>();
   field(config.min_pose_separation, "min_pose_separation");
@@ -210,7 +210,7 @@ void declare_config(KeyframeSelector::Config& config) {
 }
 
 KeyframeSelector::Config::Config()
-    : VerbosityConfig(hydra::VerbosityConfig::named("keyframes")),
+    : VerbosityConfig(VerbosityConfig::named("keyframes")),
       keyframe_policy(DistancePolicy::Config()) {}
 
 KeyframeSelector::KeyframeSelector(const Config& config, RunContext::ConstPtr context)

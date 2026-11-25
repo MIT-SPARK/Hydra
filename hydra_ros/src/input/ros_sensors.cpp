@@ -188,7 +188,7 @@ RosCamera::RosCamera(const Config&) {
 }
 
 void declare_config(RosExtrinsics::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("RosExtrinsics::Config");
   field(config.sensor_frame, "sensor_frame");

@@ -55,7 +55,7 @@ void declare_config(PoseGraphTracker::Config& config) {
 }
 
 PoseGraphTracker::Config::Config()
-    : VerbosityConfig(hydra::VerbosityConfig::named("pose_graph")) {}
+    : VerbosityConfig(VerbosityConfig::named("pose_graph")) {}
 
 PoseGraphTracker::PoseGraphTracker(const Config& config, RunContext::ConstPtr context)
     : config(config::checkValid(config)), robot_(context->config.robot) {}

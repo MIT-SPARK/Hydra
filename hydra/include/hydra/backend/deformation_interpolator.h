@@ -69,7 +69,7 @@ struct NodeCache {
  */
 class DeformationInterpolator {
  public:
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     //! Number of control points to use for deformation interpolation
     size_t num_control_points = 4;
     //! Timestamp tolerance for control points [s]

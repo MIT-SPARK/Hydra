@@ -53,7 +53,7 @@ static const auto sink_registration = config::
 }  // namespace
 
 void declare_config(ZmqSink::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("ZmqSink::Config");
   field(config.url, "url");

@@ -47,7 +47,7 @@
 namespace hydra {
 
 void declare_config(Reconciler::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("Reconciler::Config");
   field(config.update_functors, "update_functors");

@@ -51,7 +51,7 @@ using timing::ScopedTimer;
 using MergeId = std::optional<NodeId>;
 
 void declare_config(UpdatePlacesFunctor::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("UpdatePlacesFunctor::Config");
   field(config.pos_threshold_m, "pos_threshold_m", "m");

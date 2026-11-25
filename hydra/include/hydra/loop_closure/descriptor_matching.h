@@ -41,7 +41,7 @@ namespace hydra::lcd {
 
 enum class DescriptorScoreType { COSINE, L1 };
 
-struct DescriptorMatchConfig : hydra::VerbosityConfig {
+struct DescriptorMatchConfig : VerbosityConfig {
   float min_score = 1.0;
   float min_registration_score = 1.0;
   double min_time_separation_s = 0.0;

@@ -40,7 +40,7 @@
 namespace hydra {
 
 struct UpdateAgentsFunctor : public UpdateFunctor {
-  struct Config : hydra::VerbosityConfig {};
+  struct Config : VerbosityConfig {};
 
   explicit UpdateAgentsFunctor(const Config& config = {});
 

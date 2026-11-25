@@ -102,7 +102,7 @@ const Eigen::Matrix<int, 3, 8> MeshIntegrator::cube_index_offsets_ = [] {
 }();
 
 void declare_config(MeshIntegrator::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("MeshIntegratorConfig");
   field(config.min_weight, "min_weight");

@@ -57,7 +57,7 @@ using LabelClusters = MeshSegmenter::LabelClusters;
 using timing::ScopedTimer;
 
 void declare_config(MeshSegmenter::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("MeshSegmenterConfig");
   field(config.layer_id, "layer_id");

@@ -81,7 +81,7 @@ void declare_config(LayerConnector::Config& config);
 
 class GraphConnector {
  public:
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     std::vector<LayerConnector::Config> layers{LayerConnector::Config{}};
   } const config;
 

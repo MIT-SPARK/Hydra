@@ -56,7 +56,7 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
                            std::string* message = nullptr);
 
 struct TFLookup {
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     //! Amount of time to wait between tf lookup attempts
     double wait_duration_s = 0.1;
     //! Buffer size in second for tf

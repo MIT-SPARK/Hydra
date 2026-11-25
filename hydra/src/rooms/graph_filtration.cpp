@@ -559,7 +559,7 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                                              size_t start_index,
                                              size_t end_index,
                                              bool use_threshold) {
-  static const auto log_config = hydra::VerbosityConfig::named("Room Finder");
+  static const auto log_config = VerbosityConfig::named("Room Finder");
 
   if (start_index >= values.size()) {
     return std::nullopt;

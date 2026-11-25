@@ -47,8 +47,8 @@ class MeshIntegrator {
  public:
   using BlockIndexGetter = IndexGetter<BlockIndex>;
 
-  struct Config : hydra::VerbosityConfig {
-    Config() : hydra::VerbosityConfig(hydra::VerbosityConfig::named("mesh")) {}
+  struct Config : VerbosityConfig {
+    Config() : VerbosityConfig(VerbosityConfig::named("mesh")) {}
 
     float min_weight = 1.0e-4f;
     //! Inherit the run thread count when unset; non-positive counts use all threads

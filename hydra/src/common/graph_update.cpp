@@ -52,7 +52,7 @@ namespace hydra {
 using namespace spark_dsg;
 
 void declare_config(LayerTracker::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("LayerTracker::Config");
   field<CharConversion>(config.prefix, "prefix");
@@ -64,7 +64,7 @@ void declare_config(LayerTracker::Config& config) {
 }
 
 void declare_config(GraphUpdater::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("GraphUpdater::Config");
   field(config.layer_updates, "layer_updates");

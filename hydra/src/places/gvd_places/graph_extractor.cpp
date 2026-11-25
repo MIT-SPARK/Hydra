@@ -131,7 +131,7 @@ void declare_config(GraphExtractor::Config::FreespaceEdges& config) {
 }
 
 void declare_config(GraphExtractor::Config& config) {
-  config::base<hydra::VerbosityConfig>(config);
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("GraphExtractor::Config");
   field(config.compression_distance_m, "compression_distance_m");

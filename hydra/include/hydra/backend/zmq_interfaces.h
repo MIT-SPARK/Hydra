@@ -48,7 +48,7 @@ namespace hydra {
 
 class ZmqSink : public BackendModule::Sink {
  public:
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     std::string url = "tcp://127.0.0.1:8001";
     bool send_mesh = true;
     size_t num_threads = 2;

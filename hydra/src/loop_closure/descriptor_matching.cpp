@@ -44,7 +44,7 @@ using namespace spark_dsg;
 namespace hydra::lcd {
 
 void declare_config(DescriptorMatchConfig& conf) {
-  config::base<hydra::VerbosityConfig>(conf);
+  config::base<VerbosityConfig>(conf);
   using namespace config;
   name("DescriptorMatchConfig");
   field(conf.min_score, "min_score");

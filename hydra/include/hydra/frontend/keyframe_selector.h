@@ -68,7 +68,7 @@ class KeyframePolicy {
 
 class DistancePolicy : public KeyframePolicy {
  public:
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     //! @brief Minimum between pose norm to add new keyframe
     double min_pose_separation = 1.0;
     //! @brief Weighting between rotation (frobenius) norm and translation (l2) norm

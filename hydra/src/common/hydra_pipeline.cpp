@@ -91,7 +91,7 @@ void declare_config(HydraPipeline::Config& config) {
 }
 
 HydraPipeline::Config::Config()
-    : VerbosityConfig(hydra::VerbosityConfig::named("pipeline")),
+    : VerbosityConfig(VerbosityConfig::named("pipeline")),
       map_window(SpatialWindowChecker::Config()),
       active_window(ReconstructionModule::Config()),
       frontend(GraphBuilder::Config()),

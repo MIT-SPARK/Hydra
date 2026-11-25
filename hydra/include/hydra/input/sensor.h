@@ -71,7 +71,7 @@ class Sensor {
   using Ptr = std::shared_ptr<Sensor>;
   using ConstPtr = std::shared_ptr<const Sensor>;
 
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     // Minimum range the sensor can handle
     double min_range = 0.0f;
     // Maximum range the sensor can handle

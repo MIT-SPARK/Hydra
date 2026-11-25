@@ -47,7 +47,7 @@
 namespace hydra::lcd {
 
 void declare_config(LayerRegistrationConfig& conf) {
-  config::base<hydra::VerbosityConfig>(conf);
+  config::base<VerbosityConfig>(conf);
   using namespace config;
   name("LayerRegistrationConfig");
   field(conf.min_correspondences, "min_correspondences");
@@ -119,7 +119,7 @@ RegistrationSolution getFullSolutionFromLayer(const SceneGraph& graph,
                                               const LayerRegistrationSolution& solution,
                                               NodeId query_agent_id,
                                               NodeId match_root) {
-  static const auto log_config = hydra::VerbosityConfig::named("DSG LCD");
+  static const auto log_config = VerbosityConfig::named("DSG LCD");
 
   if (!solution.valid || solution.inliers.empty()) {
     return {};

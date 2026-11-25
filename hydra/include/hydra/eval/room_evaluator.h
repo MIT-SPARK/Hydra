@@ -49,7 +49,7 @@ class RoomEvaluator {
  public:
   using Ptr = std::unique_ptr<RoomEvaluator>;
 
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     bool only_labeled = false;
     float min_weight = 1.0e-6f;
     float min_distance = 0.0f;

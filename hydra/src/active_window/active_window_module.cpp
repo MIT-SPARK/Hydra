@@ -59,7 +59,7 @@ void declare_config(ActiveWindowModule::Config& config) {
 }
 
 ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
-    : VerbosityConfig(hydra::VerbosityConfig::named("active_window")),
+    : VerbosityConfig(VerbosityConfig::named("active_window")),
       max_input_queue_size(0),
       volumetric_map({0.1, 16, 0.3, with_semantics, with_tracking}) {}
 

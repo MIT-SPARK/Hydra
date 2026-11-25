@@ -47,9 +47,7 @@ namespace hydra {
 
 struct GenericUpdateFunctor : public UpdateFunctor {
   struct Config : VerbosityConfig {
-    Config()
-        : hydra::VerbosityConfig(
-              hydra::VerbosityConfig::named("GenericUpdateFunctor")) {}
+    Config() : VerbosityConfig(VerbosityConfig::named("GenericUpdateFunctor")) {}
 
     //! Layer to update
     std::string layer;

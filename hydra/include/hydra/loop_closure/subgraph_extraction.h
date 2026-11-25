@@ -41,7 +41,7 @@
 
 namespace hydra {
 
-struct SubgraphConfig : hydra::VerbosityConfig {
+struct SubgraphConfig : VerbosityConfig {
   bool fixed_radius = true;
   double max_radius_m;
   double min_radius_m;

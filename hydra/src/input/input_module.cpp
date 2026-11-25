@@ -57,8 +57,7 @@ void declare_config(InputModule::Config& config) {
   checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
 
-InputModule::Config::Config()
-    : VerbosityConfig(hydra::VerbosityConfig::named("input")) {}
+InputModule::Config::Config() : VerbosityConfig(VerbosityConfig::named("input")) {}
 
 InputModule::InputModule(const Config& _config,
                          RunContext::ConstPtr context,

@@ -52,7 +52,7 @@ struct InvalidSensor : Sensor {
 };
 
 struct RosExtrinsics : SensorExtrinsics {
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     //! @brief Override camera info frame ID
     std::string sensor_frame = "";
     //! @brief Override global robot frame ID

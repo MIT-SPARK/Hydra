@@ -66,7 +66,7 @@ class LcdDetector {
   using FactoryMap = std::map<std::string, DescriptorFactory::Ptr>;
   using SearchResultMap = std::map<size_t, LayerSearchResults>;
 
-  struct Config : hydra::VerbosityConfig {
+  struct Config : VerbosityConfig {
     TeaserParams teaser_config;
     bool enable_agent_registration = true;
     DescriptorMatchConfig agent_search_config;

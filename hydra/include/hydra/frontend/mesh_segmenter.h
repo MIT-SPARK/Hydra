@@ -67,9 +67,8 @@ class MeshSegmenter {
                           const LabelIndices&,
                           const LabelClusters&>;
 
-  struct Config : hydra::VerbosityConfig {
-    Config()
-        : hydra::VerbosityConfig(hydra::VerbosityConfig::named("Mesh Segmenter")) {}
+  struct Config : VerbosityConfig {
+    Config() : VerbosityConfig(VerbosityConfig::named("Mesh Segmenter")) {}
 
     std::string layer_id = spark_dsg::DsgLayers::OBJECTS;
     clustering::ClusteringConfig clustering;
