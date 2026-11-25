@@ -40,6 +40,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <mutex>
 #include <numeric>
 #include <ostream>
 #include <sstream>
@@ -147,9 +148,12 @@ ElapsedTimeRecorder::ElapsedTimeRecorder()
     : timing_disabled(false), disable_output(true) {}
 
 ElapsedTimeRecorder& ElapsedTimeRecorder::instance() {
-  if (!instance_) {
-    instance_.reset(new ElapsedTimeRecorder());
-  }
+  static std::once_flag initialized;
+  std::call_once(initialized, [] {
+    if (!instance_) {
+      instance_.reset(new ElapsedTimeRecorder());
+    }
+  });
 
   return *instance_;
 }
@@ -255,9 +259,9 @@ void ElapsedTimeRecorder::logTimers(const std::filesystem::path& output,
                                     const std::string& name_prefix,
                                     const std::string& name_suffix) const {
   const auto all_timers = timerNames();
-  VLOG(5) << "Saving timers: [" << all_timers << "]";
+  VLOG(3) << "Saving timers: [" << all_timers << "]";
   for (const auto& name : all_timers) {
-    VLOG(5) << "Saving timer '" << name << "'";
+    VLOG(3) << "Saving timer '" << name << "'";
 
     std::vector<Entry> entries;
     {  // start critical section
@@ -277,7 +281,7 @@ void ElapsedTimeRecorder::logTimers(const std::filesystem::path& output,
     VLOG(2) << "Writing " << entries.size() << " measurements for timer '" << name
             << "' to '" << output_csv << "'";
     writeEntries(output_csv, entries);
-    VLOG(5) << "Saved timer '" << name << "'";
+    VLOG(3) << "Saved timer '" << name << "'";
   }
 }
 

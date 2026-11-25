@@ -181,7 +181,7 @@ void DsgReceiver::handleUpdate(const DsgUpdate::ConstSharedPtr& msg) {
   }
 
   const auto size_bytes = getHumanReadableMemoryString(msg->layer_contents.size());
-  VLOG(5) << "Received dsg update message of " << size_bytes;
+  VLOG(3) << "Received dsg update message of " << size_bytes;
   try {
     if (!graph_) {
       graph_ = spark_dsg::io::binary::readGraph(msg->layer_contents);

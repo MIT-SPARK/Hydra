@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
 #include <spark_dsg/bounding_box.h>
 #include <spark_dsg/layer_view.h>
 
@@ -68,7 +69,7 @@ struct NodeCache {
  */
 class DeformationInterpolator {
  public:
-  struct Config {
+  struct Config : VerbosityConfig {
     //! Number of control points to use for deformation interpolation
     size_t num_control_points = 4;
     //! Timestamp tolerance for control points [s]

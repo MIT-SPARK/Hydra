@@ -44,6 +44,7 @@
 namespace hydra {
 
 void declare_config(SubgraphConfig& conf) {
+  config::base<VerbosityConfig>(conf);
   using namespace config;
   name("SubgraphConfig");
   field(conf.fixed_radius, "fixed_radius");

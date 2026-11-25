@@ -118,6 +118,7 @@ bool isVisible(const FeatureSelector& selector,
 using hydra::timing::ScopedTimer;
 
 void declare_config(DistancePolicy::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name<DistancePolicy::Config>();
   field(config.min_pose_separation, "min_pose_separation");
@@ -209,8 +210,7 @@ void declare_config(KeyframeSelector::Config& config) {
 }
 
 KeyframeSelector::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("keyframes")),
-      keyframe_policy(DistancePolicy::Config()) {}
+    : VerbosityConfig("keyframes"), keyframe_policy(DistancePolicy::Config()) {}
 
 KeyframeSelector::KeyframeSelector(const Config& config, RunContext::ConstPtr context)
     : config(config::checkValid(config)),
@@ -278,9 +278,8 @@ void KeyframeSelector::queueForSaving(const InputData::ConstPtr& data) {
   {
     std::lock_guard<std::mutex> lock(save_mutex_);
     if (config.max_queue_size && save_queue_.size() >= config.max_queue_size) {
-      LOG(WARNING) << config.prefix << "Keyframe save queue full ("
-                   << save_queue_.size() << "), dropping keyframe @ "
-                   << data->timestamp_ns << " [ns]";
+      MLOG_NAMED(WARN) << "Keyframe save queue full (" << save_queue_.size()
+                       << "), dropping keyframe @ " << data->timestamp_ns << " [ns]";
       return;
     }
 
@@ -332,7 +331,7 @@ void KeyframeSelector::saveSpin() {
     try {
       data->save(filepath, config.save_options);
     } catch (const std::exception& e) {
-      LOG(ERROR) << config.prefix << "Failed to save keyframe: " << e.what();
+      MLOG_NAMED(ERROR) << "Failed to save keyframe: " << e.what();
     }
 
     {
@@ -392,11 +391,11 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
     const auto stamp = frame->timestamp_ns;
 
     const auto fmt = getDefaultFormat(3);
-    MLOG(4) << "view @ " << stamp << "[ns]: " << pos.format(fmt) << " vs. "
+    MLOG(3) << "view @ " << stamp << "[ns]: " << pos.format(fmt) << " vs. "
             << msg.world_T_body().translation().format(fmt);
 
     if (!window.inBounds(msg.timestamp_ns, msg.world_T_body(), stamp, pos)) {
-      MLOG(3) << "Archival candidate found @ " << stamp << " [ns]";
+      MLOG(2) << "Archival candidate found @ " << stamp << " [ns]";
       releaseKeyframe(*iter);
       iter = keyframes_.erase(iter);
       continue;
@@ -420,7 +419,7 @@ void KeyframeSelector::limitActiveKeyframes() {
 
   // policies only compare against the newest keyframe, so evicting the oldest is safe
   while (keyframes_.size() > config.max_active_keyframes) {
-    MLOG(3) << "Evicting keyframe @ " << keyframes_.front()->timestamp_ns
+    MLOG(2) << "Evicting keyframe @ " << keyframes_.front()->timestamp_ns
             << " [ns] (more than " << config.max_active_keyframes << " active)";
     releaseKeyframe(keyframes_.front());
     keyframes_.pop_front();
@@ -485,7 +484,7 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
   for (auto& [name, layer_tracker] : active_window_) {
     auto layer = dsg.graph->findLayer(name);
     if (!layer) {
-      LOG(WARNING) << config.prefix << "Skipping unknown layer: '" << name << "'";
+      MLOG_NAMED(WARN) << "Skipping unknown layer: '" << name << "'";
       continue;
     }
 
@@ -494,13 +493,13 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
     for (const auto& node : layer_tracker.view(*layer)) {
       auto attrs = node.tryAttributes<SemanticNodeAttributes>();
       if (!attrs) {
-        LOG(ERROR) << config.prefix << "Invalid node " << NodeSymbol(node.id).str();
+        MLOG_NAMED(ERROR) << "Invalid node " << NodeSymbol(node.id).str();
         continue;
       }
 
       ++num_seen;
       if (feature_selector_->select(views, *attrs)) {
-        MLOG(5) << "node " << NodeSymbol(node.id).str() << ": "
+        MLOG(3) << "node " << NodeSymbol(node.id).str() << ": "
                 << showVec(attrs->semantic_feature);
         ++num_assigned;
       }

@@ -42,17 +42,22 @@ namespace hydra {
 
 struct VerbosityConfig {
   //! An unset value inherits the current run default
-  std::optional<int> verbosity = 0;
-  std::string prefix = "";
+  std::optional<int> verbosity = std::nullopt;
+  std::string log_name;
+  std::string log_prefix = "[";
+  std::string log_suffix = "] ";
 
-  VerbosityConfig() = default;
-  VerbosityConfig(int verbosity);
-  VerbosityConfig(const std::string& prefix, std::optional<int> verbosity = 0);
+  //! Use short snake_case names for default component log labels
+  VerbosityConfig(const std::string& name = "",
+                  std::optional<int> verbosity = std::nullopt);
 
-  //! Make a copy of the verbosity config with a prefix derived from the provided name
+  //! Copy with a different name while preserving verbosity and delimiters
   VerbosityConfig with_name(const std::string& name) const;
 
-  static VerbosityConfig default_verbosity(const std::string& name = "");
+  //! Render the component label, or an empty string when the name is empty
+  std::string get_log_prefix() const;
+
+  bool enabled(int level) const { return get_verbosity() >= level; }
 
   int get_verbosity() const;
 };
@@ -61,6 +66,18 @@ void declare_config(VerbosityConfig& config);
 
 // NOTE(nathan) you need to include <glog/logging.h> for this to work, but
 // I don't want have <glog/logging.h> included in a bunch of header files
-#define MLOG(V) LOG_IF(INFO, config.get_verbosity() >= V) << config.prefix
+// Levels 1-3 cover summaries, per-update output, and normal diagnostic details.
+// Reserve 4 for very detailed traces and 5 for data dumps or test diagnostics.
+#define MLOG_WITH(C, V) LOG_IF(INFO, (C).enabled(V)) << (C).get_log_prefix()
+#define MLOG(V) MLOG_WITH(config, V)
+
+// Severity-based module messages do not use the verbosity threshold.
+#define HYDRA_MLOG_LEVEL_INFO INFO
+#define HYDRA_MLOG_LEVEL_WARN WARNING
+#define HYDRA_MLOG_LEVEL_ERROR ERROR
+
+#define HYDRA_MLOG_NAMED(C, LEVEL) LOG(LEVEL) << (C).get_log_prefix()
+#define MLOG_NAMED_WITH(C, LEVEL) HYDRA_MLOG_NAMED(C, HYDRA_MLOG_LEVEL_##LEVEL)
+#define MLOG_NAMED(LEVEL) MLOG_NAMED_WITH(config, LEVEL)
 
 }  // namespace hydra

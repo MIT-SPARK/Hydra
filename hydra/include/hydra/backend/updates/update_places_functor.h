@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/factory.h>
+#include <hydra/utils/logging.h>
 
 #include "hydra/backend/association_strategies.h"
 #include "hydra/backend/deformation_interpolator.h"
@@ -43,7 +44,9 @@
 namespace hydra {
 
 struct UpdatePlacesFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config() : VerbosityConfig("update_places") {}
+
     //! Max distance between node centroids for a merge to be considered
     double pos_threshold_m = 0.4;
     //! Max deviation between place radii for a merge to be considered

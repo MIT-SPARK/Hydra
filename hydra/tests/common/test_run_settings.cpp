@@ -1,11 +1,57 @@
+#include <config_utilities/parsing/yaml.h>
 #include <gtest/gtest.h>
 
+#include "hydra/common/graph_update.h"
 #include "hydra/common/hydra_pipeline.h"
 #include "hydra/common/run_settings.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
 
 namespace hydra {
+
+TEST(RunSettings, VerbosityFollowsActiveRunUnlessOverridden) {
+  const auto previous = RunSettings::instance();
+  VerbosityConfig inherited;
+  VerbosityConfig explicit_zero("fixed", 0);
+  RunContext::Config first;
+  first.settings.default_verbosity = 2;
+  const auto context = std::make_shared<RunContext>(first);
+  EXPECT_EQ(inherited.get_verbosity(), 2);
+  EXPECT_EQ(explicit_zero.get_verbosity(), 0);
+
+  RunContext::Config second;
+  second.settings.default_verbosity = 5;
+  const RunContext next(second);
+  EXPECT_EQ(inherited.get_verbosity(), 5);
+  EXPECT_FALSE(explicit_zero.enabled(1));
+
+  const HydraPipeline pipeline(HydraPipeline::Config{}, context);
+  EXPECT_EQ(inherited.get_verbosity(), 2);
+  EXPECT_EQ(explicit_zero.get_verbosity(), 0);
+  RunSettings::init(previous);
+}
+
+TEST(RunSettings, LoggingLabelDoesNotChangeNodeSymbols) {
+  const VerbosityConfig defaults("objects");
+  EXPECT_EQ(defaults.get_log_prefix(), "[objects] ");
+  EXPECT_TRUE(VerbosityConfig{}.get_log_prefix().empty());
+
+  const auto node = YAML::Load(
+      "{prefix: Q, log_name: objects, log_prefix: '<', "
+      "log_suffix: '> ', verbosity: 3}");
+  const auto config = config::fromYaml<LayerTracker::Config>(node);
+  EXPECT_EQ(config.prefix, 'Q');
+  EXPECT_EQ(config.get_log_prefix(), "<objects> ");
+  EXPECT_EQ(config.get_verbosity(), 3);
+  const LayerTracker tracker(config);
+  EXPECT_EQ(tracker.next_id.category(), 'Q');
+
+  const auto renamed = config.with_name("places");
+  EXPECT_EQ(renamed.get_log_prefix(), "<places> ");
+  EXPECT_EQ(renamed.get_verbosity(), 3);
+  EXPECT_EQ(config.get_log_prefix(), "<objects> ");
+  EXPECT_TRUE(config.with_name("").get_log_prefix().empty());
+}
 
 TEST(RunSettings, InheritedThreadsPersistAndExplicitOverridesTakePrecedence) {
   const auto previous = RunSettings::instance();

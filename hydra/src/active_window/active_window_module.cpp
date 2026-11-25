@@ -59,7 +59,7 @@ void declare_config(ActiveWindowModule::Config& config) {
 }
 
 ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
-    : VerbosityConfig(VerbosityConfig::default_verbosity("active_window")),
+    : VerbosityConfig("active_window"),
       max_input_queue_size(0),
       volumetric_map({0.1, 16, 0.3, with_semantics, with_tracking}) {}
 
@@ -136,7 +136,7 @@ void ActiveWindowModule::spin() {
     }
 
     const auto msg = input_queue_->pop();
-    MLOG(3) << "Processing " << msg->timestamp_ns << " [ns]";
+    MLOG(2) << "Processing " << msg->timestamp_ns << " [ns]";
     auto output = spinOnce(msg);
     if (!output) {
       continue;

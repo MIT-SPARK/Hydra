@@ -47,7 +47,7 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
     using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
     using SemanticAssociation = association::SemanticNearestNode::Config;
 
-    Config() : VerbosityConfig("[update_2d_places] ") {}
+    Config() : VerbosityConfig("update_places_2d") {}
 
     //! Layer to update
     std::string layer = spark_dsg::DsgLayers::MESH_PLACES;

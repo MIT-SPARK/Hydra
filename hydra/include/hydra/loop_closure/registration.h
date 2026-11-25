@@ -35,6 +35,7 @@
 #pragma once
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph_layer.h>
@@ -47,7 +48,9 @@
 
 namespace hydra::lcd {
 
-struct LayerRegistrationConfig {
+struct LayerRegistrationConfig : VerbosityConfig {
+  LayerRegistrationConfig() : VerbosityConfig("lcd_registration") {}
+
   size_t min_correspondences = 5;
   size_t min_inliers = 5;
   size_t max_same_nodes = 2;
@@ -156,13 +159,13 @@ LayerRegistrationSolution registerDsgLayer(
 
   const auto src_pruned = pruneSet(src, problem.src_nodes);
   if (!src_pruned.empty()) {
-    VLOG(3) << "[DSG LCD] Found invalid source nodes in registration: "
+    MLOG(2) << "Found invalid source nodes in registration: "
             << spark_dsg::displayNodeSymbolContainer(src_pruned);
   }
 
   const auto dest_pruned = pruneSet(dest, problem.dest_nodes);
   if (!dest_pruned.empty()) {
-    VLOG(3) << "[DSG LCD] Found invalid destination nodes in registration: "
+    MLOG(2) << "Found invalid destination nodes in registration: "
             << spark_dsg::displayNodeSymbolContainer(dest_pruned);
   }
 
@@ -199,19 +202,18 @@ LayerRegistrationSolution registerDsgLayer(
   }
 
   if (correspondences.size() < config.min_correspondences) {
-    VLOG(2) << "not enough correspondences for registration at layer " << src.id << ": "
+    MLOG(2) << "not enough correspondences for registration at layer " << src.id << ": "
             << correspondences.size() << " / " << config.min_correspondences;
     return {};
   }
 
-  VLOG(20) << "=======================================================";
-  VLOG(20) << "Source: " << std::endl << src_points;
-  VLOG(20) << "Dest: " << std::endl << dest_points;
+  MLOG(5) << "=======================================================";
+  MLOG(5) << "Source: " << std::endl << src_points;
+  MLOG(5) << "Dest: " << std::endl << dest_points;
 
-  VLOG(1) << "[DSG LCD] Registering layer " << src.id << " with "
-          << correspondences.size() << " correspondences out of "
-          << problem.src_nodes.size() << " source and " << problem.dest_nodes.size()
-          << " destination nodes";
+  MLOG(1) << "Registering layer " << src.id << " with " << correspondences.size()
+          << " correspondences out of " << problem.src_nodes.size() << " source and "
+          << problem.dest_nodes.size() << " destination nodes";
 
   auto params = solver.getParams();
   solver.reset(params);
@@ -227,8 +229,8 @@ LayerRegistrationSolution registerDsgLayer(
 
   auto inliers = solver.getInlierMaxClique();
   if (inliers.size() < config.min_inliers) {
-    VLOG(2) << "[DSG LCD] Not enough inliers for registration at layer " << src.id
-            << ": " << inliers.size() << " / " << config.min_inliers;
+    MLOG(2) << "Not enough inliers for registration at layer " << src.id << ": "
+            << inliers.size() << " / " << config.min_inliers;
     return {};
   }
 

@@ -44,6 +44,7 @@ using namespace spark_dsg;
 namespace hydra::lcd {
 
 void declare_config(DescriptorMatchConfig& conf) {
+  config::base<VerbosityConfig>(conf);
   using namespace config;
   name("DescriptorMatchConfig");
   field(conf.min_score, "min_score");
@@ -182,7 +183,7 @@ LayerSearchResults searchDescriptors(
   size_t num_default_match = 0;
   size_t num_shared_nodes = 0;
 
-  VLOG(10) << "--------------------------------------------------";
+  MLOG_WITH(match_config, 4) << "--------------------------------------------------";
 
   for (const auto& valid_id : valid_matches) {
     if (root_leaf_map.at(valid_id).count(query_id)) {
@@ -208,8 +209,9 @@ LayerSearchResults searchDescriptors(
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
     if (same_robot && diff_s.count() < match_config.min_time_separation_s) {
-      VLOG(10) << "diff: " << diff_s.count()
-               << " (threshold: " << match_config.min_time_separation_s << ")";
+      MLOG_WITH(match_config, 4)
+          << "diff: " << diff_s.count()
+          << " (threshold: " << match_config.min_time_separation_s << ")";
       ++num_inside_horizon;
       continue;
     }
@@ -248,10 +250,13 @@ LayerSearchResults searchDescriptors(
   }
 
   // TODO(nathan) add layer id in again or handle stats better
-  VLOG(1) << "matching " << " -> shared: " << num_same_parent << ", null: " << num_null
-          << ", horizon: " << num_inside_horizon << ", low: " << num_low_score
-          << ", default: " << num_default_match << ", shared: " << num_shared_nodes
-          << ", valid: " << new_valid_match_scores.size();
+  MLOG_WITH(match_config, 1) << "matching " << " -> shared: " << num_same_parent
+                             << ", null: " << num_null
+                             << ", horizon: " << num_inside_horizon
+                             << ", low: " << num_low_score
+                             << ", default: " << num_default_match
+                             << ", shared: " << num_shared_nodes
+                             << ", valid: " << new_valid_match_scores.size();
 
   std::sort(new_valid_match_scores.begin(),
             new_valid_match_scores.end(),

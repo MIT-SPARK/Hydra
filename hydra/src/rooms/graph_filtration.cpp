@@ -334,7 +334,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
     const auto x = entries.back();
     entries.pop_back();
 
-    VLOG(10) << "Processing " << x;
+    VLOG(4) << "Processing " << x;
 
     bool change_in_components = true;
     if (x.target) {
@@ -357,7 +357,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
     const auto num_components = count_components(components);
     if (filtration.empty()) {
       filtration.push_front({x.distance, num_components});
-      VLOG(10) << filtration.front();
+      VLOG(4) << filtration.front();
       continue;
     }
 
@@ -369,7 +369,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
       filtration.push_front({x.distance, num_components});
     }
 
-    VLOG(10) << filtration.front();
+    VLOG(4) << filtration.front();
   }
 
   return Filtration(filtration.begin(), filtration.end());
@@ -587,34 +587,34 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                         values[start_end_pair.first].distance);
   }
 
-  if (VLOG_IS_ON(20)) {
-    VLOG(20) << "Sequences:";
+  if (VLOG_IS_ON(5)) {
+    VLOG(5) << "Sequences:";
     for (size_t i = 0; i < sequences.size(); ++i) {
-      VLOG(20) << "  - " << i << ": " << seq_values.at(i) << " -> ["
-               << sequences[i].first << ", " << sequences[i].second
-               << "], lifetime=" << lifetimes[i];
+      VLOG(5) << "  - " << i << ": " << seq_values.at(i) << " -> ["
+              << sequences[i].first << ", " << sequences[i].second
+              << "], lifetime=" << lifetimes[i];
     }
   }
 
   CHECK(!lifetimes.empty());
   const double max_lifetime = *std::max_element(lifetimes.begin(), lifetimes.end());
   const double threshold = use_threshold ? ratio : ratio * max_lifetime;
-  VLOG(5) << "[Room Finder] Max lifetime: " << max_lifetime << ", Ratio: " << ratio
+  VLOG(3) << "Max lifetime: " << max_lifetime << ", Ratio: " << ratio
           << ", Threshold: " << threshold;
 
   size_t best_sequence = 0;
   size_t best_components = 0;
-  VLOG(20) << "Best components:";
+  VLOG(5) << "Best components:";
   for (size_t i = 0; i < lifetimes.size(); ++i) {
     if (lifetimes[i] < threshold) {
-      VLOG(20) << "  - " << i << ": below threshold (" << lifetimes[i] << " < "
-               << threshold << ")";
+      VLOG(5) << "  - " << i << ": below threshold (" << lifetimes[i] << " < "
+              << threshold << ")";
       continue;
     }
 
     const auto curr_components = values[sequences[i].first].num_components;
-    VLOG(20) << "  - " << i << ": components=" << curr_components
-             << " (best=" << best_components << ")";
+    VLOG(5) << "  - " << i << ": components=" << curr_components
+            << " (best=" << best_components << ")";
     // TODO(nathan) might want >= instead
     if (curr_components > best_components) {
       best_sequence = i;

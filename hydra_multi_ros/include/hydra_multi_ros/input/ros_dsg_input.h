@@ -1,4 +1,5 @@
 #pragma once
+#include <hydra/utils/logging.h>
 #include <hydra_multi/operators/mesh_operator.h>
 #include <hydra_multi/operators/scene_graph_operator.h>
 #include <ianvs/node_handle.h>
@@ -24,7 +25,7 @@ class RosDsgInput : public Input {
   using DsgUpdate = hydra_msgs::msg::DsgUpdate;
   using MeshDeltaPtr = std::unique_ptr<kimera_pgmo::MeshDelta>;
 
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     size_t dsg_queue_size = 100;
     size_t mesh_update_queue_size = 100;
     size_t queue_size = 100;

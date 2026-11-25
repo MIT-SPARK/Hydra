@@ -105,7 +105,7 @@ PoseGraph loadLoopClosures(const ExtrinsicsMap& extrinsics, const fs::path& lcd_
   for (const auto& lc : data) {
     nlohmann::json record;
     to_json(lc, record);
-    VLOG(5) << "Processing " << record;
+    VLOG(3) << "Processing " << record;
 
     auto& edge = loop_closures.edges.emplace_back();
     edge.robot_from = lc.robot_from;

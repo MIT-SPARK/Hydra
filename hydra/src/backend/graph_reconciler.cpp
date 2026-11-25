@@ -47,6 +47,7 @@
 namespace hydra {
 
 void declare_config(Reconciler::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("Reconciler::Config");
   field(config.update_functors, "update_functors");
@@ -93,7 +94,7 @@ auto Reconciler::reconcile(Graph& graph) const -> Graph::Ptr {
       auto& tracker = merge_tracker.getMergeGroup(name);
       auto merges = hooks.find_merges(graph, info);
       auto applied = tracker.applyMerges(graph, merges, target, hooks.merge);
-      VLOG(1) << "pass 0: " << merges.size() << " merges (applied " << applied << ")";
+      MLOG(1) << "pass 0: " << merges.size() << " merges (applied " << applied << ")";
       if (!exhaustive_names.count(name)) {
         continue;
       }
@@ -103,7 +104,7 @@ auto Reconciler::reconcile(Graph& graph) const -> Graph::Ptr {
       do {
         merges = hooks.find_merges(*target.graph, info);
         applied = tracker.applyMerges(graph, merges, target, hooks.merge);
-        VLOG(1) << "pass " << iter << ": " << merges.size() << " merges (applied "
+        MLOG(1) << "pass " << iter << ": " << merges.size() << " merges (applied "
                 << applied << ")";
         ++iter;
       } while (applied > 0);

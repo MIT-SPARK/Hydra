@@ -52,6 +52,7 @@ namespace hydra {
 using namespace spark_dsg;
 
 void declare_config(LayerTracker::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("LayerTracker::Config");
   field<CharConversion>(config.prefix, "prefix");
@@ -63,6 +64,7 @@ void declare_config(LayerTracker::Config& config) {
 }
 
 void declare_config(GraphUpdater::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("GraphUpdater::Config");
   field(config.layer_updates, "layer_updates");
@@ -146,7 +148,7 @@ void GraphUpdater::addNode(SceneGraph& graph,
   }
 
   if (to_merge) {
-    VLOG(5) << "Merging to " << NodeSymbol(*to_merge).str() << " @ " << target
+    MLOG(3) << "Merging to " << NodeSymbol(*to_merge).str() << " @ " << target
             << " for " << source;
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
@@ -166,7 +168,7 @@ void GraphUpdater::addNode(SceneGraph& graph,
   }
 
   const auto new_id = tracker.next_id;
-  VLOG(5) << "Adding " << new_id.str() << " @ " << target << " for " << source;
+  MLOG(3) << "Adding " << new_id.str() << " @ " << target << " for " << source;
   graph.emplaceNode(target, new_id, std::move(attrs));
   if (entry.track_id) {
     tracker.track_to_node[*entry.track_id] = new_id;
@@ -188,7 +190,7 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
 
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter == tracker.track_to_node.end()) {
-    VLOG(5) << "Delete for unknown track_id " << *entry.track_id;
+    MLOG(3) << "Delete for unknown track_id " << *entry.track_id;
     return;
   }
 

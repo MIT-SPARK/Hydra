@@ -1,6 +1,7 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 #include <hydra/common/shared_dsg_info.h>
+#include <hydra/utils/logging.h>
 
 #include <array>
 #include <atomic>
@@ -15,7 +16,9 @@
 
 namespace hydra_multi {
 
-struct MultiPipelineConfig {
+struct MultiPipelineConfig : hydra::VerbosityConfig {
+  MultiPipelineConfig() : VerbosityConfig("multi_pipeline") {}
+
   bool timing_disabled = false;
   bool disable_timer_output = true;
   bool enable_pgmo_logging = true;

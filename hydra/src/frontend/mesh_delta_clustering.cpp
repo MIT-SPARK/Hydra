@@ -42,7 +42,7 @@ LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
                              const std::unordered_set<size_t>* invalid) {
   LabelIndices label_indices;
   if (!kimera_pgmo::traits::get_vertex_properties(delta).has_label) {
-    LOG(WARNING) << "[Delta Clustering] Mesh missing labels!";
+    LOG(WARNING) << "Mesh missing labels!";
     return label_indices;
   }
 
@@ -67,7 +67,7 @@ LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
     iter->second.push_back(i);
   }
 
-  VLOG(2) << "[Delta Clustering] Seen labels: " << printLabels(seen_labels);
+  VLOG(2) << "Seen labels: " << printLabels(seen_labels);
   return label_indices;
 }
 

@@ -177,7 +177,7 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
 void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   ScopedTimer timer("frontend/update_gvd_places", timestamp_ns, true, 2, false);
   const auto& places = graph_extractor_->graph();
-  MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
+  MLOG(2) << "Considering " << places.nodes().size() << " input place nodes ";
 
   for (const auto node_id : places.deleted_nodes()) {
     graph.removeNode(NodeSymbol(config.node_prefix, node_id));
@@ -215,7 +215,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
       if (is_active) {
         // bad things happen if we delete an archived node, so we only remove active
         // nodes if they were previously added
-        MLOG(1) << "Removed isolated node " << graph_id.str();
+        MLOG(3) << "Removed isolated node " << graph_id.str();
         graph.removeNode(graph_id);
       }
 

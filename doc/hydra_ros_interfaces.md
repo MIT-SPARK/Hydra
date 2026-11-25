@@ -26,6 +26,30 @@ If you are parsing sensor information from `sensor_msgs::msg::CameraInfo` messag
 Hydra will print out the input configuration and other global information before attempting to resolve the sensor information.
 You may also find setting the parameter `print_missing: true` useful (which will output every configuration field that was not specified by YAML parameter).
 
+Use `verbosity` to override `default_verbosity` and set the log label's name and delimiters as shown below:
+
+```yaml
+default_verbosity: 1
+backend:
+  verbosity: 3  # Show backend messages through level 3.
+  log_name: backend  # Names log messages without changing node IDs.
+  log_prefix: '['
+  log_suffix: '] '
+```
+
+`MLOG_NAMED` uses the module's rendered label with `INFO`, `WARN`, or `ERROR`
+severity. These messages do not use module verbosity.
+
+```cpp
+MLOG(2) << "Processed " << count << " nodes";
+MLOG_NAMED(WARN) << "Missing sensor " << name;
+```
+
+Use level 1 for lifecycle messages and summaries, level 2 for per-update
+output, and level 3 for normal diagnostic details. Reserve level 4 for very
+detailed traces and level 5 for data dumps or test diagnostics. Level 0 remains
+available for essential messages.
+
 Finally, you should understand how the `config_utilities` factories work (see [here](https://github.com/MIT-SPARK/config_utilities/blob/main/docs/Factories.md)).
 Searching the code-base (both Hydra and Hydra-ROS) may be necessary to find all options for virtual configurations (that the code-base uses liberally).
 Something like

@@ -70,8 +70,7 @@ void declare_config(DeformationGraphBuilder::Config& config) {
   check(config.horizon_s, GT, 0.0, "horizon_s");
 }
 
-DeformationGraphBuilder::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("dgraph_compression")) {}
+DeformationGraphBuilder::Config::Config() : VerbosityConfig("dgraph_builder") {}
 
 DeformationGraphBuilder::DeformationGraphBuilder(const Config& config,
                                                  RunContext::ConstPtr context)

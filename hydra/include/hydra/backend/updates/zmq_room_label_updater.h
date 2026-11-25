@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
+
 #include <map>
 #include <memory>
 #include <mutex>
@@ -48,7 +50,9 @@ namespace hydra {
 
 class ZmqRoomLabelUpdater : public UpdateFunctor {
  public:
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config() : VerbosityConfig("room_labels") {}
+
     std::string url = "tcp://127.0.0.1:8002";
     size_t num_threads = 2;
     size_t poll_time_ms = 10;

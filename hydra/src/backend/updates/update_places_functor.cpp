@@ -51,6 +51,7 @@ using timing::ScopedTimer;
 using MergeId = std::optional<NodeId>;
 
 void declare_config(UpdatePlacesFunctor::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("UpdatePlacesFunctor::Config");
   field(config.pos_threshold_m, "pos_threshold_m", "m");
@@ -82,8 +83,7 @@ void UpdatePlacesFunctor::filterMissing(SceneGraph& graph,
     return;
   }
 
-  VLOG(5) << "[Places Layer]: could not update "
-          << displayNodeSymbolContainer(missing_nodes);
+  MLOG(3) << "could not update " << displayNodeSymbolContainer(missing_nodes);
 
   for (const auto& node_id : missing_nodes) {
     if (!graph.hasNode(node_id)) {
@@ -92,7 +92,7 @@ void UpdatePlacesFunctor::filterMissing(SceneGraph& graph,
 
     const auto& node = graph.getNode(node_id);
     if (!node.attributes().is_active && !node.hasSiblings()) {
-      VLOG(2) << "[Places Layer]: removing node " << NodeSymbol(node_id).str();
+      MLOG(2) << "removing node " << NodeSymbol(node_id).str();
       graph.removeNode(node_id);
     }
   }
@@ -110,8 +110,8 @@ size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
   for (const auto& node : view) {
     if (!places_values.exists(node.id)) {
       // this happens for the GT version
-      VLOG(10) << "[Hydra Backend] missing place " << NodeSymbol(node.id).str()
-               << " from places factors.";
+      MLOG(4) << "missing place " << NodeSymbol(node.id).str()
+              << " from places factors.";
       continue;
     }
 
@@ -147,7 +147,7 @@ void UpdatePlacesFunctor::call(const SceneGraph& unmerged,
     deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
   }
 
-  VLOG(2) << "[Hydra Backend] Places update: " << num_changed << " nodes";
+  MLOG(2) << "Places update: " << num_changed << " nodes";
 }
 
 MergeList UpdatePlacesFunctor::findMerges(const SceneGraph& graph,

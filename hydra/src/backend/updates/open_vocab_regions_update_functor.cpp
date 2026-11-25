@@ -51,7 +51,7 @@ void declare_config(OpenVocabRegionsUpdateFunctor::Config& config) {
   field(config.clustering, "clustering");
 }
 
-OpenVocabRegionsUpdateFunctor::Config::Config() : VerbosityConfig("[IB Regions] ") {}
+OpenVocabRegionsUpdateFunctor::Config::Config() : VerbosityConfig("ib_regions") {}
 
 OpenVocabRegionsUpdateFunctor::OpenVocabRegionsUpdateFunctor(const Config& config)
     : config(config::checkValid(config)), clustering_(config.clustering.create()) {}
@@ -74,7 +74,7 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
   std::set<NodeId> new_nodes;
   for (size_t i = 0; i < clusters.size(); ++i) {
     if (clusters[i]->nodes.size() < config.min_num_nodes) {
-      MLOG(3) << "Dropping cluster of " << clusters[i]->nodes.size() << " node(s)";
+      MLOG(2) << "Dropping cluster of " << clusters[i]->nodes.size() << " node(s)";
       continue;
     }
 

@@ -64,7 +64,7 @@ std::vector<NodeId> PoseGraphPacket::addToGraph(SceneGraph& graph,
       const std::chrono::nanoseconds stamp(node.stamp_ns);
       const Eigen::Vector3d pos = node.pose.translation();
       const Eigen::Quaterniond rot(node.pose.linear());
-      VLOG(5) << "Adding agent " << node_id.str() << " @ " << stamp.count() << " [ns]";
+      VLOG(3) << "Adding agent " << node_id.str() << " @ " << stamp.count() << " [ns]";
 
       auto attrs = std::make_unique<AgentNodeAttributes>(stamp, rot, pos, node_id);
       const auto key = graph.getLayerKey(DsgLayers::AGENTS);

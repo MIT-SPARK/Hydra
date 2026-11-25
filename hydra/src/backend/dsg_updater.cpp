@@ -82,7 +82,7 @@ void findAndApplyMerges(const VerbosityConfig& config,
 
 using hydra::timing::ScopedTimer;
 
-DsgUpdater::Config::Config() : VerbosityConfig("[dsg_updated] ") {}
+DsgUpdater::Config::Config() : VerbosityConfig("dsg_updater") {}
 
 void declare_config(DsgUpdater::Config& config) {
   using namespace config;
@@ -217,15 +217,15 @@ void DsgUpdater::callFunctors(UpdateInfo::ConstPtr info) {
                          tracker,
                          exhaustive_names_.count(name));
       if (info->full_update && hooks.merge) {
-        MLOG(3) << "updating all merge attributes for " << name;
-        MLOG(3) << "current tracker: " << tracker.print();
+        MLOG(2) << "updating all merge attributes for " << name;
+        MLOG(5) << "current tracker: " << tracker.print();
         tracker.updateAllMergeAttributes(
             *source_graph_, *target_dsg_->graph, hooks.merge);
       }
     }
   }
 
-  MLOG(2) << "all merges: " << merge_tracker.print();
+  MLOG(5) << "all merges: " << merge_tracker.print();
   for (const auto& func : cleanup_hooks) {
     func(info, *source_graph_, target_dsg_.get());
   }

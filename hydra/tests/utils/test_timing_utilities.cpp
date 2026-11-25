@@ -35,10 +35,35 @@
 #include <gtest/gtest.h>
 #include <hydra/utils/timing_utilities.h>
 
+#include <future>
 #include <thread>
+#include <vector>
 
 namespace hydra {
 namespace timing {
+
+// No fixture: workers must be the first callers of the recorder.
+TEST(TimingUtilityConcurrency, FirstUseRetainsEveryMeasurement) {
+  constexpr size_t num_workers = 8;
+  std::promise<void> ready;
+  const auto start = ready.get_future().share();
+  std::vector<std::thread> workers;
+  for (size_t i = 0; i < num_workers; ++i) {
+    workers.emplace_back([start, i] {
+      start.wait();
+      ElapsedTimeRecorder::instance().record(
+          "concurrent_first_use", i, std::chrono::milliseconds(1));
+    });
+  }
+
+  ready.set_value();
+  for (auto& worker : workers) {
+    worker.join();
+  }
+
+  const auto stats = ElapsedTimeRecorder::instance().getStats("concurrent_first_use");
+  EXPECT_EQ(stats.num_measurements, num_workers);
+}
 
 struct TimingUtilityTests : public ::testing::Test {
   virtual void SetUp() override { ElapsedTimeRecorder::instance().reset(); }

@@ -53,8 +53,7 @@ void declare_config(DataReceiver::Config& config) {
   field(config.received_window_size, "received_window_size");
 }
 
-DataReceiver::Config::Config()
-    : VerbosityConfig(VerbosityConfig::default_verbosity("data_receiver")) {}
+DataReceiver::Config::Config() : VerbosityConfig("data_receiver") {}
 
 DataReceiver::DataReceiver(const Config& config,
                            const Sensor::ConstPtr& sensor,
@@ -116,7 +115,7 @@ void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
     std::chrono::nanoseconds last_time_ns(last_received_->timestamp_ns);
     std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
     if (separation_s.count() < config.input_separation_s) {
-      MLOG(3) << "Dropping input @ " << timestamp << " [ns] with separation of "
+      MLOG(2) << "Dropping input @ " << timestamp << " [ns] with separation of "
               << separation_s.count() << " [s]";
       return;
     }

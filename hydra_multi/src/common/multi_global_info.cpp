@@ -20,6 +20,7 @@ using hydra::timing::ElapsedTimeRecorder;
 decltype(MultiGlobalInfo::instance_) MultiGlobalInfo::instance_;
 
 void declare_config(MultiPipelineConfig& config) {
+  config::base<hydra::VerbosityConfig>(config);
   using namespace config;
   name("MultiPipeline::Config");
   field(config.timing_disabled, "timing_disabled");
@@ -42,7 +43,7 @@ void MultiGlobalInfo::configureTimers() {
 
 void MultiGlobalInfo::initFromConfig(const MultiPipelineConfig& config) {
   config_ = config::checkValid(config);
-  VLOG(5) << "Loading from config: " << config::toString(config);
+  VLOG(3) << "Loading from config: " << config::toString(config);
   configureTimers();
 
   if (config_.enable_pgmo_logging) {

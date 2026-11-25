@@ -41,6 +41,7 @@
 namespace hydra {
 
 void declare_config(RoomFinderConfig& conf) {
+  config::base<VerbosityConfig>(conf);
   using namespace config;
   name("RoomFinderConfig");
   field<CharConversion>(conf.room_prefix, "prefix");

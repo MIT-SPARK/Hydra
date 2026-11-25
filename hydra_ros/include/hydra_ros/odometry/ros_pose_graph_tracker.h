@@ -61,6 +61,8 @@ namespace hydra {
 class RosPoseGraphTracker : public PoseGraphTracker {
  public:
   struct Config : PoseGraphTracker::Config {
+    Config() { log_name = "ros_pose_graph"; }
+
     //! ROS namespace
     std::string ns = "~";
     //! Size of the odometry subscriber queue.

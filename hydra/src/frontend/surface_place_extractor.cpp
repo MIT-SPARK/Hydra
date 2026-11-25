@@ -125,7 +125,7 @@ void declare_config(SurfacePlaceExtractor::Config& config) {
   field(config.sinks, "sinks");
 }
 
-SurfacePlaceExtractor::Config::Config() : VerbosityConfig("[places_2d] ") {}
+SurfacePlaceExtractor::Config::Config() : VerbosityConfig("places_2d") {}
 
 SurfacePlaceExtractor::SurfacePlaceExtractor(const Config& config,
                                              const std::set<uint32_t>& labels,

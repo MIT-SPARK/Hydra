@@ -1,5 +1,6 @@
 #pragma once
 #include <gtsam/geometry/Pose3.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 
 #include <map>
@@ -35,7 +36,7 @@ class InitialAlignModule {
     gtsam::Pose3 getPrevRobotPose(size_t robot_id) const;
   };
 
-  struct Config {
+  struct Config : hydra::VerbosityConfig {
     double dgraph_consistency_tol = 5.0;  // Recompute if PGO result defers by a lot
     int reference_robot_id =
         -1;  // Robot to use as reference frame (-1 = use lowest ID)

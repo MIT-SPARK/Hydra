@@ -28,6 +28,7 @@ using rclcpp::CallbackGroupType;
 using MeshDeltaPtr = RosDsgInput::MeshDeltaPtr;
 
 void declare_config(RosDsgInput::Config& config) {
+  config::base<hydra::VerbosityConfig>(config);
   using namespace config;
   name("RosDsgInput::Config");
   field(config.dsg_queue_size, "dsg_queue_size");
@@ -136,7 +137,7 @@ void RosDsgInput::processQueues() {
   }
 
   while (!dsg_queue_.empty() && dsg_queue_.front().timestamp <= common_stamp) {
-    VLOG(2) << "Got dsg @ " << dsg_queue_.front().timestamp << " [ns] for input '"
+    MLOG(2) << "Got dsg @ " << dsg_queue_.front().timestamp << " [ns] for input '"
             << name_ << "'";
     if (!state_->dsg_) {
       state_->initDsg(spark_dsg::io::binary::readGraph(dsg_queue_.front().update));

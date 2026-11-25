@@ -154,7 +154,7 @@ void LayerConnector::connectChildren(SceneGraph& graph,
     return;
   }
 
-  MLOG(5) << "Detecting interlayer edges for layer " << config.parent_layer << " with "
+  MLOG(3) << "Detecting interlayer edges for layer " << config.parent_layer << " with "
           << active_parents.size() << " parents and " << active_children.size()
           << " children";
 
@@ -191,6 +191,7 @@ void LayerConnector::connectChildren(SceneGraph& graph,
 }
 
 void declare_config(GraphConnector::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("GraphConnector::Config");
   field(config.layers, "layers");

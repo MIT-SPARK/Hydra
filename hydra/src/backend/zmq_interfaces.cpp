@@ -53,6 +53,7 @@ static const auto sink_registration = config::
 }  // namespace
 
 void declare_config(ZmqSink::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("ZmqSink::Config");
   field(config.url, "url");
@@ -70,7 +71,7 @@ ZmqSink::~ZmqSink() = default;
 void ZmqSink::call(uint64_t timestamp_ns,
                    const SceneGraph& graph,
                    const kimera_pgmo::DeformationGraph&) const {
-  VLOG(5) << "Sending graph via zmq to '" << config.url << "' @ " << timestamp_ns
+  MLOG(3) << "Sending graph via zmq to '" << config.url << "' @ " << timestamp_ns
           << " [ns]";
   CHECK_NOTNULL(sender_)->send(graph, config.send_mesh);
 }

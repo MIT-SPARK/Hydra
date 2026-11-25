@@ -46,8 +46,8 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #pragma once
-
 #include <config_utilities/virtual_config.h>
+#include <hydra/utils/logging.h>
 
 #include <Eigen/Geometry>
 #include <filesystem>
@@ -71,7 +71,7 @@ class Sensor {
   using Ptr = std::shared_ptr<Sensor>;
   using ConstPtr = std::shared_ptr<const Sensor>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
     // Minimum range the sensor can handle
     double min_range = 0.0f;
     // Maximum range the sensor can handle

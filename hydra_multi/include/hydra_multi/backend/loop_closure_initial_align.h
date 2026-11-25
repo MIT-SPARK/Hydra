@@ -16,6 +16,8 @@ class LoopClosureInitialAlignModule : public InitialAlignModule {
   // Types.
   using Ptr = std::unique_ptr<LoopClosureInitialAlignModule>;
   struct Config : InitialAlignModule::Config {
+    Config() { log_name = "lc_align"; }
+
     double alignment_gnc_alpha = 0.7;
     double rot_sigma = 0.1;
     double trans_sigma = 1.0;

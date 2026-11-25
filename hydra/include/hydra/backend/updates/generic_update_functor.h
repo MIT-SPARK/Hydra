@@ -47,6 +47,8 @@ namespace hydra {
 
 struct GenericUpdateFunctor : public UpdateFunctor {
   struct Config : VerbosityConfig {
+    Config() : VerbosityConfig("update_layer") {}
+
     //! Layer to update
     std::string layer;
     //! Enable merging for this update functor

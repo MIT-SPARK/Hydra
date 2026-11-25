@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
+
 #include <string>
 
 namespace hydra {
@@ -46,7 +48,9 @@ enum class DilationThresholdMode {
   PLATEAU_THRESHOLD
 };
 
-struct RoomFinderConfig {
+struct RoomFinderConfig : VerbosityConfig {
+  RoomFinderConfig() : VerbosityConfig("room_finder") {}
+
   char room_prefix = 'R';
   double min_dilation_m = 0.1;
   double max_dilation_m = 0.7;

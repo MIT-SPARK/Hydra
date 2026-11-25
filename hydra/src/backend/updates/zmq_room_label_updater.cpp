@@ -64,10 +64,10 @@ ZmqRoomLabelUpdater::ZmqRoomLabelUpdater(const Config& config)
 ZmqRoomLabelUpdater::~ZmqRoomLabelUpdater() {
   should_shutdown_ = true;
   if (thread_) {
-    VLOG(2) << "[Hydra Backend] joining zmq thread and stopping";
+    MLOG(1) << "joining zmq thread and stopping";
     thread_->join();
     thread_.reset();
-    VLOG(2) << "[Hydra Backend] stopped!";
+    MLOG(2) << "stopped!";
   }
 }
 
@@ -111,6 +111,7 @@ void ZmqRoomLabelUpdater::call(const SceneGraph&,
 }
 
 void declare_config(ZmqRoomLabelUpdater::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("ZmqRoomLabelUpdater::Config");
   field(config.url, "url");

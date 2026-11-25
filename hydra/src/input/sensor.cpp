@@ -65,7 +65,7 @@ Sensor::Sensor(const Config& config, const std::string& name)
   CHECK(extrinsics_ != nullptr) << "invalid extrinsics!";
   const Eigen::Isometry3d sensor_body_pose = body_T_sensor();
   Eigen::IOFormat fmt(6, 0, ", ", "\n", "", "", "[", "]");
-  VLOG(1) << "Parsed sensor with extrinsics: " << std::endl
+  MLOG(1) << "Parsed sensor with extrinsics: " << std::endl
           << std::setfill(' ') << sensor_body_pose.matrix().format(fmt);
   if (!config.static_mask_fp.empty()) {
     static_mask_ = cv::imread(config.static_mask_fp);
@@ -97,6 +97,7 @@ Sensor::Ptr Sensor::fromRecord(const YAML::Node& node,
 void Sensor::setStaticMask(const cv::Mat& mask) { static_mask_ = mask.clone(); }
 
 void declare_config(Sensor::Config& config) {
+  config::base<VerbosityConfig>(config);
   using namespace config;
   name("Sensor");
   field(config.min_range, "min_range", "m");

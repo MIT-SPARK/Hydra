@@ -33,18 +33,22 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra/utils/logging.h>
+
 #include "hydra/backend/update_functions.h"
 
 namespace hydra {
 
 struct UpdateAgentsFunctor : public UpdateFunctor {
-  struct Config {};
+  struct Config : VerbosityConfig {};
 
-  explicit UpdateAgentsFunctor(const Config& /* config */ = {});
+  explicit UpdateAgentsFunctor(const Config& config = {});
 
   void call(const spark_dsg::SceneGraph&,
             SharedDsgInfo& graph,
             const UpdateInfo::ConstPtr& info) const override;
+
+  const Config config;
 
  private:
 };
