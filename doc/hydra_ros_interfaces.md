@@ -131,3 +131,5 @@ See [here](../hydra_ros/launch/datasets/uhumans2.launch.yaml) to get a better se
 The Hydra node uses textual `log_level` values such as `info` or `warning`.
 `forward_logs_to_ros` selects ROS forwarding. See [logging](logging.md) for
 module verbosity, C++ helpers, Python controls, and migration details.
+Set `log_to_file: true` alongside `log_path` to also write `hydra.log` in the
+run's artifact directory; the same configuration works for Python pipelines.

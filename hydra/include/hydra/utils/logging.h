@@ -94,6 +94,8 @@ void setSinks(std::vector<spdlog::sink_ptr> sinks);
 void setLogToStderr();
 void setLogDirectory(const std::string& directory,
                      const std::string& stderr_level = "error");
+//! Add or replace run file output; nullopt removes it and preserves other sinks
+void setRunLogDirectory(const std::optional<std::string>& directory);
 void configurePgmoLogging(bool enabled);
 
 // Prefer native formatting; adapt existing stream operators when needed.

@@ -126,7 +126,7 @@ PythonReconstruction::PythonReconstruction(const Config& config,
     throw std::runtime_error("invalid sensor!");
   }
 
-  RunSettings::init(context->config.settings);
+  context->activate();
   compressor_ = config.compression.create();
 
   for (const auto& filter : config.filters) {
@@ -201,6 +201,8 @@ void PythonReconstruction::save(const std::optional<std::filesystem::path>& outp
   if (mesh_) {
     mesh_->save(logs.path() / "mesh.sparkdsg");
   }
+
+  logging::logger()->flush();
 }
 
 Mesh::Ptr PythonReconstruction::mesh() const { return mesh_; }

@@ -40,6 +40,7 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -79,6 +80,13 @@ int VerbosityConfig::get_verbosity() const {
 namespace hydra::logging {
 namespace {
 
+constexpr auto kLogPattern = "[%Y-%m-%d %H:%M:%S.%e] [%l] [%s:%#] %v";
+
+spdlog::sink_ptr& runFileSink() {
+  static spdlog::sink_ptr sink;
+  return sink;
+}
+
 std::atomic<bool>& pgmoEnabled() {
   static std::atomic<bool> enabled{true};
   return enabled;
@@ -93,7 +101,7 @@ std::shared_ptr<spdlog::logger> logger() {
     }
 
     auto result = spdlog::stderr_color_mt("hydra");
-    result->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%s:%#] %v");
+    result->set_pattern(kLogPattern);
     return result;
   }();
   return instance;
@@ -136,7 +144,7 @@ void setSinks(std::vector<spdlog::sink_ptr> sinks) {
 
 void setLogToStderr() {
   setSinks({std::make_shared<spdlog::sinks::stderr_color_sink_mt>()});
-  logger()->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%s:%#] %v");
+  logger()->set_pattern(kLogPattern);
 }
 
 void setLogDirectory(const std::string& directory, const std::string& stderr_level) {
@@ -151,7 +159,38 @@ void setLogDirectory(const std::string& directory, const std::string& stderr_lev
   auto console = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
   console->set_level(threshold);
   setSinks({file_sink, console});
-  logger()->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%s:%#] %v");
+  logger()->set_pattern(kLogPattern);
+}
+
+void setRunLogDirectory(const std::optional<std::string>& directory) {
+  if (!directory && !runFileSink()) {
+    return;
+  }
+
+  spdlog::sink_ptr next;
+  if (directory) {
+    if (!std::filesystem::is_directory(*directory)) {
+      throw std::invalid_argument("Run log directory does not exist: " + *directory);
+    }
+
+    const auto file = std::filesystem::path(*directory) / "hydra.log";
+    next = std::make_shared<spdlog::sinks::basic_file_sink_mt>(file.string());
+    next->set_pattern(kLogPattern);
+  }
+
+  auto sinks = logger()->sinks();
+  sinks.erase(std::remove(sinks.begin(), sinks.end(), runFileSink()), sinks.end());
+  if (next) {
+    sinks.push_back(next);
+  }
+
+  if (sinks.empty()) {
+    sinks.push_back(std::make_shared<spdlog::sinks::stderr_color_sink_mt>());
+    sinks.back()->set_pattern(kLogPattern);
+  }
+
+  setSinks(std::move(sinks));
+  runFileSink() = std::move(next);
 }
 
 void configurePgmoLogging(bool enabled) {

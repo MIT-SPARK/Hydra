@@ -54,6 +54,26 @@ still aborts.
 
 ## Application controls
 
+Set `log_to_file: true` to save diagnostics alongside the run's other artifacts:
+
+```yaml
+log_path: /path/to/run
+log_to_file: true
+output: {use_timestamp: true}
+```
+
+This top-level configuration works for both Python pipelines and the ROS node.
+It appends to `hydra.log` in the allocated run directory, including any timestamp
+subdirectory, while keeping console or ROS output. It defaults to false and
+requires a nonempty `log_path`. Directory allocation and overwrite rules apply
+before the file opens; with `output.allocate: false`, the directory must exist.
+
+Switching runs moves diagnostic file output to the active context's directory.
+A run with `log_to_file: false` removes the previous run's file destination.
+Reusing a context restores its file destination without clearing its artifacts.
+A `save` output override does not move diagnostic logs. Activate runs after the
+previous run's workers have stopped.
+
 `log_level` selects a textual minimum severity: `trace`, `debug`, `info`,
 `warning`, `error`, `critical`, or `off`. Module diagnostics emit at info severity,
 so both this filter and module verbosity apply. `forward_logs_to_ros` selects ROS

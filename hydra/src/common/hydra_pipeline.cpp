@@ -98,7 +98,7 @@ HydraPipeline::Config::Config()
 
 HydraPipeline::HydraPipeline(const Config& config, RunContext::ConstPtr context)
     : config(config), context_(std::move(context)) {
-  RunSettings::init(context_->config.settings);
+  context_->activate();
 
   initState();
 }
@@ -160,6 +160,8 @@ void HydraPipeline::stop(bool force) {
   if (lcd_) {
     lcd_->stop(force);
   }
+
+  logging::logger()->flush();
 }
 
 void HydraPipeline::save(const DataDirectory* output) const {
@@ -194,6 +196,7 @@ void HydraPipeline::save(const DataDirectory* output) const {
   timer.logTimers(logs.path("timing"));
   timer.logStats(log_dir / "timing_stats.csv");
   MLOG(0, "Saved timing information");
+  logging::logger()->flush();
 }
 
 void HydraPipeline::showModules() const {

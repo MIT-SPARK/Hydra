@@ -14,7 +14,16 @@ pytestmark = pytest.mark.skipif(
 
 
 def make_pipeline(
-    path, robot_id, label, name, *, log_keyframes=False, num_threads=1, labelspace=None
+    path,
+    robot_id,
+    label,
+    name,
+    *,
+    log_keyframes=False,
+    num_threads=1,
+    labelspace=None,
+    log_to_file=False,
+    output=None,
 ):
     hydra.init_config_context(
         [
@@ -24,6 +33,8 @@ def make_pipeline(
                 {
                     "robot_id": robot_id,
                     "log_path": "" if path is None else str(path),
+                    "log_to_file": log_to_file,
+                    "output": {} if output is None else output,
                     **(
                         {"default_num_threads": num_threads}
                         if num_threads is not None
@@ -149,11 +160,15 @@ def test_sequential_labelspaces(tmp_path, python_labelspace):
 def test_save_override(tmp_path):
     """A save override leaves the configured run directory as the default."""
     base, override = tmp_path / "base", tmp_path / "override"
-    pipeline, _ = make_pipeline(base, 0, 1, "wall", log_keyframes=True)
+    pipeline, _ = make_pipeline(
+        base, 0, 1, "wall", log_keyframes=True, log_to_file=True
+    )
     assert step(pipeline, 1)
     pipeline.stop()
     pipeline.save(override)
     assert not (base / "hydra_config.yaml").exists()
+    assert (base / "hydra.log").is_file()
+    assert not (override / "hydra.log").exists()
     assert (base / "frontend/keyframes/1000000000.zip").is_file()
     assert not (override / "frontend/keyframes").exists()
     override_mesh = saved_mesh(override)
@@ -234,3 +249,74 @@ def test_file_logging_and_save_before_input(tmp_path):
     hydra.set_log_to_stderr()
     assert (logs / "hydra.log").is_file()
     assert (logs / "hydra.log").stat().st_size > 0
+
+
+def test_run_log_file_follows_active_context_before_input(tmp_path):
+    """File diagnostics follow allocated run directories, including context reuse."""
+    first = tmp_path / "first"
+    allocated = first / "allocated"
+    allocated.mkdir(parents=True)
+    old = allocated / "old.txt"
+    old.write_text("remove")
+    marker = first / "keep.txt"
+    marker.write_text("preserve")
+    pipeline, context = make_pipeline(
+        first,
+        0,
+        1,
+        "wall",
+        log_to_file=True,
+        output={
+            "use_timestamp": True,
+            "timestamp_format": "allocated",
+            "overwrite": True,
+        },
+    )
+    pipeline.stop()
+    pipeline.save()
+    del pipeline
+    first_log = allocated / "hydra.log"
+    first_size = first_log.stat().st_size
+    assert first_size > 0
+    assert (allocated / "hydra_config.yaml").is_file()
+    assert not (first / "hydra.log").exists()
+    assert not old.exists()
+    assert marker.read_text() == "preserve"
+
+    second = tmp_path / "second"
+    pipeline, _ = make_pipeline(second, 0, 1, "wall", log_to_file=True)
+    pipeline.stop()
+    pipeline.save()
+    del pipeline
+    second_log = second / "hydra.log"
+    second_size = second_log.stat().st_size
+    assert second_size > 0
+    assert first_log.stat().st_size == first_size
+
+    disabled = tmp_path / "disabled"
+    pipeline, _ = make_pipeline(disabled, 0, 1, "wall")
+    pipeline.stop()
+    pipeline.save()
+    del pipeline
+    assert (disabled / "hydra_config.yaml").is_file()
+    assert not (disabled / "hydra.log").exists()
+    assert first_log.stat().st_size == first_size
+    assert second_log.stat().st_size == second_size
+
+    sensor = hydra.make_camera(40.0, 40.0, 23.5, 23.5, 48, 48)
+    pipeline = hydra.HydraPipeline(sensor, context, show_config=False)
+    pipeline.stop()
+    pipeline.save()
+    del pipeline
+    assert first_log.stat().st_size > first_size
+    assert second_log.stat().st_size == second_size
+    assert marker.read_text() == "preserve"
+
+
+def test_run_file_logging_respects_disabled_directory_allocation(tmp_path):
+    """Enabling diagnostic files must not bypass the run's allocation policy."""
+    path = tmp_path / "unallocated"
+    with pytest.raises(ValueError, match="Run log directory does not exist"):
+        make_pipeline(path, 0, 1, "wall", log_to_file=True, output={"allocate": False})
+
+    assert not path.exists()

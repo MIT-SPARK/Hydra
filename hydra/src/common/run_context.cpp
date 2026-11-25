@@ -39,6 +39,7 @@
 #include <config_utilities/validation.h>
 
 #include "hydra/common/run_settings.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -48,16 +49,27 @@ void declare_config(RunContext::Config& config) {
   field(config.robot, "robot", false);
   field(config.settings, "settings", false);
   field<Path>(config.log_path, "log_path");
+  field(config.log_to_file, "log_to_file");
   field(config.output, "output");
   field(config.labelspace, "labelspace");
   field(config.semantic_layers, "semantic_layers");
   field(config.graph, "graph");
+  checkCondition(!config.log_to_file || !config.log_path.empty(),
+                 "log_to_file requires a nonempty log_path");
 }
 
 RunContext::RunContext(const Config& config)
     : config(config::checkValid(config)), logs(config.log_path, config.output) {
-  RunSettings::init(config.settings);
+  activate();
   labelspace_ = config.labelspace.create();
+}
+
+void RunContext::activate() const {
+  RunSettings::init(config.settings);
+  const auto directory = config.log_to_file
+                             ? std::optional<std::string>{logs.path().string()}
+                             : std::nullopt;
+  logging::setRunLogDirectory(directory);
 }
 
 RobotPrefixConfig RunContext::robot_prefix() const { return config.robot.prefix(); }
