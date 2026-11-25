@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/gnn_descriptors.h>
-#include <hydra/utils/logging.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra_test/resources.h"
 
 namespace hydra::lcd {

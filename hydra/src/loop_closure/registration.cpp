@@ -35,13 +35,13 @@
 #include "hydra/loop_closure/registration.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <fstream>
 #include <iomanip>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::lcd {

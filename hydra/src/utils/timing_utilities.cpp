@@ -34,8 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/timing_utilities.h"
 
-#include <hydra/utils/logging.h>
-
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -43,6 +41,8 @@
 #include <numeric>
 #include <ostream>
 #include <sstream>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::timing {
 

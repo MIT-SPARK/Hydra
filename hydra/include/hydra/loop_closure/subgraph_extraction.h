@@ -33,11 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <spark_dsg/spark_dsg_fwd.h>
 
 #include <set>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

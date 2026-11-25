@@ -36,12 +36,12 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <hydra/utils/logging.h>
 
 #include <cmath>
 #include <cstdint>
 
 #include "hydra/common/labelspace.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

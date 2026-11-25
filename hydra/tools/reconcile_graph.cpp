@@ -39,12 +39,13 @@
 #include <config_utilities/validation.h>
 #include <hydra/backend/graph_reconciler.h>
 #include <hydra/backend/update_functions.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <CLI/CLI.hpp>
 #include <filesystem>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

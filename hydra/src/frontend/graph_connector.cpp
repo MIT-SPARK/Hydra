@@ -37,10 +37,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/printing.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {

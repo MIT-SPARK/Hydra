@@ -1,4 +1,3 @@
-#include <hydra/utils/logging.h>
 /* -----------------------------------------------------------------------------
  * Copyright 2022 Massachusetts Institute of Technology.
  * All Rights Reserved
@@ -45,6 +44,7 @@
 
 #include "hydra/places/gvd_places/gvd_voxel.h"
 #include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::io {
 

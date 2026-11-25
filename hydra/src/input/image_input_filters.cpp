@@ -38,9 +38,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 
 #include <limits>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

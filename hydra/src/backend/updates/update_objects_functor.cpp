@@ -36,10 +36,10 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/backend/backend_utilities.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 

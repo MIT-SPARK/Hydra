@@ -1,4 +1,3 @@
-#include <hydra/utils/logging.h>
 // The contents of this file are originally from Panoptic-Mapping,
 // under the following license:
 //
@@ -46,6 +45,8 @@
 // implied, of the United States Air Force or the U.S. Government. The U.S.
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
+#include "hydra/input/sensor.h"
+
 #include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/eigen_matrix.h>
@@ -54,7 +55,7 @@
 #include <iomanip>
 #include <opencv2/imgcodecs.hpp>
 
-#include "hydra/input/sensor.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

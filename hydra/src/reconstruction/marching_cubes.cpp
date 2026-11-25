@@ -1,5 +1,4 @@
 #include <hydra/common/run_settings.h>
-#include <hydra/utils/logging.h>
 // The original implementation from https://github.com/personalrobotics/OpenChisel and
 // subsequent modifications falls under the following license:
 //
@@ -38,6 +37,7 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/marching_cubes.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

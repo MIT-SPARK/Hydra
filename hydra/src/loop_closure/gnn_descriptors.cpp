@@ -34,9 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/gnn_descriptors.h"
 
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <yaml-cpp/yaml.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::lcd {
 

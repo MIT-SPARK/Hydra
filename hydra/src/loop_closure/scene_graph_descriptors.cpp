@@ -34,9 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/scene_graph_descriptors.h"
 
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 using Graph = SceneGraph;

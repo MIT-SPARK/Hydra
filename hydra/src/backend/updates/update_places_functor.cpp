@@ -37,11 +37,11 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <gtsam/geometry/Pose3.h>
-#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {

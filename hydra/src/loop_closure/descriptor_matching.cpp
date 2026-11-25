@@ -36,8 +36,9 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_symbol.h>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

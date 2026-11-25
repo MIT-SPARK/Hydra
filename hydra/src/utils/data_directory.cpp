@@ -36,12 +36,12 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/path.h>
-#include <hydra/utils/logging.h>
 
 #include <ctime>
 #include <filesystem>
 #include <fstream>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/temp_path.h"
 
 namespace hydra {

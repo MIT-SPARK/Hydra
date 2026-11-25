@@ -34,11 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/integration_masking.h"
 
-#include <hydra/utils/logging.h>
-
 #include <opencv2/core.hpp>
 
 #include "hydra/input/input_data.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

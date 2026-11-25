@@ -34,12 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/python_image.h"
 
-#include <hydra/utils/logging.h>
 #include <pybind11/stl.h>
 
 #include "hydra/bindings/color_parser.h"
 #include "hydra/bindings/depth_parser.h"
 #include "hydra/bindings/label_parser.h"
+#include "hydra/utils/logging.h"
 
 namespace py = pybind11;
 

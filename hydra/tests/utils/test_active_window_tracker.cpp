@@ -34,11 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/utils/active_window_tracker.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 #include <spark_dsg/scene_graph_layer.h>
 #include <spark_dsg/scene_graph_types.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

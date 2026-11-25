@@ -35,7 +35,6 @@
 #include "hydra/backend/updates/update_surface_places_functor.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
@@ -44,6 +43,7 @@
 #include "hydra/places/2d_places/index_remapping.h"
 #include "hydra/places/2d_places/place_reallocation.h"
 #include "hydra/places/2d_places/place_splitting.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;

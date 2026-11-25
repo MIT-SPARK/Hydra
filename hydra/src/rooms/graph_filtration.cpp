@@ -35,11 +35,12 @@
 #include "hydra/rooms/graph_filtration.h"
 
 #include <hydra/common/run_settings.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 #include <cmath>
 #include <iomanip>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

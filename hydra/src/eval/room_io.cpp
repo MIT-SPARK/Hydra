@@ -34,8 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/room_io.h"
 
-#include <hydra/utils/logging.h>
 #include <yaml-cpp/yaml.h>
+
+#include "hydra/utils/logging.h"
 
 namespace YAML {
 

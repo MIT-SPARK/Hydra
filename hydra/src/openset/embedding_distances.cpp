@@ -1,6 +1,6 @@
 #include "hydra/openset/embedding_distances.h"
 
-#include <hydra/utils/logging.h>
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

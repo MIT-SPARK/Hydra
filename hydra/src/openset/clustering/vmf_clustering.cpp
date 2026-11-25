@@ -36,7 +36,6 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 
@@ -44,6 +43,8 @@
 #include <cmath>
 #include <queue>
 #include <unordered_set>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

@@ -38,13 +38,13 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <hydra/utils/nearest_neighbor_utilities.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
 #include <queue>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {

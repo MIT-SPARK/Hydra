@@ -34,9 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/minimum_spanning_tree.h"
 
-#include <hydra/utils/logging.h>
-
 #include "hydra/utils/disjoint_set.h"
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

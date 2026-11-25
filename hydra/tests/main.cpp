@@ -33,7 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/utils/logging.h>
+
+#include "hydra/utils/logging.h"
 
 int main(int argc, char** argv) {
   hydra::logging::setLogLevel("info");

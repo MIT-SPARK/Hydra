@@ -36,11 +36,11 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
-#include <hydra/utils/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/frontend/frontend_output.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;

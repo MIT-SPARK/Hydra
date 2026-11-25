@@ -37,12 +37,12 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 
 #include <iostream>
 #include <nlohmann/json.hpp>
 
 #include "hydra/backend/merge_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

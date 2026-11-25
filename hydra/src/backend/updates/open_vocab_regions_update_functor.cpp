@@ -4,13 +4,13 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/labelspace.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/rooms/room_utilities.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;

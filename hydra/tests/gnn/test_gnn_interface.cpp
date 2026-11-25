@@ -33,10 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/utils/logging.h>
 #include <ros/package.h>
 
 #include "hydra/gnn/gnn_interface.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::gnn {
 

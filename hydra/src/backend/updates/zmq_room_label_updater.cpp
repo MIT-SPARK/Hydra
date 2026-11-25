@@ -38,10 +38,11 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 #include <spark_dsg/zmq_interface.h>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

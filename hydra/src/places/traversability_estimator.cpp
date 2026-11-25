@@ -36,7 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
+
+#include "hydra/utils/logging.h"
 
 using spark_dsg::TraversabilityState;
 

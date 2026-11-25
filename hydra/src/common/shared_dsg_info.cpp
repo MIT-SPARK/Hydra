@@ -35,10 +35,11 @@
 #include "hydra/common/shared_dsg_info.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <nlohmann/json.hpp>
+
+#include "hydra/utils/logging.h"
 
 namespace YAML {
 

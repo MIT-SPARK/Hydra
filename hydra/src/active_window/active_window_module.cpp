@@ -37,10 +37,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 
 #include "hydra/common/run_context.h"
 #include "hydra/reconstruction/integration_masking.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

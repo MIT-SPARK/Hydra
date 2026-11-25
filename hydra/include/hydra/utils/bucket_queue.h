@@ -1,4 +1,3 @@
-#include <hydra/utils/logging.h>
 // Portions of the following code and their modifications are originally from
 // https://github.com/ethz-asl/voxblox and are licensed under the following license:
 //
@@ -50,6 +49,7 @@
 #include <vector>
 
 #include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 // TODO(@Nathan): Check whether this is needed.

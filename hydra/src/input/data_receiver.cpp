@@ -36,9 +36,10 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 
 #include <chrono>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

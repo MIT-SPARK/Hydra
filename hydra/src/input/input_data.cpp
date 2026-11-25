@@ -38,13 +38,13 @@
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 
 #include <opencv2/imgproc.hpp>
 #include <stdexcept>
 #include <utility>
 
 #include "hydra/input/input_data_io.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

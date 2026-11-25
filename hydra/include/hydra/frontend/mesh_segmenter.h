@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/utils/logging.h>
 #include <spark_dsg/bounding_box.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
@@ -43,6 +42,7 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/common/robot_config.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
+#include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
 class MeshDelta;

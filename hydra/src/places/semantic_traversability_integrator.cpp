@@ -37,10 +37,11 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 
 #include <algorithm>
 #include <cmath>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::places {
 namespace {

@@ -34,8 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/detector.h"
 
-#include <hydra/utils/logging.h>
-
 #include "hydra_build_config.h"
 #if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
 #include "hydra/loop_closure/gnn_descriptors.h"
@@ -47,6 +45,7 @@
 
 #include <fstream>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace teaser {

@@ -33,11 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 
-#include <hydra/utils/logging.h>
-
 #include <Eigen/Dense>
 
 #include "hydra/gnn/gnn_interface.h"
+#include "hydra/utils/logging.h"
 
 using EdgeIndex = Eigen::Matrix<int64_t, Eigen::Dynamic, Eigen::Dynamic>;
 

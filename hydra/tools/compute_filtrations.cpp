@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <hydra/rooms/graph_filtration.h>
-#include <hydra/utils/logging.h>
 #include <hydra/utils/timing_utilities.h>
 #include <spark_dsg/scene_graph.h>
 #include <yaml-cpp/yaml.h>
@@ -41,6 +40,8 @@
 #include <CLI/CLI.hpp>
 #include <filesystem>
 #include <fstream>
+
+#include "hydra/utils/logging.h"
 
 using hydra::DisjointSet;
 using hydra::getGraphFiltration;

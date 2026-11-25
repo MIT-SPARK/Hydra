@@ -46,7 +46,6 @@
 #include <hydra/frontend/graph_builder.h>
 #include <hydra/input/camera.h>
 #include <hydra/loop_closure/loop_closure_module.h>
-#include <hydra/utils/logging.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
@@ -59,6 +58,7 @@
 #include "hydra/bindings/python_sensors.h"
 #include "hydra/input/input_adapter.h"
 #include "hydra/input/input_filter.h"
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

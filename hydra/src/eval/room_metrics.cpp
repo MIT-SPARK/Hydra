@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/room_metrics.h"
 
-#include <hydra/utils/logging.h>
-
 #include <numeric>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::eval {
 

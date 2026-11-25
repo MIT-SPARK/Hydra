@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/active_window/active_window_output.h"
 
-#include <hydra/utils/logging.h>
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

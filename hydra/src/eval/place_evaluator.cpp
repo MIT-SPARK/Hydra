@@ -36,10 +36,10 @@
 
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
-#include <hydra/utils/logging.h>
 
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/layer_io.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::eval {
 

@@ -36,10 +36,10 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/robot_prefix_config.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 

@@ -37,7 +37,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <algorithm>
@@ -46,6 +45,7 @@
 #include "hydra/common/attribute_merger.h"
 #include "hydra/common/config_utilities.h"
 #include "hydra/utils/data_directory.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

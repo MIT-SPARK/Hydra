@@ -36,7 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
-#include <hydra/utils/logging.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::places {
 

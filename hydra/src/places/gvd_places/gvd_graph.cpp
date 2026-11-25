@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/gvd_graph.h"
 
-#include <hydra/utils/logging.h>
-
 #include <deque>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::places {
 

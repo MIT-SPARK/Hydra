@@ -38,13 +38,13 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <gtsam/slam/BetweenFactor.h>
-#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_edge_factor.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/timing_utilities.h"
 

@@ -34,10 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/semantic_color_map.h"
 
-#include <hydra/utils/logging.h>
-
 #include "hydra/input/input_data.h"
 #include "hydra/utils/csv_reader.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

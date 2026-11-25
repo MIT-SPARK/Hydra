@@ -34,9 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/gnn/gnn_interface.h"
 
-#include <hydra/utils/logging.h>
-
 #include "hydra/gnn/ort_utilities.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::gnn {
 

@@ -37,13 +37,13 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 
 #include <memory>
 
 #include "hydra/places/2d_places/index_remapping.h"
 #include "hydra/places/2d_places/place_splitting.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

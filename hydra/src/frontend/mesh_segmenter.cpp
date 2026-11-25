@@ -38,13 +38,13 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/mesh_traits.h>
 #include <spark_dsg/bounding_box_extraction.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 

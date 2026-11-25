@@ -37,13 +37,13 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
 #include <set>
 
 #include "hydra/active_window/volumetric_window.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 

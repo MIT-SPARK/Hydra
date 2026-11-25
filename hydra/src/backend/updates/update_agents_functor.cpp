@@ -38,13 +38,13 @@
 #include <config_utilities/factory.h>
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/nonlinear/Values.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <iomanip>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 

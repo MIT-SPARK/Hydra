@@ -1,4 +1,3 @@
-#include <hydra/utils/logging.h>
 // The original implementation from https://github.com/personalrobotics/OpenChisel and
 // subsequent modifications falls under the following license:
 //
@@ -36,6 +35,8 @@
 // implied, of the United States Air Force or the U.S. Government. The U.S.
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
+#include "hydra/reconstruction/mesh_integrator.h"
+
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
@@ -47,8 +48,8 @@
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/run_settings.h"
 #include "hydra/reconstruction/marching_cubes.h"
-#include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {

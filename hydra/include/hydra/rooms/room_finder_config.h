@@ -33,9 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/utils/logging.h>
 
 #include <string>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

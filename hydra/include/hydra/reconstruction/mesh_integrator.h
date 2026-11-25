@@ -33,11 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/utils/logging.h>
 
 #include "hydra/reconstruction/index_getter.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

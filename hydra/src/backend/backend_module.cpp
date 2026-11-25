@@ -37,7 +37,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_graph_4dof.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/pcl_mesh_traits.h>
@@ -46,6 +45,7 @@
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/common/run_context.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {

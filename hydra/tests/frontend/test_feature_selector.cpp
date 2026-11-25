@@ -33,12 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/utils/logging.h>
 
 #include "hydra/frontend/feature_selector.h"
 #include "hydra/input/camera.h"
 #include "hydra/input/input_data.h"
 #include "hydra/input/lidar.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

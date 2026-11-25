@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <memory>
@@ -42,6 +41,7 @@
 #include "hydra/eval/room_io.h"
 #include "hydra/eval/room_metrics.h"
 #include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::eval {
 

@@ -45,10 +45,10 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spatial_hash/neighbor_utils.h>
 
 #include "hydra/places/gvd_places/gvd_utilities.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {

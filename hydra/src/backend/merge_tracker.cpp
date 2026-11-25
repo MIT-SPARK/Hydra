@@ -34,11 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/merge_tracker.h"
 
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <sstream>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

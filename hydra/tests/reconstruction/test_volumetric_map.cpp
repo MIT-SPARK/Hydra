@@ -34,10 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/reconstruction/volumetric_map.h>
-#include <hydra/utils/logging.h>
 
 #include <filesystem>
 
+#include "hydra/utils/logging.h"
 #include "hydra_test/resources.h"
 
 namespace hydra {

@@ -34,11 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/frontend/graph_connector.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

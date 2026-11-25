@@ -33,9 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/utils/logging.h>
 
 #include "hydra/backend/update_functions.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

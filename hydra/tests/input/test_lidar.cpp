@@ -34,9 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/input/lidar.h>
-#include <hydra/utils/logging.h>
 
 #include <optional>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

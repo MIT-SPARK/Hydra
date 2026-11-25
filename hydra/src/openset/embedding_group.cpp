@@ -1,9 +1,9 @@
 #include "hydra/openset/embedding_group.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 
 #include "hydra/openset/embedding_distances.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {

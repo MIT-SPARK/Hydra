@@ -37,9 +37,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
-#include <hydra/utils/logging.h>
 
 #include <opencv2/core.hpp>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

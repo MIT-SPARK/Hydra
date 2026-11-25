@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/label_parser.h"
 
-#include <hydra/utils/logging.h>
+#include "hydra/utils/logging.h"
 
 namespace py = pybind11;
 

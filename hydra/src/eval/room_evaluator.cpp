@@ -34,11 +34,11 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/room_evaluator.h"
 
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 #include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/layer_io.h"
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

@@ -38,11 +38,11 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/active_window/volumetric_window.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {

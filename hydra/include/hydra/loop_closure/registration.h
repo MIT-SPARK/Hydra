@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <gtsam/geometry/Pose3.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph_layer.h>
@@ -44,6 +43,7 @@
 
 #include "hydra/loop_closure/registration_solution.h"
 #include "hydra/loop_closure/subgraph_extraction.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::lcd {
 

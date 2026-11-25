@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/input/sensor_input_packet.h"
 
-#include <hydra/utils/logging.h>
-
 #include <opencv2/imgproc.hpp>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

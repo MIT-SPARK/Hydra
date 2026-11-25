@@ -36,7 +36,8 @@
 #include <hydra/places/gvd_places/gvd_integrator.h>
 #include <hydra/places/gvd_places/gvd_utilities.h>
 #include <hydra/reconstruction/volumetric_map.h>
-#include <hydra/utils/logging.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::places {
 namespace {

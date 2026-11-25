@@ -36,9 +36,10 @@
 #include "hydra/backend/merge_proposer.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph_layer.h>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

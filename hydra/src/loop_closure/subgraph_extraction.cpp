@@ -35,11 +35,12 @@
 #include "hydra/loop_closure/subgraph_extraction.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

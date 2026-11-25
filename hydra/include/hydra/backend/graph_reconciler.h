@@ -35,10 +35,10 @@
 #pragma once
 #include <config_utilities/config.h>
 #include <config_utilities/virtual_config.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/backend/update_functions.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 struct Reconciler {

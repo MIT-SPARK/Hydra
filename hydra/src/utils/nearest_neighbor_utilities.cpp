@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
-#include <hydra/utils/logging.h>
-
 #include <nanoflann.hpp>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

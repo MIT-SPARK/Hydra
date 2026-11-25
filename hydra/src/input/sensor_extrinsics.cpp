@@ -38,9 +38,9 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 
 #include "hydra/common/config_utilities.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

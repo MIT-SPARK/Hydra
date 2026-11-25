@@ -1,12 +1,13 @@
 #include "hydra/frontend/mesh_delta_clustering.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <pcl/point_cloud.h>
 #define PCL_NO_PRECOMPILE
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
+
+#include "hydra/utils/logging.h"
 #undef PCL_NO_PRECOMPILE
 
 namespace hydra::clustering {

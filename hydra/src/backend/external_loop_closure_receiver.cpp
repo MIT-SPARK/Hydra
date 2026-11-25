@@ -35,10 +35,11 @@
 #include "hydra/backend/external_loop_closure_receiver.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

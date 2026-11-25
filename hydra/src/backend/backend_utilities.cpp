@@ -34,9 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/backend_utilities.h"
 
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::utils {
 

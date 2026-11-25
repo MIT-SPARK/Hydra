@@ -34,9 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/python_sensor_input.h"
 
-#include <hydra/utils/logging.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::python {
 

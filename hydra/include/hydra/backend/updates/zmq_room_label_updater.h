@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/utils/logging.h>
 
 #include <map>
 #include <memory>
@@ -41,6 +40,7 @@
 #include <thread>
 
 #include "hydra/backend/update_functions.h"
+#include "hydra/utils/logging.h"
 
 namespace spark_dsg {
 class ZmqReceiver;

@@ -34,11 +34,11 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/odometry/pose_graph_packet.h"
 
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
 #include "hydra/common/robot_prefix_config.h"
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

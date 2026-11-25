@@ -35,7 +35,8 @@
 #include <config_utilities/config.h>
 #include <gtest/gtest.h>
 #include <hydra/input/camera.h>
-#include <hydra/utils/logging.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

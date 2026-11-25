@@ -35,7 +35,6 @@
 #include "hydra/rooms/room_finder.h"
 
 #include <config_utilities/validation.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
@@ -46,6 +45,7 @@
 
 #include "hydra/rooms/graph_filtration.h"
 #include "hydra/rooms/room_utilities.h"
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

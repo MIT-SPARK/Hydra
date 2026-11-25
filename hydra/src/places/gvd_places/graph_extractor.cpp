@@ -36,13 +36,13 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spatial_hash/neighbor_utils.h>
 
 #include "hydra/places/gvd_places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_places/gvd_parent_tracker.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 

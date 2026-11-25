@@ -35,11 +35,11 @@
 #include "hydra/backend/graph_optimizer.h"
 
 #include <config_utilities/parsing/yaml.h>
-#include <hydra/utils/logging.h>
 
 #include <stdexcept>
 
 #include "hydra/backend/backend_module.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
