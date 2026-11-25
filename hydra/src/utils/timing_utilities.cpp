@@ -40,6 +40,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <mutex>
 #include <numeric>
 #include <ostream>
 #include <sstream>
@@ -147,9 +148,12 @@ ElapsedTimeRecorder::ElapsedTimeRecorder()
     : timing_disabled(false), disable_output(true) {}
 
 ElapsedTimeRecorder& ElapsedTimeRecorder::instance() {
-  if (!instance_) {
-    instance_.reset(new ElapsedTimeRecorder());
-  }
+  static std::once_flag initialized;
+  std::call_once(initialized, [] {
+    if (!instance_) {
+      instance_.reset(new ElapsedTimeRecorder());
+    }
+  });
 
   return *instance_;
 }
