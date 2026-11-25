@@ -69,7 +69,7 @@ class GvdPlaceExtractor : public GraphBuilderFunctor {
     //! Sinks for current pose and graph status
     std::vector<Sink::Factory> sinks;
 
-    Config() : VerbosityConfig("[gvd_places] ") {}
+    Config() : VerbosityConfig("gvd_places") {}
   } const config;
 
   explicit GvdPlaceExtractor(const Config& config, RunContext::ConstPtr context);

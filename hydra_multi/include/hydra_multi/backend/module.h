@@ -60,7 +60,7 @@ class MultiBackendModule : public kimera_pgmo::KimeraPgmoInterface {
   using NodeToRobotMap = std::unordered_map<spark_dsg::NodeId, size_t>;
 
   struct Config : hydra::DsgUpdater::Config {
-    Config() { log_prefix = "[multi_backend] "; }
+    Config() { log_name = "multi_backend"; }
 
     //! Actually perform PGO on every detected loop closure
     bool optimize_on_lc = true;

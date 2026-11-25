@@ -41,11 +41,11 @@ std::string printLabels(const std::set<uint32_t>& labels) {
 LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
                              const kimera_pgmo::MeshDelta& delta,
                              const std::unordered_set<size_t>* invalid) {
-  static const auto log_config = VerbosityConfig::named("mesh_clustering");
+  static const auto log_config = VerbosityConfig("mesh_clustering");
 
   LabelIndices label_indices;
   if (!kimera_pgmo::traits::get_vertex_properties(delta).has_label) {
-    LOG(WARNING) << log_config.log_prefix << "Mesh missing labels!";
+    LOG(WARNING) << log_config.get_log_prefix() << "Mesh missing labels!";
     return label_indices;
   }
 

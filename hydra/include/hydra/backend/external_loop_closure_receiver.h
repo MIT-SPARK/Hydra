@@ -69,7 +69,7 @@ class ExternalLoopClosureReceiver {
   };
 
   struct Config : VerbosityConfig {
-    Config() : VerbosityConfig("[external_lc] ") {}
+    Config() : VerbosityConfig("external_lc") {}
 
     //! Layer to use for the pose graph
     std::string layer = spark_dsg::DsgLayers::AGENTS;

@@ -82,7 +82,7 @@ void findAndApplyMerges(const VerbosityConfig& config,
 
 using hydra::timing::ScopedTimer;
 
-DsgUpdater::Config::Config() : VerbosityConfig("[dsg_updater] ") {}
+DsgUpdater::Config::Config() : VerbosityConfig("dsg_updater") {}
 
 void declare_config(DsgUpdater::Config& config) {
   using namespace config;

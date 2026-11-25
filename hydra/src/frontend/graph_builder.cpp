@@ -104,7 +104,7 @@ void declare_config(GraphBuilder::Config& config) {
 }
 
 GraphBuilder::Config::Config()
-    : VerbosityConfig(VerbosityConfig::named("graph_builder")),
+    : VerbosityConfig("graph_builder"),
       mesh_compression(MeshCompression::Config{0.005}),
       pose_graph_tracker(PoseGraphFromOdom::Config()),
       deformation_graph_builder(DeformationGraphBuilder::Config()) {

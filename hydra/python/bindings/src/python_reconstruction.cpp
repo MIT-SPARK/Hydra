@@ -72,7 +72,7 @@ ReconstructionModule::Config default_config() {
 class PythonReconstruction {
  public:
   struct Config : VerbosityConfig {
-    Config() : VerbosityConfig("[py_reconstruction] ") {}
+    Config() : VerbosityConfig("py_reconstruction") {}
 
     ReconstructionModule::Config reconstruction = default_config();
     std::vector<config::VirtualConfig<InputFilter, true>> filters;

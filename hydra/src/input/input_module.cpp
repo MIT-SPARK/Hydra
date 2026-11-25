@@ -57,7 +57,7 @@ void declare_config(InputModule::Config& config) {
   checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
 
-InputModule::Config::Config() : VerbosityConfig(VerbosityConfig::named("input")) {}
+InputModule::Config::Config() : VerbosityConfig("input") {}
 
 InputModule::InputModule(const Config& _config,
                          RunContext::ConstPtr context,
@@ -156,7 +156,7 @@ void InputModule::dataSpin() {
 
     const auto odom_T_body = getBodyPose(*data);
     if (!odom_T_body) {
-      LOG(WARNING) << config.log_prefix << "dropping input @ " << curr_time
+      LOG(WARNING) << config.get_log_prefix() << "dropping input @ " << curr_time
                    << " [ns] due to missing pose";
       continue;
     }

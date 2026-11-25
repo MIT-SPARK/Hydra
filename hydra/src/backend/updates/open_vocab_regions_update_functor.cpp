@@ -51,7 +51,7 @@ void declare_config(OpenVocabRegionsUpdateFunctor::Config& config) {
   field(config.clustering, "clustering");
 }
 
-OpenVocabRegionsUpdateFunctor::Config::Config() : VerbosityConfig("[ib_regions] ") {}
+OpenVocabRegionsUpdateFunctor::Config::Config() : VerbosityConfig("ib_regions") {}
 
 OpenVocabRegionsUpdateFunctor::OpenVocabRegionsUpdateFunctor(const Config& config)
     : config(config::checkValid(config)), clustering_(config.clustering.create()) {}

@@ -45,7 +45,7 @@ namespace hydra {
 
 struct UpdatePlacesFunctor : public UpdateFunctor {
   struct Config : VerbosityConfig {
-    Config() : VerbosityConfig(VerbosityConfig::named("update_places")) {}
+    Config() : VerbosityConfig("update_places") {}
 
     //! Max distance between node centroids for a merge to be considered
     double pos_threshold_m = 0.4;

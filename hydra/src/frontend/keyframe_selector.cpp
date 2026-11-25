@@ -210,8 +210,7 @@ void declare_config(KeyframeSelector::Config& config) {
 }
 
 KeyframeSelector::Config::Config()
-    : VerbosityConfig(VerbosityConfig::named("keyframes")),
-      keyframe_policy(DistancePolicy::Config()) {}
+    : VerbosityConfig("keyframes"), keyframe_policy(DistancePolicy::Config()) {}
 
 KeyframeSelector::KeyframeSelector(const Config& config, RunContext::ConstPtr context)
     : config(config::checkValid(config)),
@@ -279,7 +278,7 @@ void KeyframeSelector::queueForSaving(const InputData::ConstPtr& data) {
   {
     std::lock_guard<std::mutex> lock(save_mutex_);
     if (config.max_queue_size && save_queue_.size() >= config.max_queue_size) {
-      LOG(WARNING) << config.log_prefix << "Keyframe save queue full ("
+      LOG(WARNING) << config.get_log_prefix() << "Keyframe save queue full ("
                    << save_queue_.size() << "), dropping keyframe @ "
                    << data->timestamp_ns << " [ns]";
       return;
@@ -333,7 +332,7 @@ void KeyframeSelector::saveSpin() {
     try {
       data->save(filepath, config.save_options);
     } catch (const std::exception& e) {
-      LOG(ERROR) << config.log_prefix << "Failed to save keyframe: " << e.what();
+      LOG(ERROR) << config.get_log_prefix() << "Failed to save keyframe: " << e.what();
     }
 
     {
@@ -486,7 +485,8 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
   for (auto& [name, layer_tracker] : active_window_) {
     auto layer = dsg.graph->findLayer(name);
     if (!layer) {
-      LOG(WARNING) << config.log_prefix << "Skipping unknown layer: '" << name << "'";
+      LOG(WARNING) << config.get_log_prefix() << "Skipping unknown layer: '" << name
+                   << "'";
       continue;
     }
 
@@ -495,7 +495,8 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
     for (const auto& node : layer_tracker.view(*layer)) {
       auto attrs = node.tryAttributes<SemanticNodeAttributes>();
       if (!attrs) {
-        LOG(ERROR) << config.log_prefix << "Invalid node " << NodeSymbol(node.id).str();
+        LOG(ERROR) << config.get_log_prefix() << "Invalid node "
+                   << NodeSymbol(node.id).str();
         continue;
       }
 

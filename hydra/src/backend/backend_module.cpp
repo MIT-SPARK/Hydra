@@ -141,7 +141,7 @@ void BackendModule::start() {
   should_shutdown_ = false;
   force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
-  LOG(INFO) << config.log_prefix << "started!";
+  LOG(INFO) << config.get_log_prefix() << "started!";
 }
 
 void BackendModule::stopImpl() {
@@ -402,7 +402,7 @@ void BackendModule::updateFactorGraph(const FrontendOutput& input) {
 
     MLOG(5) << "Adding pose graph message: " << msg;
     if (hasLoopClosure(msg)) {
-      LOG(INFO) << config.log_prefix << "Input pose graph has loop closure @ "
+      LOG(INFO) << config.get_log_prefix() << "Input pose graph has loop closure @ "
                 << msg.stamp_ns << " [ns]";
     }
 
@@ -473,7 +473,7 @@ bool BackendModule::updateFromLcdQueue() {
 void BackendModule::copyMeshDelta(const FrontendOutput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
   if (!input.mesh_update) {
-    LOG_FIRST_N(WARNING, 1) << config.log_prefix << "invalid mesh update!";
+    LOG_FIRST_N(WARNING, 1) << config.get_log_prefix() << "invalid mesh update!";
     return;
   }
 

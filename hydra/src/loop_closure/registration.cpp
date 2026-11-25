@@ -119,7 +119,7 @@ RegistrationSolution getFullSolutionFromLayer(const SceneGraph& graph,
                                               const LayerRegistrationSolution& solution,
                                               NodeId query_agent_id,
                                               NodeId match_root) {
-  static const auto log_config = VerbosityConfig::named("lcd_registration");
+  static const auto log_config = VerbosityConfig("lcd_registration");
 
   if (!solution.valid || solution.inliers.empty()) {
     return {};

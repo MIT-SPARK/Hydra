@@ -131,7 +131,7 @@ bool ReconstructionModule::shouldUpdate(uint64_t timestamp_ns) const {
 
 ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& data) {
   if (!data) {
-    LOG(ERROR) << config.log_prefix << "received invalid input!";
+    LOG(ERROR) << config.get_log_prefix() << "received invalid input!";
     return nullptr;
   }
 

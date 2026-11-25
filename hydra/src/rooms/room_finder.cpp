@@ -324,7 +324,7 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
   }
 
   if (!last_results_.valid) {
-    LOG(WARNING) << config.log_prefix << "clustering failed: using components";
+    LOG(WARNING) << config.get_log_prefix() << "clustering failed: using components";
     last_results_.fillFromInitialClusters(components);
   }
 

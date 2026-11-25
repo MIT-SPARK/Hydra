@@ -110,7 +110,7 @@ bool setFixedParent(const GvdLayer& layer,
 
 using timing::ScopedTimer;
 
-GvdIntegrator::Config::Config() : VerbosityConfig("[gvd_integrator] ") {}
+GvdIntegrator::Config::Config() : VerbosityConfig("gvd_integrator") {}
 
 void declare_config(GvdIntegrator::Config& config) {
   using namespace config;

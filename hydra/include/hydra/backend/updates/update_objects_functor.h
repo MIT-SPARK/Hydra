@@ -47,7 +47,7 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
     using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
     using SemanticAssociation = association::SemanticNearestNode::Config;
 
-    Config() : VerbosityConfig("[update_objects] ") {}
+    Config() : VerbosityConfig("update_objects") {}
 
     //! Layer to update
     std::string layer = spark_dsg::DsgLayers::OBJECTS;

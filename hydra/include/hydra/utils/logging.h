@@ -43,18 +43,19 @@ namespace hydra {
 struct VerbosityConfig {
   //! An unset value inherits the current run default
   std::optional<int> verbosity = std::nullopt;
-  std::string log_prefix = "";
+  std::string log_name;
+  std::string log_prefix = "[";
+  std::string log_suffix = "] ";
 
-  VerbosityConfig() = default;
-  VerbosityConfig(int verbosity);
-  VerbosityConfig(const std::string& prefix,
+  //! Use short snake_case names for default component log labels
+  VerbosityConfig(const std::string& name = "",
                   std::optional<int> verbosity = std::nullopt);
 
-  //! Make a copy of the verbosity config with a prefix derived from the provided name
+  //! Copy with a different name while preserving verbosity and delimiters
   VerbosityConfig with_name(const std::string& name) const;
 
-  //! Use short snake_case names for default component log prefixes
-  static VerbosityConfig named(const std::string& name = "");
+  //! Render the component label, or an empty string when the name is empty
+  std::string get_log_prefix() const;
 
   bool enabled(int level) const { return get_verbosity() >= level; }
 
@@ -65,7 +66,7 @@ void declare_config(VerbosityConfig& config);
 
 // NOTE(nathan) you need to include <glog/logging.h> for this to work, but
 // I don't want have <glog/logging.h> included in a bunch of header files
-#define MLOG_WITH(C, V) LOG_IF(INFO, (C).enabled(V)) << (C).log_prefix
+#define MLOG_WITH(C, V) LOG_IF(INFO, (C).enabled(V)) << (C).get_log_prefix()
 #define MLOG(V) MLOG_WITH(config, V)
 
 }  // namespace hydra

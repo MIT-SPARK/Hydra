@@ -99,7 +99,7 @@ std::string showVec(const Eigen::MatrixXf& vec, size_t max_length = 100) {
 
 }  // namespace
 
-FeatureScoreColor::Config::Config() : VerbosityConfig("[feature_score] ") {}
+FeatureScoreColor::Config::Config() : VerbosityConfig("feature_score") {}
 
 void declare_config(FeatureScoreColor::Config& config) {
   using namespace config;

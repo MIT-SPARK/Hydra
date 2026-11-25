@@ -48,7 +48,7 @@ class MeshIntegrator {
   using BlockIndexGetter = IndexGetter<BlockIndex>;
 
   struct Config : VerbosityConfig {
-    Config() : VerbosityConfig(VerbosityConfig::named("mesh_integrator")) {}
+    Config() : VerbosityConfig("mesh_integrator") {}
 
     float min_weight = 1.0e-4f;
     //! Inherit the run thread count when unset; non-positive counts use all threads

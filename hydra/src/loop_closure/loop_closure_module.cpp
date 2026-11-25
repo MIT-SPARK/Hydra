@@ -70,7 +70,7 @@ void declare_config(LoopClosureModule::Config& config) {
   field(config.descriptor_creation_horizon_m, "descriptor_creation_horizon_m");
 }
 
-LoopClosureModule::Config::Config() : VerbosityConfig(VerbosityConfig::named("lcd")) {}
+LoopClosureModule::Config::Config() : VerbosityConfig("lcd") {}
 
 LoopClosureModule::LoopClosureModule(const Config& config,
                                      RunContext::ConstPtr context,
@@ -203,7 +203,7 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
         output_queue_->push(result);
       }
 
-      LOG(WARNING) << config.log_prefix
+      LOG(WARNING) << config.get_log_prefix()
                    << "Found valid loop-closure: " << NodeSymbol(result.from_node).str()
                    << " -> " << NodeSymbol(result.to_node).str();
     }

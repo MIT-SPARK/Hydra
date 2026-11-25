@@ -76,7 +76,7 @@ class GraphExtractor {
       //! Minimum distance to the nearest obstacle along an edge
       double min_clearance_m = 0.5;
     } freespace_edges;
-    Config() : VerbosityConfig("[gvd_graph] ") {}
+    Config() : VerbosityConfig("gvd_graph") {}
   } const config;
 
   GraphExtractor(const Config& config, float voxel_size);

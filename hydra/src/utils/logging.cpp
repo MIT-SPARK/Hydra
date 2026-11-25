@@ -42,25 +42,22 @@ namespace hydra {
 
 void declare_config(VerbosityConfig& config) {
   config::field(config.verbosity, "verbosity");
+  config::field(config.log_name, "log_name");
   config::field(config.log_prefix, "log_prefix");
+  config::field(config.log_suffix, "log_suffix");
 }
 
-VerbosityConfig::VerbosityConfig(int verbosity) : VerbosityConfig("", verbosity) {}
-
-VerbosityConfig::VerbosityConfig(const std::string& log_prefix,
-                                 std::optional<int> verbosity)
-    : verbosity(verbosity), log_prefix(log_prefix) {}
+VerbosityConfig::VerbosityConfig(const std::string& name, std::optional<int> verbosity)
+    : verbosity(verbosity), log_name(name) {}
 
 VerbosityConfig VerbosityConfig::with_name(const std::string& name) const {
   auto new_config = *this;
-  new_config.log_prefix = name.empty() ? "" : "[" + name + "] ";
+  new_config.log_name = name;
   return new_config;
 }
 
-VerbosityConfig VerbosityConfig::named(const std::string& name) {
-  VerbosityConfig config;
-  config.verbosity = std::nullopt;
-  return name.empty() ? config : config.with_name(name);
+std::string VerbosityConfig::get_log_prefix() const {
+  return log_name.empty() ? "" : log_prefix + log_name + log_suffix;
 }
 
 int VerbosityConfig::get_verbosity() const {

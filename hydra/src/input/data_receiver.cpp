@@ -53,8 +53,7 @@ void declare_config(DataReceiver::Config& config) {
   field(config.received_window_size, "received_window_size");
 }
 
-DataReceiver::Config::Config()
-    : VerbosityConfig(VerbosityConfig::named("data_receiver")) {}
+DataReceiver::Config::Config() : VerbosityConfig("data_receiver") {}
 
 DataReceiver::DataReceiver(const Config& config,
                            const Sensor::ConstPtr& sensor,
