@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/scene_graph_descriptors.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
@@ -87,9 +87,11 @@ Descriptor::Ptr ObjectDescriptorFactory::construct(
     const auto attrs = graph.getNode(node).attributes<SemanticNodeAttributes>();
     const size_t label = attrs.semantic_label;
     if (label > static_cast<size_t>(descriptor->values.rows())) {
-      LOG(ERROR) << "label " << static_cast<int>(label) << " for node "
-                 << NodeSymbol(node).str() << " exceeds max label "
-                 << descriptor->values.rows();
+      HYDRA_LOG(ERROR,
+                "label {} for node {} exceeds max label {}",
+                static_cast<int>(label),
+                NodeSymbol(node).str(),
+                descriptor->values.rows());
       continue;
     }
 

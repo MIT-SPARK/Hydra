@@ -1,6 +1,6 @@
 #include "hydra_multi/common/utils.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 namespace hydra_multi {
 
@@ -17,7 +17,7 @@ void combineMeshes(const std::map<RobotId, Mesh::Ptr>& id_mesh,
       continue;
     }
 
-    CHECK(combined_mesh->append(*robot_mesh));
+    HYDRA_CHECK(combined_mesh->append(*robot_mesh));
   }
 }
 

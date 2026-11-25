@@ -39,13 +39,12 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
 #include "hydra/active_window/reconstruction_module.h"
-#include "hydra/bindings/glog_utilities.h"
+#include "hydra/bindings/logging_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/common/labelspace.h"
 #include "hydra/common/run_settings.h"
@@ -141,8 +140,8 @@ PythonReconstruction::PythonReconstruction(const Config& config,
     mesh_ = std::make_shared<Mesh>();
   }
 
-  MLOG(2) << "\n" << config::toString(context->config);
-  MLOG(1) << "\n" << module_->show();
+  MLOG(2, "\n{}", config::toString(context->config));
+  MLOG(1, "\n{}", module_->show());
 }
 
 bool PythonReconstruction::step(size_t timestamp_ns,
@@ -166,7 +165,7 @@ bool PythonReconstruction::stepImpl(const std::shared_ptr<SensorInputPacket>& pa
     }
 
     if (!filter->valid(*packet, last_input_.get())) {
-      LOG(ERROR) << "Skipping input!";
+      HYDRA_LOG(ERROR, "Skipping input!");
       return false;
     }
   }

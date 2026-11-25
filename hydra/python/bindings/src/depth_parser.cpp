@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/depth_parser.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 namespace py = pybind11;
 
@@ -68,9 +68,9 @@ float DepthParserImpl<uint16_t>::read(const PythonImage& img,
 }
 
 DepthParser::Ptr DepthParser::create(const PythonImage& img) {
-  CHECK(img) << "invalid image";
+  HYDRA_CHECK(img, "invalid image");
   if (img.channels() != 1) {
-    LOG(ERROR) << "only single channel depth images supported";
+    HYDRA_LOG(ERROR, "only single channel depth images supported");
     return nullptr;
   }
 
@@ -80,7 +80,7 @@ DepthParser::Ptr DepthParser::create(const PythonImage& img) {
   } else if (img_format == py::format_descriptor<uint16_t>::format()) {
     return std::make_unique<DepthParserImpl<uint16_t>>();
   } else {
-    LOG(ERROR) << "invalid depth format: " << img_format;
+    HYDRA_LOG(ERROR, "invalid depth format: {}", img_format);
     return nullptr;
   }
 }

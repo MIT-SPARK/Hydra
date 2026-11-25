@@ -1,7 +1,7 @@
 #include "hydra_multi/operators/deformation_graph_operator.h"
 
-#include <glog/logging.h>
 #include <gtsam/inference/Symbol.h>
+#include <hydra/utils/logging.h>
 
 #include <Eigen/Dense>
 
@@ -57,7 +57,7 @@ bool DeformationGraphOperator::incrementalAppend(const PoseGraph& incremental_so
     }
 
     if (nodeDisconnected(node.key)) {
-      LOG(ERROR) << "Disconnected node " << node.key << "in append.";
+      HYDRA_LOG(ERROR, "Disconnected node {}in append.", node.key);
       return false;
     }
 
@@ -80,7 +80,7 @@ bool DeformationGraphOperator::update(const PoseGraph& source) {
 
   for (auto& node : data_->nodes) {
     if (!source_nodes.count(node.key)) {
-      LOG(ERROR) << "Missing source node in update.";
+      HYDRA_LOG(ERROR, "Missing source node in update.");
       // NOTE(Yun): but some nodes potentially already updated
       return false;
     }
@@ -118,7 +118,7 @@ bool DeformationGraphOperator::rebase(const PoseGraph& source) {
   // Implicitly assume that edges attributes don't need to be updated
   for (const auto& node : data_to_append.nodes) {
     if (nodeDisconnected(node.key)) {
-      LOG(ERROR) << "Disconnected node in rebase.";
+      HYDRA_LOG(ERROR, "Disconnected node in rebase.");
       return false;
     }
 
@@ -152,11 +152,11 @@ bool DeformationGraphOperator::merge(const PoseGraph& source) {
     }
 
     if (nodeDisconnected(node.key)) {
-      LOG(ERROR) << "Disconnected node in merge: " << node.robot_id << ":" << node.key;
+      HYDRA_LOG(ERROR, "Disconnected node in merge: {}:{}", node.robot_id, node.key);
       continue;
     }
 
-    VLOG(2) << "New node in merge: " << node.robot_id << ":" << node.key;
+    HYDRA_VLOG(2, "New node in merge: {}:{}", node.robot_id, node.key);
     auto new_node = PoseGraphNode(node);
     const auto& neighbors = adjacency_.at(node.key);
     for (const auto& n : neighbors) {

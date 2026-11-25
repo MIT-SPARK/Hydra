@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/gnn/gnn_interface.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include "hydra/gnn/ort_utilities.h"
 

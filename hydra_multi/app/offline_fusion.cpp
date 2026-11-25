@@ -4,9 +4,9 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/common/run_settings.h>
 #include <hydra/input/sensor_extrinsics.h>
-#include <hydra/utils/pgmo_glog_sink.h>
+#include <hydra/utils/logging.h>
 #include <hydra_multi/common/multi_global_info.h>
 #include <hydra_multi/common/multi_pipeline.h>
 #include <hydra_multi/input/file_dgraph_input.h>
@@ -93,7 +93,8 @@ inline Eigen::Isometry3d loadExtrinsicsFromYAML(const fs::path& config_path) {
 inline Eigen::Isometry3d lookupExtrinsics(const ExtrinsicsMap& extrinsics,
                                           RobotId robot) {
   auto iter = extrinsics.find(robot);
-  CHECK(iter != extrinsics.end()) << "Missing required extrinsics for robot " << robot;
+  HYDRA_CHECK(
+      iter != extrinsics.end(), "Missing required extrinsics for robot {}", robot);
   return iter->second;
 }
 
@@ -105,7 +106,7 @@ PoseGraph loadLoopClosures(const ExtrinsicsMap& extrinsics, const fs::path& lcd_
   for (const auto& lc : data) {
     nlohmann::json record;
     to_json(lc, record);
-    VLOG(3) << "Processing " << record;
+    HYDRA_VLOG(3, "Processing {}", record);
 
     auto& edge = loop_closures.edges.emplace_back();
     edge.robot_from = lc.robot_from;
@@ -133,7 +134,7 @@ PoseGraph loadLoopClosures(const ExtrinsicsMap& extrinsics, const fs::path& lcd_
 
 struct ProblemInfo {
   struct Args {
-    int log_level = 0;
+    std::string log_level = "info";
     int verbosity = 0;
     int starting_robot_id = 0;
     std::vector<fs::path> inputs;
@@ -153,8 +154,8 @@ struct ProblemInfo {
 };
 
 void ProblemInfo::Args::add_to_app(CLI::App& app) {
-  app.add_option("--verbosity", verbosity)->description("Verbosity for glog");
-  app.add_option("--log-level", log_level)->description("Log level for glog");
+  app.add_option("--verbosity", verbosity)->description("Module diagnostic verbosity");
+  app.add_option("--log-level", log_level)->description("Minimum logging severity");
   app.add_option("-s,--starting-robot-id", starting_robot_id)
       ->description("Robot ID to assign to first input");
   app.add_option("inputs", inputs)
@@ -174,12 +175,12 @@ ProblemInfo::ProblemInfo(const Args& args)
     const auto dirpath = fs::absolute(input_path);
     const auto config_path = dirpath / "hydra_config.yaml";
     if (!fs::exists(config_path)) {
-      LOG(WARNING) << "Missing hydra config @ " << config_path;
+      HYDRA_LOG(WARNING, "Missing hydra config @ {}", config_path);
     } else {
       extrinsics[robot_id] = loadExtrinsicsFromYAML(config_path);
     }
 
-    LOG(INFO) << "Merging " << dirpath << " with ID " << robot_id << std::endl;
+    HYDRA_LOG(INFO, "Merging {} with ID {}\n", dirpath, robot_id);
     hydra_multi::UnitInterface::Config robot_config;
     robot_config.robot_id = robot_id;
     robot_config.robot_name = dirpath.stem();
@@ -245,19 +246,20 @@ int main(int argc, char* argv[]) {
     return app.exit(e);
   }
 
-  FLAGS_minloglevel = args.log_level;
-  FLAGS_v = args.verbosity;
-  FLAGS_logtostderr = 1;
-  FLAGS_colorlogtostderr = 1;
-  google::InitGoogleLogging(argv[0]);
-  logging::Logger::addSink("glog", std::make_shared<hydra::PgmoGlogSink>(5));
+  hydra::logging::setLogLevel(args.log_level);
+  auto settings = hydra::RunSettings::instance();
+  settings.default_verbosity = args.verbosity;
+  hydra::RunSettings::init(settings);
+  hydra::logging::configurePgmoLogging(true);
 
   const hydra_multi::ProblemInfo problem(args);
   if (problem.robots.empty()) {
     return 0;
   }
 
-  hydra_multi::MultiOfflinePipeline multi_offline(problem.config());
+  auto pipeline_config = problem.config();
+  pipeline_config.default_verbosity = args.verbosity;
+  hydra_multi::MultiOfflinePipeline multi_offline(pipeline_config);
   multi_offline.init();
   multi_offline.fuse(problem.loop_closures);
   if (problem.output) {

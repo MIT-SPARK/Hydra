@@ -35,7 +35,7 @@
 #include "hydra/backend/updates/update_surface_places_functor.h"
 
 #include <config_utilities/config.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
@@ -77,7 +77,7 @@ inline void updateNode(const spark_dsg::Mesh& mesh,
                        Place2dNodeAttributes& attrs) {
   const auto& connections = attrs.mesh_connections;
   if (connections.empty()) {
-    LOG(ERROR) << "Found empty place2d node " << NodeSymbol(node).str();
+    HYDRA_LOG(ERROR, "Found empty place2d node {}", NodeSymbol(node).str());
     return;
   }
 
@@ -101,10 +101,10 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const SceneGraph& graph,
   // set attributes to the attributes of the first node
   auto iter = nodes.begin();
   const spark_dsg::SceneGraphNode* node = graph.findNode(*iter);
-  CHECK(node) << "Invalid node during merge!";
+  HYDRA_CHECK(node, "Invalid node during merge!");
   auto cloned = node->attributes().clone();
   auto attrs = dynamic_cast<Place2dNodeAttributes*>(cloned.get());
-  CHECK(attrs) << "Invalid attributes during merge!";
+  HYDRA_CHECK(attrs, "Invalid attributes during merge!");
   ++iter;
 
   while (iter != nodes.end()) {
@@ -112,13 +112,14 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const SceneGraph& graph,
     ++iter;
     node = graph.findNode(node_id);
     if (!node) {
-      LOG(FATAL) << "Invalid node during merge: '" << NodeSymbol(node_id).str() << "'";
+      HYDRA_LOG(FATAL, "Invalid node during merge: '{}'", NodeSymbol(node_id).str());
     }
 
     auto from_attrs = node->tryAttributes<Place2dNodeAttributes>();
     if (!from_attrs) {
-      LOG(FATAL) << "Invalid node attributes during merge: '"
-                 << NodeSymbol(node_id).str() << "'";
+      HYDRA_LOG(FATAL,
+                "Invalid node attributes during merge: '{}'",
+                NodeSymbol(node_id).str());
     }
 
     attrs->position += from_attrs->position;
@@ -195,7 +196,7 @@ void Update2dPlacesFunctor::call(const SceneGraph& unmerged,
   for (const auto& node : view) {
     auto attrs = node.tryAttributes<Place2dNodeAttributes>();
     if (!attrs) {
-      MLOG(2) << "node " << NodeSymbol(node.id).str() << " is not a 2D place!";
+      MLOG(2, "node {} is not a 2D place!", NodeSymbol(node.id).str());
       continue;
     }
 
@@ -211,7 +212,7 @@ void Update2dPlacesFunctor::call(const SceneGraph& unmerged,
     dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
-  MLOG(1) << "updated " << num_changed << " node(s)";
+  MLOG(1, "updated {} node(s)", num_changed);
 }
 
 MergeList Update2dPlacesFunctor::findMerges(const SceneGraph& graph,
@@ -233,8 +234,10 @@ MergeList Update2dPlacesFunctor::findMerges(const SceneGraph& graph,
         auto lhs_attrs = lhs.tryAttributes<Place2dNodeAttributes>();
         auto rhs_attrs = rhs.tryAttributes<Place2dNodeAttributes>();
         if (!lhs_attrs || !rhs_attrs) {
-          MLOG(2) << "invalid 2D place nodes: " << NodeSymbol(lhs.id).str() << ", "
-                  << NodeSymbol(rhs.id).str();
+          MLOG(2,
+               "invalid 2D place nodes: {}, {}",
+               NodeSymbol(lhs.id).str(),
+               NodeSymbol(rhs.id).str());
           return false;
         }
 
@@ -242,7 +245,7 @@ MergeList Update2dPlacesFunctor::findMerges(const SceneGraph& graph,
       },
       nodes_to_merge);
 
-  MLOG(1) << "Found merges: " << mergeListToStr(nodes_to_merge);
+  MLOG(1, "Found merges: {}", mergeListToStr(nodes_to_merge));
   return nodes_to_merge;
 }
 
@@ -281,7 +284,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   for (auto& node_id : checked_nodes) {
     auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
     if (attrs.mesh_connections.size() == 0) {
-      MLOG(1) << "place " << NodeSymbol(node_id).str() << " too small";
+      MLOG(1, "place {} too small", NodeSymbol(node_id).str());
       continue;
     }
 

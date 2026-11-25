@@ -37,6 +37,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 
+#include "hydra/utils/logging.h"
+
 namespace hydra {
 namespace {
 
@@ -62,6 +64,7 @@ const RunSettings::Config& RunSettings::instance() { return settings(); }
 
 const RunSettings::Config& RunSettings::init(const Config& config) {
   settings() = config::checkValid(config);
+  hydra::logging::configurePgmoLogging(settings().enable_pgmo_logging);
   return settings();
 }
 

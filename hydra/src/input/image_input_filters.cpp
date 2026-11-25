@@ -38,7 +38,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <limits>
 
@@ -92,11 +92,17 @@ bool InvalidDepthFilter::valid(const SensorInputPacket& current,
   const bool passes = ratio < config.max_invalid_ratio;
   const double valid_pct = 100.0 * (1.0 - ratio);
   const double required_pct = 100.0 * (1.0 - config.max_invalid_ratio);
-  MLOG(1) << "valid depth: " << valid_pct << "% (" << total - num_invalid << "/"
-          << total << "), required > " << required_pct << "%";
+  MLOG(1,
+       "valid depth: {}% ({}/{}), required > {}%",
+       valid_pct,
+       total - num_invalid,
+       total,
+       required_pct);
   if (!passes) {
-    MLOG(0) << "DROPPING FRAME: VALID DEPTH " << valid_pct
-            << "% DOES NOT MEET REQUIRED " << required_pct << "%";
+    MLOG(0,
+         "DROPPING FRAME: VALID DEPTH {}% DOES NOT MEET REQUIRED {}%",
+         valid_pct,
+         required_pct);
   }
   return passes;
 }

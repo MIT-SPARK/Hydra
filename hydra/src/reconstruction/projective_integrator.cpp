@@ -1,3 +1,4 @@
+#include <hydra/utils/logging.h>
 // The contents of this file are originally from Panoptic-Mapping,
 // under the following license:
 //
@@ -45,12 +46,9 @@
 // implied, of the United States Air Force or the U.S. Government. The U.S.
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
-#include "hydra/reconstruction/projective_integrator.h"
-
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include <algorithm>
 #include <future>
@@ -60,6 +58,7 @@
 #include "hydra/common/run_settings.h"
 #include "hydra/input/sensor_utilities.h"
 #include "hydra/reconstruction/index_getter.h"
+#include "hydra/reconstruction/projective_integrator.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {
@@ -162,7 +161,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
                                         const InputData& data,
                                         const cv::Mat& integration_mask,
                                         VolumetricMap& map) const {
-  MLOG(2) << "Updating " << block_indices.size() << " blocks.";
+  MLOG(2, "Updating {} blocks.", block_indices.size());
 
   // Update all blocks in parallel.
   IndexGetter<BlockIndex> index_getter(block_indices);
@@ -211,7 +210,7 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   }
 
   if (was_updated) {
-    MLOG(4) << "integrator updated block " << showIndex(block_index);
+    MLOG(4, "integrator updated block {}", showIndex(block_index));
     blocks.tsdf->setUpdated();
   }
 }
@@ -274,7 +273,7 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
                                        const Measurement& meas,
                                        VoxelTuple& voxels) const {
   if (!std::isfinite(meas.sdf)) {
-    LOG(ERROR) << "found invalid measurement!";
+    HYDRA_LOG(ERROR, "found invalid measurement!");
     return;
   }
 

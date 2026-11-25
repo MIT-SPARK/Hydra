@@ -35,7 +35,7 @@
 #include "hydra/backend/graph_optimizer.h"
 
 #include <config_utilities/parsing/yaml.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <stdexcept>
 
@@ -59,13 +59,13 @@ void optimize_graph(const OptimizationConfig& info) {
   auto dsg = state->backend_graph->clone();
   const auto config = config::fromYamlFile<BackendModule::Config>(info.config_path);
   BackendModule backend(config, context, dsg, state);
-  LOG(INFO) << "Loading backend state!";
+  HYDRA_LOG(INFO, "Loading backend state!");
   backend.loadState(info.graph, info.deformation_graph);
-  LOG(INFO) << "Loaded backend state!";
+  HYDRA_LOG(INFO, "Loaded backend state!");
 
   backend.step(true);  // forces optimization even if no loop closures set
   if (!info.output.empty()) {
-    LOG(INFO) << "Saving optimized graph to " << info.output;
+    HYDRA_LOG(INFO, "Saving optimized graph to {}", info.output);
     dsg->graph->save(info.output);
   }
 }

@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
@@ -278,8 +278,10 @@ void KeyframeSelector::queueForSaving(const InputData::ConstPtr& data) {
   {
     std::lock_guard<std::mutex> lock(save_mutex_);
     if (config.max_queue_size && save_queue_.size() >= config.max_queue_size) {
-      MLOG_NAMED(WARN) << "Keyframe save queue full (" << save_queue_.size()
-                       << "), dropping keyframe @ " << data->timestamp_ns << " [ns]";
+      MLOG_NAMED(WARN,
+                 "Keyframe save queue full ({}), dropping keyframe @ {} [ns]",
+                 save_queue_.size(),
+                 data->timestamp_ns);
       return;
     }
 
@@ -331,7 +333,7 @@ void KeyframeSelector::saveSpin() {
     try {
       data->save(filepath, config.save_options);
     } catch (const std::exception& e) {
-      MLOG_NAMED(ERROR) << "Failed to save keyframe: " << e.what();
+      MLOG_NAMED(ERROR, "Failed to save keyframe: {}", e.what());
     }
 
     {
@@ -368,11 +370,11 @@ void KeyframeSelector::call(const ActiveWindowOutput& input,
       queueForSaving(data);
       ++num_added;
     } else if (!reason.empty()) {
-      MLOG(2) << reason;
+      MLOG(2, "{}", reason);
     }
   }
 
-  MLOG(2) << "Got " << num_added << " new views!";
+  MLOG(2, "Got {} new views!", num_added);
   if (window) {
     archiveKeyframes(input, *window);
   }
@@ -391,11 +393,14 @@ void KeyframeSelector::archiveKeyframes(const ActiveWindowOutput& msg,
     const auto stamp = frame->timestamp_ns;
 
     const auto fmt = getDefaultFormat(3);
-    MLOG(3) << "view @ " << stamp << "[ns]: " << pos.format(fmt) << " vs. "
-            << msg.world_T_body().translation().format(fmt);
+    MLOG(3,
+         "view @ {}[ns]: {} vs. {}",
+         stamp,
+         pos.format(fmt),
+         msg.world_T_body().translation().format(fmt));
 
     if (!window.inBounds(msg.timestamp_ns, msg.world_T_body(), stamp, pos)) {
-      MLOG(2) << "Archival candidate found @ " << stamp << " [ns]";
+      MLOG(2, "Archival candidate found @ {} [ns]", stamp);
       releaseKeyframe(*iter);
       iter = keyframes_.erase(iter);
       continue;
@@ -419,8 +424,10 @@ void KeyframeSelector::limitActiveKeyframes() {
 
   // policies only compare against the newest keyframe, so evicting the oldest is safe
   while (keyframes_.size() > config.max_active_keyframes) {
-    MLOG(2) << "Evicting keyframe @ " << keyframes_.front()->timestamp_ns
-            << " [ns] (more than " << config.max_active_keyframes << " active)";
+    MLOG(2,
+         "Evicting keyframe @ {} [ns] (more than {} active)",
+         keyframes_.front()->timestamp_ns,
+         config.max_active_keyframes);
     releaseKeyframe(keyframes_.front());
     keyframes_.pop_front();
   }
@@ -465,11 +472,11 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
 
   const auto num_frames = keyframes_.size() + to_archive_.size();
   if (!num_frames) {
-    MLOG(2) << "Skipping feature assignment without any active keyframes";
+    MLOG(2, "Skipping feature assignment without any active keyframes");
     return;
   }
 
-  MLOG(2) << "Assigning features with " << num_frames << " active keyframe(s)";
+  MLOG(2, "Assigning features with {} active keyframe(s)", num_frames);
 
   std::vector<FeatureView> views;
   views.reserve(num_frames);
@@ -484,7 +491,7 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
   for (auto& [name, layer_tracker] : active_window_) {
     auto layer = dsg.graph->findLayer(name);
     if (!layer) {
-      MLOG_NAMED(WARN) << "Skipping unknown layer: '" << name << "'";
+      MLOG_NAMED(WARN, "Skipping unknown layer: '{}'", name);
       continue;
     }
 
@@ -493,21 +500,26 @@ void KeyframeSelector::callPostUpdate(SharedDsgInfo& dsg, FrontendOutput&) {
     for (const auto& node : layer_tracker.view(*layer)) {
       auto attrs = node.tryAttributes<SemanticNodeAttributes>();
       if (!attrs) {
-        MLOG_NAMED(ERROR) << "Invalid node " << NodeSymbol(node.id).str();
+        MLOG_NAMED(ERROR, "Invalid node {}", NodeSymbol(node.id).str());
         continue;
       }
 
       ++num_seen;
       if (feature_selector_->select(views, *attrs)) {
-        MLOG(3) << "node " << NodeSymbol(node.id).str() << ": "
-                << showVec(attrs->semantic_feature);
+        MLOG(3,
+             "node {}: {}",
+             NodeSymbol(node.id).str(),
+             showVec(attrs->semantic_feature));
         ++num_assigned;
       }
     }
 
     if (num_seen) {
-      MLOG(2) << "Assigned features to " << num_assigned << " / " << num_seen
-              << " nodes for layer '" << name << "'";
+      MLOG(2,
+           "Assigned features to {} / {} nodes for layer '{}'",
+           num_assigned,
+           num_seen,
+           name);
     }
   }
 }

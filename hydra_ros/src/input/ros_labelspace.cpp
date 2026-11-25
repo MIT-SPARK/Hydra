@@ -38,8 +38,8 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/common/run_context.h>
+#include <hydra/utils/logging.h>
 #include <ianvs/message_wait_functor.h>
 
 #include <nlohmann/json.hpp>
@@ -61,7 +61,7 @@ using MsgType = semantic_inference_msgs::msg::Labelspace;
 RosLabelspace::RosLabelspace(const Config& config) : config(config) {
   auto nh = ianvs::NodeHandle::this_node(config.ns);
   const auto resolved_topic = nh.resolve_name("labelspace", false);
-  LOG(INFO) << "Waiting for labelspace on '" << resolved_topic << "'";
+  HYDRA_LOG(INFO, "Waiting for labelspace on '{}'", resolved_topic);
 
   std::optional<MsgType> maybe_msg;
   const auto start = nh.now();
@@ -72,18 +72,18 @@ RosLabelspace::RosLabelspace(const Config& config) : config(config) {
   while (!maybe_msg && rclcpp::ok()) {
     maybe_msg = ianvs::getSingleMessage<MsgType>(nh, "labelspace", true, qos, timeout);
     if (!maybe_msg) {
-      LOG(WARNING) << "Waiting for labelspace on topic '" << resolved_topic << "'";
+      HYDRA_LOG(WARNING, "Waiting for labelspace on topic '{}'", resolved_topic);
     }
 
     const auto diff = nh.now() - start;
     if (config.error_timeout_s && (diff.seconds() > config.error_timeout_s)) {
-      LOG(ERROR) << "labelspace lookup timed out on '" << resolved_topic << "'";
+      HYDRA_LOG(ERROR, "labelspace lookup timed out on '{}'", resolved_topic);
       break;
     }
   }
 
   if (rclcpp::ok() && !maybe_msg) {
-    LOG(FATAL) << "Failed to lookup labelspace on '" << resolved_topic << "'";
+    HYDRA_LOG(FATAL, "Failed to lookup labelspace on '{}'", resolved_topic);
   }
 
   const auto& msg = *maybe_msg;
@@ -111,8 +111,9 @@ RosLabelspace::RosLabelspace(const Config& config) : config(config) {
     metadata.at("surface_places_labels").get_to(surface_places_labels);
   }
 
-  LOG(INFO) << "Loaded labelspace from ros:\n"
-            << config::toString(static_cast<const Labelspace&>(*this));
+  HYDRA_LOG(INFO,
+            "Loaded labelspace from ros:\n{}",
+            config::toString(static_cast<const Labelspace&>(*this)));
 }
 
 void declare_config(RosLabelspace::Config& config) {

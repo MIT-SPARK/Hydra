@@ -32,36 +32,14 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/utils/pgmo_glog_sink.h"
+#include <pybind11/pybind11.h>
 
-#include <glog/logging.h>
+#include <memory>
 
-namespace hydra {
+namespace hydra::python {
 
-PgmoGlogSink::PgmoGlogSink(int debug_verbosity, bool enabled)
-    : enabled(enabled), debug_verbosity(debug_verbosity) {}
-
-void PgmoGlogSink::dispatch(const logging::LogEntry& entry) const {
-  if (!enabled) {
-    return;
-  }
-
-  switch (entry.level) {
-    case logging::Level::DEBUG:
-      VLOG(debug_verbosity) << entry.prefix() << entry.message();
-      break;
-    case logging::Level::INFO:
-      LOG(INFO) << entry.prefix() << entry.message();
-      break;
-    case logging::Level::WARNING:
-      LOG(WARNING) << entry.prefix() << entry.message();
-      break;
-    case logging::Level::ERROR:
-    case logging::Level::FATAL:
-    default:
-      LOG(ERROR) << entry.prefix() << entry.message();
-      break;
-  }
+namespace logging_utilities {
+void addBindings(pybind11::module_& m);
 }
 
-}  // namespace hydra
+}  // namespace hydra::python

@@ -57,7 +57,7 @@ launch:
         --config-utilities-file $(find-pkg-share hydra_plusplus)/config/pipelines/input/kimera_multi_$(var sensor_type).yaml
         --config-utilities-yaml {robot_id: $(var robot_id), odom_frame: $(var odom_frame), robot_frame: $(var robot_frame), map_frame: $(var map_frame)}
         --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
-        --config-utilities-yaml {glog_verbosity: 0, config_verbosity: 1, show_run_settings: true, preprint_config: false}
+        --config-utilities-yaml {default_verbosity: 0, config_verbosity: 1, show_run_settings: true, preprint_config: false}
   - node:
       pkg: tf2_ros
       exec: static_transform_publisher

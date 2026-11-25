@@ -21,7 +21,7 @@ With the exception of the input configuration (discussed below), most defaults i
 Labelspace information is required for the objects and the 2D places to be created (which is considered part of the input configuration discussed below).
 You may need to check the backend module configuration to make sure appropriate update functors (pieces of code that process the scene graph to correct it) are configured properly (see [here](hydra/config/datasets/uhumans2.yaml#L86)) for the scene graph to appropriately deform after optimization and contain rooms.
 
-It may also be helpful to run Hydra with higher verbosity (i.e., set `glog_verbosity: 1` as a parameter) to see the currently parsed configuration.
+It may also be helpful to run Hydra with higher verbosity (i.e., set `default_verbosity: 1` as a parameter) to see the currently parsed configuration.
 If you are parsing sensor information from `sensor_msgs::msg::CameraInfo` messages or via `tf` (discussed below), you will likely need to start the dataset to let Hydra resolve this information before printing configuration information for the frontend, backend, active window, and loop closure detection.
 Hydra will print out the input configuration and other global information before attempting to resolve the sensor information.
 You may also find setting the parameter `print_missing: true` useful (which will output every configuration field that was not specified by YAML parameter).
@@ -41,8 +41,8 @@ backend:
 severity. These messages do not use module verbosity.
 
 ```cpp
-MLOG(2) << "Processed " << count << " nodes";
-MLOG_NAMED(WARN) << "Missing sensor " << name;
+MLOG(2, "Processed {} nodes", count);
+MLOG_NAMED(WARN, "Missing sensor {}", name);
 ```
 
 Use level 1 for lifecycle messages and summaries, level 2 for per-update
@@ -124,3 +124,9 @@ set_remap: {from: hydra_visualizer/dsg, to: hydra/backend/dsg}
 
 The uhumans2 (v2) office scene is *mostly* guaranteed to work out-of-the-box.
 See [here](../hydra_ros/launch/datasets/uhumans2.launch.yaml) to get a better sense for how everything is configured.
+
+## Logging
+
+The Hydra node uses textual `log_level` values such as `info` or `warning`.
+`forward_logs_to_ros` selects ROS forwarding. See [logging](logging.md) for
+module verbosity, C++ helpers, Python controls, and migration details.

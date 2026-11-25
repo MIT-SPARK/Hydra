@@ -2,8 +2,8 @@
 launch:
   # development arguments
   - arg: {name: debug, default: 'false', description: Run hydra with gdbserver}
-  - arg: {name: glog_verbosity, default: '0', description: Verbosity for glog-based logging in hydra}
-  - arg: {name: glog_level, default: '0', description: Minimum severity for glog-based logging in hdyra}
+  - arg: {name: default_verbosity, default: '0', description: Default module diagnostic verbosity}
+  - arg: {name: log_level, default: info, description: Minimum logging severity in Hydra}
   - arg: {name: print_missing, default: 'false', description: Have config utilities print all missing parameters when parsing configs}
   # robot configuration
   - arg: {name: use_sim_time, default: 'false', description: Use ROS sim time}
@@ -54,7 +54,7 @@ launch:
         --config-utilities-var places_model_path=$(var places_model_path)
         --config-utilities-file $(var lcd_config_path)@lcd
         --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
-        --config-utilities-yaml {print_missing: $(var print_missing), glog_level: $(var glog_level), glog_verbosity: $(var glog_verbosity)}
+        --config-utilities-yaml {print_missing: $(var print_missing), log_level: $(var log_level), default_verbosity: $(var default_verbosity)}
         --config-utilities-yaml {robot_id: $(var robot_id), odom_frame: $(var odom_frame), robot_frame: $(var robot_frame), map_frame: $(var map_frame)}
         --config-utilities-yaml {backend: {sinks: [{type: $(if $(var enable_zmq) ZmqSink '""'), url: $(var zmq_url), send_mesh: $(var zmq_send_mesh)}]}}
         --config-utilities-yaml {printing: {width: 86}}

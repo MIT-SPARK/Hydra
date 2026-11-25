@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/backend_utilities.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
@@ -47,7 +47,7 @@ using spark_dsg::SceneGraph;
 std::optional<uint64_t> getTimeNs(const SceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
   if (!graph.hasNode(node)) {
-    LOG(ERROR) << "Missing node << " << node.str() << "when logging loop closure";
+    HYDRA_LOG(ERROR, "Missing node << {}when logging loop closure", node.str());
     return std::nullopt;
   }
 

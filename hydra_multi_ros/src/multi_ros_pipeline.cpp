@@ -4,7 +4,7 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <hydra_multi/backend/module.h>
 #include <hydra_multi/common/types.h>
 
@@ -26,7 +26,7 @@ void declare_config(MultiRosPipeline::Config& config) {
 MultiRosPipeline::MultiRosPipeline(int config_verbosity)
     : MultiPipeline(config::fromContext<MultiPipelineConfig>(), config_verbosity),
       config(config::checkValid(config::fromContext<Config>())) {
-  LOG(INFO) << "Starting Hydra-Multi ROS";
+  HYDRA_LOG(INFO, "Starting Hydra-Multi ROS");
 
   auto nh = getHydraMultiNodeHandle("~");
   status_monitor_ = std::make_unique<StatusMonitor>(config.status_monitor, nh);
@@ -51,7 +51,7 @@ MultiRosPipeline::~MultiRosPipeline() {}
 
 void MultiRosPipeline::loopClosureCallback(
     const pose_graph_tools::PoseGraph& loop_closures) {
-  LOG(INFO) << "Got " << loop_closures.edges.size() << " new loop closures";
+  HYDRA_LOG(INFO, "Got {} new loop closures", loop_closures.edges.size());
   backend_->addLoopClosures(loop_closures);
 }
 

@@ -38,7 +38,7 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/settings.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/labelspace.h>
 
 #include "hydra/active_window/reconstruction_module.h"
@@ -48,7 +48,6 @@
 #include "hydra/common/run_settings.h"
 #include "hydra/frontend/graph_builder.h"
 #include "hydra/loop_closure/loop_closure_module.h"  // IWYU pragma: keep
-#include "hydra/utils/pgmo_glog_sink.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -65,7 +64,7 @@ SharedDsgInfo::Ptr buildGraph(const RunContext& context) {
       if (graph.layer_names().count(layer_name)) {
         labelspace.save(graph, layer_name);
       } else {
-        LOG(WARNING) << "Skipping saving labelspace for unknown '" << layer_name << "'";
+        HYDRA_LOG(WARNING, "Skipping saving labelspace for unknown '{}'", layer_name);
       }
     }
   }
@@ -100,9 +99,6 @@ HydraPipeline::Config::Config()
 HydraPipeline::HydraPipeline(const Config& config, RunContext::ConstPtr context)
     : config(config), context_(std::move(context)) {
   RunSettings::init(context_->config.settings);
-  logging::Logger::addSink(
-      "glog",
-      std::make_shared<PgmoGlogSink>(1, RunSettings::instance().enable_pgmo_logging));
 
   initState();
 }
@@ -193,19 +189,19 @@ void HydraPipeline::save(const DataDirectory* output) const {
   }
 
   // save timing information to avoid destructor weirdness with singletons
-  MLOG(0) << "Saving timing information to " << log_dir;
+  MLOG(0, "Saving timing information to {}", log_dir);
   const auto& timer = ElapsedTimeRecorder::instance();
   timer.logTimers(logs.path("timing"));
   timer.logStats(log_dir / "timing_stats.csv");
-  MLOG(0) << "Saved timing information";
+  MLOG(0, "Saved timing information");
 }
 
 void HydraPipeline::showModules() const {
-  MLOG(1) << "Active Window:\n" << active_window_->show();
-  MLOG(1) << "Frontend:\n" << frontend_->show();
-  MLOG(1) << "Backend:\n" << backend_->show();
+  MLOG(1, "Active Window:\n{}", active_window_->show());
+  MLOG(1, "Frontend:\n{}", frontend_->show());
+  MLOG(1, "Backend:\n{}", backend_->show());
   if (lcd_) {
-    MLOG(1) << "Loop Closure Detection:\n" << lcd_->show();
+    MLOG(1, "Loop Closure Detection:\n{}", lcd_->show());
   }
 }
 

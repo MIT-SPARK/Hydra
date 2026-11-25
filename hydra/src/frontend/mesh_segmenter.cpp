@@ -38,8 +38,7 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/mesh_traits.h>
 #include <spark_dsg/bounding_box_extraction.h>
@@ -103,7 +102,7 @@ MeshSegmenter::MeshSegmenter(const Config& config,
       next_node_id_('O', 0),
       labels_(labels),
       sinks_(Sink::instantiate(config.sinks, robot)) {
-  MLOG(1) << "using labels: " << clustering::printLabels(labels_);
+  MLOG(1, "using labels: {}", clustering::printLabels(labels_));
   for (const auto& label : labels_) {
     active_nodes_[label] = std::set<NodeId>();
   }
@@ -116,13 +115,13 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
 
   LabelClusters label_clusters;
   if (!delta.getNumActiveVertices()) {
-    MLOG(2) << "No active indices in mesh";
+    MLOG(2, "No active indices in mesh");
     return label_clusters;
   }
 
   const auto label_indices = clustering::getLabelIndices(labels_, delta);
   if (label_indices.empty()) {
-    MLOG(2) << "No vertices found matching desired labels";
+    MLOG(2, "No vertices found matching desired labels");
     Sink::callAll(sinks_, stamp_ns, delta, label_indices, {});
     return label_clusters;
   }
@@ -148,7 +147,7 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
       }
     }
 
-    MLOG(2) << "Found " << clusters.size() << " cluster(s) of label " << label;
+    MLOG(2, "Found {} cluster(s) of label {}", clusters.size(), label);
   }
 
   Sink::callAll(sinks_, stamp_ns, delta, label_indices, label_clusters);
@@ -174,12 +173,16 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
       auto& attrs = graph.getNode(node_id).attributes<ObjectNodeAttributes>();
 
       // remap and prune mesh connections
-      MLOG(5) << "Updating node " << NodeSymbol(node_id).str() << " with connections "
-              << attrs.mesh_connections;
+      MLOG(5,
+           "Updating node {} with connections {}",
+           NodeSymbol(node_id).str(),
+           attrs.mesh_connections);
       kimera_pgmo::MeshOffsetInfo::RemapStats stats;
       offsets.remapVertexIndices(attrs.mesh_connections, &stats);
-      MLOG(5) << "After update: " << attrs.mesh_connections << std::boolalpha
-              << " (active: " << !stats.all_archived << ")";
+      MLOG(5,
+           "After update: {} (active: {})",
+           attrs.mesh_connections,
+           !stats.all_archived);
       if (attrs.mesh_connections.size() < config.clustering.min_cluster_size) {
         graph.removeNode(node_id);
         iter = label_nodes.erase(iter);
@@ -196,8 +199,10 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
   }
 
   for (const auto& [label, label_nodes] : active_nodes_) {
-    MLOG(5) << "Active nodes for label " << label << ": "
-            << displayNodeSymbolContainer(label_nodes);
+    MLOG(5,
+         "Active nodes for label {}: {}",
+         label,
+         displayNodeSymbolContainer(label_nodes));
   }
 }
 
@@ -208,7 +213,7 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
   ScopedTimer timer(config.timer_namespace + "_graph_update", timestamp_ns);
   updateOldNodes(offsets, graph);
   if (!graph.hasMesh()) {
-    LOG(ERROR) << "Unable to update graph without mesh!";
+    HYDRA_LOG(ERROR, "Unable to update graph without mesh!");
     return;
   }
 
@@ -304,8 +309,10 @@ void MeshSegmenter::addNodeToGraph(SceneGraph& graph,
                                    uint32_t label,
                                    uint64_t timestamp) {
   if (cluster.indices.empty()) {
-    LOG(ERROR) << "Encountered empty cluster with label" << static_cast<int>(label)
-               << " @ " << timestamp << "[ns]";
+    HYDRA_LOG(ERROR,
+              "Encountered empty cluster with label{} @ {}[ns]",
+              static_cast<int>(label),
+              timestamp);
     return;
   }
 

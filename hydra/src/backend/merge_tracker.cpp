@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/merge_tracker.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
@@ -62,11 +62,13 @@ bool hasParent(const SceneGraph& unmerged, const SceneGraph& merged, NodeId pare
   }
 
   if (in_unmerged != in_merged) {
-    LOG(WARNING) << "Dropping merge set for parent " << NodeSymbol(parent).str()
-                 << ": missing from the " << (in_unmerged ? "merged" : "unmerged")
-                 << " graph only (inconsistent graphs)";
+    HYDRA_LOG(WARNING,
+              "Dropping merge set for parent {}: missing from the {} graph only "
+              "(inconsistent graphs)",
+              NodeSymbol(parent).str(),
+              (in_unmerged ? "merged" : "unmerged"));
   } else {
-    VLOG(1) << "Dropping merge set for deleted parent " << NodeSymbol(parent).str();
+    HYDRA_VLOG(1, "Dropping merge set for deleted parent {}", NodeSymbol(parent).str());
   }
 
   return false;
@@ -86,20 +88,22 @@ size_t MergeTracker::applyMerges(const SceneGraph& unmerged,
   for (const auto& orig_merge : proposals) {
     const auto merge = orig_merge.remap(prior_merges);
     if (merge.from == merge.to) {
-      VLOG(4) << "Found present merge: " << orig_merge << " (remapped: " << merge
-              << ")";
+      HYDRA_VLOG(4, "Found present merge: {} (remapped: {})", orig_merge, merge);
       to_update.insert(merge.to);
       continue;
     }
 
     if (!graph.mergeNodes(merge.from, merge.to)) {
-      LOG(WARNING) << "Failed to apply merge: " << merge << " (original: " << orig_merge
-                   << ", from: " << std::boolalpha << graph.hasNode(merge.from)
-                   << ", to: " << graph.hasNode(merge.to) << ")";
+      HYDRA_LOG(WARNING,
+                "Failed to apply merge: {} (original: {}, from: {}, to: {})",
+                merge,
+                orig_merge,
+                graph.hasNode(merge.from),
+                graph.hasNode(merge.to));
       continue;
     }
 
-    VLOG(3) << "Applied merge: " << merge << " (original: " << orig_merge << ")";
+    HYDRA_VLOG(3, "Applied merge: {} (original: {})", merge, orig_merge);
 
     ++num_applied;
     to_update.insert(merge.to);

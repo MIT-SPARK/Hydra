@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 

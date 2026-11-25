@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/integration_masking.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <opencv2/core.hpp>
 
@@ -56,13 +56,15 @@ inline bool initMask(const cv::Mat& input, cv::Mat& mask) {
   }
 
   if (mask.rows != input.rows || mask.cols != input.cols) {
-    LOG(ERROR) << "Dimensions do not match! input: " << showImageDim(input)
-               << " vs. mask: " << showImageDim(mask);
+    HYDRA_LOG(ERROR,
+              "Dimensions do not match! input: {} vs. mask: {}",
+              showImageDim(input),
+              showImageDim(mask));
     return false;
   }
 
   if (mask.type() != CV_8UC1) {
-    LOG(WARNING) << "Invalid mask type! Must be CV_8UC1!";
+    HYDRA_LOG(WARNING, "Invalid mask type! Must be CV_8UC1!");
 
     cv::Mat converted;
     mask.convertTo(converted, CV_8UC1);
@@ -82,7 +84,7 @@ bool maskInvalidSemantics(const cv::Mat& labels,
   }
 
   if (labels.type() != InputData::LabelMatType) {
-    LOG(ERROR) << "Invalid label image type!";
+    HYDRA_LOG(ERROR, "Invalid label image type!");
     return false;
   }
 
@@ -135,7 +137,7 @@ bool maskNonZero(const cv::Mat input, cv::Mat& mask) {
       };
       break;
     default:
-      LOG(ERROR) << "Unhandled depth: " << input.depth();
+      HYDRA_LOG(ERROR, "Unhandled depth: {}", input.depth());
       return false;
   }
 

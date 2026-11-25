@@ -13,7 +13,6 @@ option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 find_package(ament_cmake REQUIRED)
 find_package(config_utilities REQUIRED)
-find_package(gflags REQUIRED)
 find_package(hydra REQUIRED)
 find_package(hydra_msgs REQUIRED)
 find_package(hydra_multi REQUIRED)
@@ -53,7 +52,7 @@ ament_target_dependencies(
 )
 
 add_executable(hydra_multi_ros_node app/hydra_multi_ros_node.cpp)
-target_link_libraries(hydra_multi_ros_node ${PROJECT_NAME} ${gflags_LIBRARIES})
+target_link_libraries(hydra_multi_ros_node ${PROJECT_NAME})
 
 install(
   TARGETS ${PROJECT_NAME}

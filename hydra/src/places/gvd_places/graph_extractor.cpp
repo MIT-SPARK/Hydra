@@ -36,8 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spatial_hash/neighbor_utils.h>
@@ -191,10 +190,10 @@ std::vector<uint64_t> GraphExtractor::prune() {
   }
 
   const auto archived = gvd_.clearArchived();
-  MLOG(2) << "Cleared archived nodes [" << archived << "]";
+  MLOG(2, "Cleared archived nodes [{}]", archived);
 
   const auto archived_node_ids = graph_.prune();
-  MLOG(2) << "Cleared graph nodes [" << archived_node_ids << "]";
+  MLOG(2, "Cleared graph nodes [{}]", archived_node_ids);
   for (const auto& node_id : archived_node_ids) {
     node_index_map_.erase(node_id);
     node_attribute_map_.erase(node_id);
@@ -214,15 +213,17 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
 
   for (const auto& index : changes.added) {
     const auto voxel = layer.getVoxelPtr(index);
-    CHECK(voxel) << "Invalid index " << showIndex(index) << " found!";
+    HYDRA_CHECK(voxel, "Invalid index {} found!", showIndex(index));
     if (!voxel->num_extra_basis || voxel->distance < config.min_node_distance_m) {
       continue;
     }
 
     const auto parents = tracker.parents(index);
     if (parents.empty()) {
-      LOG(ERROR) << "Invalid GVD voxel with no parents: " << *voxel << " @ "
-                 << showIndex(index);
+      HYDRA_LOG(ERROR,
+                "Invalid GVD voxel with no parents: {} @ {}",
+                *voxel,
+                showIndex(index));
       continue;
     }
 
@@ -240,7 +241,7 @@ void GraphExtractor::updateCompressedNodes() {
   for (const auto& [node_id, node] : compressed) {
     stale_nodes.erase(node_id);
     const auto result = gvd_.getCompressed(node_id, *merge_policy_);
-    CHECK(result);
+    HYDRA_CHECK(result);
 
     auto attrs = std::make_unique<PlaceNodeAttributes>();
     attrs->is_active = !node.archived();
@@ -272,7 +273,7 @@ void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
     const auto node_attrs = graph_.find(node_id);
     if (!node_attrs) {
       // TODO(nathan) technically we should be able to use at
-      LOG(ERROR) << "Node " << node_id << " not in graph!";
+      HYDRA_LOG(ERROR, "Node {} not in graph!", node_id);
       continue;
     }
 
@@ -280,7 +281,7 @@ void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
     for (const auto sibling_id : node.siblings) {
       const auto sibling_attrs = graph_.find(sibling_id);
       if (!sibling_attrs) {
-        LOG(ERROR) << "Sibling " << sibling_id << " not in graph!";
+        HYDRA_LOG(ERROR, "Sibling {} not in graph!", sibling_id);
         continue;  // skip any unadded nodes
       }
 

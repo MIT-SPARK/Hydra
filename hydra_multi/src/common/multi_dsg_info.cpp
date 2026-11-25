@@ -1,6 +1,6 @@
 #include "hydra_multi/common/multi_dsg_info.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
@@ -32,7 +32,7 @@ MultiDsgInfo::Ptr MultiDsgInfo::clone() const {
 
 void MultiDsgInfo::update(const MultiDsgInfo& dsg) {
   if (!dsg.graph) {
-    LOG(ERROR) << "graph not initialized";
+    HYDRA_LOG(ERROR, "graph not initialized");
     return;
   }
 
@@ -70,12 +70,12 @@ void MultiDsgInfo::addRobotGraph(size_t robot_id,
 
   // Check if robot has already been added
   if (robot_node_map.count(robot_id)) {
-    LOG(ERROR) << "Duplicated robot graphs detected when adding to MultiDsgInfo.";
+    HYDRA_LOG(ERROR, "Duplicated robot graphs detected when adding to MultiDsgInfo.");
     return;
   }
 
   if (!kimera_pgmo::isValidId(robot_id)) {
-    LOG(FATAL) << "Robot ID (" << robot_id << ") not assigned valid prefix.";
+    HYDRA_LOG(FATAL, "Robot ID ({}) not assigned valid prefix.", robot_id);
   }
 
   robot_node_map[robot_id] = {};
@@ -105,9 +105,12 @@ void MultiDsgInfo::addLabelspaces(size_t robot_id, const SceneGraph& dsg) {
 
     if (current_spaces != current.end() && current_spaces->contains(key) &&
         !current_spaces->at(key).empty()) {
-      LOG_IF(WARNING, current_spaces->at(key) != mapping)
-          << "Robot " << robot_id << " has a different labelspace for '" << key
-          << "' than an earlier robot; keeping the earlier one";
+      HYDRA_LOG_IF(WARNING,
+                   current_spaces->at(key) != mapping,
+                   "Robot {} has a different labelspace for '{}' than an earlier "
+                   "robot; keeping the earlier one",
+                   robot_id,
+                   key);
       continue;
     }
 
@@ -172,23 +175,22 @@ void MultiDsgInfo::remapAndAddLayers(size_t robot_id,
     const auto src_iter = node_mapping.find(edge.source);
     const auto tgt_iter = node_mapping.find(edge.target);
     if (src_iter == node_mapping.end() || tgt_iter == node_mapping.end()) {
-      LOG(ERROR) << "Edge between unmapped nodes: " << NodeSymbol(edge.source).str()
-                 << " (remapped: "
-                 << (src_iter == node_mapping.end()
-                         ? "???"
-                         : NodeSymbol(src_iter->second).str())
-                 << ")" << " -> " << NodeSymbol(edge.target) << " (remapped: "
-                 << (tgt_iter == node_mapping.end()
-                         ? "???"
-                         : NodeSymbol(tgt_iter->second).str())
-                 << ")";
+      HYDRA_LOG(
+          ERROR,
+          "Edge between unmapped nodes: {} (remapped: {}) -> {} (remapped: {})",
+          NodeSymbol(edge.source).str(),
+          (src_iter == node_mapping.end() ? "???" : NodeSymbol(src_iter->second).str()),
+          NodeSymbol(edge.target),
+          (tgt_iter == node_mapping.end() ? "???"
+                                          : NodeSymbol(tgt_iter->second).str()));
       continue;
     }
 
     if (!graph->insertEdge(src_iter->second, tgt_iter->second, edge.info->clone())) {
-      LOG(ERROR) << "Failed to insert interlayer edge "
-                 << NodeSymbol(node_mapping.at(edge.source)).str() << " - "
-                 << NodeSymbol(node_mapping.at(edge.target)).str();
+      HYDRA_LOG(ERROR,
+                "Failed to insert interlayer edge {} - {}",
+                NodeSymbol(node_mapping.at(edge.source)).str(),
+                NodeSymbol(node_mapping.at(edge.target)).str());
     }
   }
 }

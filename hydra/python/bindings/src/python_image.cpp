@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/python_image.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <pybind11/stl.h>
 
 #include "hydra/bindings/color_parser.h"
@@ -77,7 +77,7 @@ PythonImage::PythonImage(const pybind11::buffer& img)
   }
 
   if (shape.size() != 2 && shape.size() != 3) {
-    LOG(ERROR) << "invalid (squeezed) image shape: " << getShapeStr(shape);
+    HYDRA_LOG(ERROR, "invalid (squeezed) image shape: {}", getShapeStr(shape));
     return;
   }
 
@@ -98,7 +98,7 @@ cv::Mat getImage(const PythonImage& img) {
 
   const auto parser = Parser::create(img);
   if (!parser) {
-    LOG(ERROR) << "could not create parser for image";
+    HYDRA_LOG(ERROR, "could not create parser for image");
     return {};
   }
 

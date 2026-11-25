@@ -32,9 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/frontend/mesh_segmenter.h>
+#include <hydra/utils/logging.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/node_attributes.h>

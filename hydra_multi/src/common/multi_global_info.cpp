@@ -4,17 +4,17 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/common/run_settings.h>
+#include <hydra/utils/logging.h>
 
 #include <filesystem>
 #include <fstream>
 
-#include "hydra/utils/pgmo_glog_sink.h"
+#include "hydra/common/run_settings.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra_multi {
 
-using hydra::PgmoGlogSink;
 using hydra::timing::ElapsedTimeRecorder;
 
 decltype(MultiGlobalInfo::instance_) MultiGlobalInfo::instance_;
@@ -43,12 +43,13 @@ void MultiGlobalInfo::configureTimers() {
 
 void MultiGlobalInfo::initFromConfig(const MultiPipelineConfig& config) {
   config_ = config::checkValid(config);
-  VLOG(3) << "Loading from config: " << config::toString(config);
+  HYDRA_VLOG(3, "Loading from config: {}", config::toString(config));
+  auto settings = hydra::RunSettings::instance();
+  settings.default_verbosity = config_.default_verbosity;
+  settings.default_num_threads = config_.default_num_threads;
+  settings.enable_pgmo_logging = config_.enable_pgmo_logging;
+  hydra::RunSettings::init(settings);
   configureTimers();
-
-  if (config_.enable_pgmo_logging) {
-    logging::Logger::addSink("glog", std::make_shared<PgmoGlogSink>());
-  }
 }
 
 MultiGlobalInfo& MultiGlobalInfo::instance() {

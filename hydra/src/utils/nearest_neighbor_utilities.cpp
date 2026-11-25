@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <nanoflann.hpp>
 
@@ -91,7 +91,7 @@ NearestNodeFinder::NearestNodeFinder(const SceneGraphLayer& layer,
                                      const std::unordered_set<NodeId>& nodes)
     : num_nodes(nodes.size()) {
   std::vector<NodeId> node_vector(nodes.begin(), nodes.end());
-  VLOG(4) << "Making node finder with " << nodes.size() << " nodes";
+  HYDRA_VLOG(4, "Making node finder with {} nodes", nodes.size());
   internals_.reset(new Detail(layer, node_vector));
 }
 

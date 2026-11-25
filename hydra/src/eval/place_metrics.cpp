@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/place_metrics.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 #include "hydra/utils/nearest_neighbor_utilities.h"

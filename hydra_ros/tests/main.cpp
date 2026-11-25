@@ -32,25 +32,16 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <hydra/utils/logging.h>
 #include <ianvs/node_init.h>
 
 #include <rclcpp/rclcpp.hpp>
 
 auto main(int argc, char** argv) -> int {
-  int verbosity = 0;
-  int minloglevel = 1;
-
-  FLAGS_logtostderr = true;
-  FLAGS_alsologtostderr = true;
-  FLAGS_colorlogtostderr = true;
-  FLAGS_minloglevel = minloglevel;
-  FLAGS_v = verbosity;
+  hydra::logging::setLogLevel("warning");
 
   ::testing::InitGoogleTest(&argc, argv);
-  google::InitGoogleLogging(argv[0]);
 
   int ret;
   {  // Start node scope

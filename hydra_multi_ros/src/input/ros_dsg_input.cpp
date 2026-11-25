@@ -2,7 +2,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo_ros/conversion/mesh_delta.h>
 #include <spark_dsg/serialization/graph_binary_serialization.h>
@@ -106,11 +106,11 @@ std::vector<MeshDeltaPtr> RosDsgInput::requestDeltas(
   auto request = std::make_shared<MeshDeltaQuery::Request>();
   request->sequence_numbers = sequence_numbers;
 
-  LOG(INFO) << "Before call service for robot" << id_;
+  HYDRA_LOG(INFO, "Before call service for robot{}", id_);
   auto nh = getHydraMultiNodeHandle(name_);
   const auto response = ianvs::call_service(*mesh_update_client_, request, 0, &nh);
   if (!response) {
-    LOG(ERROR) << "Mesh Delta Request service call failed!";
+    HYDRA_LOG(ERROR, "Mesh Delta Request service call failed!");
     return {};
   }
 
@@ -137,8 +137,7 @@ void RosDsgInput::processQueues() {
   }
 
   while (!dsg_queue_.empty() && dsg_queue_.front().timestamp <= common_stamp) {
-    MLOG(2) << "Got dsg @ " << dsg_queue_.front().timestamp << " [ns] for input '"
-            << name_ << "'";
+    MLOG(2, "Got dsg @ {} [ns] for input '{}'", dsg_queue_.front().timestamp, name_);
     if (!state_->dsg_) {
       state_->initDsg(spark_dsg::io::binary::readGraph(dsg_queue_.front().update));
     }
@@ -159,14 +158,16 @@ void RosDsgInput::processQueues() {
       }
 
       // Request and append missing deltas
-      LOG(WARNING) << "Requesting " << missing_seqs.size() << " missing mesh deltas...";
+      HYDRA_LOG(WARNING, "Requesting {} missing mesh deltas...", missing_seqs.size());
       auto recovered = requestDeltas(missing_seqs);
-      LOG(WARNING) << "Recieved " << recovered.size() << " mesh deltas...";
+      HYDRA_LOG(WARNING, "Recieved {} mesh deltas...", recovered.size());
       for (const auto& delta : recovered) {
         const auto new_seq = delta->info.sequence_number;
         if (new_seq != mesh_sequence_ + 1) {
-          LOG(FATAL) << "Still missing mesh delta for sequence " << mesh_sequence_ + 1
-                     << ", got " << new_seq;
+          HYDRA_LOG(FATAL,
+                    "Still missing mesh delta for sequence {}, got {}",
+                    mesh_sequence_ + 1,
+                    new_seq);
         }
 
         state_->mesh_operator_->incrementalAppend(*delta);
@@ -174,8 +175,11 @@ void RosDsgInput::processQueues() {
       }
 
       if (static_cast<uint16_t>(mesh_sequence_ + 1) != seq) {
-        LOG(FATAL) << "Unable to recover all missing mesh deltas before current: "
-                   << mesh_sequence_ << " vs expected " << seq - 1;
+        HYDRA_LOG(FATAL,
+                  "Unable to recover all missing mesh deltas before current: {} vs "
+                  "expected {}",
+                  mesh_sequence_,
+                  seq - 1);
       }
     }
 

@@ -33,10 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <config_utilities/parsing/yaml.h>
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
 #include <gtest/gtest.h>
 #include <hydra/input/lidar.h>
+#include <hydra/utils/logging.h>
 #include <hydra_ros/input/ros_sensors.h>
 #include <ianvs/node_handle.h>
 #include <tf2_ros/static_transform_broadcaster.h>

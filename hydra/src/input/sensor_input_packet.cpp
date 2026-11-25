@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/input/sensor_input_packet.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <opencv2/imgproc.hpp>
 
@@ -67,7 +67,7 @@ ImageInputPacket::ImageInputPacket(uint64_t stamp) : SensorInputPacket(stamp) {}
 
 bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
   if (depth.empty()) {
-    LOG(ERROR) << "Missing required images: depth image must be set.";
+    HYDRA_LOG(ERROR, "Missing required images: depth image must be set.");
     return false;
   }
 
@@ -84,27 +84,35 @@ bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
   }
 
   if (!msg.color_image.empty() && !sizesMatch(msg.depth_image, msg.color_image)) {
-    LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
-               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    HYDRA_LOG(ERROR,
+              "Color dimensions {} do not match depth dimensions {}",
+              showImageDim(msg.color_image),
+              showImageDim(msg.depth_image));
     return false;
   }
 
   if (!msg.label_image.empty() && !sizesMatch(msg.depth_image, msg.label_image)) {
-    LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
-               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    HYDRA_LOG(ERROR,
+              "Label dimensions {} do not match depth dimensions {}",
+              showImageDim(msg.label_image),
+              showImageDim(msg.depth_image));
     return false;
   }
 
   if (!msg.instance_image.empty() && !sizesMatch(msg.depth_image, msg.instance_image)) {
-    LOG(ERROR) << "Instance dimensions " << showImageDim(msg.instance_image)
-               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    HYDRA_LOG(ERROR,
+              "Instance dimensions {} do not match depth dimensions {}",
+              showImageDim(msg.instance_image),
+              showImageDim(msg.depth_image));
     return false;
   }
 
   if (!msg.traversability_image.empty() &&
       !sizesMatch(msg.depth_image, msg.traversability_image)) {
-    LOG(ERROR) << "Traversability dimensions " << showImageDim(msg.traversability_image)
-               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    HYDRA_LOG(ERROR,
+              "Traversability dimensions {} do not match depth dimensions {}",
+              showImageDim(msg.traversability_image),
+              showImageDim(msg.depth_image));
     return false;
   }
 
@@ -115,7 +123,7 @@ CloudInputPacket::CloudInputPacket(uint64_t stamp) : SensorInputPacket(stamp) {}
 
 bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   if (points.empty() || (labels.empty() && colors.empty())) {
-    LOG(ERROR) << "Missing required pointcloud.";
+    HYDRA_LOG(ERROR, "Missing required pointcloud.");
     return false;
   }
 
@@ -128,33 +136,43 @@ bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   msg.traversability_image = traversability;
 
   if (!msg.color_image.empty() && !sizesMatch(msg.vertex_map, msg.color_image)) {
-    LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
-               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
+    HYDRA_LOG(ERROR,
+              "Color dimensions {} do not match cloud dimensions {}",
+              showImageDim(msg.color_image),
+              showImageDim(msg.vertex_map));
     return false;
   }
 
   if (!msg.color_mask.empty() && !sizesMatch(msg.vertex_map, msg.color_mask)) {
-    LOG(ERROR) << "Color mask dimensions " << showImageDim(msg.color_mask)
-               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
+    HYDRA_LOG(ERROR,
+              "Color mask dimensions {} do not match cloud dimensions {}",
+              showImageDim(msg.color_mask),
+              showImageDim(msg.vertex_map));
     return false;
   }
 
   if (!msg.label_image.empty() && !sizesMatch(msg.vertex_map, msg.label_image)) {
-    LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
-               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
+    HYDRA_LOG(ERROR,
+              "Label dimensions {} do not match cloud dimensions {}",
+              showImageDim(msg.label_image),
+              showImageDim(msg.vertex_map));
     return false;
   }
 
   if (!msg.instance_image.empty() && !sizesMatch(msg.vertex_map, msg.instance_image)) {
-    LOG(ERROR) << "Instance dimensions " << showImageDim(msg.instance_image)
-               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
+    HYDRA_LOG(ERROR,
+              "Instance dimensions {} do not match cloud dimensions {}",
+              showImageDim(msg.instance_image),
+              showImageDim(msg.vertex_map));
     return false;
   }
 
   if (!msg.traversability_image.empty() &&
       !sizesMatch(msg.vertex_map, msg.traversability_image)) {
-    LOG(ERROR) << "Traversability dimensions " << showImageDim(msg.traversability_image)
-               << " do not match cloud dimensions " << showImageDim(msg.vertex_map);
+    HYDRA_LOG(ERROR,
+              "Traversability dimensions {} do not match cloud dimensions {}",
+              showImageDim(msg.traversability_image),
+              showImageDim(msg.vertex_map));
     return false;
   }
 

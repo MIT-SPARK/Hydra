@@ -3,13 +3,13 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/linear/NoiseModel.h>
 #include <gtsam/nonlinear/GncOptimizer.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/slam/BetweenFactor.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
 
 namespace hydra_multi {
@@ -48,26 +48,29 @@ bool LoopClosureInitialAlignModule::addLoopClosure(const gtsam::Key& from,
   gtsam::Symbol from_symb(from);
   gtsam::Symbol to_symb(to);
   if (from_symb.chr() == to_symb.chr()) {
-    VLOG(2) << "Attempting to add single-robot loop closure to "
-               "LoopClosureInitialAlignModule.";
+    HYDRA_VLOG(2,
+               "Attempting to add single-robot loop closure to "
+               "LoopClosureInitialAlignModule.");
     return false;
   }
 
   if (!kimera_pgmo::isRobotPrefix(from_symb.chr())) {
-    VLOG(2) << "Prefix: " << from_symb.chr() << " not a known robot prefix.";
+    HYDRA_VLOG(2, "Prefix: {} not a known robot prefix.", from_symb.chr());
     return false;
   }
 
   if (!kimera_pgmo::isRobotPrefix(to_symb.chr())) {
-    VLOG(2) << "Prefix: " << to_symb.chr() << " not a known robot prefix.";
+    HYDRA_VLOG(2, "Prefix: {} not a known robot prefix.", to_symb.chr());
     return false;
   }
 
   RobotId from_robot_id = getFrame(kimera_pgmo::idFromRobotPrefix(from_symb.chr()));
   RobotId to_robot_id = getFrame(kimera_pgmo::idFromRobotPrefix(to_symb.chr()));
   if (from_robot_id == to_robot_id) {
-    VLOG(2) << "Skipping loop closure between robots in the same frame "
-            << from_robot_id << " in LoopClosureInitialAlignModule.";
+    HYDRA_VLOG(2,
+               "Skipping loop closure between robots in the same frame {} in "
+               "LoopClosureInitialAlignModule.",
+               from_robot_id);
     return false;
   }
 
@@ -114,9 +117,12 @@ void LoopClosureInitialAlignModule::updatePairwiseTransforms(
               Wfrom_T_from.compose(from_T_to).compose(Wto_T_to.inverse());
           pairwise_transforms_[from][to].push_back(Wfrom_T_Wto);
         } catch (const std::out_of_range& e) {
-          MLOG_NAMED(ERROR) << "index not in deformation graph for to="
-                            << to_node.string() << " -> from=" << from_node.string()
-                            << " (error: " << e.what() << ")";
+          MLOG_NAMED(ERROR,
+                     "index not in deformation graph for "
+                     "to={} -> from={} (error: {})",
+                     to_node.string(),
+                     from_node.string(),
+                     e.what());
           break;
         }
       }
@@ -211,7 +217,7 @@ gtsam::Pose3 LoopClosureInitialAlignModule::robustInitialGuess(
 
 void LoopClosureInitialAlignModule::computeInitialTransforms() {
   if (pairwise_transforms_.size() == 0) {
-    VLOG(4) << "No pair-wsie transforms computed yet.";
+    HYDRA_VLOG(4, "No pair-wsie transforms computed yet.");
     return;
   }
 
@@ -269,7 +275,7 @@ void LoopClosureInitialAlignModule::computeInitialTransforms() {
   for (const auto& key : estimate.keys()) {
     const RobotId robot_id(key);
     W_T_robot_[robot_id] = estimate.at<gtsam::Pose3>(key);
-    VLOG(3) << "Update robot " << robot_id << " W_T_robot: " << W_T_robot_[robot_id];
+    HYDRA_VLOG(3, "Update robot {} W_T_robot: {}", robot_id, W_T_robot_[robot_id]);
   }
 }
 

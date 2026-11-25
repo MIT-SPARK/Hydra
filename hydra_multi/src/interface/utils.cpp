@@ -1,14 +1,14 @@
 #include "hydra_multi/interface/utils.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 namespace hydra_multi {
 using namespace Eigen;
 void estimateRigidTransformSVD(const std::vector<Vector3d>& src,
                                const std::vector<Vector3d>& trgt,
                                Eigen::Isometry3d& src_T_trgt) {
-  CHECK_EQ(src.size(), trgt.size());
-  CHECK_GE(src.size(), 3);
+  HYDRA_CHECK_EQ(src.size(), trgt.size());
+  HYDRA_CHECK_GE(src.size(), 3);
 
   // Compute the centroids
   const auto n = src.size();

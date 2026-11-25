@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/odometry/pose_graph_packet.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
@@ -51,7 +51,7 @@ std::vector<NodeId> PoseGraphPacket::addToGraph(SceneGraph& graph,
   for (const auto& pose_graph : pose_graphs) {
     for (const auto& node : pose_graph.nodes) {
       if (robot_id && node.robot_id != robot_id.value()) {
-        VLOG(1) << "Dropping node for other robot: " << node;
+        HYDRA_VLOG(1, "Dropping node for other robot: {}", node);
         continue;
       }
 
@@ -64,17 +64,17 @@ std::vector<NodeId> PoseGraphPacket::addToGraph(SceneGraph& graph,
       const std::chrono::nanoseconds stamp(node.stamp_ns);
       const Eigen::Vector3d pos = node.pose.translation();
       const Eigen::Quaterniond rot(node.pose.linear());
-      VLOG(3) << "Adding agent " << node_id.str() << " @ " << stamp.count() << " [ns]";
+      HYDRA_VLOG(3, "Adding agent {} @ {} [ns]", node_id.str(), stamp.count());
 
       auto attrs = std::make_unique<AgentNodeAttributes>(stamp, rot, pos, node_id);
       const auto key = graph.getLayerKey(DsgLayers::AGENTS);
       if (!key) {
-        LOG(ERROR) << "No layer named '" << DsgLayers::AGENTS << "' in graph!";
+        HYDRA_LOG(ERROR, "No layer named '{}' in graph!", DsgLayers::AGENTS);
         continue;
       }
 
       if (!graph.emplaceNode(key->layer, node_id, std::move(attrs), node_prefix.key)) {
-        VLOG(1) << "Failed to add node @ " << stamp.count() << "[ns]";
+        HYDRA_VLOG(1, "Failed to add node @ {}[ns]", stamp.count());
         continue;
       }
 
@@ -88,7 +88,7 @@ std::vector<NodeId> PoseGraphPacket::addToGraph(SceneGraph& graph,
     for (const auto& edge : pose_graph.edges) {
       if (robot_id &&
           (edge.robot_from != robot_id.value() || edge.robot_to != robot_id.value())) {
-        VLOG(1) << "Dropping edge for other robot: " << edge;
+        HYDRA_VLOG(1, "Dropping edge for other robot: {}", edge);
         continue;
       }
 

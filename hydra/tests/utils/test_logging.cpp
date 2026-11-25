@@ -32,18 +32,58 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <kimera_pgmo/utils/logging.h>
+#include <gtest/gtest.h>
+
+#include <csignal>
+#include <cstdlib>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
+namespace {
 
-struct PgmoGlogSink : logging::LogSink {
-  explicit PgmoGlogSink(int debug_verbosity = 1, bool enabled = true);
+// Catch exceptions so an uncaught exception cannot masquerade as a fatal check.
+template <typename Operation>
+void runAndCatch(Operation operation) {
+  try {
+    operation();
+  } catch (...) {
+  }
 
-  void dispatch(const logging::LogEntry& entry) const override;
+  std::_Exit(EXIT_SUCCESS);
+}
 
-  const bool enabled;
-  const int debug_verbosity;
-};
+}  // namespace
+
+TEST(LoggingDeathTest, FormattingFailureCannotEscapeFatalLog) {
+  EXPECT_EXIT(
+      runAndCatch([] { HYDRA_LOG(FATAL, "{}", static_cast<const char*>(nullptr)); }),
+      ::testing::KilledBySignal(SIGABRT),
+      "");
+}
+
+TEST(LoggingDeathTest, FormattingFailureCannotEscapeFailedCheck) {
+  EXPECT_EXIT(
+      runAndCatch([] { HYDRA_CHECK(false, "{}", static_cast<const char*>(nullptr)); }),
+      ::testing::KilledBySignal(SIGABRT),
+      "");
+}
+
+TEST(LoggingDeathTest, FormattingFailureCannotEscapeFailedComparison) {
+  EXPECT_EXIT(runAndCatch([] {
+                HYDRA_CHECK_EQ(1, 2, "{}", static_cast<const char*>(nullptr));
+              }),
+              ::testing::KilledBySignal(SIGABRT),
+              "");
+}
+
+TEST(LoggingDeathTest, OperandFormattingFailureCannotEscapeFailedComparison) {
+  EXPECT_EXIT(runAndCatch([] {
+                const char* missing = nullptr;
+                HYDRA_CHECK_EQ(missing, "expected");
+              }),
+              ::testing::KilledBySignal(SIGABRT),
+              "");
+}
 
 }  // namespace hydra

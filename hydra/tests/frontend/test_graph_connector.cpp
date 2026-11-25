@@ -32,9 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/frontend/graph_connector.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/printing.h>

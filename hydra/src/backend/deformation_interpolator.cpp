@@ -37,7 +37,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_pgmo/mesh_types.h>
 #include <kimera_pgmo/utils/common_functions.h>
@@ -96,8 +96,9 @@ NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
   if (timestamp_ns == 0u) {
     const auto derived = dynamic_cast<const KhronosObjectAttributes*>(&attrs);
     if (!derived || derived->last_observed_ns.empty()) {
-      LOG(ERROR) << "Unable to find valid timestamp for node "
-                 << NodeSymbol(node_id).str();
+      HYDRA_LOG(ERROR,
+                "Unable to find valid timestamp for node {}",
+                NodeSymbol(node_id).str());
       return nullptr;
     }
 
@@ -197,7 +198,7 @@ void DeformationInterpolator::interpolate(const SceneGraph& unmerged,
     if (info->node_to_robot_id) {
       auto iter = info->node_to_robot_id->find(node.id);
       if (iter == info->node_to_robot_id->end()) {
-        LOG(WARNING) << "Node " << NodeSymbol(node.id) << " does not belong to a robot";
+        HYDRA_LOG(WARNING, "Node {} does not belong to a robot", NodeSymbol(node.id));
       } else {
         robot_id = iter->second;
       }
@@ -223,8 +224,10 @@ void DeformationInterpolator::interpolate(const SceneGraph& unmerged,
 
     const auto deform_func = [&](const Eigen::Isometry3d& transform, size_t index) {
       auto entry = entries.entries[index];
-      MLOG(4) << "node " << spark_dsg::NodeSymbol(entry->id).str()
-              << " -> transform: " << printTransform(transform);
+      MLOG(4,
+           "node {} -> transform: {}",
+           spark_dsg::NodeSymbol(entry->id).str(),
+           printTransform(transform));
 
       entry->update(unmerged.getNode(entry->id).attributes(), transform);
       auto node_ptr = dsg.findNode(entry->id);

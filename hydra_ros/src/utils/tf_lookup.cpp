@@ -37,8 +37,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/common/robot_config.h>
+#include <hydra/utils/logging.h>
 #include <ianvs/node_handle.h>
 #include <tf2_ros/transform_listener.h>
 
@@ -71,14 +71,16 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
 
   bool have_transform = false;
   std::string err_str;
-  MLOG(2) << "Looking up transform " << target << "_T_" << source << stamp_suffix;
+  MLOG(2, "Looking up transform {}_T_{}{}", target, source, stamp_suffix);
 
   const auto lookup_time = stamp.value_or(rclcpp::Time());
   size_t attempt_number = 0;
   while (rclcpp::ok()) {
-    MLOG(2) << "Attempting to lookup tf @ " << lookup_time.nanoseconds()
-            << " [ns]: " << attempt_number << " / "
-            << (max_tries ? std::to_string(max_tries) : "n/a");
+    MLOG(2,
+         "Attempting to lookup tf @ {} [ns]: {} / {}",
+         lookup_time.nanoseconds(),
+         attempt_number,
+         (max_tries ? std::to_string(max_tries) : "n/a"));
     if (max_tries && attempt_number >= max_tries) {
       break;
     }
@@ -104,7 +106,7 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
     if (message) {
       *message = ss.str();
     } else {
-      LOG(ERROR) << "Failed to find " << ss.str();
+      HYDRA_LOG(ERROR, "Failed to find {}", ss.str());
     }
 
     return {false, {}, {}};
@@ -114,8 +116,11 @@ PoseStatus lookupTransform(const tf2_ros::Buffer& buffer,
   try {
     transform = buffer.lookupTransform(target, source, lookup_time);
   } catch (const tf2::TransformException& ex) {
-    LOG(ERROR) << "Failed to look up available transform " << target << "_T_" << source
-               << stamp_suffix;
+    HYDRA_LOG(ERROR,
+              "Failed to look up available transform {}_T_{}{}",
+              target,
+              source,
+              stamp_suffix);
     return {false, {}, {}};
   }
 

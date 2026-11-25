@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/path.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <ctime>
 #include <filesystem>
@@ -92,12 +92,12 @@ DataDirectory::DataDirectory(const std::filesystem::path& output_path,
   }
 
   if (std::filesystem::exists(root_path_) && config.overwrite) {
-    LOG(WARNING) << "Overwriting existing directory: '" << root_path_.string() << "'.";
+    HYDRA_LOG(WARNING, "Overwriting existing directory: '{}'.", root_path_.string());
     std::filesystem::remove_all(root_path_);
   }
 
   if (config.allocate && !makeDirs(root_path_)) {
-    LOG(WARNING) << "Failed to make dir '" << root_path_ << "'. Logging disabled!";
+    HYDRA_LOG(WARNING, "Failed to make dir '{}'. Logging disabled!", root_path_);
     return;
   }
 

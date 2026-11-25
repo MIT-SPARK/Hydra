@@ -1,4 +1,4 @@
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <hydra_multi/interface/interface_container.h>
 
 namespace hydra_multi {
@@ -22,17 +22,17 @@ void InterfaceContainer::start() {
 
 void InterfaceContainer::stop() {
   for (const auto& id_interface : interfaces_) {
-    VLOG(2) << "stopping: " << id_interface.first;
+    HYDRA_VLOG(2, "stopping: {}", id_interface.first);
     id_interface.second->stop();
-    VLOG(2) << "stopped: " << id_interface.first;
+    HYDRA_VLOG(2, "stopped: {}", id_interface.first);
   }
 }
 
 void InterfaceContainer::save(const DataDirectory& output) {
   for (const auto& id_interface : interfaces_) {
-    VLOG(2) << "saving: " << id_interface.first;
+    HYDRA_VLOG(2, "saving: {}", id_interface.first);
     id_interface.second->save(output);
-    VLOG(2) << "saved: " << id_interface.first;
+    HYDRA_VLOG(2, "saved: {}", id_interface.first);
   }
 }
 

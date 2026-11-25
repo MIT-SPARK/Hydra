@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_ros/input/pointcloud_adaptor.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 namespace hydra {
 
@@ -88,27 +88,27 @@ using sensor_msgs::msg::PointField;
 std::function<double(const uint8_t*)> initFloatParser(const PointField& field) {
   using namespace std::placeholders;
   if (field.datatype == PointField::INT8) {
-    LOG(ERROR) << "cannot parse float from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse float from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::UINT8) {
-    LOG(ERROR) << "cannot parse float from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse float from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::INT16) {
-    LOG(ERROR) << "cannot parse float from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse float from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::UINT16) {
-    LOG(ERROR) << "cannot parse float from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse float from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::INT32) {
-    LOG(ERROR) << "cannot parse float from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse float from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::UINT32) {
-    LOG(ERROR) << "cannot parse float from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse float from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
 
@@ -119,7 +119,7 @@ std::function<double(const uint8_t*)> initFloatParser(const PointField& field) {
     return std::bind(&parseFloatFrom_double, _1, field.offset);
   }
 
-  LOG(ERROR) << "unknown datatype: " << sensor_msgs::msg::to_yaml(field);
+  HYDRA_LOG(ERROR, "unknown datatype: {}", sensor_msgs::msg::to_yaml(field));
   return {};
 }
 
@@ -145,15 +145,15 @@ std::function<double(const uint8_t*)> initIntParser(const PointField& field) {
   }
 
   if (field.datatype == PointField::FLOAT32) {
-    LOG(ERROR) << "cannot parse int from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse int from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::FLOAT64) {
-    LOG(ERROR) << "cannot parse int from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse int from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
 
-  LOG(ERROR) << "unknown datatype: " << sensor_msgs::msg::to_yaml(field);
+  HYDRA_LOG(ERROR, "unknown datatype: {}", sensor_msgs::msg::to_yaml(field));
   return {};
 }
 
@@ -161,27 +161,27 @@ std::function<std::array<uint8_t, 4>(const uint8_t*)> initColorParser(
     const PointField& field) {
   using namespace std::placeholders;
   if (field.datatype == PointField::INT8) {
-    LOG(ERROR) << "cannot parse color from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse color from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::UINT8) {
-    LOG(ERROR) << "cannot parse color from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse color from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::INT16) {
-    LOG(ERROR) << "cannot parse color from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse color from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::UINT16) {
-    LOG(ERROR) << "cannot parse color from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse color from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::INT32) {
-    LOG(ERROR) << "cannot parse color from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse color from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
   if (field.datatype == PointField::FLOAT64) {
-    LOG(ERROR) << "cannot parse color from " << sensor_msgs::msg::to_yaml(field);
+    HYDRA_LOG(ERROR, "cannot parse color from {}", sensor_msgs::msg::to_yaml(field));
     return {};
   }
 
@@ -192,29 +192,29 @@ std::function<std::array<uint8_t, 4>(const uint8_t*)> initColorParser(
     return std::bind(&parseColorFrom_float, _1, field.offset);
   }
 
-  LOG(ERROR) << "unknown datatype: " << sensor_msgs::msg::to_yaml(field);
+  HYDRA_LOG(ERROR, "unknown datatype: {}", sensor_msgs::msg::to_yaml(field));
   return {};
 }
 
 PointcloudAdaptor::PointcloudAdaptor(const sensor_msgs::msg::PointCloud2& cloud) {
   for (const auto& field : cloud.fields) {
     if (field.name == "x") {
-      VLOG(4) << "found x field: " << sensor_msgs::msg::to_yaml(field);
+      HYDRA_VLOG(4, "found x field: {}", sensor_msgs::msg::to_yaml(field));
       x_parser_ = initFloatParser(field);
     } else if (field.name == "y") {
-      VLOG(4) << "found y field: " << sensor_msgs::msg::to_yaml(field);
+      HYDRA_VLOG(4, "found y field: {}", sensor_msgs::msg::to_yaml(field));
       y_parser_ = initFloatParser(field);
     } else if (field.name == "z") {
-      VLOG(4) << "found z field: " << sensor_msgs::msg::to_yaml(field);
+      HYDRA_VLOG(4, "found z field: {}", sensor_msgs::msg::to_yaml(field));
       z_parser_ = initFloatParser(field);
     } else if (field.name == "rgb" || field.name == "rgba") {
-      VLOG(4) << "found color field: " << sensor_msgs::msg::to_yaml(field);
+      HYDRA_VLOG(4, "found color field: {}", sensor_msgs::msg::to_yaml(field));
       color_parser_ = initColorParser(field);
     } else if (field.name == "label" || field.name == "ring") {
-      VLOG(4) << "found label field: " << sensor_msgs::msg::to_yaml(field);
+      HYDRA_VLOG(4, "found label field: {}", sensor_msgs::msg::to_yaml(field));
       label_parser_ = initIntParser(field);
     } else {
-      VLOG(4) << "unknown field: " << sensor_msgs::msg::to_yaml(field);
+      HYDRA_VLOG(4, "unknown field: {}", sensor_msgs::msg::to_yaml(field));
     }
   }
 }

@@ -32,8 +32,8 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <hydra/rooms/graph_filtration.h>
+#include <hydra/utils/logging.h>
 #include <hydra/utils/timing_utilities.h>
 #include <spark_dsg/scene_graph.h>
 #include <yaml-cpp/yaml.h>
@@ -49,9 +49,7 @@ using spark_dsg::NodeId;
 using spark_dsg::SceneGraph;
 
 int main(int argc, char* argv[]) {
-  FLAGS_minloglevel = 0;
-  FLAGS_logtostderr = 1;
-  FLAGS_colorlogtostderr = 1;
+  hydra::logging::setLogLevel("info");
 
   CLI::App app("Compute scene graph filtrations");
   double dilation_threshold = 1.0e-4;
@@ -67,7 +65,6 @@ int main(int argc, char* argv[]) {
   app.add_flag("--include-nodes", include_nodes);
   app.add_option("-o,--output-path", output_path);
   CLI11_PARSE(app, argc, argv);
-  google::InitGoogleLogging(argv[0]);
 
   hydra::timing::ElapsedTimeRecorder::instance().disable_output = false;
 
@@ -77,16 +74,19 @@ int main(int argc, char* argv[]) {
 
   size_t index = 0;
   for (const auto& filename : files) {
-    LOG(INFO) << "Parsing: " << filename << "...";
-    CHECK(!filename.empty());
+    HYDRA_LOG(INFO, "Parsing: {}...", filename);
+    HYDRA_CHECK(!filename.empty());
 
     const std::filesystem::path filepath(filename);
     filepaths[index] = std::filesystem::canonical(filepath).string();
     results[index] = std::list<std::pair<double, size_t>>();
     const auto graph = SceneGraph::load(filename);
     const auto& places = graph->getLayer(DsgLayers::PLACES);
-    LOG(INFO) << "Loaded " << filename << " with " << places.numNodes() << " nodes and "
-              << places.numEdges() << " edges";
+    HYDRA_LOG(INFO,
+              "Loaded {} with {} nodes and {} edges",
+              filename,
+              places.numNodes(),
+              places.numEdges());
 
     hydra::BarcodeTracker tracker(min_component_size);
     hydra::Filtration filtration;

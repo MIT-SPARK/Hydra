@@ -44,7 +44,7 @@ def cli():
 @click.option("--force", "-f", is_flag=True, help="overwrite existing scenes.")
 @click.option("--output", "-o", default=None, type=click.Path())
 def mp3d(scenes, visualize, zmq_url, max_steps, force, output):
-    hydra.set_glog_level(0, 0)
+    hydra.set_log_level("info")
     scenes = [pathlib.Path(x).expanduser().resolve() for x in scenes]
     click.secho(f"Processing scenes: {', '.join(x.stem for x in scenes)}", fg="cyan")
 

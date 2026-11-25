@@ -35,11 +35,11 @@
 #include <config_utilities/config.h>
 #include <config_utilities/external_registry.h>
 #include <config_utilities/formatting/asl.h>
-#include <config_utilities/logging/log_to_glog.h>
+#include <config_utilities/logging/log_to_spdlog.h>
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <ianvs/node_init.h>
 #include <ianvs/spin_functions.h>
 
@@ -47,6 +47,7 @@
 
 #include "hydra_ros/hydra_ros_pipeline.h"
 #include "hydra_ros/utils/node_plugins.h"
+#include "hydra_ros/utils/ros_log_sink.h"
 
 namespace hydra {
 
@@ -55,9 +56,9 @@ struct NodeSettings {
   bool exit_after_clock = false;
   bool force_shutdown = false;
   std::vector<std::string> paths;
-  bool forward_glog_to_ros = true;
-  int glog_level = 0;
-  int glog_verbosity = 0;
+  bool forward_logs_to_ros = true;
+  std::string log_level = "info";
+
   bool use_multithread_executor = true;
   std::vector<config::VirtualConfig<AppPlugin, true>> node_plugins = {
       config::VirtualConfig<AppPlugin, true>{ConfigServerPlugin::Config{}}};
@@ -70,45 +71,12 @@ void declare_config(NodeSettings& config) {
   field(config.exit_after_clock, "exit_after_clock");
   field(config.force_shutdown, "force_shutdown");
   field(config.paths, "paths");
-  field(config.forward_glog_to_ros, "forward_glog_to_ros");
-  field(config.glog_level, "glog_level");
-  field(config.glog_verbosity, "glog_verbosity");
+  field(config.forward_logs_to_ros, "forward_logs_to_ros");
+  field(config.log_level, "log_level");
+
   field(config.use_multithread_executor, "use_multithread_executor");
   field(config.node_plugins, "node_plugins");
 }
-
-struct RosSink : google::LogSink {
-  explicit RosSink(const rclcpp::Logger& logger) : logger_(logger) {}
-
-  void send(google::LogSeverity severity,
-            const char* /*full_filename*/,
-            const char* base_filename,
-            int line,
-            const struct ::tm* /*time*/,
-            const char* message,
-            size_t message_len) override {
-    std::stringstream ss;
-    ss << "[" << base_filename << ":" << line << "] "
-       << std::string(message, message_len);
-    switch (severity) {
-      case google::GLOG_WARNING:
-        RCLCPP_WARN_STREAM(logger_, ss.str());
-        break;
-      case google::GLOG_ERROR:
-        RCLCPP_ERROR_STREAM(logger_, ss.str());
-        break;
-      case google::GLOG_FATAL:
-        RCLCPP_FATAL_STREAM(logger_, ss.str());
-        break;
-      case google::GLOG_INFO:
-      default:
-        RCLCPP_INFO_STREAM(logger_, ss.str());
-        break;
-    }
-  }
-
-  rclcpp::Logger logger_;
-};
 
 }  // namespace hydra
 
@@ -117,26 +85,21 @@ int main(int argc, char* argv[]) {
   config::setConfigSettingsFromContext();
   const auto settings = config::fromContext<hydra::NodeSettings>();
 
-  FLAGS_minloglevel = settings.glog_level;
-  FLAGS_v = settings.glog_verbosity;
-  FLAGS_logtostderr = settings.forward_glog_to_ros ? 0 : 1;
-  FLAGS_colorlogtostderr = 1;
-
-  google::InitGoogleLogging(argv[0]);
-  google::InstallFailureSignalHandler();
+  hydra::logging::setLogLevel(settings.log_level);
 
   [[maybe_unused]] const auto node = ianvs::init_node(argc, argv, "hydra_ros_node");
   auto nh = ianvs::NodeHandle::this_node();
 
   std::shared_ptr<hydra::RosSink> ros_sink;
-  if (settings.forward_glog_to_ros) {
+  if (settings.forward_logs_to_ros) {
     ros_sink = std::make_shared<hydra::RosSink>(nh.logger());
-    google::AddLogSink(ros_sink.get());
+    hydra::logging::setSinks({ros_sink});
   }
 
-  config::Settings().setLogger("glog");
+  config::internal::Logger::setLogger(
+      std::make_shared<config::internal::SpdlogLogger>(hydra::logging::logger()));
   if (settings.show_run_settings) {
-    LOG(INFO) << "Using node settings\n" << config::toString(settings);
+    HYDRA_LOG(INFO, "Using node settings\n{}", config::toString(settings));
   }
 
   [[maybe_unused]] const auto plugins = config::loadExternalFactories(settings.paths);
@@ -150,7 +113,7 @@ int main(int argc, char* argv[]) {
 
     const auto run_config = config::fromContext<hydra::RunContext::Config>();
     const auto context = std::make_shared<hydra::RunContext>(run_config);
-    LOG(INFO) << "Loaded run config:\n" << config::toString(context->config);
+    HYDRA_LOG(INFO, "Loaded run config:\n{}", config::toString(context->config));
 
     auto config = config::fromContext<hydra::HydraRosPipeline::Config>();
     hydra::HydraRosPipeline hydra(config, context);
@@ -165,7 +128,7 @@ int main(int argc, char* argv[]) {
   }  // end hydra scope
 
   if (ros_sink) {
-    google::RemoveLogSink(ros_sink.get());
+    hydra::logging::setLogToStderr();
   }
 
   rclcpp::shutdown();

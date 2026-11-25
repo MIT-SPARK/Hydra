@@ -41,8 +41,8 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
-#include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/labelspace.h"
+#include "hydra/bindings/logging_utilities.h"
 #include "hydra/bindings/python_evaluation.h"
 #include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_pipeline.h"
@@ -112,7 +112,7 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   py::module_::import("spark_dsg");
   py::options options;
 
-  ::hydra::python::glog_utilities::addBindings(m);
+  ::hydra::python::logging_utilities::addBindings(m);
   ::hydra::python::labelspace::addBindings(m);
   ::hydra::python::python_evaluation::addBindings(m);
   ::hydra::python::python_image::addBindings(m);

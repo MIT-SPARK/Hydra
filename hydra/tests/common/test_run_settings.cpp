@@ -9,6 +9,29 @@
 
 namespace hydra {
 
+TEST(RunSettings, DisabledDiagnosticsDoNotEvaluateArguments) {
+  const VerbosityConfig silent("silent", -1);
+  auto evaluations = 0;
+  const auto expensive = [&] {
+    ++evaluations;
+    return "diagnostic";
+  };
+  MLOG_WITH(silent, 0, "{}", expensive());
+  EXPECT_EQ(evaluations, 0);
+}
+
+TEST(RunSettings, FatalChecksRemainActive) {
+  auto evaluations = 0;
+  const auto value = [&] {
+    ++evaluations;
+    return evaluations;
+  };
+  HYDRA_CHECK_EQ(value(), 1);
+  EXPECT_EQ(evaluations, 1);
+  EXPECT_DEATH(HYDRA_CHECK_EQ(1, 2), "");
+  EXPECT_DEATH(HYDRA_LOG(FATAL, "Unrecoverable invariant failure"), "");
+}
+
 TEST(RunSettings, VerbosityFollowsActiveRunUnlessOverridden) {
   const auto previous = RunSettings::instance();
   VerbosityConfig inherited;

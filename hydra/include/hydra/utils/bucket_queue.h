@@ -1,3 +1,4 @@
+#include <hydra/utils/logging.h>
 // Portions of the following code and their modifications are originally from
 // https://github.com/ethz-asl/voxblox and are licensed under the following license:
 //
@@ -44,8 +45,6 @@
 
 #pragma once
 
-#include <glog/logging.h>
-
 #include <deque>
 #include <queue>
 #include <vector>
@@ -76,7 +75,7 @@ class BucketQueue {
   }
 
   void push(const T& key, double value) {
-    CHECK_NE(num_buckets_, 0);
+    HYDRA_CHECK_NE(num_buckets_, 0);
     if (value > max_val_) {
       value = max_val_;
     }
@@ -105,8 +104,8 @@ class BucketQueue {
   }
 
   T front() {
-    CHECK_NE(num_buckets_, 0);
-    CHECK(!empty());
+    HYDRA_CHECK_NE(num_buckets_, 0);
+    HYDRA_CHECK(!empty());
     while (buckets_[last_bucket_index_].empty() && last_bucket_index_ < num_buckets_) {
       last_bucket_index_++;
     }

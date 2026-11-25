@@ -34,8 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/semantic_color_map.h"
 
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
+#include <hydra/utils/logging.h>
 
 #include "hydra/input/input_data.h"
 #include "hydra/utils/csv_reader.h"
@@ -50,9 +49,11 @@ SemanticColorMap::SemanticColorMap(const ColorToLabelMap& color_to_label,
                                    const Color& unknown)
     : max_label_(0), color_to_label_(color_to_label), unknown_color_(unknown) {
   for (auto&& [color, label] : color_to_label_) {
-    LOG_IF(WARNING, unknown_color_ == color)
-        << "found duplicate color with provided unknown color " << color
-        << " for label " << label;
+    HYDRA_LOG_IF(WARNING,
+                 unknown_color_ == color,
+                 "found duplicate color with provided unknown color {} for label {}",
+                 color,
+                 label);
     label_to_color_[label] = color;
     if (label > max_label_) {
       max_label_ = label;
@@ -67,7 +68,7 @@ std::optional<uint32_t> SemanticColorMap::getLabelFromColor(const Color& color) 
   }
 
   if (!unknown_colors_.count(color)) {
-    LOG(ERROR) << "Caught an unknown color " << color << ".";
+    HYDRA_LOG(ERROR, "Caught an unknown color {}.", color);
     unknown_colors_.insert(color);
   }
 
@@ -81,7 +82,7 @@ Color SemanticColorMap::getColorFromLabel(const uint32_t& label) const {
   }
 
   if (!unknown_labels_.count(label)) {
-    LOG(ERROR) << "Caught an unknown label " << std::to_string(label);
+    HYDRA_LOG(ERROR, "Caught an unknown label {}", std::to_string(label));
     unknown_labels_.insert(label);
   }
 
@@ -151,11 +152,11 @@ SemanticColorMap::Ptr SemanticColorMap::fromCsv(const std::string& filename,
 cv::Mat SemanticColorMap::colorsToLabels(const cv::Mat& colors,
                                          int32_t default_label) const {
   if (colors.empty() || colors.channels() != 3) {
-    LOG(ERROR) << "3-channel color image required for conversion to labels!";
+    HYDRA_LOG(ERROR, "3-channel color image required for conversion to labels!");
     return cv::Mat();
   }
 
-  CHECK_EQ(colors.type(), CV_8UC3);
+  HYDRA_CHECK_EQ(colors.type(), CV_8UC3);
 
   cv::Mat label_image(colors.size(), InputData::LabelMatType);
   for (int r = 0; r < colors.rows; ++r) {

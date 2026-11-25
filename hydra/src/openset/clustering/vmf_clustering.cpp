@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 
@@ -241,7 +241,7 @@ VmfClustering::VmfClustering(const Config& config)
 
 auto VmfClustering::cluster(const spark_dsg::SceneGraphLayer& layer) const -> Clusters {
   if (!queries_ || queries_->empty() || !metric_) {
-    LOG_FIRST_N(ERROR, 1) << "Queries and a metric are required for vMF clustering";
+    HYDRA_LOG_FIRST_N(ERROR, 1, "Queries and a metric are required for vMF clustering");
     return {};
   }
 
@@ -295,7 +295,7 @@ auto VmfClustering::cluster(const spark_dsg::SceneGraphLayer& layer) const -> Cl
     clusters.push_back(cluster);
   }
 
-  MLOG(1) << "finished clustering with " << clusters.size() << " cluster(s)";
+  MLOG(1, "finished clustering with {} cluster(s)", clusters.size());
   return clusters;
 }
 

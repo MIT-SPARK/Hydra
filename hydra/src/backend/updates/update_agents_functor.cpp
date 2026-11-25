@@ -36,9 +36,9 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/nonlinear/Values.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
@@ -106,17 +106,22 @@ void UpdateAgentsFunctor::call(const SceneGraph&,
       const auto diff = prev_pose.between(pose);
       const auto q_diff = Eigen::Quaterniond(diff.rotation().matrix());
       const auto p_diff = diff.translation();
-      MLOG(4) << "Updating agent " << NodeSymbol(node.id).str() << " pose from "
-              << NodeSymbol(attrs.external_key).str() << ":"
-              << "\n - original: " << toString(q_prev, p_prev)
-              << "\n - new:      " << toString(attrs.world_R_body, attrs.position)
-              << "\n - diff:     " << toString(q_diff, p_diff);
+      MLOG(4,
+           "Updating agent {} pose from {}:\n - original: {}\n - new:      {}\n - "
+           "diff:     {}",
+           NodeSymbol(node.id).str(),
+           NodeSymbol(attrs.external_key).str(),
+           toString(q_prev, p_prev),
+           toString(attrs.world_R_body, attrs.position),
+           toString(q_diff, p_diff));
     }
 
     if (!missing_nodes.empty()) {
-      LOG(WARNING) << "Layer " << DsgLayers::AGENTS << "(" << layer.id.partition
-                   << "): could not update "
-                   << displayNodeSymbolContainer(missing_nodes);
+      HYDRA_LOG(WARNING,
+                "Layer {}({}): could not update {}",
+                DsgLayers::AGENTS,
+                layer.id.partition,
+                displayNodeSymbolContainer(missing_nodes));
     }
   }
 }

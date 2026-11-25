@@ -215,3 +215,22 @@ def test_dataset_deformation_settings(tmp_path, dataset, horizon):
         config = yaml.safe_load(stream)
     assert config["frontend"]["deformation_graph_builder"]["horizon_s"] == horizon
     assert config["frontend"]["deformation_graph_builder"]["resolution"] == 2.5
+
+
+def test_file_logging_and_save_before_input(tmp_path):
+    """Logging startup must respect run output allocation before any frames arrive."""
+    logs = tmp_path / "diagnostics"
+    output = tmp_path / "run"
+    output.mkdir()
+    marker = output / "existing.txt"
+    marker.write_text("preserve")
+    hydra.set_log_directory(logs)
+    pipeline, _ = make_pipeline(output, 0, 2, "empty")
+    assert marker.read_text() == "preserve"
+    pipeline.save()
+    pipeline.stop()
+    assert (output / "hydra_config.yaml").is_file()
+    assert marker.read_text() == "preserve"
+    hydra.set_log_to_stderr()
+    assert (logs / "hydra.log").is_file()
+    assert (logs / "hydra.log").stat().st_size > 0

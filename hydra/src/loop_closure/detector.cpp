@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/detector.h"
 
+#include <hydra/utils/logging.h>
+
 #include "hydra_build_config.h"
 #if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
 #include "hydra/loop_closure/gnn_descriptors.h"
@@ -42,7 +44,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include <fstream>
 
@@ -127,7 +128,8 @@ void configureDescriptorFactories(lcd::LcdDetector& detector,
 }
 #else
 void configureDescriptorFactories(lcd::LcdDetector&, const LcdDetector::Config&) {
-  LOG(ERROR) << "Unable to initialize GNN descriptors: not built with -DHYDRA_GNN=ON";
+  HYDRA_LOG(ERROR,
+            "Unable to initialize GNN descriptors: not built with -DHYDRA_GNN=ON");
 }
 #endif
 
@@ -336,7 +338,7 @@ void LcdDetector::resetLayerAssignments(const SearchConfigMap& search_configs,
 
   // TODO(nathan) make root layer requirements explicit
   if (internal_idx == 1) {
-    LOG(ERROR) << "No DSG descriptor configs found";
+    HYDRA_LOG(ERROR, "No DSG descriptor configs found");
   } else {
     max_internal_index_ = internal_idx;
     root_layer_ = internal_index_to_layer_.at(internal_idx - 1);
@@ -428,7 +430,7 @@ std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
       continue;
     }
 
-    CHECK(match_config_map_.count(idx));
+    HYDRA_CHECK(match_config_map_.count(idx));
     const LayerSearchResults& match = matches.at(idx);
     if (match.valid_matches.empty()) {
       continue;
@@ -440,9 +442,10 @@ std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
       }
 
       const auto root = match.match_root.at(i);
-      CHECK(dsg.hasNode(root)) << "Invalid match root: " << NodeSymbol(root).str();
-      CHECK(dsg.hasNode(match.query_root))
-          << "Invalid query root: " << NodeSymbol(match.query_root).str();
+      HYDRA_CHECK(dsg.hasNode(root), "Invalid match root: {}", NodeSymbol(root).str());
+      HYDRA_CHECK(dsg.hasNode(match.query_root),
+                  "Invalid query root: {}",
+                  NodeSymbol(match.query_root).str());
 
       DsgRegistrationInput registration_input = {match.query_nodes,
                                                  match.match_nodes[i],
@@ -471,7 +474,7 @@ std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
   /*continue;*/
   /*}*/
 
-  /*CHECK(matches.count(idx));*/
+  /*HYDRA_CHECK(matches.count(idx));*/
   /*const LayerSearchResults& vmatch = matches.at(vidx);*/
 
   /*if (!validation_funcs_.at(vidx)(dsg, vmatch)) {*/
@@ -498,8 +501,8 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
   }
 
   const auto& latest_node = dsg.getNode(agent_id);
-  MLOG(3) << "************************************************************";
-  MLOG(3) << "LCD Matching: " << NodeSymbol(latest_node.id).str();
+  MLOG(3, "************************************************************");
+  MLOG(3, "LCD Matching: {}", NodeSymbol(latest_node.id).str());
 
   matches_.clear();
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
@@ -507,7 +510,7 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
     const auto& layer = internal_index_to_layer_.at(idx);
     auto descriptor = layer_factories_[layer]->construct(dsg, latest_node);
     if (descriptor) {
-      MLOG(3) << "level " << idx << ": " << showVector(descriptor->values, 3, 20, 9);
+      MLOG(3, "level {}: {}", idx, showVector(descriptor->values, 3, 20, 9));
       matches_[idx] = searchDescriptors(*descriptor,
                                         config,
                                         prev_valid_roots,
@@ -516,7 +519,7 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
                                         agent_id);
       prev_valid_roots = matches_[idx].valid_matches;
     } else {
-      MLOG(3) << "level " << idx << " -> ?";
+      MLOG(3, "level {} -> ?", idx);
       prev_valid_roots = std::set<NodeId>();
       break;
     }
@@ -532,35 +535,41 @@ std::vector<RegistrationSolution> LcdDetector::detect(const SceneGraph& dsg,
   }
 
   if (matches_.empty()) {
-    MLOG(1) << "No LCD matches for node " << NodeSymbol(agent_id).str() << " against "
-            << numDescriptors() << " descriptors";
+    MLOG(1,
+         "No LCD matches for node {} against {} descriptors",
+         NodeSymbol(agent_id).str(),
+         numDescriptors());
     return {};
   }
 
-  MLOG(3) << "-----------------------------------------------------------";
-  MLOG(3) << "LCD results for node " << NodeSymbol(agent_id).str() << " against "
-          << numDescriptors() / 2 << " roots";
+  MLOG(3, "-----------------------------------------------------------");
+  MLOG(3,
+       "LCD results for node {} against {} roots",
+       NodeSymbol(agent_id).str(),
+       numDescriptors() / 2);
   for (const auto& id_match_pair : matches_) {
     const auto& scores = id_match_pair.second.score;
     const auto best_score = std::max_element(scores.begin(), scores.end());
-    MLOG(3) << " - index " << id_match_pair.first << ": "
-            << id_match_pair.second.valid_matches.size() << " valid matches, "
-            << id_match_pair.second.match_root.size()
-            << " registration matches (best score "
-            << (best_score != scores.end() ? std::to_string(*best_score) : "n/a")
-            << ")";
+    MLOG(3,
+         " - index {}: {} valid matches, {} registration matches (best score {})",
+         id_match_pair.first,
+         id_match_pair.second.valid_matches.size(),
+         id_match_pair.second.match_root.size(),
+         (best_score != scores.end() ? std::to_string(*best_score) : "n/a"));
 
     for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
-      MLOG(3) << "   - #" << i
-              << ": query=" << NodeSymbol(id_match_pair.second.query_root).str()
-              << ", match=" << NodeSymbol(id_match_pair.second.match_root[i]).str()
-              << " -> " << id_match_pair.second.score[i];
+      MLOG(3,
+           "   - #{}: query={}, match={} -> {}",
+           i,
+           NodeSymbol(id_match_pair.second.query_root).str(),
+           NodeSymbol(id_match_pair.second.match_root[i]).str(),
+           id_match_pair.second.score[i]);
     }
   }
 
-  MLOG(3) << "-----------------------------------------------------------";
+  MLOG(3, "-----------------------------------------------------------");
   const auto results = registerAndVerify(dsg, matches_, agent_id, timestamp);
-  MLOG(3) << "************************************************************";
+  MLOG(3, "************************************************************");
 
   return results;
 }

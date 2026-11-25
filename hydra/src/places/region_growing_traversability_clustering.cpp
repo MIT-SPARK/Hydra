@@ -38,7 +38,7 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <hydra/utils/nearest_neighbor_utilities.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
@@ -89,7 +89,7 @@ void RegionGrowingTraversabilityClustering::updateGraph(
     const std::string& layer_name) {
   // Compute all updated places and store them in the place_infos.
   if (!graph.hasLayer(layer_name)) {
-    LOG(WARNING) << "Layer '" << layer_name << "' does not exist in the DSG.";
+    HYDRA_LOG(WARNING, "Layer '{}' does not exist in the DSG.", layer_name);
     return;
   }
 
@@ -528,7 +528,7 @@ void RegionGrowingTraversabilityClustering::Region::computeBoundary() {
   // Find exterior and interior boundary voxels.
   exterior_boundary = growRegion(boundary, furthest);
   if (exterior_boundary.empty()) {
-    LOG(WARNING) << "Empty region encountered!";
+    HYDRA_LOG(WARNING, "Empty region encountered!");
   }
   interior_boundary.clear();
   interior_boundary.reserve(boundary.size() - exterior_boundary.size());

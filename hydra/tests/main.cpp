@@ -32,22 +32,13 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <gtest/gtest.h>
-
-#include "hydra/utils/pgmo_glog_sink.h"
+#include <hydra/utils/logging.h>
 
 int main(int argc, char** argv) {
-  FLAGS_logtostderr = true;
-  FLAGS_alsologtostderr = true;
-  FLAGS_colorlogtostderr = true;
-  FLAGS_minloglevel = 0;
+  hydra::logging::setLogLevel("info");
 
   ::testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
 
-  logging::Logger::addSink("glog", std::make_shared<hydra::PgmoGlogSink>());
   return RUN_ALL_TESTS();
 }

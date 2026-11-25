@@ -34,7 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/rooms/graph_filtration.h"
 
-#include <glog/logging.h>
+#include <hydra/common/run_settings.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 #include <cmath>
@@ -334,7 +335,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
     const auto x = entries.back();
     entries.pop_back();
 
-    VLOG(4) << "Processing " << x;
+    HYDRA_VLOG(4, "Processing {}", x);
 
     bool change_in_components = true;
     if (x.target) {
@@ -357,7 +358,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
     const auto num_components = count_components(components);
     if (filtration.empty()) {
       filtration.push_front({x.distance, num_components});
-      VLOG(4) << filtration.front();
+      HYDRA_VLOG(4, "{}", filtration.front());
       continue;
     }
 
@@ -369,7 +370,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
       filtration.push_front({x.distance, num_components});
     }
 
-    VLOG(4) << filtration.front();
+    HYDRA_VLOG(4, "{}", filtration.front());
   }
 
   return Filtration(filtration.begin(), filtration.end());
@@ -471,7 +472,7 @@ size_t getMedianComponents(const Filtration& values,
   }
 
   std::sort(components.begin(), components.end());
-  CHECK(!components.empty());
+  HYDRA_CHECK(!components.empty());
   const size_t median_idx = std::ceil(static_cast<double>(components.size() - 1) / 2.0);
   return components[median_idx];
 }
@@ -587,34 +588,37 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                         values[start_end_pair.first].distance);
   }
 
-  if (VLOG_IS_ON(5)) {
-    VLOG(5) << "Sequences:";
+  if (RunSettings::instance().default_verbosity >= 5) {
+    HYDRA_VLOG(5, "Sequences:");
     for (size_t i = 0; i < sequences.size(); ++i) {
-      VLOG(5) << "  - " << i << ": " << seq_values.at(i) << " -> ["
-              << sequences[i].first << ", " << sequences[i].second
-              << "], lifetime=" << lifetimes[i];
+      HYDRA_VLOG(5,
+                 "  - {}: {} -> [{}, {}], lifetime={}",
+                 i,
+                 seq_values.at(i),
+                 sequences[i].first,
+                 sequences[i].second,
+                 lifetimes[i]);
     }
   }
 
-  CHECK(!lifetimes.empty());
+  HYDRA_CHECK(!lifetimes.empty());
   const double max_lifetime = *std::max_element(lifetimes.begin(), lifetimes.end());
   const double threshold = use_threshold ? ratio : ratio * max_lifetime;
-  VLOG(3) << "Max lifetime: " << max_lifetime << ", Ratio: " << ratio
-          << ", Threshold: " << threshold;
+  HYDRA_VLOG(
+      3, "Max lifetime: {}, Ratio: {}, Threshold: {}", max_lifetime, ratio, threshold);
 
   size_t best_sequence = 0;
   size_t best_components = 0;
-  VLOG(5) << "Best components:";
+  HYDRA_VLOG(5, "Best components:");
   for (size_t i = 0; i < lifetimes.size(); ++i) {
     if (lifetimes[i] < threshold) {
-      VLOG(5) << "  - " << i << ": below threshold (" << lifetimes[i] << " < "
-              << threshold << ")";
+      HYDRA_VLOG(5, "  - {}: below threshold ({} < {})", i, lifetimes[i], threshold);
       continue;
     }
 
     const auto curr_components = values[sequences[i].first].num_components;
-    VLOG(5) << "  - " << i << ": components=" << curr_components
-            << " (best=" << best_components << ")";
+    HYDRA_VLOG(
+        5, "  - {}: components={} (best={})", i, curr_components, best_components);
     // TODO(nathan) might want >= instead
     if (curr_components > best_components) {
       best_sequence = i;

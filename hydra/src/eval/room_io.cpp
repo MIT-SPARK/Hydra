@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/room_io.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <yaml-cpp/yaml.h>
 
 namespace YAML {
@@ -121,7 +121,7 @@ RoomGeometry parseRoomGeometry(const YAML::Node& root) {
   const auto box_map = root.as<std::map<size_t, std::list<BoundingBox>>>();
   for (auto&& [room_id, boxes] : box_map) {
     if (!geometries.addRoom(room_id, boxes)) {
-      LOG(WARNING) << "Founding repeated room id: " << room_id;
+      HYDRA_LOG(WARNING, "Founding repeated room id: {}", room_id);
     }
   }
 

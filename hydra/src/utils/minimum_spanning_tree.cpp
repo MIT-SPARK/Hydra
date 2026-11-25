@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/minimum_spanning_tree.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include "hydra/utils/disjoint_set.h"
 

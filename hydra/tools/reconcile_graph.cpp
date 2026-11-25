@@ -1,3 +1,4 @@
+#include <hydra/common/run_settings.h>
 /* -----------------------------------------------------------------------------
  * Copyright 2022 Massachusetts Institute of Technology.
  * All Rights Reserved
@@ -36,9 +37,9 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/backend/graph_reconciler.h>
 #include <hydra/backend/update_functions.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
 
@@ -53,7 +54,7 @@ struct AppArgs {
   std::filesystem::path scene_graph;
   std::string config_ns = "backend";
   std::filesystem::path output;
-  int log_level = 0;
+  std::string log_level = "info";
   int verbosity = 0;
 };
 
@@ -103,11 +104,10 @@ int main(int argc, char** argv) {
     return app.exit(e);
   }
 
-  FLAGS_minloglevel = args.log_level;
-  FLAGS_v = args.verbosity;
-  FLAGS_logtostderr = 1;
-  FLAGS_colorlogtostderr = 1;
-  google::InitGoogleLogging(argv[0]);
+  hydra::logging::setLogLevel(args.log_level);
+  auto settings = hydra::RunSettings::instance();
+  settings.default_verbosity = args.verbosity;
+  hydra::RunSettings::init(settings);
 
   auto output = args.output;
   if (output.empty()) {

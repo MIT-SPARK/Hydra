@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/registration.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
@@ -111,32 +112,32 @@ struct GraphRegistrationTests : public ::testing::Test {
 
     src_points = 5.0 * Eigen::MatrixXd::Random(3, 30);
 
-    CHECK(dsg->hasLayer(DsgLayers::OBJECTS));
+    HYDRA_CHECK(dsg->hasLayer(DsgLayers::OBJECTS));
 
     for (int i = 0; i < src_points.cols(); ++i) {
       SemanticNodeAttributes attrs;
       attrs.position = src_points.col(i);
       attrs.semantic_label = i;
-      CHECK(dsg->emplaceNode(DsgLayers::PLACES,
-                             NodeSymbol('p', i),
-                             std::make_unique<SemanticNodeAttributes>(attrs)));
-      CHECK(dsg->emplaceNode(DsgLayers::OBJECTS,
-                             NodeSymbol('O', i),
-                             std::make_unique<SemanticNodeAttributes>(attrs)));
+      HYDRA_CHECK(dsg->emplaceNode(DsgLayers::PLACES,
+                                   NodeSymbol('p', i),
+                                   std::make_unique<SemanticNodeAttributes>(attrs)));
+      HYDRA_CHECK(dsg->emplaceNode(DsgLayers::OBJECTS,
+                                   NodeSymbol('O', i),
+                                   std::make_unique<SemanticNodeAttributes>(attrs)));
       dsg->insertEdge(NodeSymbol('p', i), NodeSymbol('O', i));
 
       attrs.position = dest_R_src * src_points.col(i) + dest_t_src;
-      CHECK(dsg->emplaceNode(DsgLayers::PLACES,
-                             NodeSymbol('p', i + src_points.cols()),
-                             std::make_unique<SemanticNodeAttributes>(attrs)));
-      CHECK(dsg->emplaceNode(DsgLayers::OBJECTS,
-                             NodeSymbol('O', i + src_points.cols()),
-                             std::make_unique<SemanticNodeAttributes>(attrs)));
+      HYDRA_CHECK(dsg->emplaceNode(DsgLayers::PLACES,
+                                   NodeSymbol('p', i + src_points.cols()),
+                                   std::make_unique<SemanticNodeAttributes>(attrs)));
+      HYDRA_CHECK(dsg->emplaceNode(DsgLayers::OBJECTS,
+                                   NodeSymbol('O', i + src_points.cols()),
+                                   std::make_unique<SemanticNodeAttributes>(attrs)));
       dsg->insertEdge(NodeSymbol('p', i + src_points.cols()),
                       NodeSymbol('O', i + src_points.cols()));
     }
 
-    CHECK(dsg->hasNode(NodeSymbol('O', 40)));
+    HYDRA_CHECK(dsg->hasNode(NodeSymbol('O', 40)));
 
     Eigen::Quaterniond world_q_body1(std::cos(M_PI / 8), std::sin(M_PI / 8), 0.0, 0.0);
     Eigen::Vector3d world_t_body1(-1.0, 0.2, 0.5);

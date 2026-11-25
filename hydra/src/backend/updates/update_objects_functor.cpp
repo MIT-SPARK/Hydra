@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/backend/backend_utilities.h"
@@ -71,7 +71,7 @@ NodeAttributes::Ptr mergeObjectAttributes(const VerbosityConfig& config,
   auto iter = nodes.begin();
   auto attrs_ptr = graph.getNode(*iter).attributes().clone();
   auto& new_attrs =
-      *CHECK_NOTNULL(dynamic_cast<ObjectNodeAttributes*>(attrs_ptr.get()));
+      *HYDRA_CHECK_NOTNULL(dynamic_cast<ObjectNodeAttributes*>(attrs_ptr.get()));
   ++iter;
   while (iter != nodes.end()) {
     const auto& from_attrs = graph.getNode(*iter).attributes<ObjectNodeAttributes>();
@@ -80,13 +80,13 @@ NodeAttributes::Ptr mergeObjectAttributes(const VerbosityConfig& config,
   }
 
   if (new_attrs.mesh_connections.empty()) {
-    MLOG(1) << "merge is empty: " << displayNodeSymbolContainer(nodes);
+    MLOG(1, "merge is empty: {}", displayNodeSymbolContainer(nodes));
     return attrs_ptr;
   }
 
   auto mesh = graph.mesh();
   if (!updateObjectGeometry(*mesh, new_attrs)) {
-    MLOG(1) << "merge geometry invalid: " << displayNodeSymbolContainer(nodes);
+    MLOG(1, "merge geometry invalid: {}", displayNodeSymbolContainer(nodes));
   }
 
   return attrs_ptr;
@@ -129,7 +129,7 @@ void UpdateObjectsFunctor::call(const SceneGraph& unmerged,
                                 const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_objects", info->timestamp_ns);
   if (!unmerged.hasLayer(DsgLayers::OBJECTS)) {
-    MLOG(2) << "skipping object update due to missing layer";
+    MLOG(2, "skipping object update due to missing layer");
     return;
   }
 
@@ -151,23 +151,24 @@ void UpdateObjectsFunctor::call(const SceneGraph& unmerged,
       continue;  // not an object
     }
 
-    MLOG(5) << "processing object " << NodeSymbol(node.id).str()
-            << " with attributes:\n"
-            << *attrs;
+    MLOG(5,
+         "processing object {} with attributes:\n{}",
+         NodeSymbol(node.id).str(),
+         *attrs);
     if (attrs->mesh_connections.empty()) {
-      MLOG(2) << "found empty object node " << NodeSymbol(node.id).str();
+      MLOG(2, "found empty object node {}", NodeSymbol(node.id).str());
       continue;
     }
 
     if (!updateObjectGeometry(*mesh, *attrs)) {
-      MLOG(2) << "invalid centroid for object " << NodeSymbol(node.id).str();
+      MLOG(2, "invalid centroid for object {}", NodeSymbol(node.id).str());
     }
 
     // TODO(nathan) this is sloppy and needs to be cleaned up
     dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
-  MLOG(1) << "object update: " << num_changed << " node(s)";
+  MLOG(1, "object update: {} node(s)", num_changed);
 }
 
 MergeList UpdateObjectsFunctor::findMerges(const SceneGraph& graph,
@@ -206,7 +207,7 @@ void UpdateObjectsFunctor::updateMeshIndices(const SceneGraph& graph,
     return;
   }
 
-  MLOG(2) << "remapping indices for " << merged_nodes_.size() << " merged node(s)";
+  MLOG(2, "remapping indices for {} merged node(s)", merged_nodes_.size());
   auto iter = merged_nodes_.begin();
   while (iter != merged_nodes_.end()) {
     auto node = objects->findNode(*iter);
@@ -230,7 +231,7 @@ void UpdateObjectsFunctor::updateMeshIndices(const SceneGraph& graph,
     }
   }
 
-  MLOG(2) << merged_nodes_.size() << " merged node(s)";
+  MLOG(2, "{} merged node(s)", merged_nodes_.size());
 }
 
 }  // namespace hydra

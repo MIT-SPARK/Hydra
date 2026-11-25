@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
@@ -137,8 +137,8 @@ GraphBuilder::GraphBuilder(const Config& config,
                                                  context->config.robot);
   }
 
-  CHECK(dsg_ != nullptr);
-  CHECK(dsg_->graph != nullptr);
+  HYDRA_CHECK(dsg_ != nullptr);
+  HYDRA_CHECK(dsg_->graph != nullptr);
   if (mesh_compression_) {
     addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   }
@@ -175,7 +175,7 @@ void GraphBuilder::start() {
   should_shutdown_ = false;
   force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&GraphBuilder::spin, this));
-  MLOG(0) << "started!";
+  MLOG(0, "started!");
 }
 
 void GraphBuilder::stop(bool force) {
@@ -189,11 +189,11 @@ void GraphBuilder::stopImpl() {
   }
 
   if (spin_thread_) {
-    MLOG(1) << "stopping frontend!";
+    MLOG(1, "stopping frontend!");
     spin_thread_->join();
     spin_thread_.reset();
-    MLOG(1) << "stopped!";
-    MLOG(1) << queue_->size() << " messages left";
+    MLOG(1, "stopped!");
+    MLOG(1, "{} messages left", queue_->size());
   }
 }
 
@@ -217,7 +217,7 @@ void GraphBuilder::save(const DataDirectory* output) {
     try {
       graph_updater_.saveBindings(output_path / "track_bindings.json");
     } catch (const std::exception& e) {
-      LOG(ERROR) << "Failed to save track bindings: " << e.what();
+      HYDRA_LOG(ERROR, "Failed to save track bindings: {}", e.what());
     }
   }
 
@@ -338,7 +338,7 @@ void GraphBuilder::dispatchSpin(ActiveWindowOutput::Ptr msg) {
 }
 
 void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
-  MLOG(2) << "Popped input packet @ " << msg->timestamp_ns << " [ns]";
+  MLOG(2, "Popped input packet @ {} [ns]", msg->timestamp_ns);
   std::lock_guard<std::mutex> lock(mutex_);
   ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
@@ -451,7 +451,7 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
   }
 
   if (!last_mesh_update_) {
-    LOG(ERROR) << "Cannot detect objects without valid mesh";
+    HYDRA_LOG(ERROR, "Cannot detect objects without valid mesh");
     return;
   }
 
@@ -469,7 +469,7 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   }
 
   if (!last_mesh_update_) {
-    LOG(ERROR) << "Cannot detect places without valid mesh";
+    HYDRA_LOG(ERROR, "Cannot detect places without valid mesh");
     return;
   }
 

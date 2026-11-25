@@ -39,7 +39,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <iomanip>
 
@@ -62,7 +62,7 @@ SceneGraphLogger::SceneGraphLogger(const rclcpp::NodeOptions& options)
 
   bool exists = std::filesystem::exists(config.output_path);
   if (exists && !std::filesystem::is_directory(config.output_path)) {
-    LOG(ERROR) << "Invalid output path: " << config.output_path;
+    HYDRA_LOG(ERROR, "Invalid output path: {}", config.output_path);
     return;
   }
 

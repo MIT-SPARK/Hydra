@@ -35,6 +35,15 @@
 #include "hydra/utils/logging.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/logging/log_to_spdlog.h>
+#include <kimera_pgmo/utils/logging.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <stdexcept>
 
 #include "hydra/common/run_settings.h"
 
@@ -65,3 +74,106 @@ int VerbosityConfig::get_verbosity() const {
 }
 
 }  // namespace hydra
+
+namespace hydra::logging {
+namespace {
+
+std::atomic<bool>& pgmoEnabled() {
+  static std::atomic<bool> enabled{true};
+  return enabled;
+}
+
+}  // namespace
+
+std::shared_ptr<spdlog::logger> logger() {
+  static const auto instance = [] {
+    if (auto existing = spdlog::get("hydra")) {
+      return existing;
+    }
+
+    auto result = spdlog::stderr_color_mt("hydra");
+    result->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%s:%#] %v");
+    return result;
+  }();
+  return instance;
+}
+
+spdlog::level::level_enum parseLevel(const std::string& level) {
+  if (level == "trace" || level == "debug" || level == "info" || level == "warning" ||
+      level == "warn" || level == "error" || level == "critical" || level == "off") {
+    return spdlog::level::from_str(level);
+  }
+
+  throw std::invalid_argument("Invalid log level: " + level);
+}
+
+void configureConfigLogging() {
+  config::internal::Logger::setLogger(
+      std::make_shared<config::internal::SpdlogLogger>(logger()));
+}
+
+void setLogLevel(const std::string& level) {
+  const auto parsed = parseLevel(level);
+  configureConfigLogging();
+  logger()->set_level(parsed);
+  const auto pgmo = kimera_pgmo::getLogger();
+  if (pgmoEnabled().load()) {
+    pgmo->set_level(parsed);
+  }
+}
+
+void setSinks(std::vector<spdlog::sink_ptr> sinks) {
+  if (sinks.empty()) {
+    throw std::invalid_argument("At least one logging sink is required");
+  }
+
+  logger()->flush();
+  logger()->sinks() = std::move(sinks);
+  kimera_pgmo::getLogger()->sinks() = logger()->sinks();
+  configureConfigLogging();
+}
+
+void setLogToStderr() {
+  setSinks({std::make_shared<spdlog::sinks::stderr_color_sink_mt>()});
+  logger()->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%s:%#] %v");
+}
+
+void setLogDirectory(const std::string& directory, const std::string& stderr_level) {
+  const auto threshold = parseLevel(stderr_level);
+  if (directory.empty()) {
+    throw std::invalid_argument("Log directory must not be empty");
+  }
+
+  std::filesystem::create_directories(directory);
+  const auto file = std::filesystem::path(directory) / "hydra.log";
+  auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(file.string());
+  auto console = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+  console->set_level(threshold);
+  setSinks({file_sink, console});
+  logger()->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%s:%#] %v");
+}
+
+void configurePgmoLogging(bool enabled) {
+  pgmoEnabled().store(enabled);
+  const auto pgmo = kimera_pgmo::getLogger();
+  pgmo->flush();
+  pgmo->sinks() = logger()->sinks();
+  pgmo->set_level(enabled ? logger()->level() : spdlog::level::off);
+}
+
+[[noreturn]] void fail(spdlog::source_loc location, std::string_view message) noexcept {
+  try {
+    const auto instance = logger();
+    instance->set_level(spdlog::level::critical);
+    instance->log(location, spdlog::level::critical, "{}", message);
+    instance->flush();
+  } catch (...) {
+    // Preserve the failure location even if logger initialization or a sink fails.
+    std::fprintf(
+        stderr, "[%s:%d] Fatal logging failed\n", location.filename, location.line);
+  }
+
+  std::abort();
+}
+
+}  // namespace hydra::logging

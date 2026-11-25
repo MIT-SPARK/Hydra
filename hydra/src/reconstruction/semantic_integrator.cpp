@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <cmath>
 #include <cstdint>
@@ -97,8 +97,11 @@ void MLESemanticIntegrator::updateLikelihoods(uint32_t label,
                                               SemanticVoxel& voxel) const {
   if (label >= total_labels_) {
     if (label != std::numeric_limits<uint32_t>::max()) {
-      LOG_FIRST_N(ERROR, 100) << "Encountered invalid label: " << label << " (warning "
-                              << google::COUNTER << " / 100)";
+      HYDRA_LOG_FIRST_N(ERROR,
+                        100,
+                        "Encountered invalid label: {} (warning {} / 100)",
+                        label,
+                        hydra_log_count);
     }
 
     return;
@@ -176,8 +179,10 @@ void FirstKSemanticIntegrator::updateLikelihoods(uint32_t label,
   }
 
   if (!added) {
-    LOG_FIRST_N(WARNING, 5) << "More unique labels observed than k=" << config.k
-                            << ". Consider increasing k!";
+    HYDRA_LOG_FIRST_N(WARNING,
+                      5,
+                      "More unique labels observed than k={}. Consider increasing k!",
+                      config.k);
     return;
   }
 

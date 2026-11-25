@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <algorithm>
@@ -148,8 +148,7 @@ void GraphUpdater::addNode(SceneGraph& graph,
   }
 
   if (to_merge) {
-    MLOG(3) << "Merging to " << NodeSymbol(*to_merge).str() << " @ " << target
-            << " for " << source;
+    MLOG(3, "Merging to {} @ {} for {}", NodeSymbol(*to_merge).str(), target, source);
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
       tracker.bind(*entry.track_id, *to_merge, curr_timestamp_ns_);
@@ -168,7 +167,7 @@ void GraphUpdater::addNode(SceneGraph& graph,
   }
 
   const auto new_id = tracker.next_id;
-  MLOG(3) << "Adding " << new_id.str() << " @ " << target << " for " << source;
+  MLOG(3, "Adding {} @ {} for {}", new_id.str(), target, source);
   graph.emplaceNode(target, new_id, std::move(attrs));
   if (entry.track_id) {
     tracker.track_to_node[*entry.track_id] = new_id;
@@ -184,13 +183,13 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
                               LayerTracker& tracker,
                               SceneGraph& graph) {
   if (!entry.track_id) {
-    LOG(WARNING) << "Delete graph update missing track_id";
+    HYDRA_LOG(WARNING, "Delete graph update missing track_id");
     return;
   }
 
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter == tracker.track_to_node.end()) {
-    MLOG(3) << "Delete for unknown track_id " << *entry.track_id;
+    MLOG(3, "Delete for unknown track_id {}", *entry.track_id);
     return;
   }
 
@@ -235,7 +234,7 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
   }
 
   if (attrs.empty()) {
-    LOG(ERROR) << "Empty attribute merge group";
+    HYDRA_LOG(ERROR, "Empty attribute merge group");
     return;
   }
 
@@ -247,7 +246,7 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
   }
 
   if (!merged) {
-    LOG(ERROR) << "Failed to create merged attributes";
+    HYDRA_LOG(ERROR, "Failed to create merged attributes");
     return;
   }
 
@@ -271,7 +270,7 @@ void GraphUpdater::update(const GraphUpdate& update,
   for (auto& [name, tracker] : trackers_) {
     const auto key = graph.getLayerKey(name);
     if (!key) {
-      LOG(WARNING) << "Invalid layer '" << name << "'";
+      HYDRA_LOG(WARNING, "Invalid layer '{}'", name);
       continue;
     }
 
@@ -280,13 +279,13 @@ void GraphUpdater::update(const GraphUpdate& update,
 
   for (const auto& [layer_id, layer_update] : update) {
     if (!layer_update) {
-      LOG(WARNING) << "Received invalid update for layer " << layer_id;
+      HYDRA_LOG(WARNING, "Received invalid update for layer {}", layer_id);
       continue;
     }
 
     auto iter = trackers_by_id.find(layer_id);
     if (iter == trackers_by_id.end()) {
-      LOG(WARNING) << "Recieved updates for unhandled layer " << layer_id;
+      HYDRA_LOG(WARNING, "Recieved updates for unhandled layer {}", layer_id);
       continue;
     }
 
@@ -302,7 +301,7 @@ void GraphUpdater::update(const GraphUpdate& update,
         }
         case NodeUpdate::UpdateType::UpdateOrAdd: {
           if (!entry.attributes) {
-            LOG(WARNING) << "Update graph update missing attributes";
+            HYDRA_LOG(WARNING, "Update graph update missing attributes");
             break;
           }
 

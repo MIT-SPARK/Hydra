@@ -4,7 +4,7 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/labelspace.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
@@ -69,12 +69,12 @@ void OpenVocabRegionsUpdateFunctor::call(const SceneGraph&,
   clearRegions(graph, config.target_layer);
 
   const auto clusters = clustering_->cluster(places);
-  MLOG(1) << "Got " << clusters.size() << " cluster(s)";
+  MLOG(1, "Got {} cluster(s)", clusters.size());
 
   std::set<NodeId> new_nodes;
   for (size_t i = 0; i < clusters.size(); ++i) {
     if (clusters[i]->nodes.size() < config.min_num_nodes) {
-      MLOG(2) << "Dropping cluster of " << clusters[i]->nodes.size() << " node(s)";
+      MLOG(2, "Dropping cluster of {} node(s)", clusters[i]->nodes.size());
       continue;
     }
 

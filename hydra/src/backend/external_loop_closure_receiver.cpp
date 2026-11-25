@@ -35,7 +35,7 @@
 #include "hydra/backend/external_loop_closure_receiver.h"
 
 #include <config_utilities/config.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
@@ -123,43 +123,56 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const SceneGraph& graph,
   const auto layer_id = graph.getLayerKey(config.layer)->layer;
   const auto layer = graph.findLayer(layer_id, prefix);
   if (!layer) {
-    LOG(WARNING) << "Missing robot " << robot_id << " for external loop closure";
+    HYDRA_LOG(WARNING, "Missing robot {} for external loop closure", robot_id);
     return {};
   }
 
   const auto stamp = std::chrono::nanoseconds(stamp_ns);
   const auto last_stamp = getLastStamp(*layer);
   if (!last_stamp) {
-    MLOG(1) << "No nodes exist for robot '" << robot_id
-            << "' when looking up timestamp " << stamp_ns << " [ns]";
+    MLOG(1,
+         "No nodes exist for robot '{}' when looking up timestamp {} [ns]",
+         robot_id,
+         stamp_ns);
     return {};
   }
 
   if (stamp > *last_stamp) {
     // avoid clearing loop closure before best candidate node can be determined
-    MLOG(1) << "Latest timestamp " << *last_stamp << " [ns] for " << robot_id
-            << "' when looking up timestamp " << stamp_ns << " [ns] is too old";
+    MLOG(
+        1,
+        "Latest timestamp {} [ns] for {}' when looking up timestamp {} [ns] is too old",
+        *last_stamp,
+        robot_id,
+        stamp_ns);
     return {};
   }
 
   auto closest = getClosest(*layer, stamp);
   if (!closest) {
-    MLOG(1) << "Could not find closest node for '" << robot_id
-            << "' when looking up timestamp " << stamp_ns << " [ns]";
+    MLOG(1,
+         "Could not find closest node for '{}' when looking up timestamp {} [ns]",
+         robot_id,
+         stamp_ns);
     return {};
   }
 
   const NodeSymbol best_id(*closest);
   const auto best_stamp = getAgentTimestamp(layer->getNode(*closest));
   const auto diff_s = convertToSeconds(best_stamp - stamp);
-  MLOG(2) << "Found node " << best_id.str() << " with difference of " << diff_s
-          << " [s] for timestamp " << stamp_ns << " [ns]";
+  MLOG(2,
+       "Found node {} with difference of {} [s] for timestamp {} [ns]",
+       best_id.str(),
+       diff_s,
+       stamp_ns);
 
   // avoid associating to nodes that are too far away in time
   if (max_diff_s && std::abs(diff_s) >= max_diff_s) {
-    LOG(WARNING) << "Nearest node " << best_id.str()
-                 << " has too large of a time difference: " << diff_s
-                 << " [s] >= " << max_diff_s << " [s]";
+    HYDRA_LOG(WARNING,
+              "Nearest node {} has too large of a time difference: {} [s] >= {} [s]",
+              best_id.str(),
+              diff_s,
+              max_diff_s);
     return {LookupResult::Status::INVALID};
   }
 
@@ -257,7 +270,7 @@ void ExternalLoopClosureReceiver::update(const SceneGraph& graph,
     const auto to_node = findClosest(graph, edge.key_to, edge.robot_to, max_diff_s);
     if (from_node.status == LookupResult::Status::INVALID ||
         to_node.status == LookupResult::Status::INVALID) {
-      LOG(WARNING) << "Dropped external loop closure: " << edge;
+      HYDRA_LOG(WARNING, "Dropped external loop closure: {}", edge);
       iter = loop_closures_.erase(iter);
       continue;
     }
@@ -274,8 +287,10 @@ void ExternalLoopClosureReceiver::update(const SceneGraph& graph,
     auto& previous_loops_for_pair = previous_loops(edge.robot_from, edge.robot_to);
     bool should_add = should_add_lc(previous_loops_for_pair, from_ns, to_ns, edge.pose);
     if (should_add) {
-      MLOG(1) << "Added external loop closure " << NodeSymbol(to_node.id).str()
-              << " -> " << NodeSymbol(from_node.id).str();
+      MLOG(1,
+           "Added external loop closure {} -> {}",
+           NodeSymbol(to_node.id).str(),
+           NodeSymbol(from_node.id).str());
       previous_loops_for_pair.insert(edge);
       // to_id, from_id, to_T_from
       callback(to_node.id, from_node.id, gtsam::Pose3(edge.pose.matrix()));

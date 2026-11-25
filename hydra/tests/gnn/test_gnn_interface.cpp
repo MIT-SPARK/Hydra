@@ -32,8 +32,8 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <hydra/utils/logging.h>
 #include <ros/package.h>
 
 #include "hydra/gnn/gnn_interface.h"

@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 using spark_dsg::TraversabilityState;
 
@@ -275,8 +275,10 @@ void HeightTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg,
   for (const auto& block : msg.map().getTsdfLayer()) {
     tsdf_layer_->allocateBlock(block.index) = block;
     if (!block.updated) {
-      LOG(WARNING) << "TSDF block " << block.index.transpose()
-                   << " is not marked as updated, but it was copied from the map.";
+      HYDRA_LOG(
+          WARNING,
+          "TSDF block {} is not marked as updated, but it was copied from the map.",
+          block.index.transpose());
     }
   }
 
@@ -431,8 +433,10 @@ void GradientTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg,
   for (const auto& block : msg.map().getTsdfLayer()) {
     tsdf_layer_->allocateBlock(block.index) = block;
     if (!block.updated) {
-      LOG(WARNING) << "TSDF block " << block.index.transpose()
-                   << " is not marked as updated, but it was copied from the map.";
+      HYDRA_LOG(
+          WARNING,
+          "TSDF block {} is not marked as updated, but it was copied from the map.",
+          block.index.transpose());
     }
   }
 

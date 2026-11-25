@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/room_evaluator.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 
 #include "hydra/reconstruction/voxel_types.h"
@@ -47,7 +47,7 @@ namespace hydra::eval {
 RoomEvaluator::RoomEvaluator(const Config& config,
                              const RoomGeometry& rooms,
                              const TsdfLayer::Ptr& tsdf)
-    : config(config), rooms_(rooms), tsdf_(CHECK_NOTNULL(tsdf)) {
+    : config(config), rooms_(rooms), tsdf_(HYDRA_CHECK_NOTNULL(tsdf)) {
   computeRoomIndices();
 }
 
@@ -85,8 +85,10 @@ void RoomEvaluator::computeDsgIndices(const SceneGraph& graph,
   const auto& rooms = graph.getLayer(DsgLayers::ROOMS);
   for (const auto& room_node : rooms.nodes()) {
     if (room_node.children().size() < config.min_room_nodes) {
-      MLOG(3) << "skipping room of size: " << room_node.children().size() << " (vs. "
-              << config.min_room_nodes << ")";
+      MLOG(3,
+           "skipping room of size: {} (vs. {})",
+           room_node.children().size(),
+           config.min_room_nodes);
       continue;
     }
 
@@ -169,7 +171,7 @@ RoomEvaluator::Ptr RoomEvaluator::fromFile(const Config& config,
 
   auto tsdf = io::loadLayer<TsdfLayer>(tsdf_filepath);
   if (!tsdf) {
-    LOG(ERROR) << "Failed to load TSDF from: " << tsdf_filepath;
+    HYDRA_LOG(ERROR, "Failed to load TSDF from: {}", tsdf_filepath);
     return nullptr;
   }
 

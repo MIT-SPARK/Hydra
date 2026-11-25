@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <algorithm>
 #include <cmath>
@@ -301,9 +301,11 @@ void ProjectiveSemanticTraversabilityIntegrator::apply(const ActiveWindowOutput&
   }
 
   if (!integrated) {
-    LOG_FIRST_N(WARNING, 5) << "No " << ("traversability")
-                            << " image in input data; semantic traversability "
-                               "requires a semantic input source.";
+    HYDRA_LOG_FIRST_N(WARNING,
+                      5,
+                      "No {} image in input data; semantic traversability requires a "
+                      "semantic input source.",
+                      ("traversability"));
   }
 
   // Blocks recomputed by the estimator this update lost their fused traversability, so

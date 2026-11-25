@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 namespace hydra {
 
@@ -67,7 +67,7 @@ TsdfLayer::Ptr DownsampleTsdfInterpolator::interpolate(
   const auto new_vs = input.voxel_size * config.ratio;
   const auto new_vps = input.voxels_per_side / config.ratio;
   if (new_vps <= 1) {
-    LOG(ERROR) << "ratio invalid for current number of voxels";
+    HYDRA_LOG(ERROR, "ratio invalid for current number of voxels");
     return nullptr;
   }
   auto new_layer = std::make_shared<TsdfLayer>(new_vs, new_vps);

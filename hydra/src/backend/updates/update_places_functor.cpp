@@ -36,8 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph.h>
@@ -83,7 +83,7 @@ void UpdatePlacesFunctor::filterMissing(SceneGraph& graph,
     return;
   }
 
-  MLOG(3) << "could not update " << displayNodeSymbolContainer(missing_nodes);
+  MLOG(3, "could not update {}", displayNodeSymbolContainer(missing_nodes));
 
   for (const auto& node_id : missing_nodes) {
     if (!graph.hasNode(node_id)) {
@@ -92,7 +92,7 @@ void UpdatePlacesFunctor::filterMissing(SceneGraph& graph,
 
     const auto& node = graph.getNode(node_id);
     if (!node.attributes().is_active && !node.hasSiblings()) {
-      MLOG(2) << "removing node " << NodeSymbol(node_id).str();
+      MLOG(2, "removing node {}", NodeSymbol(node_id).str());
       graph.removeNode(node_id);
     }
   }
@@ -110,8 +110,7 @@ size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
   for (const auto& node : view) {
     if (!places_values.exists(node.id)) {
       // this happens for the GT version
-      MLOG(4) << "missing place " << NodeSymbol(node.id).str()
-              << " from places factors.";
+      MLOG(4, "missing place {} from places factors.", NodeSymbol(node.id).str());
       continue;
     }
 
@@ -147,7 +146,7 @@ void UpdatePlacesFunctor::call(const SceneGraph& unmerged,
     deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
   }
 
-  MLOG(2) << "Places update: " << num_changed << " nodes";
+  MLOG(2, "Places update: {} nodes", num_changed);
 }
 
 MergeList UpdatePlacesFunctor::findMerges(const SceneGraph& graph,
@@ -165,8 +164,10 @@ MergeList UpdatePlacesFunctor::findMerges(const SceneGraph& graph,
         const auto lhs_attrs = lhs.tryAttributes<PlaceNodeAttributes>();
         const auto rhs_attrs = rhs.tryAttributes<PlaceNodeAttributes>();
         if (!lhs_attrs || !rhs_attrs) {
-          LOG(WARNING) << "Invalid place nodes: " << NodeSymbol(lhs.id).str() << ", "
-                       << NodeSymbol(rhs.id).str();
+          HYDRA_LOG(WARNING,
+                    "Invalid place nodes: {}, {}",
+                    NodeSymbol(lhs.id).str(),
+                    NodeSymbol(rhs.id).str());
           return false;
         }
 

@@ -15,7 +15,6 @@ find_package(ament_cmake REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(gflags REQUIRED)
 find_package(hydra REQUIRED)
 find_package(hydra_msgs REQUIRED)
 find_package(hydra_visualizer REQUIRED)
@@ -95,7 +94,7 @@ ament_target_dependencies(
 )
 
 add_executable(hydra_ros_node app/hydra_node.cpp)
-target_link_libraries(hydra_ros_node ${PROJECT_NAME} ${gflags_LIBRARIES})
+target_link_libraries(hydra_ros_node ${PROJECT_NAME})
 
 add_executable(color_to_label_node app/color_to_label_node.cpp)
 target_link_libraries(color_to_label_node ${PROJECT_NAME} cv_bridge::cv_bridge CLI11::CLI11)
@@ -111,7 +110,7 @@ rclcpp_components_register_node(
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest)
   ament_add_gtest(test_${PROJECT_NAME} tests/main.cpp tests/test_ros_sensors.cpp)
-  target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME} gflags)
+  target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME})
 endif()
 
 install(

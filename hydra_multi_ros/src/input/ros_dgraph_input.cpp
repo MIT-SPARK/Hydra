@@ -2,7 +2,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <pose_graph_tools_ros/conversions.h>
 

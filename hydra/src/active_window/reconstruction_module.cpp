@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <chrono>
 #include <iomanip>
@@ -103,13 +103,15 @@ ReconstructionModule::ReconstructionModule(const Config& config,
 
   if (config.tsdf.mode != SensorMapMode::Strict &&
       config.tsdf.default_config.semantic_integrator) {
-    LOG(ERROR) << "Semantic integrator specified but map has no semantic layer!";
+    HYDRA_LOG(ERROR, "Semantic integrator specified but map has no semantic layer!");
   }
 
   for (const auto& [name, tsdf_config] : config.tsdf.sensors) {
     if (tsdf_config.semantic_integrator) {
-      LOG(ERROR) << "Semantic integrator specified for sensor " << name
-                 << " but map has no semantic layer!";
+      HYDRA_LOG(
+          ERROR,
+          "Semantic integrator specified for sensor {} but map has no semantic layer!",
+          name);
     }
   }
 }
@@ -131,20 +133,24 @@ bool ReconstructionModule::shouldUpdate(uint64_t timestamp_ns) const {
 
 ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& data) {
   if (!data) {
-    MLOG_NAMED(ERROR) << "received invalid input!";
+    MLOG_NAMED(ERROR, "received invalid input!");
     return nullptr;
   }
 
   const auto stamp = data->timestamp_ns;
   const auto fmt = getDefaultFormat();
-  MLOG(2) << "Got input @ " << stamp
-          << " [ns] with pose: p=" << data->world_T_body.translation().format(fmt)
-          << ", q=" << printRotation(data->world_T_body.rotation());
+  MLOG(2,
+       "Got input @ {} [ns] with pose: p={}, q={}",
+       stamp,
+       data->world_T_body.translation().format(fmt),
+       printRotation(data->world_T_body.rotation()));
 
   const auto do_full_update = shouldUpdate(stamp);
-  MLOG(2) << "starting " << (do_full_update ? "full" : "partial")
-          << " update for message @ " << stamp << " (" << input_queue_->size()
-          << " message(s) left)";
+  MLOG(2,
+       "starting {} update for message @ {} ({} message(s) left)",
+       (do_full_update ? "full" : "partial"),
+       stamp,
+       input_queue_->size());
 
   ScopedTimer timer("reconstruction/spin", stamp);
   // force semantic normalization if volumetric map has semantic layer
@@ -154,7 +160,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
 
   const auto tsdf_integrator = tsdf_integrators_.get(data->getSensor().name);
   if (!tsdf_integrator) {
-    MLOG(1) << "Unknown sensor '" << data->getSensor().name << "'";
+    MLOG(1, "Unknown sensor '{}'", data->getSensor().name);
     return nullptr;
   }
 
@@ -186,7 +192,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputData::Ptr& dat
   if (map_window_) {
     // this comes before clearing the update flag as we don't archive updated blocks
     output->archived = map_window_->archiveBlocks(stamp, data->world_T_body, map_);
-    MLOG(2) << "archived " << output->archived.size() << " @ " << stamp << " [ns]";
+    MLOG(2, "archived {} @ {} [ns]", output->archived.size(), stamp);
   }
 
   output->setMap(map_.cloneUpdated());

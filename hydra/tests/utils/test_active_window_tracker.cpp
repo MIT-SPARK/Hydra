@@ -32,9 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/utils/active_window_tracker.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 #include <spark_dsg/scene_graph_layer.h>

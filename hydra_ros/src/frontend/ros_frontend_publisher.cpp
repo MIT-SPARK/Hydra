@@ -38,8 +38,8 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/common/robot_config.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo_ros/conversion/mesh_delta.h>
 
@@ -117,18 +117,18 @@ std::string RosFrontendPublisher::printInfo() const { return config::toString(co
 
 void RosFrontendPublisher::processMeshDeltaQuery(const MeshDeltaRequest req,
                                                  MeshDeltaResponse resp) {
-  LOG(INFO) << "Received request for " << req->sequence_numbers.size() << " deltas...";
+  HYDRA_LOG(INFO, "Received request for {} deltas...", req->sequence_numbers.size());
   for (const auto& seq : req->sequence_numbers) {
     auto& msg = resp->deltas.emplace_back();
     if (!stored_delta_.count(seq)) {
-      LOG(ERROR) << "Mesh delta sequence " << seq << " not found";
+      HYDRA_LOG(ERROR, "Mesh delta sequence {} not found", seq);
       continue;
     }
 
     msg = *stored_delta_.at(seq);
   }
 
-  LOG(INFO) << "Responding with " << resp->deltas.size() << " deltas...";
+  HYDRA_LOG(INFO, "Responding with {} deltas...", resp->deltas.size());
 }
 
 }  // namespace hydra

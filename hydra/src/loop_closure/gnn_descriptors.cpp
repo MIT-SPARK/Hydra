@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/gnn_descriptors.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <yaml-cpp/yaml.h>
 
@@ -168,17 +168,17 @@ Descriptor::Ptr ObjectGnnDescriptor::construct(const SceneGraph& graph,
   }
 
   auto input = makeInput(graph, descriptor->nodes);
-  VLOG(5) << "Inputs:";
-  VLOG(5) << "  - x: " << std::endl << input.at("x").map<float>();
-  VLOG(5) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
+  HYDRA_VLOG(5, "Inputs:");
+  HYDRA_VLOG(5, "  - x: \n{}", input.at("x").map<float>());
+  HYDRA_VLOG(5, "  - edge_index: \n{}", input.at("edge_index").map<int64_t>());
   if (!use_pos_in_feature_) {
-    VLOG(5) << "  - pos: " << std::endl << input.at("pos").map<float>();
+    HYDRA_VLOG(5, "  - pos: \n{}", input.at("pos").map<float>());
   }
 
   auto output = (*model_)(input).at("output");
-  VLOG(5) << "--------------------------------------";
-  VLOG(5) << "Output type: " << output;
-  VLOG(5) << "Output:" << std::endl << output.map<float>();
+  HYDRA_VLOG(5, "--------------------------------------");
+  HYDRA_VLOG(5, "Output type: {}", output);
+  HYDRA_VLOG(5, "Output:\n{}", output.map<float>());
   descriptor->values = output.map<float>().transpose();
   return descriptor;
 }
@@ -266,39 +266,39 @@ Descriptor::Ptr PlaceGnnDescriptor::construct(const SceneGraph& graph,
   }
 
   auto input = makeInput(graph, descriptor->nodes);
-  VLOG(5) << "Inputs:";
-  VLOG(5) << "  - x: " << std::endl << input.at("x").map<float>();
-  VLOG(5) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
+  HYDRA_VLOG(5, "Inputs:");
+  HYDRA_VLOG(5, "  - x: \n{}", input.at("x").map<float>());
+  HYDRA_VLOG(5, "  - edge_index: \n{}", input.at("edge_index").map<int64_t>());
   if (!use_pos_in_feature_) {
-    VLOG(5) << "  - pos: " << std::endl << input.at("pos").map<float>();
+    HYDRA_VLOG(5, "  - pos: \n{}", input.at("pos").map<float>());
   }
 
   auto output = (*model_)(input).at("output");
-  VLOG(5) << "--------------------------------------";
-  VLOG(5) << "Output type: " << output;
-  VLOG(5) << "Output:" << std::endl << output.map<float>();
+  HYDRA_VLOG(5, "--------------------------------------");
+  HYDRA_VLOG(5, "Output type: {}", output);
+  HYDRA_VLOG(5, "Output:\n{}", output.map<float>());
   descriptor->values = output.map<float>().transpose();
   return descriptor;
 }
 
 ObjectGnnDescriptor::LabelEmbeddings loadLabelEmbeddings(const std::string& filename) {
   ObjectGnnDescriptor::LabelEmbeddings embeddings;
-  VLOG(3) << "Reading embeddings from: " << filename;
+  HYDRA_VLOG(3, "Reading embeddings from: {}", filename);
 
   YAML::Node root = YAML::LoadFile(filename);
   if (!root["embeddings"]) {
-    LOG(ERROR) << "file " << filename << " did not contain embeddings field";
+    HYDRA_LOG(ERROR, "file {} did not contain embeddings field", filename);
     return embeddings;
   }
 
   for (const auto embedding : root["embeddings"]) {
     if (!embedding["label"]) {
-      LOG(WARNING) << "embedding did not contain label! skipping...";
+      HYDRA_LOG(WARNING, "embedding did not contain label! skipping...");
       continue;
     }
 
     if (!embedding["values"]) {
-      LOG(WARNING) << "embedding did not contain values! skipping...";
+      HYDRA_LOG(WARNING, "embedding did not contain values! skipping...");
       continue;
     }
 

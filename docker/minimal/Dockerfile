@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
     nlohmann-json3-dev \
     libgoogle-glog-dev \
+    libspdlog-dev \
     libcli11-dev \
     libeigen3-dev \
     && rm -rf /var/lib/apt/lists/*

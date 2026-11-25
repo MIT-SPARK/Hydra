@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 namespace hydra {
 namespace {
@@ -61,13 +61,13 @@ void declare_config(ColormappedLabelsAdapter::Config& config) {
 ColormappedLabelsAdapter::ColormappedLabelsAdapter(const Config& config)
     : config(config::checkValid(config)),
       colormap_(SemanticColorMap::fromCsv(config.colormap_path)) {
-  CHECK(colormap_) << "Colormap required!";
+  HYDRA_CHECK(colormap_, "Colormap required!");
 }
 
 void ColormappedLabelsAdapter::update(InputData& data) const {
   const auto colors = data.label_image;
   if (colors.empty() || colors.channels() != 3) {
-    LOG(ERROR) << "Failed to decode label_image from colors to semantics!";
+    HYDRA_LOG(ERROR, "Failed to decode label_image from colors to semantics!");
     return;
   }
 

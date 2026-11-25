@@ -32,8 +32,8 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <hydra/utils/logging.h>
 
 #include "hydra/frontend/feature_selector.h"
 #include "hydra/input/camera.h"

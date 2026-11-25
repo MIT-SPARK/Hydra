@@ -3,7 +3,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
@@ -71,12 +71,13 @@ NodeAttributes::Ptr getMergedAttributes(const SceneGraph& graph,
   }
 
   auto iter = nodes.begin();
-  CHECK(graph.hasNode(*iter));
+  HYDRA_CHECK(graph.hasNode(*iter));
   const auto& node = graph.getNode(*iter);
   ++iter;
 
   auto attrs_ptr = node.attributes().clone();
-  auto& attrs = *CHECK_NOTNULL(dynamic_cast<KhronosObjectAttributes*>(attrs_ptr.get()));
+  auto& attrs =
+      *HYDRA_CHECK_NOTNULL(dynamic_cast<KhronosObjectAttributes*>(attrs_ptr.get()));
   while (iter != nodes.end()) {
     const auto& other = graph.getNode(*iter);
     const auto& other_attrs = other.attributes<KhronosObjectAttributes>();
@@ -127,13 +128,13 @@ FeatureMap<NodeId> getLayerEmbeddings(const SceneGraphLayer& layer,
   for (const auto node_id : nodes) {
     auto node = layer.findNode(node_id);
     if (!node) {
-      LOG(ERROR) << "Node " << NodeSymbol(node_id).str() << " not found!";
+      HYDRA_LOG(ERROR, "Node {} not found!", NodeSymbol(node_id).str());
       continue;
     }
 
     auto attrs = node->tryAttributes<SemanticNodeAttributes>();
     if (!attrs) {
-      LOG(ERROR) << "Node " << NodeSymbol(node_id).str() << " has invalid attributes!";
+      HYDRA_LOG(ERROR, "Node {} has invalid attributes!", NodeSymbol(node_id).str());
       continue;
     }
 
@@ -148,7 +149,7 @@ std::vector<FeatureVector> getAllFeatures(const SceneGraphLayer& layer) {
   for (const auto& node : layer.nodes()) {
     auto attrs = node.tryAttributes<SemanticNodeAttributes>();
     if (!attrs) {
-      LOG(ERROR) << "Node " << NodeSymbol(node.id).str() << " has invalid attributes!";
+      HYDRA_LOG(ERROR, "Node {} has invalid attributes!", NodeSymbol(node.id).str());
       continue;
     }
 
@@ -255,7 +256,7 @@ std::set<size_t> IBObjectsUpdateFunctor::addSegmentEdges(SceneGraph& graph) cons
     auto& attrs = node.attributes<SemanticNodeAttributes>();
     const auto result = tasks_->getBestScore(*metric_, attrs.semantic_feature);
     if (result.score < config.min_segment_score) {
-      MLOG(3) << "Skipping segment with score: " << result.score;
+      MLOG(3, "Skipping segment with score: {}", result.score);
       ignored_.insert(node.id);
       attrs.is_active = false;
       continue;
@@ -318,18 +319,18 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
 
     const auto clusters = new_component->ws.getClusters();
     for (const auto& cluster : clusters) {
-      MLOG(3) << "Cluster: " << displayNodeSymbolContainer(cluster);
+      MLOG(3, "Cluster: {}", displayNodeSymbolContainer(cluster));
 
       auto attrs = getMergedAttributes(graph, cluster);
       if (!attrs) {
-        LOG(ERROR) << "empty cluster!";
+        HYDRA_LOG(ERROR, "empty cluster!");
         continue;
       }
 
       const auto derived = dynamic_cast<SemanticNodeAttributes*>(attrs.get());
       const auto result = tasks_->getBestScore(*metric_, derived->semantic_feature);
       if (result.score < config.min_object_score) {
-        MLOG(3) << "Skipping object with score: " << result.score;
+        MLOG(3, "Skipping object with score: {}", result.score);
         continue;
       }
 
@@ -338,7 +339,7 @@ void IBObjectsUpdateFunctor::detectObjects(SceneGraph& graph) const {
 
       const auto parent = getBestParent(graph, cluster);
       if (!parent) {
-        LOG(WARNING) << "object '" << next_node_id_.str() << "' without parent!";
+        HYDRA_LOG(WARNING, "object '{}' without parent!", next_node_id_.str());
         active_.insert(next_node_id_);
       } else {
         auto&& [parent_id, parent_active] = *parent;

@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <spark_dsg/node_symbol.h>
 
 using namespace spark_dsg;
@@ -62,7 +62,7 @@ void declare_config(DescriptorMatchConfig& conf) {
 float computeDistanceHist(const Descriptor& lhs,
                           const Descriptor& rhs,
                           const std::function<float(float, float)>& distance_func) {
-  CHECK_EQ(lhs.values.rows(), rhs.values.rows());
+  HYDRA_CHECK_EQ(lhs.values.rows(), rhs.values.rows());
 
   float score = 0.0;
   for (int r = 0; r < lhs.values.rows(); ++r) {
@@ -81,8 +81,8 @@ float computeDistanceHist(const Descriptor& lhs,
 float computeDistanceBow(const Descriptor& lhs,
                          const Descriptor& rhs,
                          const std::function<float(float, float)>& distance_func) {
-  CHECK_EQ(lhs.values.rows(), lhs.words.rows());
-  CHECK_EQ(rhs.values.rows(), rhs.words.rows());
+  HYDRA_CHECK_EQ(lhs.values.rows(), lhs.words.rows());
+  HYDRA_CHECK_EQ(rhs.values.rows(), rhs.words.rows());
   float score = 0.0;
   int r1 = 0;
   int r2 = 0;
@@ -183,7 +183,7 @@ LayerSearchResults searchDescriptors(
   size_t num_default_match = 0;
   size_t num_shared_nodes = 0;
 
-  MLOG_WITH(match_config, 4) << "--------------------------------------------------";
+  MLOG_WITH(match_config, 4, "--------------------------------------------------");
 
   for (const auto& valid_id : valid_matches) {
     if (root_leaf_map.at(valid_id).count(query_id)) {
@@ -201,17 +201,21 @@ LayerSearchResults searchDescriptors(
                             NodeSymbol(*root_leaf_map.at(valid_id).begin()).category();
     if (!same_robot) {
       const auto child = NodeSymbol(*root_leaf_map.at(valid_id).begin());
-      LOG(WARNING) << "Found different robot: query " << NodeSymbol(query_id).str()
-                   << ", putative: " << child.str();
+      HYDRA_LOG(WARNING,
+                "Found different robot: query {}, putative: {}",
+                NodeSymbol(query_id).str(),
+                child.str());
     }
 
     const Descriptor& other_descriptor = *other_ptr;
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
     if (same_robot && diff_s.count() < match_config.min_time_separation_s) {
-      MLOG_WITH(match_config, 4)
-          << "diff: " << diff_s.count()
-          << " (threshold: " << match_config.min_time_separation_s << ")";
+      MLOG_WITH(match_config,
+                4,
+                "diff: {} (threshold: {})",
+                diff_s.count(),
+                match_config.min_time_separation_s);
       ++num_inside_horizon;
       continue;
     }
@@ -250,13 +254,17 @@ LayerSearchResults searchDescriptors(
   }
 
   // TODO(nathan) add layer id in again or handle stats better
-  MLOG_WITH(match_config, 1) << "matching " << " -> shared: " << num_same_parent
-                             << ", null: " << num_null
-                             << ", horizon: " << num_inside_horizon
-                             << ", low: " << num_low_score
-                             << ", default: " << num_default_match
-                             << ", shared: " << num_shared_nodes
-                             << ", valid: " << new_valid_match_scores.size();
+  MLOG_WITH(match_config,
+            1,
+            "matching  -> shared: {}, null: {}, horizon: {}, low: {}, default: {}, "
+            "shared: {}, valid: {}",
+            num_same_parent,
+            num_null,
+            num_inside_horizon,
+            num_low_score,
+            num_default_match,
+            num_shared_nodes,
+            new_valid_match_scores.size());
 
   std::sort(new_valid_match_scores.begin(),
             new_valid_match_scores.end(),

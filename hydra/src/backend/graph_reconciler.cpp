@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -94,7 +94,7 @@ auto Reconciler::reconcile(Graph& graph) const -> Graph::Ptr {
       auto& tracker = merge_tracker.getMergeGroup(name);
       auto merges = hooks.find_merges(graph, info);
       auto applied = tracker.applyMerges(graph, merges, target, hooks.merge);
-      MLOG(1) << "pass 0: " << merges.size() << " merges (applied " << applied << ")";
+      MLOG(1, "pass 0: {} merges (applied {})", merges.size(), applied);
       if (!exhaustive_names.count(name)) {
         continue;
       }
@@ -104,8 +104,7 @@ auto Reconciler::reconcile(Graph& graph) const -> Graph::Ptr {
       do {
         merges = hooks.find_merges(*target.graph, info);
         applied = tracker.applyMerges(graph, merges, target, hooks.merge);
-        MLOG(1) << "pass " << iter << ": " << merges.size() << " merges (applied "
-                << applied << ")";
+        MLOG(1, "pass {}: {} merges (applied {})", iter, merges.size(), applied);
         ++iter;
       } while (applied > 0);
     }
