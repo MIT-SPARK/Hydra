@@ -86,6 +86,12 @@ Directory paths are omitted to match file logging. To include the location once,
 set `RCUTILS_CONSOLE_OUTPUT_FORMAT` to
 `[{severity}] [{name}] [{file_name}:{line_number}] {message}`.
 
+The shared ROS sink lives in ianvs. Applications that manage destinations can use
+`ianvs::makeRosSink(ros_logger)` with `hydra::logging::setSinks`. For a standalone
+spdlog logger, `ianvs::setRosSink(logger, ros_logger)` replaces its destinations
+with ROS forwarding. Both helpers are in `<ianvs/ros_log_sink.h>` and require
+linking `ianvs::ianvs_spdlog`.
+
 Python exposes `set_log_level("info")`, `set_log_directory(path,
 stderr_level="error")`, and `set_log_to_stderr()`. File output appends to
 `hydra.log`; changing destinations preserves severity and module verbosity.

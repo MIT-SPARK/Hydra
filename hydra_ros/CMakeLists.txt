@@ -18,11 +18,11 @@ find_package(geometry_msgs REQUIRED)
 find_package(hydra REQUIRED)
 find_package(hydra_msgs REQUIRED)
 find_package(hydra_visualizer REQUIRED)
+find_package(ianvs REQUIRED)
 find_package(kimera_pgmo_ros REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common)
 find_package(pose_graph_tools_ros REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rcutils REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
@@ -90,13 +90,12 @@ ament_target_dependencies(
   PUBLIC
   geometry_msgs
   hydra_msgs
-  rcutils
   semantic_inference_msgs
   std_msgs
 )
 
 add_executable(hydra_ros_node app/hydra_node.cpp)
-target_link_libraries(hydra_ros_node ${PROJECT_NAME})
+target_link_libraries(hydra_ros_node ${PROJECT_NAME} ianvs::ianvs_spdlog)
 
 add_executable(color_to_label_node app/color_to_label_node.cpp)
 target_link_libraries(color_to_label_node ${PROJECT_NAME} cv_bridge::cv_bridge CLI11::CLI11)
@@ -140,9 +139,9 @@ ament_export_dependencies(
   hydra
   hydra_msgs
   hydra_visualizer
+  ianvs
   kimera_pgmo_ros
   pose_graph_tools_ros
-  rcutils
   semantic_inference_msgs
   tf2_eigen
   tf2_ros

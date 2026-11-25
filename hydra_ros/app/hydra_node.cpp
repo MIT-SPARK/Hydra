@@ -41,13 +41,13 @@
 #include <config_utilities/types/path.h>
 #include <hydra/utils/logging.h>
 #include <ianvs/node_init.h>
+#include <ianvs/ros_log_sink.h>
 #include <ianvs/spin_functions.h>
 
 #include <rclcpp/executors/multi_threaded_executor.hpp>
 
 #include "hydra_ros/hydra_ros_pipeline.h"
 #include "hydra_ros/utils/node_plugins.h"
-#include "hydra_ros/utils/ros_log_sink.h"
 
 namespace hydra {
 
@@ -90,10 +90,8 @@ int main(int argc, char* argv[]) {
   [[maybe_unused]] const auto node = ianvs::init_node(argc, argv, "hydra_ros_node");
   auto nh = ianvs::NodeHandle::this_node();
 
-  std::shared_ptr<hydra::RosSink> ros_sink;
   if (settings.forward_logs_to_ros) {
-    ros_sink = std::make_shared<hydra::RosSink>(nh.logger());
-    hydra::logging::setSinks({ros_sink});
+    hydra::logging::setSinks({ianvs::makeRosSink(nh.logger())});
   }
 
   config::internal::Logger::setLogger(
@@ -127,7 +125,7 @@ int main(int argc, char* argv[]) {
     hydra.save();
   }  // end hydra scope
 
-  if (ros_sink) {
+  if (settings.forward_logs_to_ros) {
     hydra::logging::setLogToStderr();
   }
 
