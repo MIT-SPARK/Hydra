@@ -130,21 +130,17 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const SceneGraph& graph,
   const auto stamp = std::chrono::nanoseconds(stamp_ns);
   const auto last_stamp = getLastStamp(*layer);
   if (!last_stamp) {
-    MLOG(1,
-         "No nodes exist for robot '{}' when looking up timestamp {} [ns]",
-         robot_id,
-         stamp_ns);
+    MLOG(1, "No nodes for robot {} at query {} [ns]", robot_id, stamp_ns);
     return {};
   }
 
   if (stamp > *last_stamp) {
     // avoid clearing loop closure before best candidate node can be determined
-    MLOG(
-        1,
-        "Latest timestamp {} [ns] for {}' when looking up timestamp {} [ns] is too old",
-        *last_stamp,
-        robot_id,
-        stamp_ns);
+    MLOG(1,
+         "Latest={} [ns] for robot {} is too old for query={} [ns]",
+         *last_stamp,
+         robot_id,
+         stamp_ns);
     return {};
   }
 

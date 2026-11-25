@@ -256,8 +256,8 @@ LayerSearchResults searchDescriptors(
   // TODO(nathan) add layer id in again or handle stats better
   MLOG_WITH(match_config,
             1,
-            "matching  -> shared: {}, null: {}, horizon: {}, low: {}, default: {}, "
-            "shared: {}, valid: {}",
+            "Matches: parent={}, null={}, horizon={}, low={}, default={}, "
+            "shared={}, valid={}",
             num_same_parent,
             num_null,
             num_inside_horizon,
