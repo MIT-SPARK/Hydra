@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/detector.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
 using namespace spark_dsg;
 

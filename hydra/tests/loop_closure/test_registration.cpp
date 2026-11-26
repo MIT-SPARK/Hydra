@@ -39,6 +39,8 @@
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
+#include <set>
+
 #include "hydra/utils/logging.h"
 
 namespace hydra::lcd {
@@ -76,7 +78,7 @@ struct LayerRegistrationTests : public ::testing::Test {
       dest_attrs->position = dest_points.col(i);
       dest_layer->emplaceNode(i, std::move(dest_attrs));
 
-      node_ids.push_back(i);
+      node_ids.insert(i);
     }
   }
 
@@ -86,7 +88,7 @@ struct LayerRegistrationTests : public ::testing::Test {
   Eigen::Matrix3d dest_R_src;
   Eigen::Vector3d dest_t_src;
 
-  std::list<NodeId> node_ids;
+  std::set<NodeId> node_ids;
   std::unique_ptr<SceneGraphLayer> src_layer;
   std::unique_ptr<SceneGraphLayer> dest_layer;
 
@@ -187,6 +189,8 @@ TEST_F(LayerRegistrationTests, TestCorrectCorrespondenceRegistration) {
   problem.src_nodes = node_ids;
   problem.dest_nodes = node_ids;
   problem.dest_layer = dest_layer.get();
+  problem.src_nodes.insert(1000);
+  problem.dest_nodes.insert(2000);
 
   auto solution =
       registerDsgLayer(reg_config,
@@ -198,6 +202,8 @@ TEST_F(LayerRegistrationTests, TestCorrectCorrespondenceRegistration) {
                        });
 
   ASSERT_TRUE(solution.valid);
+  EXPECT_EQ(problem.src_nodes, node_ids);
+  EXPECT_EQ(problem.dest_nodes, node_ids);
   EXPECT_NEAR(dest_t_src.x(), solution.dest_T_src.translation().x(), 1.0e-4);
   EXPECT_NEAR(dest_t_src.y(), solution.dest_T_src.translation().y(), 1.0e-4);
   EXPECT_NEAR(dest_t_src.z(), solution.dest_T_src.translation().z(), 1.0e-4);
@@ -368,14 +374,14 @@ TEST_F(LayerRegistrationTests, TestRepeatedRegistration) {
 
   ASSERT_TRUE(solution.valid);
 
-  std::list<NodeId> partial_list;
+  std::set<NodeId> partial_nodes;
   for (size_t i = 0; i < 10; ++i) {
-    partial_list.push_back(i);
+    partial_nodes.insert(i);
   }
 
   LayerRegistrationProblem problem2;
-  problem2.src_nodes = partial_list;
-  problem2.dest_nodes = partial_list;
+  problem2.src_nodes = partial_nodes;
+  problem2.dest_nodes = partial_nodes;
   problem2.dest_layer = dest_layer.get();
 
   solution =
