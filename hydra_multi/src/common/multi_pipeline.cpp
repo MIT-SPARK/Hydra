@@ -5,7 +5,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/settings.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <hydra/utils/timing_utilities.h>
 
 namespace hydra_multi {
@@ -20,7 +20,7 @@ MultiPipeline::MultiPipeline(const MultiPipelineConfig& pipeline_config,
   }
 
   backend_ = config.backend.create(interfaces_->states());
-  MLOG_NAMED(INFO) << "Initialized pipeline with:\n" << config::toString(config);
+  MLOG_NAMED(INFO, "Initialized pipeline with:\n{}", config::toString(config));
 }
 
 MultiPipeline::~MultiPipeline() {}
@@ -43,11 +43,11 @@ void MultiPipeline::save(const DataDirectory& output) {
   }
 
   const auto& config = MultiGlobalInfo::instance().getConfig();
-  MLOG_NAMED(INFO) << "saving timing information to " << output.path();
+  MLOG_NAMED(INFO, "saving timing information to {}", output.path());
   const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
   timer.logTimers(output.path("timing"));
   timer.logStats(output.path() / "timing_stats.csv");
-  MLOG_NAMED(INFO) << "saved timing information";
+  MLOG_NAMED(INFO, "saved timing information");
 
   auto node = config::toYaml(config);
   std::ofstream fout(output.path() / "hydra_multi_config.yaml");

@@ -34,9 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/python_sensor_input.h"
 
-#include <glog/logging.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::python {
 
@@ -58,19 +59,19 @@ PythonCloudInput::PythonCloudInput(uint64_t timestamp_ns,
                                    const ColorVec& color_vec)
     : CloudInputPacket(timestamp_ns) {
   if (pos_vec.cols() == 0) {
-    LOG(ERROR) << "received input without any points";
+    HYDRA_LOG(ERROR, "received input without any points");
     return;
   }
 
   bool colors_empty = color_vec.cols() == 0;
   if (!colors_empty && color_vec.cols() != pos_vec.cols()) {
-    LOG(ERROR) << "received a different number of colors than points";
+    HYDRA_LOG(ERROR, "received a different number of colors than points");
     colors_empty = true;
   }
 
   bool labels_empty = label_vec.cols() == 0;
   if (!labels_empty && label_vec.cols() != pos_vec.cols()) {
-    LOG(ERROR) << "received a different number of labels than points";
+    HYDRA_LOG(ERROR, "received a different number of labels than points");
     labels_empty = true;
   }
 

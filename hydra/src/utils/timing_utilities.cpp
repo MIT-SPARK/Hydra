@@ -34,9 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/timing_utilities.h"
 
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
-
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -44,6 +41,8 @@
 #include <numeric>
 #include <ostream>
 #include <sstream>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::timing {
 
@@ -93,7 +92,7 @@ void writeEntries(const std::filesystem::path& output_csv, const Entries& entrie
   std::filesystem::create_directories(output_csv.parent_path());
   output_file.open(output_csv);
   if (!output_file.is_open()) {
-    LOG(ERROR) << "Could not open file " << output_csv << " for writing";
+    HYDRA_LOG(ERROR, "Could not open file {} for writing", output_csv);
     return;
   }
 
@@ -171,7 +170,7 @@ void ElapsedTimeRecorder::start(const std::string& name, const uint64_t timestam
     }
   }  // end critical section
 
-  LOG(ERROR) << "Timer '" << name << "' was already started. Discarding time point!";
+  HYDRA_LOG(ERROR, "Timer '{}' was already started. Discarding time point!", name);
 }
 
 void ElapsedTimeRecorder::stop(const std::string& name) {
@@ -187,7 +186,7 @@ void ElapsedTimeRecorder::stop(const std::string& name) {
     }
   }  // end critical section
 
-  LOG(ERROR) << "Timer '" << name << "' was not started. Discarding time point!";
+  HYDRA_LOG(ERROR, "Timer '{}' was not started. Discarding time point!", name);
 }
 
 void ElapsedTimeRecorder::record(const std::string& name,
@@ -259,9 +258,9 @@ void ElapsedTimeRecorder::logTimers(const std::filesystem::path& output,
                                     const std::string& name_prefix,
                                     const std::string& name_suffix) const {
   const auto all_timers = timerNames();
-  VLOG(3) << "Saving timers: [" << all_timers << "]";
+  HYDRA_VLOG(3, "Saving timers: [{}]", all_timers);
   for (const auto& name : all_timers) {
-    VLOG(3) << "Saving timer '" << name << "'";
+    HYDRA_VLOG(3, "Saving timer '{}'", name);
 
     std::vector<Entry> entries;
     {  // start critical section
@@ -273,15 +272,18 @@ void ElapsedTimeRecorder::logTimers(const std::filesystem::path& output,
     }  // end critical section
 
     if (entries.empty()) {
-      LOG(ERROR) << "Invalid timer encountered while saving '" << name << "'";
+      HYDRA_LOG(ERROR, "Invalid timer encountered while saving '{}'", name);
       continue;
     }
 
     const auto output_csv = getTimerPath(output, name, name_prefix, name_suffix);
-    VLOG(2) << "Writing " << entries.size() << " measurements for timer '" << name
-            << "' to '" << output_csv << "'";
+    HYDRA_VLOG(2,
+               "Writing {} measurements for timer '{}' to '{}'",
+               entries.size(),
+               name,
+               output_csv);
     writeEntries(output_csv, entries);
-    VLOG(3) << "Saved timer '" << name << "'";
+    HYDRA_VLOG(3, "Saved timer '{}'", name);
   }
 }
 
@@ -343,7 +345,7 @@ void ScopedTimer::start() {
     return;
   }
 
-  if (verbosity_disables_ and !VLOG_IS_ON(verbosity_)) {
+  if (verbosity_disables_ and !VerbosityConfig{}.enabled(verbosity_)) {
     return;
   }
 
@@ -360,7 +362,7 @@ void ScopedTimer::stop() {
     return;
   }
 
-  if (verbosity_disables_ and !VLOG_IS_ON(verbosity_)) {
+  if (verbosity_disables_ and !VerbosityConfig{}.enabled(verbosity_)) {
     return;
   }
 
@@ -374,17 +376,20 @@ void ScopedTimer::stop() {
     return;
   }
 
-  if (!VLOG_IS_ON(verbosity_)) {
+  if (!VerbosityConfig{}.enabled(verbosity_)) {
     return;
   }
 
   if (elapsed_only_) {
-    VLOG(verbosity_) << "{Timer " << name_
-                     << "}: " << *ElapsedTimeRecorder::instance().getLastElapsed(name_)
-                     << " [s] elapsed";
+    HYDRA_VLOG(verbosity_,
+               "{{Timer {}}}: {} [s] elapsed",
+               name_,
+               *ElapsedTimeRecorder::instance().getLastElapsed(name_));
   } else {
-    VLOG(verbosity_) << "{Timer " << name_
-                     << "}: " << ElapsedTimeRecorder::instance().getStats(name_);
+    HYDRA_VLOG(verbosity_,
+               "{{Timer {}}}: {}",
+               name_,
+               ElapsedTimeRecorder::instance().getStats(name_));
   }
 }
 

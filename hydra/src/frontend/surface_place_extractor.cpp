@@ -37,13 +37,13 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 
 #include <memory>
 
 #include "hydra/places/2d_places/index_remapping.h"
 #include "hydra/places/2d_places/place_splitting.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -104,7 +104,7 @@ std::unordered_set<size_t> getFrozenSet(const VerbosityConfig& config,
     ++iter;
   }
 
-  MLOG(2) << "n frozen indices: " << frozen_indices.size();
+  MLOG(2, "n frozen indices: {}", frozen_indices.size());
   return frozen_indices;
 }
 
@@ -134,19 +134,19 @@ SurfacePlaceExtractor::SurfacePlaceExtractor(const Config& config,
       sinks_(Sink::instantiate(config.sinks, robot)),
       labels_(labels),
       next_node_id_(config.prefix, 0) {
-  MLOG(1) << "using labels: " << clustering::printLabels(labels_);
+  MLOG(1, "using labels: {}", clustering::printLabels(labels_));
 }
 
 void SurfacePlaceExtractor::detect(const ActiveWindowOutput& msg,
                                    const kimera_pgmo::MeshDelta& delta,
                                    const kimera_pgmo::MeshOffsetInfo& offsets) {
-  MLOG(2) << "detect called";
-  MLOG(2) << "n original active indices: " << delta.getNumActiveVertices();
+  MLOG(2, "detect called");
+  MLOG(2, "n original active indices: {}", delta.getNumActiveVertices());
   const auto frozen =
       getFrozenSet(config, msg.timestamp_ns, offsets, active_places_, to_remove_);
   const auto label_indices = clustering::getLabelIndices(labels_, delta, &frozen);
   if (label_indices.empty()) {
-    MLOG(2) << "no vertices found matching desired labels";
+    MLOG(2, "no vertices found matching desired labels");
     return;
   }
 
@@ -156,7 +156,7 @@ void SurfacePlaceExtractor::detect(const ActiveWindowOutput& msg,
     }
 
     auto clusters = clustering::findClusters(config.clustering, delta, indices);
-    MLOG(2) << "got " << clusters.size() << " initial places";
+    MLOG(2, "got {} initial places", clusters.size());
     std::vector<Place2d> places;
     for (auto& cluster_indices : clusters) {
       Place2d place;
@@ -177,11 +177,13 @@ void SurfacePlaceExtractor::detect(const ActiveWindowOutput& msg,
                      places);
     }
 
-    MLOG(2) << places.size() << " final places of label " << label;
+    MLOG(2, "{} final places of label {}", places.size(), label);
     for (const auto& place : places) {
       if (place.indices.empty()) {
-        LOG(ERROR) << "[2D Places] Encountered empty place with label" << label << " @ "
-                   << msg.timestamp_ns << "[ns]";
+        HYDRA_LOG(ERROR,
+                  "[2D Places] Encountered empty place with label{} @ {}[ns]",
+                  label,
+                  msg.timestamp_ns);
         continue;
       }
 
@@ -211,7 +213,7 @@ void SurfacePlaceExtractor::updateGraph(const ActiveWindowOutput&,
 
   to_remove_.clear();
 
-  MLOG(2) << "updateGraph";
+  MLOG(2, "updateGraph");
   for (const auto& [nid, attrs] : active_places_) {
     // overrides all previous nodes
     graph.addOrUpdateNode(config.layer, nid, attrs.clone());

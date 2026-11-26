@@ -35,13 +35,13 @@
 #include "hydra/loop_closure/registration.h"
 
 #include <config_utilities/config.h>
-#include <hydra/utils/logging.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <fstream>
 #include <iomanip>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::lcd {
@@ -133,12 +133,14 @@ RegistrationSolution getFullSolutionFromLayer(const SceneGraph& graph,
   gtsam::Pose3 to_T_from = to_pose_info.world_T_body.inverse() * solution.dest_T_src *
                            from_pose_info.world_T_body;
 
-  VLOG(2) << "Solution of " << NodeSymbol(query_agent_id).str() << " -> "
-          << NodeSymbol(to_pose_info.id).str() << ":";
-  VLOG(2) << "  - world_T_from: " << getPoseRepr(from_pose_info.world_T_body);
-  VLOG(2) << "  - world_T_to:   " << getPoseRepr(to_pose_info.world_T_body);
-  VLOG(2) << "  - dest_T_src:   " << getPoseRepr(solution.dest_T_src);
-  VLOG(2) << "  - to_T_from:    " << getPoseRepr(to_T_from);
+  HYDRA_VLOG(2,
+             "Solution of {} -> {}:",
+             NodeSymbol(query_agent_id).str(),
+             NodeSymbol(to_pose_info.id).str());
+  HYDRA_VLOG(2, "  - world_T_from: {}", getPoseRepr(from_pose_info.world_T_body));
+  HYDRA_VLOG(2, "  - world_T_to:   {}", getPoseRepr(to_pose_info.world_T_body));
+  HYDRA_VLOG(2, "  - dest_T_src:   {}", getPoseRepr(solution.dest_T_src));
+  HYDRA_VLOG(2, "  - to_T_from:    {}", getPoseRepr(to_T_from));
 
   return {true,
           from_pose_info.id,
@@ -211,9 +213,9 @@ RegistrationSolution DsgTeaserSolver::solve(const SceneGraph& dsg,
 
   if (problem.src_nodes.size() <= 3 || problem.dest_nodes.size() <= 3) {
     if (problem.src_nodes.empty()) {
-      LOG(ERROR) << "Invalid query: " << NodeSymbol(match.query_root).str();
+      HYDRA_LOG(ERROR, "Invalid query: {}", NodeSymbol(match.query_root).str());
     } else {
-      LOG(ERROR) << "Invalid match: " << NodeSymbol(match.match_root).str();
+      HYDRA_LOG(ERROR, "Invalid match: {}", NodeSymbol(match.match_root).str());
     }
 
     return {};
@@ -227,8 +229,10 @@ RegistrationSolution DsgTeaserSolver::solve(const SceneGraph& dsg,
   }
 
   if (num_same >= config.max_same_nodes) {
-    VLOG(2) << "Rejecting registration: " << num_same << " / " << config.max_same_nodes
-            << " shared nodes";
+    HYDRA_VLOG(2,
+               "Rejecting registration: {} / {} shared nodes",
+               num_same,
+               config.max_same_nodes);
     return {};
   }
 

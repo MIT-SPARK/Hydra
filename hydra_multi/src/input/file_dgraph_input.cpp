@@ -3,7 +3,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/types/path.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_pgmo/utils/common_functions.h>
 
@@ -45,7 +45,7 @@ FileDGraphInput::FileDGraphInput(const Config& config,
 void FileDGraphInput::init() {
   // keep the saved robot ids: the backend shifts them so the lowest is the unit id
   auto dgraph = DeformationGraph::load(config.dgrf_path, config.include_priors);
-  CHECK(dgraph);
+  HYDRA_CHECK(dgraph);
 
   if (config.fix_as_prior) {
     dgraph->fixPosesAsPriors(config.prior_variance);

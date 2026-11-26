@@ -35,7 +35,7 @@
 #pragma once
 #include <hydra/input/camera.h>
 #include <hydra/input/sensor.h>
-#include <hydra/utils/logging.h>
+#include <hydra/utils/verbosity_config.h>
 
 namespace hydra {
 

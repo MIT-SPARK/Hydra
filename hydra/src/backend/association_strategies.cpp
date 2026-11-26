@@ -37,7 +37,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 

@@ -32,11 +32,11 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 
 #include <Eigen/Dense>
 
 #include "hydra/gnn/gnn_interface.h"
+#include "hydra/utils/logging.h"
 
 using EdgeIndex = Eigen::Matrix<int64_t, Eigen::Dynamic, Eigen::Dynamic>;
 
@@ -47,22 +47,17 @@ void showTensorContents(hydra::gnn::Tensor& tensor) {
 }
 
 int main(int argc, char* argv[]) {
-  FLAGS_minloglevel = 0;
-  FLAGS_logtostderr = 1;
-  FLAGS_colorlogtostderr = 1;
-
-  google::InitGoogleLogging(argv[0]);
-  google::InstallFailureSignalHandler();
+  hydra::logging::setLogLevel("info");
 
   if (argc < 2) {
-    LOG(FATAL) << "usage: model_reader path_to_model";
+    HYDRA_LOG(FATAL, "usage: model_reader path_to_model");
     return 1;
   }
 
   std::string model_path(argv[1]);
   hydra::gnn::GnnInterface gnn(model_path);
 
-  LOG(INFO) << gnn;
+  HYDRA_LOG(INFO, "{}", gnn);
 
   hydra::gnn::Tensor x(10, 5);
   auto x_map = x.map<float>();
@@ -74,7 +69,7 @@ int main(int argc, char* argv[]) {
   index_map(1, 1) = 2;
   index_map(1, 2) = 3;
 
-  LOG(INFO) << "Running GNN!";
+  HYDRA_LOG(INFO, "Running GNN!");
   auto y = gnn(x, edge_index);
 
   std::cout << "y: " << y << std::endl;

@@ -40,7 +40,7 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/common/robot_config.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace kimera_pgmo {
 class MeshDelta;

@@ -33,13 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <config_utilities/printing.h>
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
 #include <gtest/gtest.h>
 #include <hydra/backend/updates/generic_update_functor.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <spark_dsg/scene_graph.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra_test/resources.h"
 #include "hydra_test/shared_dsg_fixture.h"
 
@@ -112,7 +111,7 @@ TEST(GenericUpdateFunctor, shouldUpdate) {
 
   auto config = defaultConfig();
   config.enable_merging = false;
-  VLOG(1) << "Using config:\n" << config::toString(config);
+  HYDRA_VLOG(1, "Using config:\n{}", config::toString(config));
 
   GenericUpdateFunctor functor(config);
   auto info = std::make_shared<UpdateInfo>();

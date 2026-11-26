@@ -32,10 +32,10 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/gnn_descriptors.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra_test/resources.h"
 
 namespace hydra::lcd {

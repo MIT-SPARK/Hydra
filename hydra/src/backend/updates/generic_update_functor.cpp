@@ -36,9 +36,9 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/scene_graph.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 using namespace spark_dsg;
@@ -98,13 +98,13 @@ void GenericUpdateFunctor::call(const SceneGraph& unmerged,
   active_tracker.clear();  // reset from previous pass
   const auto view = info->full_update ? LayerView(layer) : active_tracker.view(layer);
   deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
-  MLOG(1) << "" << config.layer << " update: " << layer.numNodes() << " nodes";
+  MLOG(1, "{} update: {} nodes", config.layer, layer.numNodes());
 }
 
 MergeList GenericUpdateFunctor::findMerges(const SceneGraph& graph,
                                            const UpdateInfo::ConstPtr& info) const {
   if (!node_matcher) {
-    LOG(WARNING) << "No node matcher!";
+    HYDRA_LOG(WARNING, "No node matcher!");
     return {};
   }
 

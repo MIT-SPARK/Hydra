@@ -37,7 +37,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {
@@ -75,7 +76,7 @@ bool CentroidBBoxMatcher::match(const Attrs& lhs_attrs, const Attrs& rhs_attrs) 
   const auto lhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&lhs_attrs);
   const auto rhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&rhs_attrs);
   if (!lhs_derived || !rhs_derived) {
-    LOG(WARNING) << "Unable to cast both attributes to SemanticNodeAttributes";
+    HYDRA_LOG(WARNING, "Unable to cast both attributes to SemanticNodeAttributes");
     return false;
   }
 
@@ -95,7 +96,7 @@ bool IoUNodeMatcher::match(const Attrs& lhs_attrs, const Attrs& rhs_attrs) const
   const auto lhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&lhs_attrs);
   const auto rhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&rhs_attrs);
   if (!lhs_derived || !rhs_derived) {
-    LOG(WARNING) << "Unable to cast both attributes to SemanticNodeAttributes";
+    HYDRA_LOG(WARNING, "Unable to cast both attributes to SemanticNodeAttributes");
     return false;
   }
 
@@ -123,7 +124,7 @@ bool BBoxIntersectionMatcher::match(const Attrs& lhs_attrs,
   const auto lhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&lhs_attrs);
   const auto rhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&rhs_attrs);
   if (!lhs_derived || !rhs_derived) {
-    LOG(WARNING) << "Unable to cast both attributes to SemanticNodeAttributes";
+    HYDRA_LOG(WARNING, "Unable to cast both attributes to SemanticNodeAttributes");
     return false;
   }
 
@@ -157,7 +158,7 @@ bool PlaceNodeMatcher::match(const Attrs& lhs_attrs, const Attrs& rhs_attrs) con
   const auto lhs_derived = dynamic_cast<const PlaceNodeAttributes*>(&lhs_attrs);
   const auto rhs_derived = dynamic_cast<const PlaceNodeAttributes*>(&rhs_attrs);
   if (!lhs_derived || !rhs_derived) {
-    LOG(WARNING) << "Unable to cast both attributes to PlaceNodeAttributes";
+    HYDRA_LOG(WARNING, "Unable to cast both attributes to PlaceNodeAttributes");
     return false;
   }
   if (!lhs_derived->real_place || !rhs_derived->real_place) {

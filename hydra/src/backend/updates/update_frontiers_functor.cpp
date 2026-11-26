@@ -36,10 +36,10 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/robot_prefix_config.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -105,7 +105,7 @@ bool point_in_polygon(Eigen::Vector2d pt, std::vector<Eigen::Vector3d> polygon) 
     auto x2 = polygon.at((idx + 1) % polygon.size());
     auto u = (x2 - x1).head(2);
     if (u.norm() < .00001) {
-      LOG(WARNING) << "short edge: " << x2 << x1;
+      HYDRA_LOG(WARNING, "short edge: {}{}", x2, x1);
     }
     Eigen::Vector2d normal(-u(1), u(0));
     auto projection = normal.dot(pt - x1.head(2));
@@ -152,7 +152,7 @@ void UpdateFrontiersFunctor::cleanup(const UpdateInfo::ConstPtr& info,
   const auto& places_2d_layer = dsg.graph->getLayer(DsgLayers::MESH_PLACES);
   const auto agent_layer = dsg.graph->getLayerKey(DsgLayers::AGENTS);
   if (!agent_layer) {
-    LOG(ERROR) << "Update frontiers functor could not find agents layer";
+    HYDRA_LOG(ERROR, "Update frontiers functor could not find agents layer");
     return;
   }
 

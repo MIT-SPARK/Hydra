@@ -42,7 +42,7 @@
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

@@ -6,8 +6,7 @@ When this happens, there are several ways to get more information about what mig
 
 ### Running hydra with GDB to get a backtrace
 
-The most helpful piece of information is to get a backtrace of where a segfault is occurring or other issue is occurring.
-Hydra should be set up to output a backtrace when it crashes, but this may not always appear (it depends on how far the Hydra node gets in the startup process).
+Use GDB to get a backtrace when Hydra crashes.
 You may have to install GDB (`sudo apt install gdb gdbserver`) if you haven't already. You can then run:
 
 ```

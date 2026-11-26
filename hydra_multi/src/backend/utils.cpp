@@ -1,7 +1,7 @@
 #include "hydra_multi/backend/utils.h"
 
-#include <glog/logging.h>
 #include <hydra/places/2d_places/index_remapping.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
@@ -42,7 +42,7 @@ void remapLayerConnections(const SceneGraphLayer& layer,
     const auto robot_id = node_to_robot.at(node.id);
     auto iter = mesh_offsets.find(robot_id);
     if (iter == mesh_offsets.end()) {
-      LOG(ERROR) << "Robot " << robot_id << " has no mesh offsets!";
+      HYDRA_LOG(ERROR, "Robot {} has no mesh offsets!", robot_id);
       continue;
     }
 
@@ -59,8 +59,9 @@ bool updateToGlobalFrame(const kimera_pgmo::DeformationGraph& dgraph,
                          gtsam::Pose3& global_T_pose) {
   const char robot_prefix = kimera_pgmo::getRobotPrefix(robot_id);
   if (robot_prefix == '\0') {
-    LOG(WARNING) << "Robot ID (" << robot_id
-                 << ") not assigned valid prefix in updateToGlobalFrame.";
+    HYDRA_LOG(WARNING,
+              "Robot ID ({}) not assigned valid prefix in updateToGlobalFrame.",
+              robot_id);
   }
 
   const gtsam::Symbol first_node(robot_prefix, 0);
@@ -89,7 +90,7 @@ size_t findClosestStampIdx(const Timestamps& stamps, const Timestamp query_stamp
 std::optional<Timestamp> getTimeNs(const SceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
   if (!graph.hasNode(node)) {
-    LOG(ERROR) << "Missing node << " << node << "when getting time.";
+    HYDRA_LOG(ERROR, "Missing node << {}when getting time.", node);
     return std::nullopt;
   }
   return graph.getNode(node).attributes<AgentNodeAttributes>().timestamp.count();

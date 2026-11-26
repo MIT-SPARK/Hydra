@@ -16,7 +16,7 @@ launch:
       exec: hydra_visualizer_node
       name: hydra_visualizer
       args: >
-        --config-utilities-yaml {graph: {type: GraphFromRos}, glog_verbosity: 0, glog_level: 1}
+        --config-utilities-yaml {graph: {type: GraphFromRos}, default_verbosity: 0, log_level: warning}
         --config-utilities-file $(var visualizer_config_path)
         --config-utilities-file $(find-pkg-share hydra_plusplus)/config/visualizer/visualizer_overrides.yaml
         --config-utilities-file $(find-pkg-share hydra_plusplus)/config/visualizer/$(var object_variant)_visualizer_plugins.yaml

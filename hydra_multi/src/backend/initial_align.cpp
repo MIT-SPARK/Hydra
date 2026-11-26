@@ -3,7 +3,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
 
 namespace hydra_multi {
@@ -32,8 +32,8 @@ RobotId InitialAlignModule::getFrame(RobotId robot_id) const {
 void InitialAlignModule::update(InitialAlignModule::Info::Ptr info) {
   robot_frames_ = info->robot_frames;
   if (!checkAlignConsistent(info)) {
-    LOG(WARNING)
-        << "Initial alignment inconsistent with deformation graph. Resetting...";
+    HYDRA_LOG(WARNING,
+              "Initial alignment inconsistent with deformation graph. Resetting...");
     W_T_robot_.clear();
   }
 }
@@ -49,13 +49,13 @@ gtsam::Values InitialAlignModule::computeInitialGuess(
     } else if (kimera_pgmo::isVertexKey(key)) {  // Deformation graph vertex
       robot_id = getFrame(kimera_pgmo::idFromVertexKey(key));
     } else {
-      LOG(ERROR) << "Unrecognized prefix in loopClosureInitialization.";
+      HYDRA_LOG(ERROR, "Unrecognized prefix in loopClosureInitialization.");
       continue;
     }
 
     if (!W_T_robot_.count(robot_id)) {
-      LOG_EVERY_N(ERROR, 50) << "Missing Robot ID (" << robot_id
-                             << ") when computing initial guess.";
+      HYDRA_LOG_EVERY_N(
+          ERROR, 50, "Missing Robot ID ({}) when computing initial guess.", robot_id);
       continue;
     }
 
@@ -79,7 +79,7 @@ gtsam::Values InitialAlignModule::computeInitialGuess(
 bool InitialAlignModule::checkAlignConsistent(InitialAlignModule::Info::Ptr info) {
   const auto optimized_values = info->dgraph->getValues();
   for (const auto& [robot_id, transform] : W_T_robot_) {
-    CHECK(kimera_pgmo::isValidId(robot_id));
+    HYDRA_CHECK(kimera_pgmo::isValidId(robot_id));
 
     const char robot_prefix = kimera_pgmo::getRobotPrefix(robot_id);
     const gtsam::Pose3 Wrobot_T_pose = info->getPrevRobotPose(robot_id).between(
@@ -89,8 +89,12 @@ bool InitialAlignModule::checkAlignConsistent(InitialAlignModule::Info::Ptr info
     const gtsam::Pose3 Wglobal_T_Wrobot =
         Wglobal_T_pose.compose(Wrobot_T_pose.inverse());
     if (!transform.equals(Wglobal_T_Wrobot, config.dgraph_consistency_tol)) {
-      LOG(ERROR) << "Robot " << robot_id << " has initial alignment: " << transform
-                 << " which is inconsistent with actual: " << Wglobal_T_Wrobot;
+      HYDRA_LOG(
+          ERROR,
+          "Robot {} has initial alignment: {} which is inconsistent with actual: {}",
+          robot_id,
+          transform,
+          Wglobal_T_Wrobot);
       return false;
     }
   }

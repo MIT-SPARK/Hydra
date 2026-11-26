@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <hydra/utils/timing_utilities.h>
 #include <ianvs/node_handle.h>
 #include <message_filters/subscriber.h>
@@ -159,7 +159,7 @@ cv::Mat parseColor(const Image& msg) {
     try {
       return cv_bridge::toCvCopy(msg, RGB8)->image;
     } catch (const cv_bridge::Exception& e) {
-      LOG(ERROR) << "Failed to convert color image: " << e.what();
+      HYDRA_LOG(ERROR, "Failed to convert color image: {}", e.what());
       return cv::Mat();
     }
   }
@@ -171,12 +171,13 @@ cv::Mat parseColor(const Image& msg) {
       cv::cvtColor(mono->image, color, cv::COLOR_GRAY2RGB);
       return color;
     } catch (const cv_bridge::Exception& e) {
-      LOG(ERROR) << "Failed to convert mono image as color input: " << e.what();
+      HYDRA_LOG(ERROR, "Failed to convert mono image as color input: {}", e.what());
       return cv::Mat();
     }
   }
 
-  LOG(ERROR) << "Failed to convert color image: unsupported encoding: " << msg.encoding;
+  HYDRA_LOG(
+      ERROR, "Failed to convert color image: unsupported encoding: {}", msg.encoding);
   return cv::Mat();
 }
 
@@ -184,7 +185,7 @@ cv::Mat parseDepth(const Image& img) {
   try {
     return cv_bridge::toCvCopy(img)->image;
   } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert depth image: " << e.what();
+    HYDRA_LOG(ERROR, "Failed to convert depth image: {}", e.what());
     return cv::Mat();
   }
 }
@@ -193,7 +194,7 @@ cv::Mat parseImage(const Image& msg) {
   try {
     return cv_bridge::toCvCopy(msg)->image;
   } catch (const cv_bridge::Exception& e) {
-    LOG(ERROR) << "Failed to convert image: " << e.what();
+    HYDRA_LOG(ERROR, "Failed to convert image: {}", e.what());
     return cv::Mat();
   }
 }
@@ -250,7 +251,7 @@ struct InstanceAdapter {
   static void fill(const Image& msg, ImageInputPacket& packet) {
     const auto mat = parseImage(msg);
     if (mat.type() != CV_32SC1) {
-      LOG(ERROR) << "Invalid encoding for instance+label image";
+      HYDRA_LOG(ERROR, "Invalid encoding for instance+label image");
       return;
     }
 
@@ -289,7 +290,7 @@ struct OpenSetAdapter {
   static void fill(const FeatureImage& msg, ImageInputPacket& packet) {
     packet.instances = parseImage(msg.image);
 
-    CHECK_EQ(msg.mask_ids.size(), msg.features.size());
+    HYDRA_CHECK_EQ(msg.mask_ids.size(), msg.features.size());
     for (size_t i = 0; i < msg.mask_ids.size(); ++i) {
       const auto& vec = msg.features[i].data;
       packet.label_features.emplace(
@@ -621,7 +622,7 @@ ImageReceiver::ImageReceiver(const Config& config,
                              const OutputQueue::Ptr& output)
     : RosDataReceiver(config, sensor, output), config(config) {
   if (config.queue_size <= 2 && !config.use_exact) {
-    LOG(WARNING) << "ApproximateTime policy requires queue sizes larger than 2";
+    HYDRA_LOG(WARNING, "ApproximateTime policy requires queue sizes larger than 2");
   }
 }
 

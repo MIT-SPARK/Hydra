@@ -34,12 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/frontend/place_mesh_connector.h"
 
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/node_attributes.h>
 
 #include <nanoflann.hpp>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

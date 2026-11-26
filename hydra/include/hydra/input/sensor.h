@@ -47,7 +47,6 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 #include <config_utilities/virtual_config.h>
-#include <hydra/utils/logging.h>
 
 #include <Eigen/Geometry>
 #include <filesystem>
@@ -55,6 +54,7 @@
 #include <opencv2/core/mat.hpp>
 
 #include "hydra/input/sensor_extrinsics.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

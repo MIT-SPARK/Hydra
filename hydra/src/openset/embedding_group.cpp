@@ -1,9 +1,9 @@
 #include "hydra/openset/embedding_group.h"
 
 #include <config_utilities/config.h>
-#include <glog/logging.h>
 
 #include "hydra/openset/embedding_distances.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {
@@ -86,13 +86,13 @@ Eigen::VectorXf EmbeddingGroup::getDistances(const EmbeddingDistance& dist,
 Eigen::VectorXf EmbeddingGroup::getScores(const EmbeddingDistance& dist,
                                           const FeatureVector& embedding) const {
   const auto fmt = getDefaultFormat();
-  VLOG(5) << "====================================================================";
-  VLOG(5) << "Embedding: " << embedding.format(fmt);
-  VLOG(5) << "====================================================================";
+  HYDRA_VLOG(5, "====================================================================");
+  HYDRA_VLOG(5, "Embedding: {}", embedding.format(fmt));
+  HYDRA_VLOG(5, "====================================================================");
   Eigen::VectorXf scores(embeddings.size());
   for (size_t i = 0; i < embeddings.size(); ++i) {
     scores(i) = dist.score(embeddings[i], embedding);
-    VLOG(5) << "(i=" << i << "): " << scores(i) << " @ " << embeddings[i].format(fmt);
+    HYDRA_VLOG(5, "(i={}): {} @ {}", i, scores(i), embeddings[i].format(fmt));
   }
 
   return scores;

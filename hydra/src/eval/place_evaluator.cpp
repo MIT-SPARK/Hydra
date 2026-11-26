@@ -36,10 +36,10 @@
 
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
-#include <glog/logging.h>
 
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/layer_io.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::eval {
 
@@ -49,7 +49,7 @@ using spark_dsg::SceneGraph;
 
 PlaceEvaluator::PlaceEvaluator(const GvdIntegrator::Config& config,
                                const TsdfLayer::Ptr& tsdf)
-    : tsdf_(CHECK_NOTNULL(tsdf)) {
+    : tsdf_(HYDRA_CHECK_NOTNULL(tsdf)) {
   gvd_.reset(new GvdLayer(tsdf_->voxel_size, tsdf_->voxels_per_side));
   computeGroundTruth(config);
 }
@@ -57,10 +57,10 @@ PlaceEvaluator::PlaceEvaluator(const GvdIntegrator::Config& config,
 void PlaceEvaluator::computeGroundTruth(const GvdIntegrator::Config& config) {
   config_ = config;
 
-  VLOG(1) << "using GVD config:" << std::endl << config_;
+  HYDRA_VLOG(1, "using GVD config:\n{}", config_);
   places::GvdIntegrator integrator(config_, gvd_);
   auto map = VolumetricMap::fromTsdf(*tsdf_, 0.3, false);
-  CHECK(map) << "Invalid map!";
+  HYDRA_CHECK(map, "Invalid map!");
   integrator.updateFromTsdf(0, map->getTsdfLayer(), false, &map->getMeshLayer(), true);
   integrator.updateGvd(0);
 }
@@ -75,7 +75,7 @@ PlaceEvaluator::Ptr PlaceEvaluator::fromFile(const std::string& config_filepath,
 
   auto tsdf = io::loadLayer<TsdfLayer>(tsdf_filepath);
   if (!tsdf) {
-    LOG(ERROR) << "Failed to load TSDF from: " << tsdf_filepath;
+    HYDRA_LOG(ERROR, "Failed to load TSDF from: {}", tsdf_filepath);
     return nullptr;
   }
 

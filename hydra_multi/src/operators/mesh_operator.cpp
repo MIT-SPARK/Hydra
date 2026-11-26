@@ -1,6 +1,6 @@
 #include "hydra_multi/operators/mesh_operator.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <kimera_pgmo/mesh_delta.h>
 

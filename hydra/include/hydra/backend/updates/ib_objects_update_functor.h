@@ -8,6 +8,7 @@
 #include "hydra/common/node_matchers.h"
 #include "hydra/openset/clustering/agglomerative_ib_clustering.h"
 #include "hydra/utils/id_tracker.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

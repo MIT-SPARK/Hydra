@@ -37,7 +37,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {
@@ -123,8 +124,11 @@ PoseGraphPacket PoseGraphFromOdom::update(uint64_t timestamp_ns,
     const auto diff_s =
         std::chrono::duration_cast<std::chrono::duration<double>>(diff_ns);
     if (config.min_time_separation_s && diff_s.count() < config.min_time_separation_s) {
-      MLOG(2) << "Dropped pose @ " << timestamp_ns << "[ns] with time separation "
-              << diff_s.count() << " < " << config.min_time_separation_s << " [s]";
+      MLOG(2,
+           "Dropped pose @ {}[ns] with time separation {} < {} [s]",
+           timestamp_ns,
+           diff_s.count(),
+           config.min_time_separation_s);
       return packet;
     }
 
@@ -134,8 +138,11 @@ PoseGraphPacket PoseGraphFromOdom::update(uint64_t timestamp_ns,
     const auto total_diff =
         translation_diff + config.rotation_separation_weight * rotation_diff;
     if (config.min_pose_separation && total_diff < config.min_pose_separation) {
-      MLOG(2) << "Dropped pose @ " << timestamp_ns << "[ns] with pose separation "
-              << total_diff << " < " << config.min_pose_separation;
+      MLOG(2,
+           "Dropped pose @ {}[ns] with pose separation {} < {}",
+           timestamp_ns,
+           total_diff,
+           config.min_pose_separation);
       return packet;
     }
 

@@ -40,7 +40,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include <iomanip>
 #include <list>
@@ -50,6 +49,7 @@
 #include "hydra/common/run_settings.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {
@@ -139,7 +139,7 @@ void MeshIntegrator::showUpdateInfo(const VolumetricMap& map,
        << " vertices @ " << showIndex(idx);
   }
 
-  MLOG(verbosity) << ss.str();
+  MLOG(verbosity, "{}", ss.str());
 }
 
 void MeshIntegrator::generateMesh(VolumetricMap& map,
@@ -189,7 +189,7 @@ void MeshIntegrator::processBlocks(VolumetricMap* map,
 
   while (index_getter->getNextIndex(block_index)) {
     MarchingCubes::EdgeCache cache(map->config.voxels_per_side);
-    MLOG(4) << "Extracting interior for block: " << showIndex(block_index);
+    MLOG(4, "Extracting interior for block: {}", showIndex(block_index));
 
     VoxelIndex v_idx;
     const int limit = map->config.voxels_per_side - 1;
@@ -200,7 +200,8 @@ void MeshIntegrator::processBlocks(VolumetricMap* map,
         }
       }
     }
-    MLOG(4) << "Extracting exterior for block: " << showIndex(block_index);
+
+    MLOG(4, "Extracting exterior for block: {}", showIndex(block_index));
     const auto vps = static_cast<int>(map->config.voxels_per_side);
 
     // Max X plane
@@ -235,11 +236,11 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map,
                                        MarchingCubes::EdgeCache* cache) const {
-  MLOG(4) << "processing interior voxel: " << index.transpose();
+  MLOG(4, "processing interior voxel: {}", index.transpose());
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
   if (!block || !mesh) {
-    LOG(ERROR) << "Invalid block index: " << block_index.transpose();
+    HYDRA_LOG(ERROR, "Invalid block index: {}", block_index.transpose());
     return;
   }
 
@@ -302,11 +303,11 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map,
                                        MarchingCubes::EdgeCache* cache) const {
-  MLOG(4) << "processing exterior voxel: " << index.transpose();
+  MLOG(4, "processing exterior voxel: {}", index.transpose());
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
   if (!block || !mesh) {
-    LOG(ERROR) << "Invalid block index: " << block_index.transpose();
+    HYDRA_LOG(ERROR, "Invalid block index: {}", block_index.transpose());
     return;
   }
 
@@ -338,7 +339,7 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
         return;
       }
 
-      CHECK(n_block->isValidVoxelIndex(c_idx));
+      HYDRA_CHECK(n_block->isValidVoxelIndex(c_idx));
       voxel = &n_block->getVoxel(c_idx);
       if (semantics) {
         const auto& s_block = map.getSemanticLayer()->getBlock(n_idx);

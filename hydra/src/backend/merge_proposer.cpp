@@ -36,9 +36,10 @@
 #include "hydra/backend/merge_proposer.h"
 
 #include <config_utilities/config.h>
-#include <glog/logging.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph_layer.h>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 
@@ -74,7 +75,7 @@ void MergeProposer::findMerges(const SceneGraphLayer& layer,
                                MergeList& nodes_to_merge) const {
   const auto associator = config.strategy.create<const SceneGraphLayer&>(layer);
   if (!associator) {
-    LOG(WARNING) << "Merges enabled, but factory not specified!";
+    HYDRA_LOG(WARNING, "Merges enabled, but factory not specified!");
     return;
   }
 

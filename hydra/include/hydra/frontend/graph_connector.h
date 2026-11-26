@@ -39,7 +39,7 @@
 #include <set>
 #include <vector>
 
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

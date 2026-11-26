@@ -1,7 +1,7 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 #include <hydra/common/shared_dsg_info.h>
-#include <hydra/utils/logging.h>
+#include <hydra/utils/verbosity_config.h>
 
 #include <array>
 #include <atomic>

@@ -37,7 +37,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <kimera_pgmo/deformation_edge_factor.h>
 #include <kimera_pgmo/deformation_graph.h>
@@ -45,6 +44,7 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -82,7 +82,7 @@ void MstPlaceFactors::updateProblem(
     const NodeRobotMap* robot_lookup) const {
   const auto& places = graph.getLayer(DsgLayers::PLACES);
   if (places.numNodes() == 0) {
-    LOG(WARNING) << "Attempting to build place constraints without places";
+    HYDRA_LOG(WARNING, "Attempting to build place constraints without places");
     return;
   }
 

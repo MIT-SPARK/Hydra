@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/room_metrics.h"
 
-#include <glog/logging.h>
-
 #include <numeric>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::eval {
 
@@ -87,7 +87,7 @@ RoomMetrics scoreRooms(const RoomIndices& gt_rooms, const RoomIndices& est_rooms
 
   // recalls
   const auto max_gt_overlaps = results.overlaps.rowwise().maxCoeff();
-  CHECK_EQ(max_gt_overlaps.rows(), static_cast<int>(results.gt_sizes.size()));
+  HYDRA_CHECK_EQ(max_gt_overlaps.rows(), static_cast<int>(results.gt_sizes.size()));
 
   for (size_t i = 0; i < results.gt_sizes.size(); ++i) {
     const auto curr_size = results.gt_sizes.at(i);
@@ -100,7 +100,7 @@ RoomMetrics scoreRooms(const RoomIndices& gt_rooms, const RoomIndices& est_rooms
 
   // precisions
   const auto max_est_overlaps = results.overlaps.colwise().maxCoeff();
-  CHECK_EQ(max_est_overlaps.cols(), static_cast<int>(results.est_sizes.size()));
+  HYDRA_CHECK_EQ(max_est_overlaps.cols(), static_cast<int>(results.est_sizes.size()));
 
   for (size_t i = 0; i < results.est_sizes.size(); ++i) {
     const auto curr_size = results.est_sizes.at(i);
@@ -108,8 +108,8 @@ RoomMetrics scoreRooms(const RoomIndices& gt_rooms, const RoomIndices& est_rooms
   }
 
   Eigen::IOFormat fmt(6, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
-  VLOG(4) << "GT: " << max_gt_overlaps.format(fmt);
-  VLOG(4) << "EST: " << max_est_overlaps.format(fmt);
+  HYDRA_VLOG(4, "GT: {}", max_gt_overlaps.format(fmt));
+  HYDRA_VLOG(4, "EST: {}", max_est_overlaps.format(fmt));
 
   const auto total_est_size =
       std::accumulate(results.est_sizes.begin(), results.est_sizes.end(), size_t{0});

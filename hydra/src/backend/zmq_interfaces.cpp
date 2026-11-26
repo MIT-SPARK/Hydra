@@ -38,8 +38,9 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/zmq_interface.h>
+
+#include "hydra/utils/logging.h"
 
 using spark_dsg::SceneGraph;
 
@@ -71,9 +72,8 @@ ZmqSink::~ZmqSink() = default;
 void ZmqSink::call(uint64_t timestamp_ns,
                    const SceneGraph& graph,
                    const kimera_pgmo::DeformationGraph&) const {
-  MLOG(3) << "Sending graph via zmq to '" << config.url << "' @ " << timestamp_ns
-          << " [ns]";
-  CHECK_NOTNULL(sender_)->send(graph, config.send_mesh);
+  MLOG(3, "Sending graph via zmq to '{}' @ {} [ns]", config.url, timestamp_ns);
+  HYDRA_CHECK_NOTNULL(sender_)->send(graph, config.send_mesh);
 }
 
 std::string ZmqSink::printInfo() const { return config::toString(config); }

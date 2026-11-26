@@ -37,6 +37,8 @@
 #include <hydra/places/gvd_places/gvd_utilities.h>
 #include <hydra/reconstruction/volumetric_map.h>
 
+#include "hydra/utils/logging.h"
+
 namespace hydra::places {
 namespace {
 
@@ -88,9 +90,9 @@ class GvdIntegratorData {
 
 VoxelIndex validateCoords(const GvdIntegratorData::Coords& coords,
                           size_t voxels_per_side) {
-  CHECK_LT(coords[0], voxels_per_side);
-  CHECK_LT(coords[1], voxels_per_side);
-  CHECK_LT(coords[2], voxels_per_side);
+  HYDRA_CHECK_LT(coords[0], voxels_per_side);
+  HYDRA_CHECK_LT(coords[1], voxels_per_side);
+  HYDRA_CHECK_LT(coords[2], voxels_per_side);
 
   VoxelIndex v_index;
   v_index << coords[0], coords[1], coords[2];
@@ -294,12 +296,12 @@ TEST(GvdIntegrator, OccupancyIntegration2DCorrect) {
 
     const auto expected = GvdSlice::fromExpected(expected_distances, {{0, 2}, {1, 2}});
     const auto result = GvdSlice::fromData(4, 8, data);
-    VLOG(1) << "Result:\n" << result;
-    VLOG(1) << "Expected:\n" << expected;
+    HYDRA_VLOG(1, "Result:\n{}", result);
+    HYDRA_VLOG(1, "Expected:\n{}", expected);
     expected.check(result);
   }
 
-  VLOG(1) << "Perturbing GVD: (3, 2) -> 10.0, (7, 2) -> 0.0";
+  HYDRA_VLOG(1, "Perturbing GVD: (3, 2) -> 10.0, (7, 2) -> 0.0");
 
   // raise the middle obstacle and lower one on the side
   // reset surface flags for previous surfaces
@@ -325,8 +327,8 @@ TEST(GvdIntegrator, OccupancyIntegration2DCorrect) {
     const auto expected = GvdSlice::fromExpected(
         expected_distances, {{0, 4}, {1, 3}, {1, 4}, {2, 3}, {2, 4}, {3, 3}, {3, 4}});
     const auto result = GvdSlice::fromData(4, 8, data);
-    VLOG(1) << "Result:\n" << result;
-    VLOG(1) << "Expected:\n" << expected;
+    HYDRA_VLOG(1, "Result:\n{}", result);
+    HYDRA_VLOG(1, "Expected:\n{}", expected);
     expected.check(result);
   }
 }
@@ -388,8 +390,8 @@ TEST(GvdIntegrator, NegativeIntegration2DCorrect) {
 
   const auto expected = GvdSlice::fromExpected(expected_distances, {});
   const auto result = GvdSlice::fromData(8, 8, data);
-  VLOG(1) << "Result:\n" << result;
-  VLOG(1) << "Expected:\n" << expected;
+  HYDRA_VLOG(1, "Result:\n{}", result);
+  HYDRA_VLOG(1, "Expected:\n{}", expected);
   expected.check(result);
 }
 

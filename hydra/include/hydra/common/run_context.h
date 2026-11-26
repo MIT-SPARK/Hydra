@@ -55,6 +55,8 @@ class RunContext {
     RunSettings::Config settings = RunSettings::instance();
     //! Base artifact directory; an empty path disables run logging
     std::filesystem::path log_path;
+    //! Save diagnostic output to hydra.log in the allocated artifact directory
+    bool log_to_file = false;
     //! Directory allocation and overwrite settings
     DataDirectory::Config output;
     //! Layer names for the scene graph
@@ -72,6 +74,9 @@ class RunContext {
 
   const Config config;
   const DataDirectory logs;
+
+  //! Restore run defaults and diagnostic file output before constructing modules
+  void activate() const;
 
   RobotPrefixConfig robot_prefix() const;
   const Labelspace& labelspace() const;

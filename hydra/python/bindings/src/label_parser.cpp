@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/label_parser.h"
 
-#include <glog/logging.h>
+#include "hydra/utils/logging.h"
 
 namespace py = pybind11;
 
@@ -50,9 +50,9 @@ struct LabelParserImpl : LabelParser {
 };
 
 LabelParser::Ptr LabelParser::create(const PythonImage& img) {
-  CHECK(img) << "invalid image";
+  HYDRA_CHECK(img, "invalid image");
   if (img.channels() != 1) {
-    LOG(ERROR) << "only single channel label images supported";
+    HYDRA_LOG(ERROR, "only single channel label images supported");
     return nullptr;
   }
 
@@ -70,7 +70,7 @@ LabelParser::Ptr LabelParser::create(const PythonImage& img) {
   } else if (img_format == py::format_descriptor<int32_t>::format()) {
     return std::make_unique<LabelParserImpl<int32_t>>();
   } else {
-    LOG(ERROR) << "invalid label format: " << img_format;
+    HYDRA_LOG(ERROR, "invalid label format: {}", img_format);
     return nullptr;
   }
 }

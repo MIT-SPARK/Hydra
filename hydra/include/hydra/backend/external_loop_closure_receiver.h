@@ -41,7 +41,7 @@
 #include <list>
 
 #include "hydra/common/message_queue.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

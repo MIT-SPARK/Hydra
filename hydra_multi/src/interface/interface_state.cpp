@@ -1,6 +1,6 @@
 #include "hydra_multi/interface/interface_state.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <fstream>
 #include <iostream>
@@ -24,7 +24,7 @@ void UnitInterfaceState::save(const std::filesystem::path& log_dir) const {
   std::filesystem::path file_path = log_dir / "world_T_robot.txt";
   std::ofstream ofs(file_path);
   if (!ofs.is_open()) {
-    LOG(ERROR) << "Failed to open file: " << file_path << std::endl;
+    HYDRA_LOG(ERROR, "Failed to open file: {}\n", file_path);
     return;
   }
 

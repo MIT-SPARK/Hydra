@@ -36,9 +36,10 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include <chrono>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -115,8 +116,10 @@ void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
     std::chrono::nanoseconds last_time_ns(last_received_->timestamp_ns);
     std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
     if (separation_s.count() < config.input_separation_s) {
-      MLOG(2) << "Dropping input @ " << timestamp << " [ns] with separation of "
-              << separation_s.count() << " [s]";
+      MLOG(2,
+           "Dropping input @ {} [ns] with separation of {} [s]",
+           timestamp,
+           separation_s.count());
       return;
     }
   }
@@ -127,7 +130,7 @@ void DataReceiver::pushPacket(SensorInputPacket::Ptr packet) {
     }
   }
 
-  MLOG(2) << "Got input @ " << timestamp << " [ns]";
+  MLOG(2, "Got input @ {} [ns]", timestamp);
   last_received_ = packet;
 
   auto data = std::make_shared<InputData>(sensor);
@@ -207,11 +210,11 @@ std::string DataReceiver::RateStats::str() const {
 void DataReceiver::stopImpl() {
   should_shutdown_ = true;
   if (thread_) {
-    MLOG(1) << "stopping receiver '" << sensor_name << "'";
+    MLOG(1, "stopping receiver '{}'", sensor_name);
     thread_->join();
     thread_.reset();
-    MLOG(1) << "stopped receiver '" << sensor_name << "'";
-    MLOG(1) << "remaining in receiver '" << sensor_name << "' queue: " << queue_.size();
+    MLOG(1, "stopped receiver '{}'", sensor_name);
+    MLOG(1, "remaining in receiver '{}' queue: {}", sensor_name, queue_.size());
   }
 }
 

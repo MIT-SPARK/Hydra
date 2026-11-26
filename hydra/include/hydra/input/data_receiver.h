@@ -41,7 +41,7 @@
 #include "hydra/input/input_filter.h"
 #include "hydra/input/sensor.h"
 #include "hydra/input/sensor_input_packet.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

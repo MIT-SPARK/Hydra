@@ -3,7 +3,7 @@ launch:
   # development arguments
   - arg: {name: debug, default: 'false'}
   - arg: {name: verbosity, default: '0'}
-  - arg: {name: glog_level, default: '0'}
+  - arg: {name: log_level, default: info}
   - arg: {name: print_missing, default: 'false', description: have config utilities print all missing parameters when parsing configs}
   # run behavior
   - arg: {name: scene, default: office, description: uhumans2 scene name}
@@ -28,7 +28,7 @@ launch:
         --config-utilities-file $(var input_config_path)
         --config-utilities-yaml {world_frame: $(var world_frame)}
         --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
-        --config-utilities-yaml {print_missing: $(var print_missing), glog_level: $(var glog_level), verbosity: $(var verbosity)}
+        --config-utilities-yaml {print_missing: $(var print_missing), log_level: $(var log_level), verbosity: $(var verbosity)}
   - include:
       file: $(find-pkg-share hydra_visualizer)/launch/streaming_visualizer.launch.yaml
       arg:

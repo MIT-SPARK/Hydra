@@ -49,9 +49,9 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
-#include <glog/logging.h>
 
 #include "hydra/utils/layer_io.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -176,12 +176,12 @@ std::unique_ptr<VolumetricMap> VolumetricMap::load(const std::string& filepath) 
   const auto cpath = filepath + ".yaml";
   auto config = config::fromYamlFile<VolumetricMap::Config>(cpath, "map");
   if (std::abs(config.voxel_size - tsdf->voxel_size) > 1.0e-5) {
-    LOG(ERROR) << "TSDF voxel size does not match config voxel size";
+    HYDRA_LOG(ERROR, "TSDF voxel size does not match config voxel size");
     return nullptr;
   }
 
   if (config.voxels_per_side != tsdf->voxels_per_side) {
-    LOG(ERROR) << "TSDF vps does not match config vps";
+    HYDRA_LOG(ERROR, "TSDF vps does not match config vps");
     return nullptr;
   }
 

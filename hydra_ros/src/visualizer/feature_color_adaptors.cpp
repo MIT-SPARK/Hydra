@@ -2,9 +2,9 @@
 
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/openset/embedding_distances.h>
 #include <hydra/openset/embedding_group.h>
+#include <hydra/utils/logging.h>
 #include <hydra_visualizer/color/color_parsing.h>
 #include <ianvs/node_handle.h>
 #include <spark_dsg/colormaps.h>
@@ -136,8 +136,11 @@ void FeatureScoreColor::setGraph(const SceneGraph& graph, LayerKey layer_key) {
   for (const auto& node : layer.nodes()) {
     const auto& attrs = node.attributes<SemanticNodeAttributes>();
     const auto score = metric_->score(feature_, attrs.semantic_feature);
-    MLOG(2) << "node " << NodeSymbol(node.id).str() << " -> " << score << ": "
-            << showVec(attrs.semantic_feature);
+    MLOG(2,
+         "node {} -> {}: {}",
+         NodeSymbol(node.id).str(),
+         score,
+         showVec(attrs.semantic_feature));
     range_.min = std::min(range_.min, score);
     range_.max = std::max(range_.max, score);
     values_[node.id] = score;
@@ -147,7 +150,7 @@ void FeatureScoreColor::setGraph(const SceneGraph& graph, LayerKey layer_key) {
     range_ = {config.min_score, config.max_score};
   }
 
-  MLOG(2) << "score range: [" << range_.min << ", " << range_.max << "]";
+  MLOG(2, "score range: [{}, {}]", range_.min, range_.max);
 }
 
 Color FeatureScoreColor::getColor(const SceneGraph&, const SceneGraphNode& node) const {
@@ -161,7 +164,7 @@ Color FeatureScoreColor::getColor(const SceneGraph&, const SceneGraphNode& node)
 }
 
 void FeatureScoreColor::setFeature(const Eigen::VectorXf& feature) {
-  MLOG(1) << "Got new task!";
+  MLOG(1, "Got new task!");
   feature_ = feature;
   has_feature_ = true;
   has_change_ = true;

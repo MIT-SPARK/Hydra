@@ -20,7 +20,7 @@
   <depend>spatial_hash</depend>
   <depend>spark_dsg</depend>
   <depend>teaserpp</depend>
-  <depend>libgoogle-glog-dev</depend>
+  <depend>spdlog</depend>
   <depend>libopencv-dev</depend>
   <depend>libzip-dev</depend>
   <depend>nlohmann-json-dev</depend>

@@ -3,10 +3,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/backend/backend_utilities.h>
 #include <hydra/backend/mst_factors.h>
 #include <hydra/common/launch_callbacks.h>
+#include <hydra/utils/logging.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <hydra/utils/timing_utilities.h>
 #include <kimera_pgmo/deformation_graph_4dof.h>
@@ -88,8 +88,9 @@ void saveTrajectory(const SceneGraphLayer& layer,
   for (const auto& node : layer.nodes()) {
     const auto attrs = node.tryAttributes<AgentNodeAttributes>();
     if (!attrs) {
-      LOG(ERROR) << "Invalid agent layer, node " << NodeSymbol(node.id).str()
-                 << " is not agent node";
+      HYDRA_LOG(ERROR,
+                "Invalid agent layer, node {} is not agent node",
+                NodeSymbol(node.id).str());
       continue;
     }
 
@@ -131,10 +132,13 @@ std::map<size_t, size_t> shiftToUnitId(size_t unit_id,
   const auto lowest = *node_ids.begin();
   for (const auto robot_id : robot_ids) {
     const auto new_id = robot_id + unit_id - lowest;
-    CHECK(robot_id + unit_id >= lowest && kimera_pgmo::getRobotPrefix(new_id) != '\0')
-        << "Robot " << robot_id << " of unit " << unit_id
-        << " has no valid robot id after shifting the lowest robot id " << lowest
-        << " to the unit id";
+    HYDRA_CHECK(
+        robot_id + unit_id >= lowest && kimera_pgmo::getRobotPrefix(new_id) != '\0',
+        "Robot {} of unit {} has no valid robot id after shifting the lowest robot id "
+        "{} to the unit id",
+        robot_id,
+        unit_id,
+        lowest);
     id_mapping[robot_id] = new_id;
   }
 
@@ -206,7 +210,7 @@ MultiBackendModule::MultiBackendModule(
   status_.reset();
   status_log_.push_back(status_);
   if (!config.include_mesh_factors) {
-    LOG(WARNING) << "Mesh factors are OFF! Mesh will not be updated!";
+    HYDRA_LOG(WARNING, "Mesh factors are OFF! Mesh will not be updated!");
   }
 }
 
@@ -215,7 +219,7 @@ MultiBackendModule::~MultiBackendModule() { stopImpl(); }
 void MultiBackendModule::start() {
   spin_thread_.reset(new std::thread(&MultiBackendModule::spin, this));
   optimization_thread_.reset(new std::thread(&MultiBackendModule::optimizeSpin, this));
-  LOG(INFO) << " [Hydra-Multi Backend] started!";
+  MLOG_NAMED(INFO, "Started");
 }
 
 void MultiBackendModule::stop() { stopImpl(); }
@@ -360,21 +364,21 @@ void MultiBackendModule::optimizeSpin() {
 }
 
 void MultiBackendModule::stopImpl() {
-  MLOG(1) << "Backend stopping...";
+  MLOG(1, "Backend stopping...");
   should_shutdown_ = true;
 
   if (optimization_thread_) {
-    MLOG(1) << "joining optimizer thread and stopping";
+    MLOG(1, "joining optimizer thread and stopping");
     optimization_thread_->join();
     optimization_thread_.reset();
-    MLOG(1) << "optimizer thread stopped!";
+    MLOG(1, "optimizer thread stopped!");
   }
 
   if (spin_thread_) {
-    MLOG(1) << "joining spin thread and stopping";
+    MLOG(1, "joining spin thread and stopping");
     spin_thread_->join();
     spin_thread_.reset();
-    MLOG(1) << "spin stopped!";
+    MLOG(1, "spin stopped!");
   }
 }
 
@@ -472,7 +476,7 @@ void MultiBackendModule::partialOptimization(const Timestamp& timestamp_ns) {
   }
 
   if (has_all_keys) {
-    LOG(WARNING) << "No work to do in partial optimization!";
+    HYDRA_LOG(WARNING, "No work to do in partial optimization!");
     return;
   }
 
@@ -498,13 +502,13 @@ void MultiBackendModule::partialOptimization(const Timestamp& timestamp_ns) {
   // Set all factors as inliers
   auto known_indices = std::views::iota(size_t(0), factors.size());
   problem.inliers = std::set<size_t>(known_indices.begin(), known_indices.end());
-  LOG(INFO) << "Starting partial optimization";
+  HYDRA_LOG(INFO, "Starting partial optimization");
   kimera_pgmo::OptimizationResult result;
   try {
     result = partial_pgo_->update(problem);
-    LOG(INFO) << "Finished partial optimization";
+    HYDRA_LOG(INFO, "Finished partial optimization");
   } catch (const gtsam::IndeterminantLinearSystemException& e) {
-    LOG(ERROR) << "Failed optimization: '" << gtsam::Symbol(e.nearbyVariable());
+    HYDRA_LOG(ERROR, "Failed optimization: '{}", gtsam::Symbol(e.nearbyVariable()));
     std::vector<gtsam::NonlinearFactorGraph::sharedFactor> nearby_factors;
     for (const auto& factor : factors) {
       for (const auto& key : factor->keys()) {
@@ -529,7 +533,7 @@ void MultiBackendModule::partialOptimization(const Timestamp& timestamp_ns) {
       }
 
       ss << "]";
-      LOG(ERROR) << "factor " << i << ": " << ss.str();
+      HYDRA_LOG(ERROR, "factor {}: {}", i, ss.str());
     }
 
     return;
@@ -546,13 +550,13 @@ bool MultiBackendModule::spinOnce(Timestamp timestamp_ns) {
     auto lock = deformation_graph_->acquireLock();
     std::lock_guard<std::mutex> graph_lock(unmerged_dsg_->mutex);
 
-    MLOG(2) << "Checking for updates @ " << timestamp_ns << " [ns]";
+    MLOG(2, "Checking for updates @ {} [ns]", timestamp_ns);
     if (!updateFromStates(timestamp_ns)) {
-      MLOG(2) << "Waiting for states...";
+      MLOG(2, "Waiting for states...");
       return true;
     }
 
-    MLOG(2) << "Spinning once for update @ " << timestamp_ns << " [ns]";
+    MLOG(2, "Spinning once for update @ {} [ns]", timestamp_ns);
     partialOptimization(timestamp_ns);
 
     combineAndDeformMesh(timestamp_ns, should_deform_);
@@ -571,7 +575,7 @@ bool MultiBackendModule::spinOnce(Timestamp timestamp_ns) {
     rebaseStates(timestamp_ns);
   }
 
-  MLOG(2) << "Calling backend sinks @ " << timestamp_ns << " [ns]";
+  MLOG(2, "Calling backend sinks @ {} [ns]", timestamp_ns);
   ScopedTimer sink_timer("backend/sinks", timestamp_ns);
   MultiBackendModuleStatus status;
   {  // status critical section
@@ -612,13 +616,14 @@ void MultiBackendModule::optimizeCleanup(const gtsam::Values& results) {
 
 void MultiBackendModule::optimize(size_t timestamp_ns) {
   ScopedTimer timer("backend/optimize", timestamp_ns);
-  LOG(INFO) << "Starting full optimization";
+  HYDRA_LOG(INFO, "Starting full optimization");
   kimera_pgmo::OptimizeStats stats;
   {  // timer scope
     ScopedTimer timer("backend/optimization", timestamp_ns, true, 0, false);
     stats = KimeraPgmoInterface::optimize();
   }  // timer scope
-  LOG(INFO) << "Finish full optimization";
+
+  HYDRA_LOG(INFO, "Finish full optimization");
 
   {  // status scope
     std::lock_guard<std::mutex> lock(status_mutex_);
@@ -697,7 +702,7 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
   }
 
   for (const auto& [id, state] : *shared_states_) {
-    MLOG(2) << "Saw robot " << id << " in update @ " << timestamp_ns << " [ns]";
+    MLOG(2, "Saw robot {} in update @ {} [ns]", id, timestamp_ns);
     std::lock_guard<std::mutex> state_lock(state->mutex);
 
     // Append transform
@@ -716,10 +721,13 @@ bool MultiBackendModule::updateFromStates(Timestamp timestamp_ns) {
         robot_units_[id_mapping.at(node.robot_id)] = id;
       }
 
-      MLOG(2) << "Remapping robots " << id_mapping.begin()->first << ".."
-              << id_mapping.rbegin()->first << " -> " << id_mapping.begin()->second
-              << ".." << id_mapping.rbegin()->second << " for pg with "
-              << state->pose_graph_->nodes.size() << " nodes";
+      MLOG(2,
+           "Remapping robots {}..{} -> {}..{} for pg with {} nodes",
+           id_mapping.begin()->first,
+           id_mapping.rbegin()->first,
+           id_mapping.begin()->second,
+           id_mapping.rbegin()->second,
+           state->pose_graph_->nodes.size());
       deformation_graph_->processPoseGraph(
           *state->pose_graph_, edge_variance_map_, id_mapping, &transform);
       if (config.anchor_robot_id >= 0 &&
@@ -768,12 +776,12 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
   Mesh::Ptr combined_mesh;
   for (const auto& [id, mesh_data] : staged_mesh_data_) {
     if (!mesh_data) {
-      LOG(WARNING) << "No mesh for robot " << id;
+      HYDRA_LOG(WARNING, "No mesh for robot {}", id);
       continue;
     }
 
     if (have_loopclosures_ || force_mesh_update) {
-      MLOG(2) << "Deforming mesh for robot " << id;
+      MLOG(2, "Deforming mesh for robot {}", id);
       // TODO(Yun): cannot use pre archived vertices as 'start_hint'
       // Note that here the mesh in the state is actually getting modified!
       deformation_graph_->deformPoints(*mesh_data->mesh,
@@ -783,7 +791,7 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
                                        KimeraPgmoInterface::config_.interp_horizon);
     }
 
-    MLOG(3) << "Copying mesh to combined mesh for robot " << id;
+    MLOG(3, "Copying mesh to combined mesh for robot {}", id);
     if (!combined_mesh) {
       combined_mesh = mesh_data->mesh->clone();
       unmerged_dsg_->robot_vertex_offset[id] = 0;
@@ -801,7 +809,7 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
                            unmerged_dsg_->node_robot_map,
                            unmerged_dsg_->robot_vertex_offset);
   } else {
-    MLOG(2) << "No mesh for any robot!";
+    MLOG(2, "No mesh for any robot!");
   }
 
   // TODO(nathan) fix this!!!!!!!!!!!!!!!!
@@ -814,7 +822,7 @@ void MultiBackendModule::combineAndDeformMesh(Timestamp timestamp_ns,
 
 void MultiBackendModule::initialAlignment() {
   if (!initial_align_) {
-    LOG(WARNING) << "Initial alignment not set.";
+    HYDRA_LOG(WARNING, "Initial alignment not set.");
     return;
   }
 
@@ -829,7 +837,7 @@ void MultiBackendModule::initialAlignment() {
     info->loop_closures.push_back({lc.src, lc.dest, lc.src_T_dest});
   }
 
-  MLOG(1) << "Running initial alignment";
+  MLOG(1, "Running initial alignment");
   initial_align_->update(info);
 
   auto pgmo_values = deformation_graph_->getValuesCopy();

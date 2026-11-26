@@ -56,7 +56,7 @@ def run(
     args += ["-c", "{app_plugins: [{type: ConfigServerPlugin}, {type: SpinPlugin}]}"]
     args += ["-c", "{verbosity: 1}"]
 
-    hydra.set_glog_level(0, 0)
+    hydra.set_log_level("info")
     hydra.init_config_context(args)
     with BagReader(bag_path) as bag, ianvs.init_node_handle(
         "hydra"

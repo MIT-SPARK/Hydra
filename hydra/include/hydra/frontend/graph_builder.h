@@ -52,7 +52,7 @@
 #include "hydra/frontend/mesh_compressor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_place_extractor.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace kimera_pgmo {
 class MeshDelta;

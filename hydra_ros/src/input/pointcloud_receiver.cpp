@@ -2,7 +2,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <ianvs/node_handle.h>
 
 #include "hydra_ros/input/pointcloud_adaptor.h"
@@ -51,7 +51,7 @@ bool PointcloudReceiver::initImpl() {
 
 void PointcloudReceiver::callback(const PointCloud2::ConstSharedPtr& msg) {
   const auto stamp = rclcpp::Time(msg->header.stamp).nanoseconds();
-  MLOG(2) << "Got raw pointcloud input @ " << stamp << " [ns]";
+  MLOG(2, "Got raw pointcloud input @ {} [ns]", stamp);
 
   auto packet = std::make_shared<CloudInputPacket>(stamp);
   fillPointcloudPacket(

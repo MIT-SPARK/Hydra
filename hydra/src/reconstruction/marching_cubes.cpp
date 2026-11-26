@@ -1,3 +1,4 @@
+#include <hydra/common/run_settings.h>
 // The original implementation from https://github.com/personalrobotics/OpenChisel and
 // subsequent modifications falls under the following license:
 //
@@ -36,8 +37,7 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/marching_cubes.h"
-
-#include <glog/logging.h>
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -45,7 +45,7 @@ using spark_dsg::Color;
 using spark_dsg::Mesh;
 
 MarchingCubes::EdgeCache::EdgeCache(size_t cubes_per_side) : side_(cubes_per_side) {
-  CHECK_GT(side_, 0u);
+  HYDRA_CHECK_GT(side_, 0u);
   for (auto& indices : indices_) {
     indices.resize(side_ * (side_ + 1) * (side_ + 1), kInvalid);
   }
@@ -158,9 +158,11 @@ SdfPoint MarchingCubes::interpolateEdge(const SdfPoints& points,
     edge_point.color = interpColor(point0, point1, 0.5);
     edge_point.label = interpLabel(point0, point1, 0.5);
 
-    VLOG(4) << "- t=n/a" << ", v0=" << point0.pos.transpose()
-            << ", v1=" << point1.pos.transpose()
-            << ", coord: " << edge_point.pos.transpose();
+    HYDRA_VLOG(4,
+               "- t=n/a, v0={}, v1={}, coord: {}",
+               point0.pos.transpose(),
+               point1.pos.transpose(),
+               edge_point.pos.transpose());
     return edge_point;
   }
 
@@ -170,9 +172,12 @@ SdfPoint MarchingCubes::interpolateEdge(const SdfPoints& points,
   edge_point.color = interpColor(point0, point1, t);
   edge_point.label = interpLabel(point0, point1, t);
 
-  VLOG(4) << "- t=" << t << ", v0=" << point0.pos.transpose()
-          << ", v1=" << point1.pos.transpose()
-          << ", coord: " << edge_point.pos.transpose();
+  HYDRA_VLOG(4,
+             "- t={}, v0={}, v1={}, coord: {}",
+             t,
+             point0.pos.transpose(),
+             point1.pos.transpose(),
+             edge_point.pos.transpose());
   return edge_point;
 }
 
@@ -223,15 +228,15 @@ size_t MarchingCubes::meshCube(const SdfPoints& points,
                                EdgeCache* cache,
                                bool compute_normals) {
   static constexpr auto NO_LABEL = std::numeric_limits<uint32_t>::max();
-  if (VLOG_IS_ON(4)) {
-    VLOG(4) << "points: ";
+  if (RunSettings::instance().default_verbosity >= 4) {
+    HYDRA_VLOG(4, "points: ");
     for (size_t i = 0; i < 8; ++i) {
-      VLOG(4) << " - " << i << ": " << points[i];
+      HYDRA_VLOG(4, " - {}: {}", i, points[i]);
     }
   }
 
   const int index = calculateVertexConfig(points);
-  VLOG(4) << "vertex sdf index: " << index;
+  HYDRA_VLOG(4, "vertex sdf index: {}", index);
 
   if (index == 0) {
     return 0;  // no surface crossing in sdf cube

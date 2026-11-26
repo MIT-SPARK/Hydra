@@ -37,9 +37,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
-#include <glog/logging.h>
 
 #include <opencv2/core.hpp>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {
@@ -49,25 +50,25 @@ static const auto registration =
 
 bool inputValid(const InputData& input) {
   if (input.vertex_map.empty()) {
-    LOG(ERROR) << "pointcloud required to finalize data!";
+    HYDRA_LOG(ERROR, "pointcloud required to finalize data!");
     return false;
   }
 
   if (!input.label_image.empty() &&
       input.vertex_map.size() != input.label_image.size()) {
-    LOG(ERROR) << "label input size does not match pointcloud!";
+    HYDRA_LOG(ERROR, "label input size does not match pointcloud!");
     return false;
   }
 
   if (!input.instance_image.empty() &&
       input.vertex_map.size() != input.instance_image.size()) {
-    LOG(ERROR) << "instance input size does not match pointcloud!";
+    HYDRA_LOG(ERROR, "instance input size does not match pointcloud!");
     return false;
   }
 
   if (!input.color_image.empty() &&
       input.vertex_map.size() != input.color_image.size()) {
-    LOG(ERROR) << "color input size does not match pointcloud!";
+    HYDRA_LOG(ERROR, "color input size does not match pointcloud!");
     return false;
   }
 
@@ -285,8 +286,11 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
 
   const auto total_lidar = input.vertex_map.rows * input.vertex_map.cols;
   const auto percent_invalid = static_cast<double>(num_invalid) / total_lidar;
-  VLOG(3) << "Converted lidar points! invalid: " << num_invalid << " / " << total_lidar
-          << " (percent: " << percent_invalid << ")";
+  HYDRA_VLOG(3,
+             "Converted lidar points! invalid: {} / {} (percent: {})",
+             num_invalid,
+             total_lidar,
+             percent_invalid);
   input.label_image = labels;
   input.instance_image = instances;
   input.color_image = color;

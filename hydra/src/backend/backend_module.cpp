@@ -37,8 +37,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
 #include <kimera_pgmo/deformation_graph_4dof.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/pcl_mesh_traits.h>
@@ -47,6 +45,7 @@
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/common/run_context.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -141,7 +140,7 @@ void BackendModule::start() {
   should_shutdown_ = false;
   force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
-  MLOG_NAMED(INFO) << "started!";
+  MLOG_NAMED(INFO, "started!");
 }
 
 void BackendModule::stopImpl() {
@@ -150,10 +149,10 @@ void BackendModule::stopImpl() {
   }
 
   if (spin_thread_) {
-    MLOG(1) << "joining optimizer thread and stopping";
+    MLOG(1, "joining optimizer thread and stopping");
     spin_thread_->join();
     spin_thread_.reset();
-    MLOG(2) << "stopped!";
+    MLOG(2, "stopped!");
   }
 
   if (config.finalize_on_shutdown) {
@@ -265,7 +264,7 @@ bool BackendModule::spinOnce(bool force_update) {
   status_log_.back().total_loop_closures = num_loop_closures_;
 
   if (!updatePrivateDsg(timestamp_ns, force_update)) {
-    MLOG(2) << "Backend skipping input @ " << timestamp_ns << " [ns]";
+    MLOG(2, "Backend skipping input @ {} [ns]", timestamp_ns);
     // we only read from the frontend dsg if we've processed all the
     // factor graph update packets (as long as force_update is false)
     // we still log the status for each received frontend packet
@@ -325,12 +324,12 @@ void BackendModule::loadState(const std::filesystem::path& mesh_path,
   if (mesh_path.extension() == ".sparkdsg" || mesh_path.extension() == ".json") {
     auto graph = SceneGraph::load(mesh_path);
     if (!graph) {
-      LOG(ERROR) << "Invalid graph path: " << mesh_path;
+      HYDRA_LOG(ERROR, "Invalid graph path: {}", mesh_path);
       return;
     }
 
     if (!graph->hasMesh()) {
-      LOG(WARNING) << "Invalid mesh path: " << mesh_path << ", graph has no mesh!";
+      HYDRA_LOG(WARNING, "Invalid mesh path: {}, graph has no mesh!", mesh_path);
     }
 
     mesh = graph->mesh();
@@ -339,10 +338,12 @@ void BackendModule::loadState(const std::filesystem::path& mesh_path,
   }
 
   if (mesh) {
-    LOG(ERROR) << "Loaded mesh with " << mesh->numVertices() << " vertices and "
-               << mesh->numFaces() << " faces";
+    HYDRA_LOG(ERROR,
+              "Loaded mesh with {} vertices and {} faces",
+              mesh->numVertices(),
+              mesh->numFaces());
   } else {
-    LOG(ERROR) << "Failed to load mesh...";
+    HYDRA_LOG(ERROR, "Failed to load mesh...");
   }
 
   private_dsg_->graph->setMesh(mesh);
@@ -351,8 +352,9 @@ void BackendModule::loadState(const std::filesystem::path& mesh_path,
   have_loopclosures_ = force_loopclosures;
 
   KimeraPgmoInterface::loadGraph(dgrf_path);
-  LOG(WARNING) << "Loaded " << deformation_graph_->getNumVertices()
-               << " vertices for deformation graph";
+  HYDRA_LOG(WARNING,
+            "Loaded {} vertices for deformation graph",
+            deformation_graph_->getNumVertices());
 }
 
 void BackendModule::addSink(const Sink::Ptr& sink) {
@@ -390,20 +392,19 @@ void BackendModule::updateFactorGraph(const FrontendOutput& input) {
                                   inc_mesh_indices,
                                   inc_mesh_index_stamps);
     } catch (const gtsam::ValuesKeyDoesNotExist& e) {
-      LOG(ERROR) << *input.deformation_graph;
+      HYDRA_LOG(ERROR, "{}", *input.deformation_graph);
       throw std::logic_error(e.what());
     }
   } else {
-    MLOG(4) << "Dropping empty deformation graph @ " << input.timestamp_ns << " [ns]";
+    MLOG(4, "Dropping empty deformation graph @ {} [ns]", input.timestamp_ns);
   }
 
   for (const auto& msg : input.agent_updates.pose_graphs) {
     status_log_.back().new_factors += msg.edges.size();
 
-    MLOG(3) << "Adding pose graph message: " << msg;
+    MLOG(3, "Adding pose graph message: {}", msg);
     if (hasLoopClosure(msg)) {
-      MLOG_NAMED(INFO) << "Input pose graph has loop closure @ " << msg.stamp_ns
-                       << " [ns]";
+      MLOG_NAMED(INFO, "Input pose graph has loop closure @ {} [ns]", msg.stamp_ns);
     }
 
     processIncrementalPoseGraph(
@@ -428,7 +429,7 @@ void BackendModule::updateFactorGraph(const FrontendOutput& input) {
       });
 
   if (num_loop_closures_ > prev_loop_closures) {
-    LOG(WARNING) << "New loop closures detected!";
+    HYDRA_LOG(WARNING, "New loop closures detected!");
     have_new_loopclosures_ = true;
   }
 
@@ -473,7 +474,7 @@ bool BackendModule::updateFromLcdQueue() {
 void BackendModule::copyMeshDelta(const FrontendOutput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
   if (!input.mesh_update) {
-    LOG_FIRST_N(WARNING, 1) << config.get_log_prefix() << "invalid mesh update!";
+    HYDRA_LOG_FIRST_N(WARNING, 1, "{}invalid mesh update!", config.get_log_prefix());
     return;
   }
 
@@ -541,7 +542,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 
   ScopedTimer timer("backend/mesh_deformation", timestamp_ns);
 
-  MLOG(2) << "Deforming mesh with " << mesh->numVertices() << " vertices";
+  MLOG(2, "Deforming mesh with {} vertices", mesh->numVertices());
 
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
                                    original_vertices_,

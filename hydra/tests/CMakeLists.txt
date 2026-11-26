@@ -1,5 +1,4 @@
 find_package(GTest REQUIRED)
-find_package(gflags REQUIRED)
 
 include(GoogleTest)
 enable_testing()
@@ -70,6 +69,7 @@ add_executable(
   rooms/test_room_utilities.cpp
   utils/test_active_window_tracker.cpp
   utils/test_data_directory.cpp
+  utils/test_logging.cpp
   utils/test_mesh_utilities.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp
@@ -80,7 +80,7 @@ target_include_directories(
   test_${PROJECT_NAME} PUBLIC include PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(
-  test_${PROJECT_NAME} ${PROJECT_NAME} ${gflags_LIBRARIES} GTest::gtest_main
+  test_${PROJECT_NAME} ${PROJECT_NAME} GTest::gtest_main
 )
 gtest_add_tests(TARGET test_${PROJECT_NAME})
 

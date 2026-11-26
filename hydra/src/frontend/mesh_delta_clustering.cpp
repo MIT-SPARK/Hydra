@@ -1,12 +1,13 @@
 #include "hydra/frontend/mesh_delta_clustering.h"
 
 #include <config_utilities/config.h>
-#include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <pcl/point_cloud.h>
 #define PCL_NO_PRECOMPILE
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
+
+#include "hydra/utils/logging.h"
 #undef PCL_NO_PRECOMPILE
 
 namespace hydra::clustering {
@@ -42,7 +43,7 @@ LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
                              const std::unordered_set<size_t>* invalid) {
   LabelIndices label_indices;
   if (!kimera_pgmo::traits::get_vertex_properties(delta).has_label) {
-    LOG(WARNING) << "Mesh missing labels!";
+    HYDRA_LOG(WARNING, "Mesh missing labels!");
     return label_indices;
   }
 
@@ -67,7 +68,7 @@ LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
     iter->second.push_back(i);
   }
 
-  VLOG(2) << "Seen labels: " << printLabels(seen_labels);
+  HYDRA_VLOG(2, "Seen labels: {}", printLabels(seen_labels));
   return label_indices;
 }
 

@@ -36,8 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/utils/display_utilities.h>
+#include <hydra/utils/logging.h>
 #include <hydra/utils/pgmo_mesh_traits.h>
 #include <hydra/utils/timing_utilities.h>
 #include <kimera_pgmo/utils/common_functions.h>
@@ -181,7 +181,7 @@ void DsgReceiver::handleUpdate(const DsgUpdate::ConstSharedPtr& msg) {
   }
 
   const auto size_bytes = getHumanReadableMemoryString(msg->layer_contents.size());
-  VLOG(3) << "Received dsg update message of " << size_bytes;
+  HYDRA_VLOG(3, "Received dsg update message of {}", size_bytes);
   try {
     if (!graph_) {
       graph_ = spark_dsg::io::binary::readGraph(msg->layer_contents);
@@ -190,7 +190,7 @@ void DsgReceiver::handleUpdate(const DsgUpdate::ConstSharedPtr& msg) {
     }
     has_update_ = true;
   } catch (const std::exception& e) {
-    LOG(ERROR) << "Received invalid message: " << e.what();
+    HYDRA_LOG(ERROR, "Received invalid message: {}", e.what());
     return;
   }
 

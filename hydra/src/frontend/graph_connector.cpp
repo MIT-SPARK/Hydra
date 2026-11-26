@@ -37,10 +37,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/printing.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
@@ -82,7 +82,7 @@ void LayerConnector::updateParents(const SceneGraph& graph,
                                    const std::vector<NodeId>& new_nodes) {
   const auto parent_key = graph.getLayerKey(config.parent_layer);
   if (!parent_key) {
-    LOG(ERROR) << "Invalid parent layer and partition!";
+    HYDRA_LOG(ERROR, "Invalid parent layer and partition!");
     return;
   }
 
@@ -128,7 +128,7 @@ void LayerConnector::connectChildren(SceneGraph& graph,
   for (const auto& child_config : config.child_layers) {
     const auto key = graph.getLayerKey(child_config.layer);
     if (!key) {
-      LOG(WARNING) << "Invalid layer '" << child_config.layer << "' for graph!";
+      HYDRA_LOG(WARNING, "Invalid layer '{}' for graph!", child_config.layer);
       continue;
     }
 
@@ -154,9 +154,11 @@ void LayerConnector::connectChildren(SceneGraph& graph,
     return;
   }
 
-  MLOG(3) << "Detecting interlayer edges for layer " << config.parent_layer << " with "
-          << active_parents.size() << " parents and " << active_children.size()
-          << " children";
+  MLOG(3,
+       "Detecting interlayer edges for layer {} with {} parents and {} children",
+       config.parent_layer,
+       active_parents.size(),
+       active_children.size());
 
   std::vector<spark_dsg::NodeId> parent_ids;
   std::transform(active_parents.begin(),

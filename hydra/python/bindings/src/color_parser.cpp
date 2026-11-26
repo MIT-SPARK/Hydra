@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/color_parser.h"
 
-#include <glog/logging.h>
+#include "hydra/utils/logging.h"
 
 namespace py = pybind11;
 
@@ -109,9 +109,9 @@ cv::Vec3b RgbParserImpl<float>::read(const PythonImage& img,
 }
 
 ColorParser::Ptr ColorParser::create(const PythonImage& img) {
-  CHECK(img) << "invalid image";
+  HYDRA_CHECK(img, "invalid image");
   if (img.channels() != 1 && img.channels() != 3) {
-    LOG(ERROR) << "only single-channel or 3 channel color images supported";
+    HYDRA_LOG(ERROR, "only single-channel or 3 channel color images supported");
     return nullptr;
   }
 
@@ -124,7 +124,7 @@ ColorParser::Ptr ColorParser::create(const PythonImage& img) {
     } else if (img_format == py::format_descriptor<float>::format()) {
       return std::make_unique<MonoParserImpl<float>>();
     } else {
-      LOG(ERROR) << "invalid color format for mono image: " << img_format;
+      HYDRA_LOG(ERROR, "invalid color format for mono image: {}", img_format);
       return nullptr;
     }
   }
@@ -134,7 +134,7 @@ ColorParser::Ptr ColorParser::create(const PythonImage& img) {
   } else if (img_format == py::format_descriptor<float>::format()) {
     return std::make_unique<RgbParserImpl<float>>();
   } else {
-    LOG(ERROR) << "invalid color format for rgb image: " << img_format;
+    HYDRA_LOG(ERROR, "invalid color format for rgb image: {}", img_format);
     return nullptr;
   }
 }

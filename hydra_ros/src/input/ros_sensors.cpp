@@ -39,8 +39,8 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/types/path.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/common/run_context.h>
+#include <hydra/utils/logging.h>
 #include <ianvs/message_wait_functor.h>
 
 #include <rclcpp/rclcpp.hpp>
@@ -108,8 +108,8 @@ std::optional<sensor_msgs::msg::CameraInfo> getCameraInfo(
     const RosCamera::Config& config, const std::string& ns) {
   auto nh = ianvs::NodeHandle::this_node(ns);
   const auto resolved_topic = nh.resolve_name("camera_info", false);
-  LOG(INFO) << "Waiting for CameraInfo on " << resolved_topic
-            << " to initialize sensor model";
+  HYDRA_LOG(
+      INFO, "Waiting for CameraInfo on {} to initialize sensor model", resolved_topic);
 
   const auto start = nh.now();
   const auto qos = rclcpp::QoS(1).durability(
@@ -121,12 +121,12 @@ std::optional<sensor_msgs::msg::CameraInfo> getCameraInfo(
   while (!msg && rclcpp::ok()) {
     msg = ianvs::getSingleMessage<CameraInfo>(nh, "camera_info", true, qos, timeout);
     if (!msg) {
-      LOG(WARNING) << "Waiting for CameraInfo on topic '" << resolved_topic << "'";
+      HYDRA_LOG(WARNING, "Waiting for CameraInfo on topic '{}'", resolved_topic);
     }
 
     const auto diff = nh.now() - start;
     if (config.error_timeout_s && (diff.seconds() > config.error_timeout_s)) {
-      LOG(ERROR) << "Sensor intrinsics lookup timed out on '" << resolved_topic << "'";
+      HYDRA_LOG(ERROR, "Sensor intrinsics lookup timed out on '{}'", resolved_topic);
       break;
     }
   }
@@ -137,8 +137,10 @@ std::optional<sensor_msgs::msg::CameraInfo> getCameraInfo(
 ParamSensorExtrinsics::Config lookupExtrinsics(const RosExtrinsics::Config& config,
                                                const std::string& sensor_frame,
                                                const std::string& robot_frame) {
-  LOG(INFO) << "Looking for sensor extrinsics '" << robot_frame << "_T_" << sensor_frame
-            << "' via TF";
+  HYDRA_LOG(INFO,
+            "Looking for sensor extrinsics '{}_T_{}' via TF",
+            robot_frame,
+            sensor_frame);
 
   auto nh = ianvs::NodeHandle::this_node();
   auto clock = nh.node().get<rclcpp::node_interfaces::NodeClockInterface>();
@@ -161,17 +163,17 @@ ParamSensorExtrinsics::Config lookupExtrinsics(const RosExtrinsics::Config& conf
                              config,
                              &message);
     if (!status) {
-      LOG(WARNING) << "Waiting for sensor extrinsics " << message;
+      HYDRA_LOG(WARNING, "Waiting for sensor extrinsics {}", message);
     }
 
     const auto diff = nh.now() - start;
     if (config.error_timeout_s && (diff.seconds() > config.error_timeout_s)) {
-      LOG(ERROR) << "Sensor extrinsics lookup timed out for " << message;
+      HYDRA_LOG(ERROR, "Sensor extrinsics lookup timed out for {}", message);
       break;
     }
   }
 
-  CHECK(status.is_valid) << "Could not look up extrinsics from ros!";
+  HYDRA_CHECK(status.is_valid, "Could not look up extrinsics from ros!");
 
   ParamSensorExtrinsics::Config params;
   params.body_R_sensor = status.target_R_source;
@@ -234,7 +236,7 @@ VirtualSensor loadExtrinsics(const VirtualSensor& sensor,
   const auto frame = derived.sensor_frame.empty() ? sensor_frame : derived.sensor_frame;
   const auto parent = derived.robot_frame.empty() ? robot_frame : derived.robot_frame;
   if (frame.empty()) {
-    LOG(ERROR) << "sensor frame required if not constructing from camera info!";
+    HYDRA_LOG(ERROR, "sensor frame required if not constructing from camera info!");
     return {};
   }
 
@@ -267,7 +269,7 @@ VirtualSensor loadSensor(const VirtualSensor& sensor,
 
   VirtualSensor new_sensor(config);
   new_sensor = loadExtrinsics(new_sensor, robot_frame, msg->header.frame_id);
-  LOG(INFO) << "Initialized camera as " << std::endl << config::toString(new_sensor);
+  HYDRA_LOG(INFO, "Initialized camera as \n{}", config::toString(new_sensor));
   return new_sensor;
 }
 

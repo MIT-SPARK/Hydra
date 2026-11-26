@@ -33,9 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <config_utilities/config.h>
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/input/camera.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {

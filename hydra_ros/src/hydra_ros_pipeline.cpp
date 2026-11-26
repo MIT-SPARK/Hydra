@@ -38,9 +38,9 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/active_window/active_window_module.h>
 #include <hydra/common/run_context.h>
+#include <hydra/utils/logging.h>
 #include <pose_graph_tools_ros/conversions.h>
 
 #include <cstdint>
@@ -65,10 +65,10 @@ void declare_config(HydraRosPipeline::Config& config) {
 HydraRosPipeline::HydraRosPipeline(const Config& config, RunContext::ConstPtr context)
     : HydraPipeline(config, context), config(config::checkValid(config)) {
   if (config.preprint_config) {
-    LOG(INFO) << "Using configuration to start Hydra\n" << config::toString(config);
+    HYDRA_LOG(INFO, "Using configuration to start Hydra\n{}", config::toString(config));
   }
 
-  MLOG(1) << "Starting Hydra-ROS with input\n" << config::toString(config.input);
+  MLOG(1, "Starting Hydra-ROS with input\n{}", config::toString(config.input));
 }
 
 HydraRosPipeline::~HydraRosPipeline() { stop(); }

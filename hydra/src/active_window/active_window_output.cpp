@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/active_window/active_window_output.h"
 
-#include <glog/logging.h>
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -44,7 +44,7 @@ ActiveWindowOutput::ActiveWindowOutput(const InputData::ConstPtr& _data)
 }
 
 const VolumetricMap& ActiveWindowOutput::map() const {
-  CHECK(map_) << "Invalid map!";
+  HYDRA_CHECK(map_, "Invalid map!");
   return *map_;
 }
 
@@ -71,7 +71,7 @@ void ActiveWindowOutput::updateFrom(ActiveWindowOutput&& msg, bool clone_map) {
   msg.graph_update.clear();
 
   if (!msg.map_) {
-    LOG(ERROR) << "Reconstruction output message contained no map!";
+    HYDRA_LOG(ERROR, "Reconstruction output message contained no map!");
     return;
   }
 

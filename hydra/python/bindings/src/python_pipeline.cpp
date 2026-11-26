@@ -38,7 +38,6 @@
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/active_window/reconstruction_module.h>
 #include <hydra/backend/backend_module.h>
 #include <hydra/backend/zmq_interfaces.h>
@@ -54,11 +53,12 @@
 
 #include <filesystem>
 
-#include "hydra/bindings/glog_utilities.h"
+#include "hydra/bindings/logging_utilities.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_sensors.h"
 #include "hydra/input/input_adapter.h"
 #include "hydra/input/input_filter.h"
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 
@@ -127,7 +127,7 @@ PythonPipeline::PythonPipeline(const Config& _config,
   init();
 
   if (show_config) {
-    MLOG(0) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
+    MLOG(0, "Using sensor '{}':\n{}", sensor->name, sensor->dump());
     showModules();
   }
 }
@@ -172,7 +172,7 @@ bool PythonPipeline::step(const std::shared_ptr<SensorInputPacket>& packet,
     }
 
     if (!filter->valid(*packet, last_input_.get())) {
-      LOG(ERROR) << "Skipping input!";
+      HYDRA_LOG(ERROR, "Skipping input!");
       return false;
     }
   }
@@ -193,7 +193,7 @@ bool PythonPipeline::stepImpl(const InputData::Ptr& input) {
   }
 
   if (!frontend_->spinOnce()) {
-    MLOG_NAMED(ERROR) << "Frontend failed to return output";
+    MLOG_NAMED(ERROR, "Frontend failed to return output");
     return false;
   }
 

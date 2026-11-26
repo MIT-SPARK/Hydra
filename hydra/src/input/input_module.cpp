@@ -37,7 +37,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -84,7 +85,7 @@ void InputModule::start() {
   }
 
   data_thread_.reset(new std::thread(&InputModule::dataSpin, this));
-  MLOG(0) << "started!";
+  MLOG(0, "started!");
 }
 
 void InputModule::stop(bool force) {
@@ -102,10 +103,10 @@ void InputModule::stopImpl() {
   }
 
   if (data_thread_) {
-    MLOG(1) << "stopping input thread";
+    MLOG(1, "stopping input thread");
     data_thread_->join();
     data_thread_.reset();
-    MLOG(1) << "stopped input thread";
+    MLOG(1, "stopped input thread");
   }
 }
 
@@ -132,7 +133,7 @@ void InputModule::summarize() const {
 
   ss << "  - [output] size: " << output_queue_->size()
      << " (max: " << output_queue_->max_size << ")";
-  MLOG(2) << ss.str();
+  MLOG(2, "{}", ss.str());
 }
 
 void InputModule::dataSpin() {
@@ -152,12 +153,11 @@ void InputModule::dataSpin() {
     }
 
     const auto curr_time = data->timestamp_ns;
-    MLOG(2) << "popped input @ " << curr_time << " [ns]";
+    MLOG(2, "popped input @ {} [ns]", curr_time);
 
     const auto odom_T_body = getBodyPose(*data);
     if (!odom_T_body) {
-      MLOG_NAMED(WARN) << "dropping input @ " << curr_time
-                       << " [ns] due to missing pose";
+      MLOG_NAMED(WARN, "dropping input @ {} [ns] due to missing pose", curr_time);
       continue;
     }
 

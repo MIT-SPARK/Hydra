@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <glog/logging.h>
 #include <spark_dsg/serialization/binary_conversions.h>
 #include <spark_dsg/serialization/binary_serialization.h>
 
@@ -45,6 +44,7 @@
 
 #include "hydra/places/gvd_places/gvd_voxel.h"
 #include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::io {
 
@@ -85,15 +85,15 @@ inline std::string toString(LayerType type) {
 // Serialize voxels.
 template <typename VoxelT>
 bool serializeVoxel(BinarySerializer& /* serializer */, const VoxelT& /* voxel */) {
-  LOG(ERROR) << "No serialization function for voxel type " << typeid(VoxelT).name()
-             << ".";
+  HYDRA_LOG(
+      ERROR, "No serialization function for voxel type {}.", typeid(VoxelT).name());
   return false;
 }
 
 template <typename VoxelT>
 bool deserializeVoxel(BinaryDeserializer& /* deserializer */, VoxelT& /* voxel */) {
-  LOG(ERROR) << "No deserialization function for voxel type " << typeid(VoxelT).name()
-             << ".";
+  HYDRA_LOG(
+      ERROR, "No deserialization function for voxel type {}.", typeid(VoxelT).name());
   return false;
 }
 
@@ -173,7 +173,7 @@ bool serializeBlock(BinarySerializer& serializer, const BlockT& block) {
   // Write voxels.
   for (const auto& voxel : block) {
     if (!serializeVoxel(serializer, voxel)) {
-      LOG(ERROR) << "Failed to serialize voxel.";
+      HYDRA_LOG(ERROR, "Failed to serialize voxel.");
       return false;
     }
   }
@@ -191,7 +191,7 @@ bool deserializeBlock(BinaryDeserializer& deserializer, VoxelLayer<BlockT>& laye
   // Create block.
   for (auto& voxel : block) {
     if (!deserializeVoxel(deserializer, voxel)) {
-      LOG(ERROR) << "Failed to deserialize voxel.";
+      HYDRA_LOG(ERROR, "Failed to deserialize voxel.");
       return false;
     }
   }
@@ -221,7 +221,7 @@ inline bool deserializeBlock(BinaryDeserializer& deserializer,
   // Create block.
   for (auto& voxel : block) {
     if (!deserializeVoxel(deserializer, voxel)) {
-      LOG(ERROR) << "Failed to deserialize voxel.";
+      HYDRA_LOG(ERROR, "Failed to deserialize voxel.");
       return false;
     }
   }
@@ -236,8 +236,7 @@ bool serializeLayer(BinarySerializer& serializer, const LayerT& layer) {
   // Layer config.
   const auto type = getLayerType<LayerT>();
   if (type == LayerType::INVALID) {
-    LOG(ERROR) << "Invalid block type " << typeid(LayerT).name()
-               << " for serialization.";
+    HYDRA_LOG(ERROR, "Invalid block type {} for serialization.", typeid(LayerT).name());
     return false;
   }
   serializer.write(static_cast<uint8_t>(type));
@@ -248,7 +247,7 @@ bool serializeLayer(BinarySerializer& serializer, const LayerT& layer) {
   // Write blocks.
   for (const auto& block : layer) {
     if (!serializeBlock(serializer, block)) {
-      LOG(ERROR) << "Failed to serialize block " << block.index.transpose() << ".";
+      HYDRA_LOG(ERROR, "Failed to serialize block {}.", block.index.transpose());
       return false;
     }
   }
@@ -260,20 +259,22 @@ typename LayerT::Ptr deserializeLayer(BinaryDeserializer& deserializer) {
   // Layer config.
   const auto expected_type = getLayerType<LayerT>();
   if (expected_type == LayerType::INVALID) {
-    LOG(ERROR) << "Invalid block type " << typeid(LayerT).name()
-               << " for deserialization.";
+    HYDRA_LOG(
+        ERROR, "Invalid block type {} for deserialization.", typeid(LayerT).name());
     return nullptr;
   }
   uint8_t type_int;
   deserializer.read(type_int);
   const auto type = static_cast<LayerType>(type_int);
   if (type == LayerType::INVALID) {
-    LOG(ERROR) << "Invalid layer type in saved file.";
+    HYDRA_LOG(ERROR, "Invalid layer type in saved file.");
     return nullptr;
   }
   if (type != getLayerType<LayerT>()) {
-    LOG(ERROR) << "Layer type mismatch. Expected " << toString(expected_type)
-               << " but read " << toString(type) << ".";
+    HYDRA_LOG(ERROR,
+              "Layer type mismatch. Expected {} but read {}.",
+              toString(expected_type),
+              toString(type));
     return nullptr;
   }
   float voxel_size;
@@ -287,7 +288,7 @@ typename LayerT::Ptr deserializeLayer(BinaryDeserializer& deserializer) {
   auto layer = std::make_shared<LayerT>(voxel_size, voxels_per_side);
   for (size_t i = 0; i < num_blocks; ++i) {
     if (!deserializeBlock<typename LayerT::BlockType>(deserializer, *layer)) {
-      LOG(ERROR) << "Failed to deserialize block " << i << ".";
+      HYDRA_LOG(ERROR, "Failed to deserialize block {}.", i);
       return nullptr;
     }
   }
@@ -316,7 +317,7 @@ bool saveLayer(std::string filepath,
   // Setup file.
   std::ofstream out(filepath, std::ios::out | std::ios::binary);
   if (!out.is_open()) {
-    LOG(ERROR) << "Could not open file " << filepath << " for writing.";
+    HYDRA_LOG(ERROR, "Could not open file {} for writing.", filepath);
     return false;
   }
 
@@ -324,7 +325,7 @@ bool saveLayer(std::string filepath,
   std::vector<uint8_t> buffer;
   spark_dsg::serialization::BinarySerializer serializer(&buffer);
   if (!internal::serializeLayer(serializer, layer)) {
-    LOG(ERROR) << "Failed to serialize layer.";
+    HYDRA_LOG(ERROR, "Failed to serialize layer.");
     return false;
   }
   out.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
@@ -350,7 +351,7 @@ std::shared_ptr<spatial_hash::VoxelLayer<typename LayerT::BlockType>> loadLayer(
   // Setup file.
   std::ifstream in(filepath, std::ios::in | std::ios::binary);
   if (!in.is_open()) {
-    LOG(ERROR) << "Could not open file " << filepath << " for reading.";
+    HYDRA_LOG(ERROR, "Could not open file {} for reading.", filepath);
     return nullptr;
   }
 

@@ -37,10 +37,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include "hydra/common/run_context.h"
 #include "hydra/reconstruction/integration_masking.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -85,7 +85,7 @@ void ActiveWindowModule::start() {
   should_shutdown_ = false;
   force_shutdown_ = false;
   spin_thread_.reset(new std::thread(&ActiveWindowModule::spin, this));
-  MLOG(0) << "started!";
+  MLOG(0, "started!");
 }
 
 void ActiveWindowModule::stop(bool force) {
@@ -99,16 +99,16 @@ void ActiveWindowModule::stopImpl() {
   }
 
   if (spin_thread_) {
-    MLOG(1) << "stopping!";
+    MLOG(1, "stopping!");
     spin_thread_->join();
     spin_thread_.reset();
-    MLOG(1) << "stopped!";
+    MLOG(1, "stopped!");
 
-    MLOG(1) << "input queue: " << input_queue_->size();
+    MLOG(1, "input queue: {}", input_queue_->size());
     if (output_queue_) {
-      MLOG(1) << "output queue: " << output_queue_->size();
+      MLOG(1, "output queue: {}", output_queue_->size());
     } else {
-      MLOG(1) << "output queue: n/a";
+      MLOG(1, "output queue: n/a");
     }
   }
 }
@@ -136,7 +136,7 @@ void ActiveWindowModule::spin() {
     }
 
     const auto msg = input_queue_->pop();
-    MLOG(2) << "Processing " << msg->timestamp_ns << " [ns]";
+    MLOG(2, "Processing {} [ns]", msg->timestamp_ns);
     auto output = spinOnce(msg);
     if (!output) {
       continue;

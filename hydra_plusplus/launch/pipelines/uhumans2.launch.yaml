@@ -29,7 +29,7 @@ launch:
         --config-utilities-file $(find-pkg-share hydra_plusplus)/config/pipelines/input/uhumans2.yaml
         --config-utilities-yaml {robot_id: $(var robot_id), odom_frame: odom, robot_frame: base_link_gt, map_frame: map}
         --config-utilities-yaml {exit_after_clock: $(var exit_after_clock), log_path: $(var log_path)}
-        --config-utilities-yaml {glog_verbosity: 0, config_verbosity: -1, show_run_settings: false, preprint_config: false}
+        --config-utilities-yaml {default_verbosity: 0, config_verbosity: -1, show_run_settings: false, preprint_config: false}
   - include:
       file: $(find-pkg-share hydra_plusplus)/launch/visualizer.launch.yaml
       arg:

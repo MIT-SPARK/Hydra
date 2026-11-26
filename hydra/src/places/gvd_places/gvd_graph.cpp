@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/gvd_graph.h"
 
-#include <glog/logging.h>
-
 #include <deque>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::places {
 
@@ -206,7 +206,7 @@ void GvdGraph::remove(const GlobalIndex& index, std::set<uint64_t>& updated) {
   compression_map_.erase(gvd_id);
 
   auto iter = compressed_.find(compressed_id);
-  CHECK(iter != compressed_.end()) << "Invalid compressed ID " << compressed_id;
+  HYDRA_CHECK(iter != compressed_.end(), "Invalid compressed ID {}", compressed_id);
 
   auto& node = iter->second;
   node.active_refs.erase(gvd_id);
@@ -235,7 +235,7 @@ void GvdGraph::dropCompressed(uint64_t compressed_id) {
   const auto refs = iter->second.refs();
   for (const auto gvd_id : refs) {
     auto niter = uncompressed_.find(gvd_id);
-    CHECK(niter != uncompressed_.end()) << "Invalid uncompressed ID " << gvd_id;
+    HYDRA_CHECK(niter != uncompressed_.end(), "Invalid uncompressed ID {}", gvd_id);
     if (!niter->second.archived) {
       drop_uncompressed(niter->second.info.index);
     }
@@ -352,7 +352,7 @@ Node* GvdGraph::add_uncompressed(const GlobalIndex& index,
 
   const auto pos = voxel_grid.toPoint(index);
   const auto id = next_uncompressed_id();
-  CHECK(!uncompressed_.count(id)) << "Re-using uncompressed ID";
+  HYDRA_CHECK(!uncompressed_.count(id), "Re-using uncompressed ID");
   uncompressed_index_map_.emplace(index, id);
 
   auto niter =
@@ -467,7 +467,7 @@ std::optional<uint64_t> GvdGraph::drop_uncompressed(const GlobalIndex& idx) {
 void GvdGraph::drop_uncompressed_node(uint64_t gvd_id) {
   auto iter = uncompressed_.find(gvd_id);
   if (iter == uncompressed_.end()) {
-    LOG(WARNING) << "Dropping node " << gvd_id << " but doesn't exist";
+    HYDRA_LOG(WARNING, "Dropping node {} but doesn't exist", gvd_id);
     return;
   }
 

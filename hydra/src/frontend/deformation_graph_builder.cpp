@@ -36,10 +36,10 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <kimera_pgmo/compression/block_compression.h>
 #include <kimera_pgmo/utils/common_functions.h>
 
+#include "hydra/utils/logging.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/timing_utilities.h"
 

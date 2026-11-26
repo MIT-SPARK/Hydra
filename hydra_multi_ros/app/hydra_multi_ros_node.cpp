@@ -1,10 +1,11 @@
 #include <config_utilities/config.h>
 #include <config_utilities/external_registry.h>
 #include <config_utilities/formatting/asl.h>
-#include <config_utilities/logging/log_to_glog.h>
+#include <config_utilities/logging/log_to_spdlog.h>
+#include <config_utilities/logging/set_logger.h>
 #include <config_utilities/parsing/context.h>
 #include <config_utilities/types/path.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <ianvs/node_handle_factory.h>
 #include <ianvs/spin_functions.h>
 
@@ -19,8 +20,8 @@ struct RunSettings {
   bool force_shutdown = false;
   std::vector<std::string> paths;
   int config_verbosity = 1;
-  int glog_level = 0;
-  int glog_verbosity = 0;
+  std::string log_level = "info";
+
   std::filesystem::path log_path;
   hydra::DataDirectory::Config output;
 };
@@ -32,8 +33,8 @@ void declare_config(RunSettings& config) {
   field(config.force_shutdown, "force_shutdown");
   field(config.paths, "paths");
   field(config.config_verbosity, "config_verbosity");
-  field(config.glog_level, "glog_level");
-  field(config.glog_verbosity, "glog_verbosity");
+  field(config.log_level, "log_level");
+
   field<Path::Absolute>(config.log_path, "log_path");
   field(config.output, "output");
 }
@@ -47,15 +48,10 @@ int main(int argc, char* argv[]) {
 
   const auto settings = config::fromContext<hydra_multi::RunSettings>();
 
-  FLAGS_minloglevel = settings.glog_level;
-  FLAGS_v = settings.glog_verbosity;
-  FLAGS_logtostderr = 1;
-  FLAGS_colorlogtostderr = 1;
+  hydra::logging::setLogLevel(settings.log_level);
 
-  google::InitGoogleLogging(argv[0]);
-  google::InstallFailureSignalHandler();
-
-  config::Settings().setLogger("glog");
+  config::setCustomLogger(
+      std::make_unique<config::SpdlogLogger>(hydra::logging::logger()));
 
   auto node = std::make_shared<rclcpp::Node>("hydra_multi_ros_node");
   ianvs::NodeHandle nh(*node);

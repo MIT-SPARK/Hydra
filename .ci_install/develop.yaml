@@ -31,7 +31,7 @@ repositories:
   spatial_hash:
     type: git
     url: https://github.com/MIT-SPARK/Spatial-Hash.git
-    version: main
+    version: develop
   teaser_plusplus:
     type: git
     url: https://github.com/MIT-SPARK/TEASER-plusplus.git

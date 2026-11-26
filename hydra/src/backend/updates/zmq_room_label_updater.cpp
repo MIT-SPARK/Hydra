@@ -38,10 +38,11 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 #include <spark_dsg/zmq_interface.h>
+
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 
@@ -64,10 +65,10 @@ ZmqRoomLabelUpdater::ZmqRoomLabelUpdater(const Config& config)
 ZmqRoomLabelUpdater::~ZmqRoomLabelUpdater() {
   should_shutdown_ = true;
   if (thread_) {
-    MLOG(1) << "joining zmq thread and stopping";
+    MLOG(1, "joining zmq thread and stopping");
     thread_->join();
     thread_.reset();
-    MLOG(2) << "stopped!";
+    MLOG(2, "stopped!");
   }
 }
 
@@ -79,7 +80,7 @@ void ZmqRoomLabelUpdater::checkForUpdates() {
 
     auto update_graph = receiver_->graph();
     if (!update_graph) {
-      LOG(ERROR) << "zmq receiver graph is invalid";
+      HYDRA_LOG(ERROR, "zmq receiver graph is invalid");
       continue;
     }
 

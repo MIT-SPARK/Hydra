@@ -50,7 +50,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <ianvs/node_handle.h>
 
 namespace hydra {
@@ -103,7 +103,7 @@ PoseGraphPacket RosPoseGraphTracker::update(uint64_t, const Eigen::Isometry3d&) 
 
 void RosPoseGraphTracker::odomCallback(const PoseGraph& msg) {
   if (msg.nodes.empty()) {
-    MLOG_NAMED(WARN) << "Received empty pose graph, skipping!";
+    MLOG_NAMED(WARN, "Received empty pose graph, skipping!");
     return;
   }
 

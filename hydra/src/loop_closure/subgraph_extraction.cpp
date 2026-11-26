@@ -35,11 +35,12 @@
 #include "hydra/loop_closure/subgraph_extraction.h"
 
 #include <config_utilities/config.h>
-#include <glog/logging.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -178,8 +179,7 @@ std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
   try {
     origin = graph.getNode(root_node).attributes().position;
   } catch (const std::out_of_range& e) {
-    LOG(ERROR) << "Invalid root node " << NodeSymbol(root_node).str() << ": "
-               << e.what();
+    HYDRA_LOG(ERROR, "Invalid root node {}: {}", NodeSymbol(root_node).str(), e.what());
     return {};
   }
 

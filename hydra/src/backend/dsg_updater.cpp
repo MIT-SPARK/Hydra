@@ -37,13 +37,12 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph.h>
 
 #include "hydra/common/launch_callbacks.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
@@ -62,7 +61,7 @@ void findAndApplyMerges(const VerbosityConfig& config,
   // TODO(nathan) handle given merges
   auto merges = hooks.find_merges(source, info);
   auto applied = tracker.applyMerges(source, merges, target, hooks.merge);
-  MLOG(1) << "pass 0: " << merges.size() << " merges (applied " << applied << ")";
+  MLOG(1, "pass 0: {} merges (applied {})", merges.size(), applied);
   if (!exhaustive) {
     return;
   }
@@ -72,8 +71,7 @@ void findAndApplyMerges(const VerbosityConfig& config,
   do {
     merges = hooks.find_merges(*target.graph, info);
     applied = tracker.applyMerges(source, merges, target, hooks.merge);
-    MLOG(1) << "pass " << iter << ": " << merges.size() << " merges (applied "
-            << applied << ")";
+    MLOG(1, "pass {}: {} merges (applied {})", iter, merges.size(), applied);
     ++iter;
   } while (applied > 0);
 }
@@ -106,7 +104,7 @@ DsgUpdater::DsgUpdater(const Config& config,
   std::set<std::string> seen;
   for (const auto& [name, functor] : config.update_functors) {
     if (!seen.insert(name).second) {
-      LOG(WARNING) << "Ignoring duplicate update functor '" << name << "'";
+      HYDRA_LOG(WARNING, "Ignoring duplicate update functor '{}'", name);
       continue;
     }
 
@@ -217,15 +215,15 @@ void DsgUpdater::callFunctors(UpdateInfo::ConstPtr info) {
                          tracker,
                          exhaustive_names_.count(name));
       if (info->full_update && hooks.merge) {
-        MLOG(2) << "updating all merge attributes for " << name;
-        MLOG(5) << "current tracker: " << tracker.print();
+        MLOG(2, "updating all merge attributes for {}", name);
+        MLOG(5, "current tracker: {}", tracker.print());
         tracker.updateAllMergeAttributes(
             *source_graph_, *target_dsg_->graph, hooks.merge);
       }
     }
   }
 
-  MLOG(5) << "all merges: " << merge_tracker.print();
+  MLOG(5, "all merges: {}", merge_tracker.print());
   for (const auto& func : cleanup_hooks) {
     func(info, *source_graph_, target_dsg_.get());
   }

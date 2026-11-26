@@ -1,6 +1,6 @@
 #include "hydra_multi/operators/pose_graph_operator.h"
 
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 
 #include <Eigen/Dense>
 #include <unordered_set>
@@ -40,7 +40,7 @@ bool PoseGraphOperator::incrementalAppend(const PoseGraph& incremental_source) {
       continue;
     }
     if (!connections_.count(node.key)) {
-      LOG(ERROR) << "Disconnected node " << node.key << "in append.";
+      HYDRA_LOG(ERROR, "Disconnected node {}in append.", node.key);
       return false;
     }
     auto tracked = connections_[node.key].first;
@@ -69,7 +69,7 @@ bool PoseGraphOperator::update(const PoseGraph& source) {
 
   for (auto& node : data_->nodes) {
     if (!source_nodes.count(node.key)) {
-      LOG(ERROR) << "Missing source node in update.";
+      HYDRA_LOG(ERROR, "Missing source node in update.");
       // NOTE(Yun): but some nodes potentially already updated
       return false;
     }
@@ -107,7 +107,7 @@ bool PoseGraphOperator::rebase(const PoseGraph& source) {
   // Implicitly assume that edges attributes don't need to be updated
   for (const auto& node : data_to_append.nodes) {
     if (!connections_.count(node.key)) {
-      LOG(ERROR) << "Disconnected node in rebase.";
+      HYDRA_LOG(ERROR, "Disconnected node in rebase.");
       return false;
     }
     auto tracked = connections_[node.key].first;
@@ -143,7 +143,7 @@ bool PoseGraphOperator::merge(const PoseGraph& source) {
     }
 
     if (!connections_.count(node.key)) {
-      LOG(ERROR) << "Disconnected node in merge.";
+      HYDRA_LOG(ERROR, "Disconnected node in merge.");
       // This shows up a lot fo mesh graphs. TODO(Yun) fix this or profile.
       data_->nodes.push_back(node);
       tracked_nodes_[node.key] = node;

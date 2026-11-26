@@ -3,7 +3,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/types/path.h>
-#include <glog/logging.h>
+#include <hydra/utils/logging.h>
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_attributes.h>
@@ -37,8 +37,7 @@ void movePartition(SceneGraph& graph,
                    const SceneGraphLayer& prev_layer,
                    char new_char) {
   const auto layer_id = prev_layer.id.layer;
-  LOG(INFO) << "Moving Layer " << prev_layer.id << " to "
-            << LayerKey(layer_id, new_char);
+  HYDRA_LOG(INFO, "Moving Layer {} to {}", prev_layer.id, LayerKey(layer_id, new_char));
 
   // add all nodes
   std::map<NodeId, NodeId> lookup;
@@ -79,7 +78,7 @@ void shiftRobotIds(size_t new_id, SceneGraph& graph) {
   for (const auto& layer : graph.layer_partition(agent_key.layer)) {
     const auto prefix = static_cast<char>(layer.id.partition);
     if (!kimera_pgmo::isRobotPrefix(prefix)) {
-      LOG(WARNING) << "Agent layer " << layer.id << " is not a robot partition";
+      HYDRA_LOG(WARNING, "Agent layer {} is not a robot partition", layer.id);
       continue;
     }
 
@@ -87,7 +86,7 @@ void shiftRobotIds(size_t new_id, SceneGraph& graph) {
   }
 
   if (robot_ids.empty()) {
-    LOG(WARNING) << "Could not find agent layer in graph!";
+    HYDRA_LOG(WARNING, "Could not find agent layer in graph!");
     return;
   }
 
@@ -105,9 +104,12 @@ void shiftRobotIds(size_t new_id, SceneGraph& graph) {
 
   for (const auto robot_id : robot_ids) {
     const auto new_char = kimera_pgmo::getRobotPrefix(robot_id + new_id - lowest);
-    CHECK(robot_id + new_id >= lowest && new_char != '\0')
-        << "Robot " << robot_id << " has no valid robot id after shifting the lowest "
-        << "robot id " << lowest << " to " << new_id;
+    HYDRA_CHECK(
+        robot_id + new_id >= lowest && new_char != '\0',
+        "Robot {} has no valid robot id after shifting the lowest robot id {} to {}",
+        robot_id,
+        lowest,
+        new_id);
     const auto prev_char = kimera_pgmo::getRobotPrefix(robot_id);
     movePartition(graph, graph.getLayer(agent_key.layer, prev_char), new_char);
   }

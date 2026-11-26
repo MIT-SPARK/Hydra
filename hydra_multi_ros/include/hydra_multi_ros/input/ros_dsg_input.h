@@ -1,5 +1,5 @@
 #pragma once
-#include <hydra/utils/logging.h>
+#include <hydra/utils/verbosity_config.h>
 #include <hydra_multi/operators/mesh_operator.h>
 #include <hydra_multi/operators/scene_graph_operator.h>
 #include <ianvs/node_handle.h>

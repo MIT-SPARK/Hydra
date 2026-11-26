@@ -32,30 +32,38 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <pybind11/pybind11.h>
+#include "hydra/utils/verbosity_config.h"
 
-#include <memory>
+#include <config_utilities/config.h>
 
-namespace hydra::python {
+#include "hydra/common/config_utilities.h"
+#include "hydra/common/run_settings.h"
 
-struct GlogSingleton {
-  static GlogSingleton& instance();
+namespace hydra {
 
-  ~GlogSingleton() = default;
-
-  void setLogLevel(int log_level, int verbosity = 0, bool override_settings = true);
-
-  void setLogDirectory(const std::string& dirname, int min_stderr_threshold = 2);
-
- private:
-  GlogSingleton();
-
-  bool configured_ = false;
-  static std::unique_ptr<GlogSingleton> instance_;
-};
-
-namespace glog_utilities {
-void addBindings(pybind11::module_& m);
+void declare_config(VerbosityConfig& config) {
+  config::field(config.verbosity, "verbosity");
+  config::field(config.show_log_prefix, "show_log_prefix");
+  config::field(config.log_name, "log_name");
+  config::field(config.log_prefix, "log_prefix");
+  config::field(config.log_suffix, "log_suffix");
 }
 
-}  // namespace hydra::python
+VerbosityConfig::VerbosityConfig(const std::string& name, std::optional<int> verbosity)
+    : verbosity(verbosity), log_name(name) {}
+
+VerbosityConfig VerbosityConfig::with_name(const std::string& name) const {
+  auto new_config = *this;
+  new_config.log_name = name;
+  return new_config;
+}
+
+std::string VerbosityConfig::get_log_prefix() const {
+  return !show_log_prefix || log_name.empty() ? "" : log_prefix + log_name + log_suffix;
+}
+
+int VerbosityConfig::get_verbosity() const {
+  return verbosity.value_or(RunSettings::instance().default_verbosity);
+}
+
+}  // namespace hydra

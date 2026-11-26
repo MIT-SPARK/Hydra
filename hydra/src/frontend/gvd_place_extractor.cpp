@@ -42,6 +42,7 @@
 #include <spark_dsg/printing.h>
 
 #include "hydra/active_window/volumetric_window.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -104,10 +105,10 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c, RunContext::ConstPtr conte
       tsdf_interpolator_(config.tsdf_interpolator.create()),
       sinks_(Sink::instantiate(config.sinks, context->config.robot)) {
   if (tsdf_interpolator_) {
-    MLOG(0) << "Downsampling TSDF when creating places!";
+    MLOG(0, "Downsampling TSDF when creating places!");
   }
 
-  MLOG(1) << "\n" << Sink::printSinks(sinks_);
+  MLOG(1, "\n{}", Sink::printSinks(sinks_));
 }
 
 GvdPlaceExtractor::~GvdPlaceExtractor() {}
@@ -128,10 +129,11 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
 
   const auto& map = msg.map();
   if (static_cast<float>(config.gvd.min_distance_m) >= map.config.truncation_distance) {
-    LOG(ERROR) << "GVD integrator min distance must be less than truncation distance "
-                  "(currently "
-               << config.gvd.min_distance_m << " vs. truncation distance "
-               << map.config.truncation_distance << ")";
+    HYDRA_LOG(ERROR,
+              "GVD integrator min distance must be less than truncation distance "
+              "(currently {} vs. truncation distance {})",
+              config.gvd.min_distance_m,
+              map.config.truncation_distance);
     return;
   }
 
@@ -177,7 +179,7 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg,
 void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   ScopedTimer timer("frontend/update_gvd_places", timestamp_ns, true, 2, false);
   const auto& places = graph_extractor_->graph();
-  MLOG(2) << "Considering " << places.nodes().size() << " input place nodes ";
+  MLOG(2, "Considering {} input place nodes ", places.nodes().size());
 
   for (const auto node_id : places.deleted_nodes()) {
     graph.removeNode(NodeSymbol(config.node_prefix, node_id));
@@ -204,7 +206,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
     const NodeSymbol graph_id(config.node_prefix, node_id);
     const auto& attrs = node.attributes();
     if (attributesInvalid(attrs)) {
-      LOG(ERROR) << "Invalid place node " << graph_id.str();
+      HYDRA_LOG(ERROR, "Invalid place node {}", graph_id.str());
       graph.removeNode(graph_id);
       continue;
     }
@@ -215,7 +217,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
       if (is_active) {
         // bad things happen if we delete an archived node, so we only remove active
         // nodes if they were previously added
-        MLOG(3) << "Removed isolated node " << graph_id.str();
+        MLOG(3, "Removed isolated node {}", graph_id.str());
         graph.removeNode(graph_id);
       }
 

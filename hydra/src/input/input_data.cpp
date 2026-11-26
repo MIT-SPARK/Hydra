@@ -38,13 +38,13 @@
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include <opencv2/imgproc.hpp>
 #include <stdexcept>
 #include <utility>
 
 #include "hydra/input/input_data_io.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {
@@ -61,7 +61,7 @@ bool convertDepth(InputData& data) {
   }
 
   if (data.depth_image.channels() != 1) {
-    LOG(ERROR) << "depth image must be single-channel";
+    HYDRA_LOG(ERROR, "depth image must be single-channel");
     return false;
   }
 
@@ -70,8 +70,9 @@ bool convertDepth(InputData& data) {
   }
 
   if (data.depth_image.type() != CV_16UC1) {
-    LOG(ERROR) << "only CV_32FC1 or CV_16UC1 formats supported, not "
-               << showTypeInfo(data.depth_image);
+    HYDRA_LOG(ERROR,
+              "only CV_32FC1 or CV_16UC1 formats supported, not {}",
+              showTypeInfo(data.depth_image));
     return false;
   }
 
@@ -87,7 +88,7 @@ bool convertColor(InputData& data) {
   }
 
   if (data.color_image.type() != InputData::ColorMatType) {
-    LOG(ERROR) << "only 3-channel rgb images supported";
+    HYDRA_LOG(ERROR, "only 3-channel rgb images supported");
     return false;
   }
 
@@ -182,17 +183,17 @@ bool InputData::inRange(float range_m) const {
 
 bool InputData::finalize(bool vertices_in_world_frame, bool normalize_labels) {
   if (!convertDepth(*this)) {
-    LOG(ERROR) << "Unable to normalize depth";
+    HYDRA_LOG(ERROR, "Unable to normalize depth");
     return false;
   }
 
   if (!convertColor(*this)) {
-    LOG(ERROR) << "Unable to normalize color";
+    HYDRA_LOG(ERROR, "Unable to normalize color");
     return false;
   }
 
   if (normalize_labels && !convertLabels(*this)) {
-    LOG(ERROR) << "Unable to normalize labels";
+    HYDRA_LOG(ERROR, "Unable to normalize labels");
     return false;
   }
 
@@ -206,12 +207,12 @@ bool InputData::finalize(bool vertices_in_world_frame, bool normalize_labels) {
   convertToLabelType(traversability_image);
 
   if (!vertex_map.empty() && vertex_map.type() != InputData::VertexMatType) {
-    LOG(ERROR) << "pointcloud must be CV_32FC3, not " << showTypeInfo(vertex_map);
+    HYDRA_LOG(ERROR, "pointcloud must be CV_32FC3, not {}", showTypeInfo(vertex_map));
     return false;
   }
 
   if (!sensor_->finalizeRepresentations(*this)) {
-    LOG(ERROR) << "Unable to compute inputs for integration";
+    HYDRA_LOG(ERROR, "Unable to compute inputs for integration");
     return false;
   }
 

@@ -36,7 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
-#include <glog/logging.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra::places {
 
@@ -105,7 +106,7 @@ VoronoiCondition checkVoronoi(const VoronoiCheckConfig& cfg,
   const GlobalIndex::Scalar dist_c_pn = c_pn.dot(c_pn);
   const GlobalIndex::Scalar dist_n_pc = n_pc.dot(n_pc);
 
-  VLOG(4) << "  d_c_pn: " << dist_c_pn << " d_n_pc: " << dist_n_pc;
+  HYDRA_VLOG(4, "  d_c_pn: {} d_n_pc: {}", dist_c_pn, dist_n_pc);
   result.current_is_voronoi = (dist_c_pn <= dist_n_pc);
   result.neighbor_is_voronoi = (dist_n_pc <= dist_c_pn);
   return result;

@@ -38,7 +38,7 @@
 #include "hydra/common/run_context.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/utils/data_directory.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

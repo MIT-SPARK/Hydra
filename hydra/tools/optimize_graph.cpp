@@ -32,15 +32,14 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <hydra/backend/graph_optimizer.h>
 
 #include <CLI/CLI.hpp>
 
+#include "hydra/utils/logging.h"
+
 int main(int argc, char* argv[]) {
-  FLAGS_minloglevel = 0;
-  FLAGS_logtostderr = 1;
-  FLAGS_colorlogtostderr = 1;
+  hydra::logging::setLogLevel("info");
 
   CLI::App app("Optimize a saved scene graph using backend state");
   hydra::OptimizationConfig info;
@@ -53,7 +52,6 @@ int main(int argc, char* argv[]) {
       ->check(CLI::ExistingFile);
   app.add_option("-o,--output-path", info.output);
   CLI11_PARSE(app, argc, argv);
-  google::InitGoogleLogging(argv[0]);
 
   hydra::optimize_graph(info);
   return 0;

@@ -38,9 +38,9 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
 #include "hydra/common/config_utilities.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {
@@ -86,7 +86,7 @@ KimeraSensorExtrinsics::KimeraSensorExtrinsics(const Config& config)
   config::checkValid(config);
   const auto node = YAML::LoadFile(config.sensor_filepath);
   const auto elements = node["T_BS"]["data"].as<std::vector<double>>();
-  CHECK_EQ(elements.size(), 16u);
+  HYDRA_CHECK_EQ(elements.size(), 16u);
 
   Eigen::Matrix4d body_T_sensor = Eigen::Matrix4d::Identity();
   for (int r = 0; r < 4; ++r) {

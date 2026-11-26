@@ -1,9 +1,9 @@
 #include "hydra/utils/csv_reader.h"
 
-#include <glog/logging.h>
-
 #include <filesystem>
 #include <fstream>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -18,12 +18,12 @@ bool CsvReader::setup(const std::string& file_name,
                       bool skip_first_line) {
   // Check file can be read.
   if (!std::filesystem::exists(file_name)) {
-    LOG(WARNING) << "CSV file '" << file_name << "' does not exist.";
+    HYDRA_LOG(WARNING, "CSV file '{}' does not exist.", file_name);
     return false;
   }
   std::ifstream file(file_name);
   if (!file.is_open()) {
-    LOG(WARNING) << "Could not open CSV file '" << file_name << "'.";
+    HYDRA_LOG(WARNING, "Could not open CSV file '{}'.", file_name);
     return false;
   }
 
@@ -90,7 +90,7 @@ const std::vector<CsvReader::Row>& CsvReader::getRows() const { return rows_; }
 
 const CsvReader::Row& CsvReader::getRow(size_t row) const {
   if (row >= rows_.size()) {
-    LOG(WARNING) << "Row index '" << row << +"' out of bounds.";
+    HYDRA_LOG(WARNING, "Row index '{}{}", row, +"' out of bounds.");
     return rows_[0];
   }
   return rows_[row];
@@ -98,12 +98,12 @@ const CsvReader::Row& CsvReader::getRow(size_t row) const {
 
 const std::string& CsvReader::getEntry(const std::string& header, size_t row) const {
   if (row >= rows_.size()) {
-    LOG(WARNING) << "Row index '" << row << +"' out of bounds.";
+    HYDRA_LOG(WARNING, "Row index '{}{}", row, +"' out of bounds.");
     return rows_[0][0];
   }
   auto it = header_to_index_->find(header);
   if (it == header_to_index_->end()) {
-    LOG(WARNING) << "Header '" << header << "' not found.";
+    HYDRA_LOG(WARNING, "Header '{}' not found.", header);
     return rows_[0][0];
   }
   return rows_[row][it->second];
@@ -123,7 +123,8 @@ bool CsvReader::checkRequiredHeaders(const std::vector<std::string>& headers) co
       msg << ", ";
     }
   }
-  LOG(ERROR) << msg.str();
+
+  HYDRA_LOG(ERROR, "{}", msg.str());
   return false;
 }
 
@@ -141,7 +142,8 @@ void CsvReader::checkOptionalHeaders(const std::vector<std::string>& headers) co
       msg << ", ";
     }
   }
-  LOG(WARNING) << msg.str();
+
+  HYDRA_LOG(WARNING, "{}", msg.str());
 }
 
 std::vector<std::string> CsvReader::missingHeaders(
@@ -158,7 +160,7 @@ std::vector<std::string> CsvReader::missingHeaders(
 const std::string& CsvReader::Row::getEntry(const std::string& header) const {
   const auto it = header_to_index->find(header);
   if (it == header_to_index->end()) {
-    LOG(WARNING) << "Header '" << header << "' not found.";
+    HYDRA_LOG(WARNING, "Header '{}' not found.", header);
     return this->at(0);
   }
   return this->at(it->second);

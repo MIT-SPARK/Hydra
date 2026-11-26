@@ -51,10 +51,11 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/types/path.h>
-#include <glog/logging.h>
 
 #include <iomanip>
 #include <opencv2/imgcodecs.hpp>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -62,15 +63,14 @@ Sensor::Sensor(const Config& config, const std::string& name)
     : config(config::checkValid(config)),
       name(name),
       extrinsics_(config.extrinsics.create()) {
-  CHECK(extrinsics_ != nullptr) << "invalid extrinsics!";
+  HYDRA_CHECK(extrinsics_ != nullptr, "invalid extrinsics!");
   const Eigen::Isometry3d sensor_body_pose = body_T_sensor();
   Eigen::IOFormat fmt(6, 0, ", ", "\n", "", "", "[", "]");
-  MLOG(1) << "Parsed sensor with extrinsics: " << std::endl
-          << std::setfill(' ') << sensor_body_pose.matrix().format(fmt);
+  MLOG(1, "Parsed sensor with extrinsics:\n{}", sensor_body_pose.matrix().format(fmt));
   if (!config.static_mask_fp.empty()) {
     static_mask_ = cv::imread(config.static_mask_fp);
     if (static_mask_.empty()) {
-      LOG(WARNING) << "Failed to load static mask from: " << config.static_mask_fp;
+      HYDRA_LOG(WARNING, "Failed to load static mask from: {}", config.static_mask_fp);
     }
   }
 }

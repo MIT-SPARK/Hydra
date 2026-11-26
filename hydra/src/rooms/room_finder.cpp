@@ -35,7 +35,6 @@
 #include "hydra/rooms/room_finder.h"
 
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
@@ -46,6 +45,7 @@
 
 #include "hydra/rooms/graph_filtration.h"
 #include "hydra/rooms/room_utilities.h"
+#include "hydra/utils/logging.h"
 
 using namespace spark_dsg;
 
@@ -178,7 +178,7 @@ InitialClusters RoomFinder::getBestComponents(
       false,
       get_distance);
 
-  MLOG(5) << "Filtration: " << filtration;
+  MLOG(5, "Filtration: {}", filtration);
 
   auto window = getTrimmedFiltration(filtration,
                                      config.min_dilation_m,
@@ -192,17 +192,25 @@ InitialClusters RoomFinder::getBestComponents(
     const double window_size =
         filtration[window.second].distance - filtration[window.first].distance;
     if (window_size < config.min_window_size) {
-      MLOG(2) << "Bad window bounds: [" << config.min_dilation_m << ", "
-              << config.max_dilation_m << "],  window: [" << window.first << ", "
-              << window.second << "]" << " with size: " << window_size;
+      MLOG(2,
+           "Bad window bounds: [{}, {}],  window: [{}, {}] with size: {}",
+           config.min_dilation_m,
+           config.max_dilation_m,
+           window.first,
+           window.second,
+           window_size);
 
       window = getTrimmedFiltration(
           filtration, config.min_dilation_m, config.max_dilation_m, false);
     }
   }
 
-  MLOG(2) << "Bounds: [" << config.min_dilation_m << ", " << config.max_dilation_m
-          << "],  window: [" << window.first << ", " << window.second << "]";
+  MLOG(2,
+       "Bounds: [{}, {}],  window: [{}, {}]",
+       config.min_dilation_m,
+       config.max_dilation_m,
+       window.first,
+       window.second);
 
   std::optional<FiltrationInfo> candidate = std::nullopt;
   switch (config.dilation_threshold_mode) {
@@ -235,12 +243,11 @@ InitialClusters RoomFinder::getBestComponents(
   }
 
   const auto info = *candidate;
-  MLOG(2) << "Best threshold: " << info.distance << " (" << info.num_components
-          << " components)";
+  MLOG(2, "Best threshold: {} ({} components)", info.distance, info.num_components);
 
   if (log_file_) {
     if (graph_log_file_) {
-      LOG(FATAL) << "Not implemented currently";
+      HYDRA_LOG(FATAL, "Not implemented currently");
       /* const auto bson_str = places.toBson();*/
       /* graph_entries_.push_back(*/
       /*{graph_offset_, bson_str.size(), places.numNodes(), places.numEdges()});*/
@@ -273,7 +280,7 @@ InitialClusters RoomFinder::getBestComponents(
 }
 
 SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
-  MLOG(2) << "Detecting rooms for " << places.numNodes() << " nodes";
+  MLOG(2, "Detecting rooms for {} nodes", places.numNodes());
   last_results_.clear();
   cluster_room_map_.clear();
   const DistanceAdaptor get_distance;
@@ -288,7 +295,7 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
 
   const auto components = getBestComponents(places, get_distance);
   if (components.empty()) {
-    MLOG(2) << "No components found";
+    MLOG(2, "No components found");
     return nullptr;
   }
 
@@ -324,7 +331,7 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
   }
 
   if (!last_results_.valid) {
-    MLOG_NAMED(WARN) << "clustering failed: using components";
+    MLOG_NAMED(WARN, "clustering failed: using components");
     last_results_.fillFromInitialClusters(components);
   }
 

@@ -33,17 +33,36 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_pgmo/utils/logging.h>
+
+#include <optional>
+#include <string>
 
 namespace hydra {
 
-struct PgmoGlogSink : logging::LogSink {
-  explicit PgmoGlogSink(int debug_verbosity = 1, bool enabled = true);
+struct VerbosityConfig {
+  //! An unset value inherits the current run default
+  std::optional<int> verbosity = std::nullopt;
+  //! Include the configured component label in messages
+  bool show_log_prefix = false;
+  std::string log_name;
+  std::string log_prefix = "[";
+  std::string log_suffix = "] ";
 
-  void dispatch(const logging::LogEntry& entry) const override;
+  //! Use short snake_case names for default component log labels
+  VerbosityConfig(const std::string& name = "",
+                  std::optional<int> verbosity = std::nullopt);
 
-  const bool enabled;
-  const int debug_verbosity;
+  //! Copy with a different name while preserving verbosity and label settings
+  VerbosityConfig with_name(const std::string& name) const;
+
+  //! Render the component label when enabled and named
+  std::string get_log_prefix() const;
+
+  bool enabled(int level) const { return get_verbosity() >= level; }
+
+  int get_verbosity() const;
 };
+
+void declare_config(VerbosityConfig& config);
 
 }  // namespace hydra

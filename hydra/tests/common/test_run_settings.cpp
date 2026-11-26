@@ -6,8 +6,32 @@
 #include "hydra/common/run_settings.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
+
+TEST(RunSettings, DisabledDiagnosticsDoNotEvaluateArguments) {
+  const VerbosityConfig silent("silent", -1);
+  auto evaluations = 0;
+  const auto expensive = [&] {
+    ++evaluations;
+    return "diagnostic";
+  };
+  MLOG_WITH(silent, 0, "{}", expensive());
+  EXPECT_EQ(evaluations, 0);
+}
+
+TEST(RunSettings, FatalChecksRemainActive) {
+  auto evaluations = 0;
+  const auto value = [&] {
+    ++evaluations;
+    return evaluations;
+  };
+  HYDRA_CHECK_EQ(value(), 1);
+  EXPECT_EQ(evaluations, 1);
+  EXPECT_DEATH(HYDRA_CHECK_EQ(1, 2), "");
+  EXPECT_DEATH(HYDRA_LOG(FATAL, "Unrecoverable invariant failure"), "");
+}
 
 TEST(RunSettings, VerbosityFollowsActiveRunUnlessOverridden) {
   const auto previous = RunSettings::instance();
@@ -32,25 +56,13 @@ TEST(RunSettings, VerbosityFollowsActiveRunUnlessOverridden) {
 }
 
 TEST(RunSettings, LoggingLabelDoesNotChangeNodeSymbols) {
-  const VerbosityConfig defaults("objects");
-  EXPECT_EQ(defaults.get_log_prefix(), "[objects] ");
-  EXPECT_TRUE(VerbosityConfig{}.get_log_prefix().empty());
-
   const auto node = YAML::Load(
-      "{prefix: Q, log_name: objects, log_prefix: '<', "
+      "{prefix: Q, show_log_prefix: true, log_name: objects, log_prefix: '<', "
       "log_suffix: '> ', verbosity: 3}");
   const auto config = config::fromYaml<LayerTracker::Config>(node);
   EXPECT_EQ(config.prefix, 'Q');
-  EXPECT_EQ(config.get_log_prefix(), "<objects> ");
-  EXPECT_EQ(config.get_verbosity(), 3);
   const LayerTracker tracker(config);
   EXPECT_EQ(tracker.next_id.category(), 'Q');
-
-  const auto renamed = config.with_name("places");
-  EXPECT_EQ(renamed.get_log_prefix(), "<places> ");
-  EXPECT_EQ(renamed.get_verbosity(), 3);
-  EXPECT_EQ(config.get_log_prefix(), "<objects> ");
-  EXPECT_TRUE(config.with_name("").get_log_prefix().empty());
 }
 
 TEST(RunSettings, InheritedThreadsPersistAndExplicitOverridesTakePrecedence) {

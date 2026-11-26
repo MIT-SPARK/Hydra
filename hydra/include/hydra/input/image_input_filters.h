@@ -35,7 +35,7 @@
 #pragma once
 
 #include "hydra/input/input_filter.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

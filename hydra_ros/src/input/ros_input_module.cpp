@@ -38,8 +38,8 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 #include <hydra/common/run_context.h>
+#include <hydra/utils/logging.h>
 
 #include "hydra_ros/input/ros_sensors.h"
 
@@ -79,8 +79,10 @@ InputModule::Config RosInputModule::Config::remapSensors(
     if (isNumber(sensor_name)) {
       // this happens when the yaml receiver list is specified without a name
       sensor_name = "sensor" + name;
-      LOG(WARNING) << "Invalid ROS name found for sensor: '" << name
-                   << "'. Remapping to '" << sensor_name << "'";
+      HYDRA_LOG(WARNING,
+                "Invalid ROS name found for sensor: '{}'. Remapping to '{}'",
+                name,
+                sensor_name);
     }
 
     to_return.inputs[sensor_name] = input_pair;
@@ -110,7 +112,7 @@ PoseStatus RosInputModule::getBodyPose(const InputData& packet) {
   }
 
   if (!pose_status && !have_first_pose_ && config.clear_queue_on_fail) {
-    LOG(WARNING) << "Clearing input queues while pose is unavailable";
+    HYDRA_LOG(WARNING, "Clearing input queues while pose is unavailable");
     for (auto& receiver : receivers_) {
       receiver->clear();
     }

@@ -32,12 +32,12 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/reconstruction/volumetric_map.h>
 
 #include <filesystem>
 
+#include "hydra/utils/logging.h"
 #include "hydra_test/resources.h"
 
 namespace hydra {
@@ -58,7 +58,7 @@ void fillSemanticBlock(SemanticBlock& block, size_t offset) {
 }
 
 void compareVoxels(const SemanticBlock& lhs, const SemanticBlock& rhs) {
-  CHECK_EQ(lhs.numVoxels(), rhs.numVoxels());
+  HYDRA_CHECK_EQ(lhs.numVoxels(), rhs.numVoxels());
   for (size_t i = 0; i < lhs.numVoxels(); ++i) {
     SCOPED_TRACE("Voxel " + std::to_string(i));
     auto& v_lhs = lhs.getVoxel(i);
@@ -74,7 +74,7 @@ struct VolumetricMapFixture : public ::testing::Test {
     const auto path = VolumetricMapFixture::filepath();
     if (std::filesystem::exists(path)) {
       std::filesystem::remove_all(path);
-      LOG(ERROR) << "test path '" << path.string() << "' previously existed!";
+      HYDRA_LOG(ERROR, "test path '{}' previously existed!", path.string());
     }
 
     if (!std::filesystem::create_directories(path)) {

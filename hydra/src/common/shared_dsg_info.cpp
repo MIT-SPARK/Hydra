@@ -35,10 +35,11 @@
 #include "hydra/common/shared_dsg_info.h"
 
 #include <config_utilities/config.h>
-#include <glog/logging.h>
 #include <spark_dsg/scene_graph.h>
 
 #include <nlohmann/json.hpp>
+
+#include "hydra/utils/logging.h"
 
 namespace YAML {
 
@@ -58,7 +59,7 @@ struct convert<spark_dsg::LayerKey> {
     }
 
     if (!node["layer"]) {
-      LOG(ERROR) << "Invalid layer key '" << node << "', missing layer!";
+      HYDRA_LOG(ERROR, "Invalid layer key '{}', missing layer!", node);
       return false;
     }
 

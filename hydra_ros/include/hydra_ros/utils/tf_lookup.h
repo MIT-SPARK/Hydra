@@ -35,7 +35,7 @@
 #pragma once
 #include <hydra/common/robot_config.h>
 #include <hydra/input/input_module.h>
-#include <hydra/utils/logging.h>
+#include <hydra/utils/verbosity_config.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 

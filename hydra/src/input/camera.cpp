@@ -50,7 +50,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
-#include <glog/logging.h>
+
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 namespace {
@@ -210,9 +211,16 @@ cv::Mat Camera::computeVertexMap(const cv::Mat& depth_image,
                                 depth * (static_cast<float>(v) - config_.cy) * fy_inv,
                                 depth);
       const auto p_W = T_W_C ? ((*T_W_C) * p_C).eval() : p_C;
-      VLOG(4) << "(" << u << ", " << v << "), d=" << depth << ", fx=" << fx_inv
-              << ", fy=" << fy_inv << ", cx=" << config_.cx << ", cy=" << config_.cy
-              << " -> " << p_W.transpose();
+      HYDRA_VLOG(4,
+                 "({}, {}), d={}, fx={}, fy={}, cx={}, cy={} -> {}",
+                 u,
+                 v,
+                 depth,
+                 fx_inv,
+                 fy_inv,
+                 config_.cx,
+                 config_.cy,
+                 p_W.transpose());
       auto& vertex = vertices.at<InputData::VertexType>(v, u);
       vertex[0] = p_W.x();
       vertex[1] = p_W.y();
