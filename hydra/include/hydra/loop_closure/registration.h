@@ -34,16 +34,20 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <gtsam/geometry/Pose3.h>
-#include <spark_dsg/node_attributes.h>
-#include <spark_dsg/printing.h>
 #include <spark_dsg/scene_graph_layer.h>
 #include <teaser/registration.h>
 
+#include <functional>
+#include <memory>
 #include <mutex>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "hydra/loop_closure/registration_solution.h"
 #include "hydra/loop_closure/subgraph_extraction.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra::lcd {
 
@@ -103,10 +107,10 @@ struct DsgTeaserSolver : DsgRegistrationSolver {
 using CorrespondenceFunc = std::function<bool(const spark_dsg::SceneGraphNode&,
                                               const spark_dsg::SceneGraphNode&)>;
 
-template <typename NodeSet = std::list<spark_dsg::NodeId>>
+//! Candidate IDs are unique and ordered; registration prunes missing nodes.
 struct LayerRegistrationProblem {
-  mutable NodeSet src_nodes;
-  mutable NodeSet dest_nodes;
+  mutable std::set<spark_dsg::NodeId> src_nodes;
+  mutable std::set<spark_dsg::NodeId> dest_nodes;
   spark_dsg::SceneGraphLayer* dest_layer = nullptr;
   std::mutex* src_mutex = nullptr;
   std::mutex* dest_mutex = nullptr;
@@ -120,168 +124,23 @@ struct LayerRegistrationSolution {
   std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> inliers;
 };
 
-template <typename NodeSet>
-std::list<spark_dsg::NodeId> pruneSet(const spark_dsg::SceneGraphLayer& layer,
-                                      NodeSet& nodes) {
-  std::list<spark_dsg::NodeId> pruned;
-  auto iter = nodes.begin();
-  while (iter != nodes.end()) {
-    if (layer.hasNode(*iter)) {
-      ++iter;
-    } else {
-      pruned.push_back(*iter);
-      iter = nodes.erase(iter);
-    }
-  }
-  return pruned;
-}
-
-template <typename NodeSet>
 LayerRegistrationSolution registerDsgLayer(
     const LayerRegistrationConfig& config,
     teaser::RobustRegistrationSolver& solver,
-    const LayerRegistrationProblem<NodeSet>& problem,
+    const LayerRegistrationProblem& problem,
     const spark_dsg::SceneGraphLayer& src,
-    const CorrespondenceFunc& correspondence_func) {
-  std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> correspondences;
-  correspondences.reserve(problem.src_nodes.size() * problem.dest_nodes.size());
+    const CorrespondenceFunc& correspondence_func);
 
-  if (problem.src_mutex) {
-    problem.src_mutex->lock();
-  }
-
-  if (problem.dest_mutex) {
-    problem.dest_mutex->lock();
-  }
-
-  const auto& dest = problem.dest_layer ? *problem.dest_layer : src;
-
-  const auto src_pruned = pruneSet(src, problem.src_nodes);
-  if (!src_pruned.empty()) {
-    MLOG(2,
-         "Found invalid source nodes in registration: {}",
-         spark_dsg::displayNodeSymbolContainer(src_pruned));
-  }
-
-  const auto dest_pruned = pruneSet(dest, problem.dest_nodes);
-  if (!dest_pruned.empty()) {
-    MLOG(2,
-         "Found invalid destination nodes in registration: {}",
-         spark_dsg::displayNodeSymbolContainer(dest_pruned));
-  }
-
-  for (const auto& src_id : problem.src_nodes) {
-    auto src_node_opt = src.findNode(src_id);
-    HYDRA_CHECK(src_node_opt);
-    const auto& src_node = *src_node_opt;
-
-    for (const auto& dest_id : problem.dest_nodes) {
-      auto dest_node_opt = dest.findNode(dest_id);
-      HYDRA_CHECK(dest_node_opt);
-      const auto& dest_node = *dest_node_opt;
-
-      if (correspondence_func(src_node, dest_node)) {
-        correspondences.emplace_back(src_id, dest_id);
-      }
-    }
-  }
-
-  if (problem.src_mutex) {
-    problem.src_mutex->unlock();
-  }
-
-  if (problem.dest_mutex) {
-    problem.dest_mutex->unlock();
-  }
-
-  Eigen::Matrix<double, 3, Eigen::Dynamic> src_points(3, correspondences.size());
-  Eigen::Matrix<double, 3, Eigen::Dynamic> dest_points(3, correspondences.size());
-  for (size_t i = 0; i < correspondences.size(); ++i) {
-    const auto correspondence = correspondences[i];
-    src_points.col(i) = src.getNode(correspondence.first).attributes().position;
-    dest_points.col(i) = dest.getNode(correspondence.second).attributes().position;
-  }
-
-  if (correspondences.size() < config.min_correspondences) {
-    MLOG(2,
-         "not enough correspondences for registration at layer {}: {} / {}",
-         src.id,
-         correspondences.size(),
-         config.min_correspondences);
-    return {};
-  }
-
-  MLOG(5, "=======================================================");
-  MLOG(5, "Source: \n{}", src_points);
-  MLOG(5, "Dest: \n{}", dest_points);
-
-  MLOG(1,
-       "Registering layer {} with {} correspondences out of {} source and {} "
-       "destination nodes",
-       src.id,
-       correspondences.size(),
-       problem.src_nodes.size(),
-       problem.dest_nodes.size());
-
-  auto params = solver.getParams();
-  solver.reset(params);
-
-  teaser::RegistrationSolution result = solver.solve(src_points, dest_points);
-  if (!result.valid) {
-    return {};
-  }
-
-  std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> valid_correspondences;
-  valid_correspondences.reserve(
-      std::min(problem.src_nodes.size(), problem.dest_nodes.size()));
-
-  auto inliers = solver.getInlierMaxClique();
-  if (inliers.size() < config.min_inliers) {
-    MLOG(2,
-         "Not enough inliers for registration at layer {}: {} / {}",
-         src.id,
-         inliers.size(),
-         config.min_inliers);
-    return {};
-  }
-
-  for (const auto& index : inliers) {
-    HYDRA_CHECK_LT(static_cast<size_t>(index), correspondences.size());
-    valid_correspondences.push_back(correspondences.at(index));
-  }
-
-  return {true,
-          gtsam::Pose3(gtsam::Rot3(result.rotation), result.translation),
-          valid_correspondences};
-}
-
-template <typename NodeSet>
 LayerRegistrationSolution registerDsgLayerPairwise(
     const LayerRegistrationConfig& config,
     teaser::RobustRegistrationSolver& solver,
-    const LayerRegistrationProblem<NodeSet>& problem,
-    const spark_dsg::SceneGraphLayer& src) {
-  return registerDsgLayer(
-      config, solver, problem, src, [](const auto&, const auto&) { return true; });
-}
+    const LayerRegistrationProblem& problem,
+    const spark_dsg::SceneGraphLayer& src);
 
-template <typename NodeSet>
 LayerRegistrationSolution registerDsgLayerSemantic(
     const LayerRegistrationConfig& config,
     teaser::RobustRegistrationSolver& solver,
-    const LayerRegistrationProblem<NodeSet>& problem,
-    const spark_dsg::SceneGraphLayer& src) {
-  return registerDsgLayer(
-      config,
-      solver,
-      problem,
-      src,
-      [](const spark_dsg::SceneGraphNode& src_node,
-         const spark_dsg::SceneGraphNode& dest_node) {
-        return src_node.attributes<spark_dsg::SemanticNodeAttributes>()
-                   .semantic_label ==
-               dest_node.attributes<spark_dsg::SemanticNodeAttributes>().semantic_label;
-      });
-}
+    const LayerRegistrationProblem& problem,
+    const spark_dsg::SceneGraphLayer& src);
 
 }  // namespace hydra::lcd

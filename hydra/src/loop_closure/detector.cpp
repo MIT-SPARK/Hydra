@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/detector.h"
 
+#include <spark_dsg/node_symbol.h>
+
 #include "hydra_build_config.h"
 #if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
 #include "hydra/loop_closure/gnn_descriptors.h"

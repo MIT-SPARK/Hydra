@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <kimera_pgmo/utils/common_functions.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/frontend/frontend_output.h"
