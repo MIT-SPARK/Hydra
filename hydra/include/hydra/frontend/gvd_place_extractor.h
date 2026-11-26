@@ -43,6 +43,7 @@
 #include "hydra/places/gvd_places/graph_extractor.h"
 #include "hydra/places/gvd_places/gvd_integrator.h"
 #include "hydra/reconstruction/tsdf_interpolators.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

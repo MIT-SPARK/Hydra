@@ -54,7 +54,7 @@
 #include <opencv2/core/mat.hpp>
 
 #include "hydra/input/sensor_extrinsics.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

@@ -37,7 +37,7 @@
 #include "hydra/reconstruction/index_getter.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/voxel_types.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

@@ -6,6 +6,7 @@
 #include "hydra/common/run_settings.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 

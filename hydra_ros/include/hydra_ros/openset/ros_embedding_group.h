@@ -1,6 +1,6 @@
 #pragma once
 #include <hydra/openset/embedding_group.h>
-#include <hydra/utils/logging.h>
+#include <hydra/utils/verbosity_config.h>
 
 namespace hydra {
 

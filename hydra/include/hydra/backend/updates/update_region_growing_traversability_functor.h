@@ -38,7 +38,7 @@
 
 #include "hydra/backend/deformation_interpolator.h"
 #include "hydra/backend/update_functions.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

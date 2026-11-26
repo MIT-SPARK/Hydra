@@ -53,7 +53,7 @@
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/semantic_integrator.h"
 #include "hydra/reconstruction/volumetric_map.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

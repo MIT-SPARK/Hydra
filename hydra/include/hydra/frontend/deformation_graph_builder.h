@@ -39,7 +39,7 @@
 
 #include "hydra/common/robot_config.h"
 #include "hydra/frontend/graph_builder_functor.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace kimera_pgmo {
 class MeshCompression;

@@ -41,7 +41,7 @@
 #include "hydra/eval/room_io.h"
 #include "hydra/eval/room_metrics.h"
 #include "hydra/reconstruction/voxel_types.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra::eval {
 

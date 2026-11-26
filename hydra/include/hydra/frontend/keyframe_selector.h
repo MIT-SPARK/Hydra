@@ -49,7 +49,7 @@
 #include "hydra/frontend/feature_selector.h"
 #include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

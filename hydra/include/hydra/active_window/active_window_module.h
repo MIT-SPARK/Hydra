@@ -44,7 +44,7 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/input/input_data.h"
 #include "hydra/reconstruction/volumetric_map.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

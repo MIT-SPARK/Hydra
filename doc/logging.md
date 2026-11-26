@@ -66,6 +66,9 @@ Change them between runs after workers have stopped.
 
 ## Writing module messages
 
+Include `hydra/utils/verbosity_config.h` for configuration declarations and
+`hydra/utils/logging.h` where you write messages.
+
 Add `VerbosityConfig` as a base class and call
 `config::base<VerbosityConfig>(config)` in `declare_config`. Give each module a
 short snake_case name, such as `VerbosityConfig("mesh_segmenter")`.

@@ -52,37 +52,7 @@
 #include <utility>
 #include <vector>
 
-#include "hydra/common/config_utilities.h"
-
-namespace hydra {
-
-struct VerbosityConfig {
-  //! An unset value inherits the current run default
-  std::optional<int> verbosity = std::nullopt;
-  //! Include the configured component label in messages
-  bool show_log_prefix = false;
-  std::string log_name;
-  std::string log_prefix = "[";
-  std::string log_suffix = "] ";
-
-  //! Use short snake_case names for default component log labels
-  VerbosityConfig(const std::string& name = "",
-                  std::optional<int> verbosity = std::nullopt);
-
-  //! Copy with a different name while preserving verbosity and label settings
-  VerbosityConfig with_name(const std::string& name) const;
-
-  //! Render the component label when enabled and named
-  std::string get_log_prefix() const;
-
-  bool enabled(int level) const { return get_verbosity() >= level; }
-
-  int get_verbosity() const;
-};
-
-void declare_config(VerbosityConfig& config);
-
-}  // namespace hydra
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra::logging {
 

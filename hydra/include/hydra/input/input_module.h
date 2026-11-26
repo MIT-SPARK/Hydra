@@ -42,6 +42,7 @@
 #include "hydra/common/module.h"
 #include "hydra/input/data_receiver.h"
 #include "hydra/input/input_data.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

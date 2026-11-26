@@ -37,7 +37,7 @@
 #include "hydra/common/partial_graph.h"
 #include "hydra/places/gvd_places/gvd_graph.h"
 #include "hydra/places/gvd_places/gvd_voxel.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra::places {
 

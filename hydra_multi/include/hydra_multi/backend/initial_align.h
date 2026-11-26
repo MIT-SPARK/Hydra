@@ -1,6 +1,6 @@
 #pragma once
 #include <gtsam/geometry/Pose3.h>
-#include <hydra/utils/logging.h>
+#include <hydra/utils/verbosity_config.h>
 #include <kimera_pgmo/deformation_graph.h>
 
 #include <map>

@@ -40,7 +40,7 @@
 #include "hydra/places/gvd_places/gvd_parent_tracker.h"
 #include "hydra/places/gvd_places/gvd_utilities.h"
 #include "hydra/utils/bucket_queue.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra::places {
 namespace gvd {

@@ -37,7 +37,7 @@
 #include "hydra/loop_closure/descriptor_matching.h"
 #include "hydra/loop_closure/registration.h"
 #include "hydra/loop_closure/scene_graph_descriptors.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra::lcd {
 

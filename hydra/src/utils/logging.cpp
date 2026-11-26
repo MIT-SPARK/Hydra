@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/logging.h"
 
-#include <config_utilities/config.h>
 #include <config_utilities/logging/log_to_spdlog.h>
 #include <config_utilities/logging/set_logger.h>
 #include <kimera_pgmo/utils/logging.h>
@@ -46,37 +45,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <stdexcept>
-
-#include "hydra/common/run_settings.h"
-
-namespace hydra {
-
-void declare_config(VerbosityConfig& config) {
-  config::field(config.verbosity, "verbosity");
-  config::field(config.show_log_prefix, "show_log_prefix");
-  config::field(config.log_name, "log_name");
-  config::field(config.log_prefix, "log_prefix");
-  config::field(config.log_suffix, "log_suffix");
-}
-
-VerbosityConfig::VerbosityConfig(const std::string& name, std::optional<int> verbosity)
-    : verbosity(verbosity), log_name(name) {}
-
-VerbosityConfig VerbosityConfig::with_name(const std::string& name) const {
-  auto new_config = *this;
-  new_config.log_name = name;
-  return new_config;
-}
-
-std::string VerbosityConfig::get_log_prefix() const {
-  return !show_log_prefix || log_name.empty() ? "" : log_prefix + log_name + log_suffix;
-}
-
-int VerbosityConfig::get_verbosity() const {
-  return verbosity.value_or(RunSettings::instance().default_verbosity);
-}
-
-}  // namespace hydra
 
 namespace hydra::logging {
 namespace {

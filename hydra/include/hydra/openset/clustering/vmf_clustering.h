@@ -37,7 +37,7 @@
 #include <unordered_map>
 
 #include "hydra/openset/layer_clustering.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

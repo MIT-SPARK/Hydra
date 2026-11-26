@@ -38,7 +38,7 @@
 #include <memory>
 
 #include "hydra/backend/backend_module.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace spark_dsg {
 class ZmqSender;

@@ -49,7 +49,7 @@
 
 #include "hydra/common/attribute_merger.h"
 #include "hydra/common/node_matchers.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra {
 

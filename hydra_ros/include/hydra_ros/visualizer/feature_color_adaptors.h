@@ -1,5 +1,6 @@
 #pragma once
 #include <hydra/openset/embedding_distances.h>
+#include <hydra/utils/verbosity_config.h>
 #include <hydra_visualizer/adapters/node_color.h>
 #include <hydra_visualizer/adapters/text.h>
 

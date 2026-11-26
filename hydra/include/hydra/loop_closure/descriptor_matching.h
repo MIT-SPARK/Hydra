@@ -35,7 +35,7 @@
 #pragma once
 
 #include "hydra/loop_closure/scene_graph_descriptors.h"
-#include "hydra/utils/logging.h"
+#include "hydra/utils/verbosity_config.h"
 
 namespace hydra::lcd {
 
